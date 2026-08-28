@@ -55,6 +55,8 @@ documentation and repository evidence outrank memory.
 
 - GSD owns project discovery, requirements, roadmap, phase discussion, planning,
   execution, verification, review, and milestone closure.
+- During an autonomous goal, keep chat output to brief status updates and real
+  blockers. Do not spend output tokens on narration the user does not need.
 - Run one deep product brainstorm before each new milestone. It must lock the
   milestone product contract, every phase boundary, acceptance criteria, and
   non-goals deeply enough for bounded autonomous execution.
