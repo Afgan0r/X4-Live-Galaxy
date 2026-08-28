@@ -1,0 +1,21 @@
+{
+  "schema_version": "1",
+  "root_cue": "live_galaxy_persistence_root",
+  "variable_name": "live_galaxy_checkpoint",
+  "game_protocol_identity": "live_galaxy.persistence.v1",
+  "required_fields": [
+    "schema_version",
+    "game_protocol_identity",
+    "sequence",
+    "integrity_hash",
+    "compatibility_status",
+    "x4_restart_required",
+    "payload"
+  ],
+  "compatibility_statuses": [
+    "compatible",
+    "x4_restart_required"
+  ],
+  "scope": "extension-owned campaign-lifetime checkpoint storage",
+  "runtime_evidence": "pending-X4"
+}

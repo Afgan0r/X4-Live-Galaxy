@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mdscript name="live_galaxy_persistence">
+  <!--
+    This root cue owns only the extension-scoped checkpoint envelope. XML
+    parsing proves its shape locally; payload capacity, interruption, save/load,
+    and reconnect behavior remain pending-X4 for the Phase 7 disposable probe.
+  -->
+  <cues>
+    <cue name="live_galaxy_persistence_root">
+      <conditions>
+        <event_game_started />
+      </conditions>
+      <actions>
+        <set_value name="$live_galaxy_checkpoint" exact="'{&quot;schema_version&quot;:&quot;1&quot;,&quot;game_protocol_identity&quot;:&quot;live_galaxy.persistence.v1&quot;,&quot;sequence&quot;:0,&quot;integrity_hash&quot;:&quot;uninitialized&quot;,&quot;compatibility_status&quot;:&quot;x4_restart_required&quot;,&quot;x4_restart_required&quot;:true,&quot;payload&quot;:&quot;&quot;}'" />
+      </actions>
+    </cue>
+  </cues>
+</mdscript>
