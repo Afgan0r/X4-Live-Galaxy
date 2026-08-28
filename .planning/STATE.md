@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-08-28T22:14:08.348Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-08-28T22:46:40.055Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: 6b49386e93d9de7a6a22560fd50ac8fb390afaa6
+state_head: e932eaa5b3fca90ddd06dbc0916bdb5d74579b33
 progress:
   total_phases: 8
-  completed_phases: 0
-  total_plans: 10
-  completed_plans: 9
-  percent: 0
+  completed_phases: 1
+  total_plans: 13
+  completed_plans: 10
+  percent: 13
 ---
 
 # Project State
@@ -32,7 +32,7 @@ Plan: 9 of 9
 Status: Plan 01-09 pending human X4 verification
 Last activity: 2026-08-29 — Phase 1 execution started
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 13%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P06 | 18 min | 2 tasks | 7 files |
 | Phase 01 P07 | not recorded | 2 tasks | 2 files |
 | Phase 02 P01 | 5 min | 3 tasks | 4 files |
+| Phase 03-faction-scoped-strategic-state P01 | 40 min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,7 @@ Recent decisions affecting current work:
 - [Phase 1]: The completed 01-07 procedure is local planning evidence only; it found no active MD cue, registered UI Lua, or runnable Rust named-pipe server, so OBS-X4-01 through OBS-X4-04 cannot yet run.
 - [Phase 1]: Plan 01-08 must create the telemetry-only UI-Lua/MD/named-pipe harness before Plan 01-09 performs the sole human X4 gate.
 - [Phase 2]: Phase 2 validates only structured static XEN/KHK evidence; runtime unknowns remain non-gating.
+- [Phase 1]: Foreign changing facts stay inaccessible while static resource maps remain available under recorded policy.
 
 ### Pending Todos
 
@@ -121,6 +123,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T22:14:08.333Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-08-28T22:46:39.960Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None

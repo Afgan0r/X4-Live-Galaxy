@@ -10,8 +10,8 @@
 - [x] **OBS-01**: The system can ingest bounded, versioned observation envelopes from X4 without blocking the game thread on bridge or model work, and the X4 adapter and Rust bridge negotiate explicit transport/session capabilities before accepting traffic.
 - [x] **OBS-02**: Every observed entity and event used by strategy has a stable typed identity, source, observation time, and monotonic state or event version.
 - [x] **OBS-03**: Normalized world-state sections preserve freshness, coverage, quality, and explicit unknown or unsupported states instead of fabricating missing facts.
-- [ ] **OBS-04**: The observation model provides the supported economic, military, territorial, and threat facts required by the ZYA and ARG minds.
-- [ ] **OBS-05**: XEN is represented as the primary hostile pressure shared by ZYA and ARG, and KHK is recognized when authoritative observations contain it.
+- [x] **OBS-04**: The observation model provides the supported economic, military, territorial, and threat facts required by the ZYA and ARG minds.
+- [x] **OBS-05**: XEN is represented as the primary hostile pressure shared by ZYA and ARG, and KHK is recognized when authoritative observations contain it.
 - [x] **OBS-06**: Runtime sectors, assets, capacity, and ownership are discovered from observed state rather than assumed from a fixed vanilla map or job count.
 - [x] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
 - [x] **OBS-08**: Milestone 0.1 X4 integration exposes no fleet, economy, diplomacy, institution, or other game-state mutation command.
@@ -19,8 +19,8 @@
 ### Faction Minds and Deterministic Strategy
 
 - [ ] **MIND-01**: ZYA and ARG each have an independent full Faction Mind with explicit doctrine, motives, priorities, goals, short-term plans, long-term plans, and an Executive-owned typed Shadow diplomatic posture for their mutual relationship.
-- [ ] **MIND-02**: Each Faction Mind receives only authoritative truth and information available to that faction, with the applied visibility policy recorded for replay.
-- [ ] **MIND-03**: The deterministic kernel derives bounded strategic facts, priorities, and allowed shadow primitives from a frozen normalized snapshot.
+- [x] **MIND-02**: Each Faction Mind receives only authoritative truth and information available to that faction, with the applied visibility policy recorded for replay.
+- [x] **MIND-03**: The deterministic kernel derives bounded strategic facts, priorities, and allowed shadow primitives from a frozen normalized snapshot.
 - [ ] **MIND-04**: Equivalent replay inputs produce canonically ordered, reproducible deterministic inputs and admission results.
 - [ ] **MIND-05**: ZYA and ARG exhibit measurably distinct strategic responses to shared scenarios rather than differing only by faction labels.
 - [ ] **MIND-06**: Accepted shadow plans and Executive diplomatic postures carry typed goals or dispositions, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations without opening inter-faction negotiation.
@@ -127,14 +127,14 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | OBS-01 | Phase 1 | Complete |
 | OBS-02 | Phase 1 | Complete |
 | OBS-03 | Phase 1 | Complete |
-| OBS-04 | Phase 3 | Pending |
-| OBS-05 | Phase 3 | Pending |
+| OBS-04 | Phase 3 | Complete |
+| OBS-05 | Phase 3 | Complete |
 | OBS-06 | Phase 1 | Complete |
 | OBS-07 | Phase 1 | Complete |
 | OBS-08 | Phase 1 | Complete |
 | MIND-01 | Phase 4 | Pending |
-| MIND-02 | Phase 3 | Pending |
-| MIND-03 | Phase 3 | Pending |
+| MIND-02 | Phase 3 | Complete |
+| MIND-03 | Phase 3 | Complete |
 | MIND-04 | Phase 3 | Pending |
 | MIND-05 | Phase 4 | Pending |
 | MIND-06 | Phase 5 | Pending |
