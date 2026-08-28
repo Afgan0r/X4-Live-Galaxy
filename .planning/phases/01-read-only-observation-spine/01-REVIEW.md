@@ -2,7 +2,7 @@
 phase: 01-read-only-observation-spine
 reviewed: 2026-08-29T00:00:00Z
 depth: deep
-files_reviewed: 52
+files_reviewed: 60
 files_reviewed_list:
   - .cargo/config.toml
   - Cargo.lock
@@ -33,16 +33,23 @@ files_reviewed_list:
   - crates/x4-bridge/Cargo.toml
   - crates/x4-bridge/src/ingress.rs
   - crates/x4-bridge/src/lib.rs
+  - crates/x4-bridge/src/listener.rs
+  - crates/x4-bridge/src/main.rs
   - crates/x4-bridge/src/protocol.rs
+  - crates/x4-bridge/src/server.rs
+  - crates/x4-bridge/src/server/session_gate.rs
   - crates/x4-bridge/src/session.rs
   - crates/x4-bridge/src/telemetry.rs
   - crates/x4-bridge/tests/backpressure_contract.rs
   - crates/x4-bridge/tests/generation_ingress_contract.rs
+  - crates/x4-bridge/tests/named_pipe_contract.rs
   - crates/x4-bridge/tests/protocol_contract.rs
+  - crates/x4-bridge/tests/reconnect_idempotency.rs
   - crates/x4-bridge/tests/session_state_machine.rs
   - extensions/live_galaxy/content.xml
   - extensions/live_galaxy/lua/live_galaxy_normalize.lua
   - extensions/live_galaxy/lua/live_galaxy_scheduler.lua
+  - extensions/live_galaxy/lua/live_galaxy_runtime.lua
   - extensions/live_galaxy/lua/live_galaxy_telemetry.lua
   - extensions/live_galaxy/md/live_galaxy_observation.xml
   - extensions/live_galaxy/tests/scheduler_contract.lua
@@ -51,6 +58,7 @@ files_reviewed_list:
   - tests/fixtures/oversized-envelope.json
   - tests/fixtures/reordered-duplicate-sequence.json
   - tests/fixtures/tracer-observation.json
+  - tests/x4-disposable/01-install-guard.ps1
   - tests/x4-disposable/01-probe-evidence.md
   - tests/x4-disposable/01-probe-procedure.md
   - tests/x4-disposable/README.md
@@ -68,27 +76,47 @@ status: clean
 
 **Reviewed:** 2026-08-29T00:00:00Z
 **Depth:** deep
-**Files Reviewed:** 52
+**Files Reviewed:** 60
 **Status:** clean
 
 ## Summary
 
-Targeted reconnect-generation verification is clean. `BoundedIngress` binds
-the sequence watermark to `SessionGeneration`: a newer compatible generation
-resets that watermark while preserving the documented queue capacity, and an
-older generation is rejected as stale. Same-generation replay remains rejected
-and rejected submissions do not consume the active generation's sequence.
+The eighth deep review is clean. The production observation path now calls
+`BoundedIngress::release()` immediately after every accepted submission has
+been buffered, including rejected buffer dispositions. `release()` preserves
+the bound generation and replay watermark while decrementing only the
+in-flight reservation. Rejections before admission do not mutate ingress;
+discard and marker completion hold no reservation to leak. Pending-snapshot
+count and byte limits remain the independent real-server capacity boundary.
 
-Focused generation, backpressure, and session tests pass, as does `cargo lint`.
+The 80-cycle production `PipeServer` regression proves capacity is reusable
+beyond the former 64-observation lifetime limit while preserving monotonic
+sequences. Existing ingress contracts still prove genuine saturation at a
+configured full queue. The current code and tests also retain the previously
+reviewed fail-closed malformed/stale/replay/mismatched behavior, atomic marker
+admission, higher-generation reconnect projection preservation, and bounded
+accept recovery.
+
+Evidence run in this iteration:
+
+- Focused bridge contracts: `named_pipe_contract`, `reconnect_idempotency`,
+  `generation_ingress_contract`, and `backpressure_contract`.
+- `cargo lint`
+- `cargo test --workspace`
+- `cargo build -p x4-bridge`
+- `tests/x4-disposable/01-install-guard.ps1 -VerifyPackageOnly`
+
+All passed. No critical or warning correctness finding remains in the reviewed
+scope.
 
 ## Residual Verification Risks
 
-- Actual Lua producer execution and X4 9.00 runtime behavior are intentionally
-  classified as pending external validation in the Plan 01-07 human ledger.
-  The Rust fake-adapter/decoder test makes no claim to execute Lua or observe
-  X4 behavior, so this is not a source-level defect.
-- The Mission Director path remains telemetry-only in source. No observed-in-X4
-  claim was inferred from static checks or local Rust tests.
+- Native Lua execution, Mission Director delivery, and support-API named-pipe
+  behavior remain pending the disposable human X4 validation gate. The local
+  Rust/fake-adapter evidence does not claim to execute the Lua producer.
+- Durable accepted-projection recovery across a bridge process restart remains
+  explicitly deferred to Phase 4; the Phase 01 in-process higher-generation
+  reconnect path is covered.
 
 ---
 

@@ -56,7 +56,7 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 - [x] 01-05-PLAN.md
 - [x] 01-06-PLAN.md
 - [x] 01-07-PLAN.md
-- [ ] 01-08-PLAN.md
+- [x] 01-08-PLAN.md
 - [ ] 01-09-PLAN.md
 
 ### Phase 2: Hostile-Faction Research Track
@@ -185,7 +185,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
-| 1. Read-Only Observation Spine | 7/9 | In Progress |  |
+| 1. Read-Only Observation Spine | 8/9 | In Progress |  |
 | 2. Hostile-Faction Research Track | 0/TBD | Not started | - |
 | 3. Faction-Scoped Strategic State | 0/TBD | Not started | - |
 | 4. Persistent Full Faction Minds | 0/TBD | Not started | - |
