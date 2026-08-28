@@ -1,5 +1,6 @@
 use crate::{EntityId, ObservationSource, ObservationTime, ObservationVersion};
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SectionQuality {
     Fresh,
@@ -10,12 +11,14 @@ pub enum SectionQuality {
     Unsupported,
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SectionFreshness {
     Fresh,
     Stale,
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SectionCoverage {
     Complete,
@@ -25,6 +28,7 @@ pub enum SectionCoverage {
     Unsupported,
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SectionState {
     freshness: SectionFreshness,
@@ -48,6 +52,7 @@ impl SectionState {
     }
 }
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompleteMarker {
     scope: EntityId,
@@ -81,6 +86,7 @@ pub fn quality_for_empty_section(
     }
 }
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SectionDescriptor {
     entity_id: EntityId,

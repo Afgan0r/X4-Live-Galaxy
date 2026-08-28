@@ -2,6 +2,7 @@ use std::num::NonZeroUsize;
 
 use crate::{CompleteMarker, EntityId, ObservationVersion};
 
+#[must_use]
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct CanonicalObservationKey {
     entity_id: EntityId,
@@ -22,10 +23,12 @@ impl CanonicalObservationKey {
     }
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CollectionLimit(NonZeroUsize);
 
 impl CollectionLimit {
+    #[must_use]
     pub const fn new(value: usize) -> Option<Self> {
         match NonZeroUsize::new(value) {
             Some(value) => Some(Self(value)),
@@ -33,11 +36,13 @@ impl CollectionLimit {
         }
     }
 
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0.get()
     }
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CollectionSize(usize);
 
@@ -53,11 +58,13 @@ impl CollectionSize {
             .map_err(|_| CountError::ExceedsPlatformCapacity)
     }
 
+    #[must_use]
     pub const fn get(self) -> usize {
         self.0
     }
 }
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReconciliationDecision {
     PreservedIncompleteScope,

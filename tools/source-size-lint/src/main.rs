@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-const MAX_RUST_FILE_LINES: usize = 300;
+const MAX_RUST_FILE_LINES: usize = 200;
 
 fn main() -> ExitCode {
     match run() {
@@ -56,6 +56,12 @@ fn run() -> Result<(), String> {
                 "--",
                 "-D",
                 "warnings",
+                "-A",
+                "clippy::expect_used",
+                "-A",
+                "clippy::panic",
+                "-A",
+                "clippy::unwrap_used",
             ],
         ),
     ] {
@@ -78,14 +84,14 @@ fn enforce_source_size(repository: &Path) -> Result<(), String> {
     collect_rust_files(&repository.join("tools"), &mut files)?;
     files.sort();
 
-    let violations = files
-        .into_iter()
-        .filter_map(|path| {
-            let source = fs::read_to_string(&path).ok()?;
-            let lines = source.lines().count();
-            (lines > MAX_RUST_FILE_LINES).then_some((path, lines))
-        })
-        .collect::<Vec<_>>();
+    let mut violations = Vec::new();
+    for path in files {
+        let source = read_source(&path)?;
+        let lines = source.lines().count();
+        if lines > MAX_RUST_FILE_LINES {
+            violations.push((path, lines));
+        }
+    }
 
     if violations.is_empty() {
         return Ok(());
@@ -103,6 +109,11 @@ fn enforce_source_size(repository: &Path) -> Result<(), String> {
     Err(format!(
         "Rust source file limit exceeded (max {MAX_RUST_FILE_LINES} lines):\n{details}"
     ))
+}
+
+fn read_source(path: &Path) -> Result<String, String> {
+    fs::read_to_string(path)
+        .map_err(|error| format!("failed to read Rust source {}: {error}", path.display()))
 }
 
 fn collect_rust_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -126,4 +137,28 @@ fn collect_path(path: PathBuf, files: &mut Vec<PathBuf>) -> Result<(), String> {
         files.push(path);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::read_source;
+
+    #[test]
+    fn unreadable_rust_source_fails_with_its_path() {
+        let path = std::env::temp_dir().join("source-size-lint-non-utf8.rs");
+        assert!(
+            fs::write(&path, [0xff]).is_ok(),
+            "test fixture must be writable"
+        );
+
+        let error = read_source(&path).expect_err("non-UTF-8 source must fail closed");
+
+        assert!(error.contains(&path.display().to_string()));
+        assert!(
+            fs::remove_file(path).is_ok(),
+            "test fixture must be removable"
+        );
+    }
 }

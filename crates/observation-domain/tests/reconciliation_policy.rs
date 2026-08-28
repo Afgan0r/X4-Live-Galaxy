@@ -1,3 +1,8 @@
+#![expect(
+    clippy::expect_used,
+    reason = "test fixtures fail immediately when their invariants are invalid"
+)]
+
 use observation_domain::{
     CanonicalObservationKey, CollectionLimit, CollectionSize, CompleteMarker, CountError, EntityId,
     ObservationVersion, ReconciliationDecision, reconcile_membership,
@@ -7,7 +12,7 @@ fn entity(value: &str) -> EntityId {
     EntityId::new(value).expect("test identity is valid")
 }
 
-fn version(value: u64) -> ObservationVersion {
+const fn version(value: u64) -> ObservationVersion {
     ObservationVersion::new(value).expect("test version is positive")
 }
 

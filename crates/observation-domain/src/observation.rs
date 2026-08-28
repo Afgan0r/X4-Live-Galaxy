@@ -5,6 +5,7 @@ pub enum ObservationRecordError {
     EmptyContent,
 }
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservationRecord {
     entity_id: EntityId,
@@ -53,6 +54,7 @@ impl ObservationRecord {
     }
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DuplicateDecision {
     Idempotent,
