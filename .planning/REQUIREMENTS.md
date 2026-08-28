@@ -77,9 +77,9 @@
 
 ### Parallel Hostile-Faction Research
 
-- [ ] **RES-01**: A versioned research artifact records observed XEN and KHK state, events, identity, visibility, scheduling, and control limitations relevant to future autonomous minds.
-- [ ] **RES-02**: XEN and KHK research runs independently of the ZYA and ARG critical path and cannot delay or silently expand milestone 0.1 implementation scope.
-- [ ] **RES-03**: Research separates documented, observed, inferred, and unknown claims and records provenance only for sources that materially influence Live Galaxy design.
+- [x] **RES-01**: A versioned research artifact records observed XEN and KHK state, events, identity, visibility, scheduling, and control limitations relevant to future autonomous minds.
+- [x] **RES-02**: XEN and KHK research runs independently of the ZYA and ARG critical path and cannot delay or silently expand milestone 0.1 implementation scope.
+- [x] **RES-03**: Research separates documented, observed, inferred, and unknown claims and records provenance only for sources that materially influence Live Galaxy design.
 
 ## Later Milestones
 
@@ -173,9 +173,9 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | VAL-04 | Phase 8 | Pending |
 | VAL-05 | Phase 8 | Pending |
 | VAL-06 | Phase 1 | Pending |
-| RES-01 | Phase 2 | Pending |
-| RES-02 | Phase 2 | Pending |
-| RES-03 | Phase 2 | Pending |
+| RES-01 | Phase 2 | Complete |
+| RES-02 | Phase 2 | Complete |
+| RES-03 | Phase 2 | Complete |
 
 **Coverage:** 52/52 milestone requirements mapped.
 
