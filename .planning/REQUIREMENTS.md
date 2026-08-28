@@ -100,21 +100,57 @@
 
 ## Traceability
 
-Roadmap coverage is assigned when the milestone 0.1 roadmap is created.
+Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| OBS-01 through OBS-08 | TBD | Pending |
-| MIND-01 through MIND-07 | TBD | Pending |
-| MODEL-01 through MODEL-09 | TBD | Pending |
-| STATE-01 through STATE-05 | TBD | Pending |
-| DIAG-01 through DIAG-05 | TBD | Pending |
-| VAL-01 through VAL-06 | TBD | Pending |
-| RES-01 through RES-03 | TBD | Pending |
+| OBS-01 | Phase 1 | Pending |
+| OBS-02 | Phase 1 | Pending |
+| OBS-03 | Phase 1 | Pending |
+| OBS-04 | Phase 3 | Pending |
+| OBS-05 | Phase 3 | Pending |
+| OBS-06 | Phase 1 | Pending |
+| OBS-07 | Phase 1 | Pending |
+| OBS-08 | Phase 1 | Pending |
+| MIND-01 | Phase 4 | Pending |
+| MIND-02 | Phase 3 | Pending |
+| MIND-03 | Phase 3 | Pending |
+| MIND-04 | Phase 3 | Pending |
+| MIND-05 | Phase 4 | Pending |
+| MIND-06 | Phase 5 | Pending |
+| MIND-07 | Phase 5 | Pending |
+| MODEL-01 | Phase 5 | Pending |
+| MODEL-02 | Phase 5 | Pending |
+| MODEL-03 | Phase 5 | Pending |
+| MODEL-04 | Phase 5 | Pending |
+| MODEL-05 | Phase 4 | Pending |
+| MODEL-06 | Phase 5 | Pending |
+| MODEL-07 | Phase 5 | Pending |
+| MODEL-08 | Phase 8 | Pending |
+| MODEL-09 | Phase 8 | Pending |
+| STATE-01 | Phase 4 | Pending |
+| STATE-02 | Phase 4 | Pending |
+| STATE-03 | Phase 4 | Pending |
+| STATE-04 | Phase 4 | Pending |
+| STATE-05 | Phase 4 | Pending |
+| DIAG-01 | Phase 6 | Pending |
+| DIAG-02 | Phase 6 | Pending |
+| DIAG-03 | Phase 6 | Pending |
+| DIAG-04 | Phase 6 | Pending |
+| DIAG-05 | Phase 6 | Pending |
+| VAL-01 | Phase 7 | Pending |
+| VAL-02 | Phase 7 | Pending |
+| VAL-03 | Phase 7 | Pending |
+| VAL-04 | Phase 8 | Pending |
+| VAL-05 | Phase 8 | Pending |
+| VAL-06 | Phase 1 | Pending |
+| RES-01 | Phase 2 | Pending |
+| RES-02 | Phase 2 | Pending |
+| RES-03 | Phase 2 | Pending |
 
-**Coverage:** 0/43 milestone requirements assigned before roadmap creation.
+**Coverage:** 43/43 milestone requirements mapped.
 
 ---
 
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after milestone 0.1 requirements definition*
+*Last updated: 2026-08-28 after milestone 0.1 roadmap creation*
