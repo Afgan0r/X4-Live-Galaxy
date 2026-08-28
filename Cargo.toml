@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/observation-domain"]
+members = [
+    "crates/observation-domain",
+    "crates/observation-ingest",
+    "crates/x4-bridge",
+]
 resolver = "3"
 
 [workspace.package]

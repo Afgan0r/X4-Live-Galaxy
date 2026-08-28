@@ -1,0 +1,8 @@
+[package]
+name = "observation-ingest"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+observation-domain = { path = "../observation-domain" }
