@@ -18,11 +18,36 @@ fn projection() -> observation_ingest::ProjectionSnapshot {
 
 #[test]
 fn policies_filter_before_derivation_and_preserve_phase_one_quality_assumption() {
-    let packets = derive_with_policy(&projection(), VisibilityPolicy::v1(), PacketLimits::tracer())
-        .expect("Phase 1 quality mapping is a local runtime-semantics assumption");
-    assert_eq!(packets.packet(Faction::Zya).policy_version(), "visibility-v1");
-    assert_eq!(packets.packet(Faction::Arg).policy_version(), "visibility-v1");
-    assert_eq!(packets.packet(Faction::Zya).availability(FactFamily::Military), FactAvailability::Inaccessible);
-    assert_eq!(packets.packet(Faction::Zya).availability(FactFamily::Territorial), FactAvailability::Available);
-    assert_eq!(packets.packet(Faction::Arg).availability(FactFamily::Economic), FactAvailability::Inaccessible);
+    let packets = derive_with_policy(
+        &projection(),
+        VisibilityPolicy::v1(),
+        PacketLimits::tracer(),
+    )
+    .expect("Phase 1 quality mapping is a local runtime-semantics assumption");
+    assert_eq!(
+        packets.packet(Faction::Zya).policy_version(),
+        "visibility-v1"
+    );
+    assert_eq!(
+        packets.packet(Faction::Arg).policy_version(),
+        "visibility-v1"
+    );
+    assert_eq!(
+        packets
+            .packet(Faction::Zya)
+            .availability(FactFamily::Military),
+        FactAvailability::Inaccessible
+    );
+    assert_eq!(
+        packets
+            .packet(Faction::Zya)
+            .availability(FactFamily::Territorial),
+        FactAvailability::Available
+    );
+    assert_eq!(
+        packets
+            .packet(Faction::Arg)
+            .availability(FactFamily::Economic),
+        FactAvailability::Inaccessible
+    );
 }
