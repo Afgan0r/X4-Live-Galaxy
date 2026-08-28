@@ -51,34 +51,34 @@ function Get-ValidSkeleton {
 '@
 }
 
+function Invoke-Verifier([string]$EvidencePath) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $scriptPath -EvidencePath $EvidencePath -Stage skeleton 2>$null | Out-Null
+    return $LASTEXITCODE
+}
+
 Describe 'verify_xen_khk_evidence' {
     It 'accepts a valid skeleton without X4 runtime access' {
         $path = New-EvidenceFixture (Get-ValidSkeleton)
-        & $scriptPath -EvidencePath $path -Stage skeleton
-        $LASTEXITCODE | Should Be 0
+        (Invoke-Verifier $path) | Should Be 0
     }
 
     It 'rejects duplicate source identifiers' {
         $json = (Get-ValidSkeleton).Replace('"x4-version-dat","kind"', '"x4-jobs","kind"')
-        & $scriptPath -EvidencePath (New-EvidenceFixture $json) -Stage skeleton
-        $LASTEXITCODE | Should Not Be 0
+        (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
     }
 
     It 'rejects unknown claim source identifiers' {
         $json = (Get-ValidSkeleton).Replace('"source_id":"x4-jobs"', '"source_id":"unknown-source"')
-        & $scriptPath -EvidencePath (New-EvidenceFixture $json) -Stage skeleton
-        $LASTEXITCODE | Should Not Be 0
+        (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
     }
 
     It 'rejects unallowlisted source kind path or boundary' {
         $json = (Get-ValidSkeleton).Replace('"installed_x4_file"', '"network_source"')
-        & $scriptPath -EvidencePath (New-EvidenceFixture $json) -Stage skeleton
-        $LASTEXITCODE | Should Not Be 0
+        (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
     }
 
     It 'rejects a conclusion outside its source scope' {
         $json = (Get-ValidSkeleton).Replace('"permitted_conclusion":"xen_job_configuration"', '"permitted_conclusion":"khk_activity_configuration"')
-        & $scriptPath -EvidencePath (New-EvidenceFixture $json) -Stage skeleton
-        $LASTEXITCODE | Should Not Be 0
+        (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
     }
 }
