@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-08-28T18:18:55.278Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-08-28T18:26:50.989Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: 78d135d79b7e1211cad616471b6b274668560e9d
+state_head: 0b114ccdb355a74c75ec0be18494b3322b2cc36a
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 7
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 1 (Read-Only Observation Spine) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Ready to execute
 Last activity: 2026-08-29 — Phase 1 execution started
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 01 P01 | 31 min | 2 tasks | 5 files |
 | Phase 01 P02 | 35 min | 2 tasks | 13 files |
+| Phase 01 P03 | 22 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Initial observation contracts remain dependency-free and transport-free.
 - [Phase 1]: Phase 1 bridge admission remains closed to bounded telemetry; incompatible capabilities require an X4 restart.
 - [Phase 1]: Telemetry JSON decoding uses pinned serde contracts with strict unknown-field rejection.
+- [Phase 1]: Known-empty requires a successful completion marker for the same runtime scope.
+- [Phase 1]: Incomplete scopes preserve prior membership; over-limit scans reject without truncation.
 
 ### Pending Todos
 
@@ -103,6 +106,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T18:18:55.262Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-08-28T18:26:50.976Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
