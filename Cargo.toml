@@ -2,6 +2,7 @@
 members = [
     "crates/observation-domain",
     "crates/observation-ingest",
+    "crates/strategic-state",
     "crates/x4-bridge",
     "tools/source-size-lint",
 ]
