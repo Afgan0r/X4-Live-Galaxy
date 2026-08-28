@@ -40,10 +40,11 @@ Invoke-Pester -Path tools/verify_xen_khk_evidence.Tests.ps1
 ```
 
 The fixtures prove that the parser accepts a valid skeleton and rejects duplicate
-source IDs, unknown claim sources, unallowlisted source descriptors, and
-conclusions outside a source's permitted scope. The local Pester 3.4 installation
+source IDs, unknown claim sources, each unallowlisted source kind/path/boundary
+descriptor, and conclusions outside a source's permitted scope. The local Pester 3.4 installation
 does not provide the newer `-CI` switch; this command is the compatible equivalent
-and still reports pass/fail deterministically.
+and still reports pass/fail deterministically. The suite contains 14 focused
+behavioral cases, including the three independent source-descriptor mutations.
 
 ## Evidence Boundary Audit
 

@@ -91,6 +91,17 @@ Describe 'verify_xen_khk_evidence' {
         (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
     }
 
+    It 'rejects each unallowlisted source descriptor dimension' {
+        foreach ($mutation in @(
+            @{ from = '"installed_x4_file"'; to = '"network_source"' },
+            @{ from = '"version.dat"'; to = '"https://example.invalid/version.dat"' },
+            @{ from = '"installed X4 9.00"'; to = '"external network"' }
+        )) {
+            $json = (Get-ValidSkeleton).Replace($mutation.from, $mutation.to)
+            (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
+        }
+    }
+
     It 'rejects a conclusion outside its source scope' {
         $json = (Get-ValidSkeleton).Replace('"permitted_conclusion":"xen_job_configuration"', '"permitted_conclusion":"khk_activity_configuration"')
         (Invoke-Verifier (New-EvidenceFixture $json)) | Should Not Be 0
