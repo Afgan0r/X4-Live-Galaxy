@@ -10,17 +10,18 @@ const FRAMES: [&str; 4] = [
     r#"{"type":"observation","scope":"XEN","entity_id":"XEN:threat:XEN","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"shared"}"#,
 ];
 
-fn committed_mind() -> mind_domain::PendingMindCommit {
+fn committed_mind() -> Result<mind_domain::PendingMindCommit, String> {
     let snapshot = admit_batch(AcceptedProjection::empty(), &FRAMES)
         .into_projection()
         .snapshot;
-    let packets = derive_packets(&snapshot, PacketLimits::tracer()).unwrap();
+    let packets =
+        derive_packets(&snapshot, PacketLimits::tracer()).map_err(|error| format!("{error:?}"))?;
     let packet = packets.packet(Faction::Zya);
     transition(
         &MindAggregate::empty(Faction::Zya),
         MindCommand::from_packet(packet, CommandId::new("mind-zya-1")),
     )
-    .unwrap()
+    .map_err(|error| format!("{error:?}"))
 }
 
 fn draft() -> CheckpointDraft {
@@ -35,24 +36,55 @@ fn draft() -> CheckpointDraft {
 
 #[test]
 fn encodes_a_complete_deterministic_committed_transition() {
-    let commit = committed_mind();
-    let first = CheckpointEnvelope::from_pending_commit(1, None, &commit, draft()).unwrap();
-    let second = CheckpointEnvelope::from_pending_commit(1, None, &commit, draft()).unwrap();
+    let commit_result = committed_mind();
+    assert!(commit_result.is_ok());
+    let Ok(commit) = commit_result else { return };
+    let first_result = CheckpointEnvelope::from_pending_commit(1, None, &commit, draft());
+    assert!(first_result.is_ok());
+    let Ok(first) = first_result else { return };
+    let second_result = CheckpointEnvelope::from_pending_commit(1, None, &commit, draft());
+    assert!(second_result.is_ok());
+    let Ok(second) = second_result else { return };
 
-    assert_eq!(first.encode().unwrap(), second.encode().unwrap());
+    let first_bytes = first.encode();
+    let second_bytes = second.encode();
+    assert_eq!(first_bytes, second_bytes);
     assert_eq!(first.integrity_hash(), second.integrity_hash());
     assert_eq!(first.sequence(), 1);
     assert_eq!(first.strategic_tick_id(), "tick-zya-1");
-    assert_eq!(CheckpointEnvelope::decode(&first.encode().unwrap()), Ok(first));
+    let Ok(bytes) = first_bytes else { return };
+    assert_eq!(CheckpointEnvelope::decode(&bytes), Ok(first));
 }
 
 #[test]
 fn rejects_tampered_partial_and_oversized_checkpoint_records() {
-    let commit = committed_mind();
-    let envelope = CheckpointEnvelope::from_pending_commit(1, None, &commit, draft()).unwrap();
-    let mut encoded = envelope.encode().unwrap();
-    encoded[10] ^= 1;
-    assert_eq!(CheckpointEnvelope::decode(&encoded), Err(CheckpointError::InvalidHash));
-    assert!(matches!(CheckpointEnvelope::decode(b"{}"), Err(CheckpointError::Malformed)));
-    assert!(matches!(CheckpointEnvelope::decode(&vec![b'x'; 32_769]), Err(CheckpointError::Oversized)));
+    let commit_result = committed_mind();
+    assert!(commit_result.is_ok());
+    let Ok(commit) = commit_result else { return };
+    let envelope_result = CheckpointEnvelope::from_pending_commit(1, None, &commit, draft());
+    assert!(envelope_result.is_ok());
+    let Ok(envelope) = envelope_result else {
+        return;
+    };
+    let bytes_result = envelope.encode();
+    assert!(bytes_result.is_ok());
+    let Ok(bytes) = bytes_result else { return };
+    let text_result = String::from_utf8(bytes);
+    assert!(text_result.is_ok());
+    let Ok(text) = text_result else { return };
+    let encoded = text
+        .replace("snapshot-zya-1", "snapshot-zya-2")
+        .into_bytes();
+    assert_eq!(
+        CheckpointEnvelope::decode(&encoded),
+        Err(CheckpointError::InvalidHash)
+    );
+    assert!(matches!(
+        CheckpointEnvelope::decode(b"{}"),
+        Err(CheckpointError::Malformed)
+    ));
+    assert!(matches!(
+        CheckpointEnvelope::decode(&vec![b'x'; 32_769]),
+        Err(CheckpointError::Oversized)
+    ));
 }

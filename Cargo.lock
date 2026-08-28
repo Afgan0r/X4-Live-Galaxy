@@ -52,6 +52,7 @@ name = "mind-persistence"
 version = "0.1.0"
 dependencies = [
  "mind-domain",
+ "observation-ingest",
  "serde",
  "serde_json",
  "strategic-state",
