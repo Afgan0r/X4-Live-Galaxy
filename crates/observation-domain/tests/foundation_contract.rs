@@ -1,10 +1,10 @@
 use observation_domain::{
-    EntityId, ObservationSource, ObservationTime, ObservationVersion,
-    SectionDescriptor, SectionQuality,
+    EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
+    SectionQuality,
 };
 
 #[test]
-fn preserves_typed_identity_provenance_and_versioned_section_quality() {
+fn foundation_contract_preserves_typed_identity_and_section_quality() {
     let entity_id = EntityId::new("sector:alpha").expect("a fixed entity id is valid");
     let source = ObservationSource::x4_runtime();
     let observed_at = ObservationTime::from_unix_millis(1_725_000_000_000);
@@ -19,13 +19,8 @@ fn preserves_typed_identity_provenance_and_versioned_section_quality() {
     ];
 
     for quality in declared_qualities {
-        let descriptor = SectionDescriptor::new(
-            entity_id.clone(),
-            source.clone(),
-            observed_at,
-            version,
-            quality,
-        );
+        let descriptor =
+            SectionDescriptor::new(entity_id.clone(), source, observed_at, version, quality);
 
         assert_eq!(descriptor.entity_id(), &entity_id);
         assert_eq!(descriptor.source(), &source);
