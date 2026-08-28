@@ -1,0 +1,9 @@
+{
+  "type": "observation",
+  "scope": "runtime:sectors",
+  "entity_id": "sector:alpha",
+  "observed_at_unix_millis": "invalid",
+  "version": 3,
+  "quality": "fresh",
+  "content": "malformed"
+}
