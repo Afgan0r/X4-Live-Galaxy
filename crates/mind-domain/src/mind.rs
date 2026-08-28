@@ -1,4 +1,4 @@
-use crate::{CausalEvent, CausalKind};
+use crate::{CausalEvent, CausalKind, Initiative, InitiativeCommand, PendingInitiativeCommit};
 use strategic_state::{BilateralPosture, Capability, Faction, StrategicPacket};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -15,6 +15,7 @@ impl CommandId {
 pub enum MindError {
     FactionMismatch,
     UnsupportedProfile,
+    Initiative(crate::InitiativeError),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -46,9 +47,9 @@ impl MindCommand {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MindAggregate {
-    faction: Faction,
+    pub(crate) faction: Faction,
     doctrine_version: &'static str,
     motives: [&'static str; 2],
     priorities: [Capability; 3],
@@ -56,6 +57,10 @@ pub struct MindAggregate {
     short_term_plans: [Capability; 3],
     long_term_plans: [Capability; 3],
     posture: BilateralPosture,
+    pub(crate) slots: [Option<Initiative>; 3],
+    pub(crate) history: Vec<Initiative>,
+    pub(crate) ledger: Vec<CausalEvent>,
+    pub(crate) commands: Vec<(InitiativeCommand, Vec<CausalEvent>)>,
 }
 
 impl MindAggregate {
@@ -70,6 +75,10 @@ impl MindAggregate {
             short_term_plans: Capability::ALL,
             long_term_plans: Capability::ALL,
             posture: BilateralPosture::PreserveRelations,
+            slots: [None, None, None],
+            history: Vec::new(),
+            ledger: Vec::new(),
+            commands: Vec::new(),
         }
     }
     #[must_use]
@@ -96,9 +105,27 @@ impl MindAggregate {
     pub const fn posture(&self) -> BilateralPosture {
         self.posture
     }
+    #[must_use]
+    pub const fn active_initiative(&self, capability: Capability) -> Option<&Initiative> {
+        self.slots[crate::initiative::slot(capability)].as_ref()
+    }
+    #[must_use]
+    pub fn initiative_history(&self) -> &[Initiative] {
+        &self.history
+    }
+    #[must_use]
+    pub fn causal_events(&self) -> &[CausalEvent] {
+        &self.ledger
+    }
+    pub fn apply_initiative(
+        &self,
+        command: InitiativeCommand,
+    ) -> Result<PendingInitiativeCommit, MindError> {
+        crate::ledger::apply(self, command).map_err(MindError::Initiative)
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingMindCommit {
     aggregate: MindAggregate,
     events: [CausalEvent; 1],
@@ -141,6 +168,10 @@ pub fn transition(
         short_term_plans: command.priorities,
         long_term_plans: command.priorities,
         posture: command.posture,
+        slots: prior.slots,
+        history: prior.history.clone(),
+        ledger: prior.ledger.clone(),
+        commands: prior.commands.clone(),
     };
     Ok(PendingMindCommit {
         aggregate,
