@@ -18,13 +18,10 @@ fn ingress_accepts_exact_frame_and_queue_limits_then_rejects_one_over() {
 
     let (ingress, first) = ingress.submit(&session, SequenceNumber::new(1), "observation", "abc");
     let (ingress, second) = ingress.submit(&session, SequenceNumber::new(2), "observation", "abc");
-    let (_, one_over_queue) = ingress.submit(&session, SequenceNumber::new(3), "observation", "abc");
-    let (_, one_over_frame) = BoundedIngress::new(limits).submit(
-        &session,
-        SequenceNumber::new(3),
-        "observation",
-        "abcd",
-    );
+    let (_, one_over_queue) =
+        ingress.submit(&session, SequenceNumber::new(3), "observation", "abc");
+    let (_, one_over_frame) =
+        BoundedIngress::new(limits).submit(&session, SequenceNumber::new(3), "observation", "abcd");
 
     assert_eq!(first, BackpressureOutcome::Accepted);
     assert_eq!(second, BackpressureOutcome::Accepted);
@@ -56,12 +53,8 @@ fn terminal_or_stale_sessions_are_nonblocking_non_admissions() {
         .expect("compatible first sequence is accepted");
     let ingress = BoundedIngress::new(FrameLimits::new(3, 1));
 
-    let (ingress, terminal_outcome) = ingress.submit(
-        &terminal,
-        SequenceNumber::new(1),
-        "observation",
-        "abc",
-    );
+    let (ingress, terminal_outcome) =
+        ingress.submit(&terminal, SequenceNumber::new(1), "observation", "abc");
     let (_, stale_outcome) = ingress.submit(&stale, SequenceNumber::new(2), "observation", "abc");
 
     assert_eq!(terminal_outcome, BackpressureOutcome::SessionNotCompatible);

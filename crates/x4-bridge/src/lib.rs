@@ -175,6 +175,78 @@ impl SessionState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameLimits {
+    max_frame_bytes: usize,
+    max_queue_depth: usize,
+}
+
+impl FrameLimits {
+    pub const fn new(max_frame_bytes: usize, max_queue_depth: usize) -> Self {
+        Self {
+            max_frame_bytes,
+            max_queue_depth,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackpressureOutcome {
+    Accepted,
+    FrameTooLarge,
+    QueueSaturated,
+    UnsupportedFrameKind,
+    SessionNotCompatible,
+    StaleSequence,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BoundedIngress {
+    limits: FrameLimits,
+    queued_frames: usize,
+}
+
+impl BoundedIngress {
+    pub const fn new(limits: FrameLimits) -> Self {
+        Self {
+            limits,
+            queued_frames: 0,
+        }
+    }
+
+    pub fn submit(
+        &self,
+        session: &SessionState,
+        sequence: SequenceNumber,
+        kind: &str,
+        payload: &str,
+    ) -> (Self, BackpressureOutcome) {
+        if session.decision() != CapabilityDecision::Compatible {
+            return (*self, BackpressureOutcome::SessionNotCompatible);
+        }
+        if session.accept_sequence(sequence).is_none() {
+            return (*self, BackpressureOutcome::StaleSequence);
+        }
+        if kind != "observation" {
+            return (*self, BackpressureOutcome::UnsupportedFrameKind);
+        }
+        if payload.len() > self.limits.max_frame_bytes {
+            return (*self, BackpressureOutcome::FrameTooLarge);
+        }
+        if self.queued_frames >= self.limits.max_queue_depth {
+            return (*self, BackpressureOutcome::QueueSaturated);
+        }
+
+        (
+            Self {
+                queued_frames: self.queued_frames + 1,
+                ..*self
+            },
+            BackpressureOutcome::Accepted,
+        )
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TelemetryFrame {
     Observation { payload: String },
