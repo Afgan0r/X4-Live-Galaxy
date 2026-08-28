@@ -6,12 +6,14 @@ institutions through validated game actions.
 
 ## Status
 
-The repository currently contains only the project bootstrap. All `0.x`
-versions are internal prototypes. Version `1.0.0` is reserved for the first
-public alpha.
+Milestone `0.1` — Shadow Director is the active internal prototype. It observes
+X4 without mutating the game and validates persistent ZYA and ARG Faction Minds
+under shared XEN pressure. Phase 1, Read-Only Observation Spine, is ready for
+discussion and planning.
 
-The initial product discovery and roadmap will be created through GSD after the
-project-local agent routing is generated and Codex is restarted.
+See [PROJECT.md](.planning/PROJECT.md) for the product boundary and
+[ROADMAP.md](.planning/ROADMAP.md) for the milestone phases. All `0.x` versions
+are internal prototypes. Version `1.0.0` is reserved for the first public alpha.
 
 ## Direction
 
