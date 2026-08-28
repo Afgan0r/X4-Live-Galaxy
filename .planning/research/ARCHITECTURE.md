@@ -16,9 +16,11 @@ X4 Lua/MD producers
   -> Rust ingest + normalization
   -> immutable snapshot/checkpoint store
   -> deterministic faction kernel
-  -> provider adapter (untrusted proposal)
+  -> primitive institution views
+  -> provider adapter(s) (untrusted institution/Executive candidates)
+  -> bounded Executive arbitration
   -> schema/semantic/information/budget/current-state validation
-  -> typed shadow plan + explanation
+  -> typed shadow plan + institution initiative lifecycle + explanation
   -> idempotent report outbox -> low-cost X4 Mail/Logbook
                          \-> diagnostics/evaluation/replay artifacts
 ```
@@ -36,6 +38,8 @@ economy, diplomacy, missions, custom UI, or full-faction rollout now.
 | Ingest/normalizer | Decode and validate envelopes; canonicalize IDs/quantities/time; reject malformed or oversized input; assign monotonic state versions | Transport, snapshot store |
 | Snapshot/checkpoint store | Atomic section replacement, immutable event log, current projection, retention, recovery markers | Ingest, kernel, replay, diagnostics |
 | Deterministic strategic kernel | Derive bounded facts, faction information views, goals, priorities, budgets, and allowed strategic primitives from typed snapshots | Snapshot store, provider orchestration, evaluator |
+| Primitive institution layer | Apply fixed faction-conditioned priorities; own at most one active Shadow initiative per institution; emit typed proposals, objections, and preemption requests | Kernel, Executive arbitration, persistence |
+| Executive arbitration | Originate, approve, revise, preempt, reject, and assign initiatives; invoke at most two dialogue cycles only on material disagreement | Institution layer, provider orchestration, validator |
 | Model-provider port/adapters | Prompt/package construction and provider-specific calls; bounded timeout/retry/token budget; return raw response as untrusted data | Kernel, validator |
 | Proposal validator/admission | Schema, semantic, safety, information, budget, freshness and faction-policy checks; all-or-nothing admission | Kernel, persistence, report outbox |
 | Plan/explanation projection | Store typed accepted shadow plan and safe rationale summary; never expose hidden reasoning or raw private prompts | Validator, diagnostics, report outbox |
@@ -57,11 +61,19 @@ record, updates touched snapshot sections, and advances a monotonic
 partial cycles retain section freshness and never imply deletion.
 
 The kernel reads one frozen snapshot/checkpoint and builds separate ZYA and ARG
-information views under shared observed XEN pressure. It applies deterministic
-ordering, bounded context compaction, and stable decision inputs before a model
-call. The provider returns a typed candidate, but the candidate remains outside
-the trust boundary until admission succeeds. Rejected candidates produce a
-diagnostic and no plan/report side effect.
+information views under shared observed XEN pressure. Primitive institutions
+inside each faction consume the same authoritative faction-visible snapshot and
+apply fixed faction-conditioned priorities. Each may own at most one active
+Shadow initiative and may propose a new initiative or an explicit preemption
+request carrying the current initiative state and replacement rationale.
+
+The Executive Brain composes and allocates strategy rather than executing it.
+It may originate, approve, revise, preempt, reject, or assign an initiative.
+Aligned proposals proceed directly to validation. A material objection, forced
+mandate, preemption, or revision may invoke at most two full dialogue cycles;
+the final Executive disposition must still pass deterministic admission. The
+provider output remains outside the trust boundary throughout. Rejected
+candidates produce diagnostics and no plan, initiative, or report side effect.
 
 Accepted plans are persisted transactionally with the decision input hash,
 provider/model identity, schema version, validation result, and report identity.
@@ -77,6 +89,10 @@ quality gaps, and evaluation data remain external diagnostics.
   validation, provider orchestration, caching, and diagnostics.
 - Providers may propose goals/plans/explanations only; they cannot issue native
   X4 calls or mutate storage directly.
+- Institutions own proposals and Shadow initiative lifecycle, not authoritative
+  facts, Executive authority, or X4 effects.
+- The Executive owns final initiative disposition but cannot bypass kernel
+  legality, compatibility, budgets, or the no-mutation milestone boundary.
 - Reports are projections, not authority. A report must identify its snapshot
   and decision, and must not claim an action occurred in 0.1.
 
@@ -97,6 +113,12 @@ delivery by the same identity. On restart, reconcile pending outbox entries and
 resume from the last durable cursor/checkpoint. Never advance a cursor before a
 successful durable write, and never partially apply a future game command.
 
+Persist institution identity, fixed-priority version, active initiative ID,
+initiative owner, proposal and objection records, Executive disposition,
+preemption reason, validator result, and terminal outcome. An institution cannot
+silently replace active work; suspension or cancellation is an explicit state
+transition that preserves the previous initiative history.
+
 ## Patterns to Follow
 
 ### Pattern 1: Frozen snapshot plus pure decision kernel
@@ -116,6 +138,13 @@ coverage, and quality. Use explicit `unknown`, `unsupported`, and stale states.
 **What:** Validate the complete candidate before one transactional persistence
 boundary; emit player-facing reports asynchronously by idempotent identity.
 **When:** Every model cycle, including degraded or provider-failure paths.
+
+### Pattern 4: Bounded initiative state machine
+
+**What:** Represent proposal, active work, objection, revision, preemption,
+completion, failure, cancellation, and rejection as typed transitions. Direct
+agreement is the fast path; exceptional dialogue is capped at two cycles.
+**When:** Every primitive institution and Executive disposition in 0.1.
 
 ## Anti-Patterns to Avoid
 
@@ -139,6 +168,15 @@ payload, queue, and retry caps.
 zero/empty/idle. **Why bad:** It fabricates strategic evidence. **Instead:** carry
 quality and coverage through normalization, kernel, explanation, and diagnostics.
 
+### Anti-Pattern 4: Turning the idea catalogue into runtime scope
+
+**What:** Prebuilding private knowledge, political resistance, rich councils,
+news chains, or treaty systems because a Bannerlord reference demonstrates them.
+**Why bad:** It recreates the scope-growth and idea-overload problem that the
+confirmed milestone policy rejects. **Instead:** Implement only the accepted
+primitive institution lifecycle; retain all other mechanisms as phase-triggered
+hypotheses.
+
 ## Scalability Considerations
 
 | Concern | At 100 users | At 10K users | At 1M users |
@@ -156,17 +194,29 @@ quality and coverage through normalization, kernel, explanation, and diagnostics
    fake-adapter, and disposable in-game observation behavior.
 3. Implement atomic persistence, section freshness, checkpoints, restart
    recovery, and idempotent ingestion before model integration.
-4. Implement deterministic ZYA/ARG kernel and information views under XEN
-   pressure; benchmark packet size and cycle budgets with recorded snapshots.
-5. Add provider ports, exact cache keys, typed candidate parsing, and complete
-   validation/admission; evaluate with recorded fixtures only.
+4. Implement deterministic ZYA/ARG kernel, information views, primitive
+   institution priorities, and typed one-active-initiative state with recorded
+   snapshots.
+5. Add provider ports, Executive arbitration, exceptional two-cycle dialogue,
+   exact cache keys, typed candidate parsing, and complete validation/admission;
+   evaluate with recorded fixtures only.
 6. Add report outbox and external diagnostics, then run AFK/SETA soak with
    health evidence. Keep future mutation seams as interfaces only.
 
 ## Sources
 
 - **Documented:** Live Galaxy project boundary and requirements, local
-  [`PROJECT.md`](../PROJECT.md), revision `a263e6d` (2026-08-28).
+  [`PROJECT.md`](../PROJECT.md), updated from confirmed MemPalace decisions on
+  2026-08-28.
+- **Confirmed decisions:** primitive institutions in 0.1 and small verified
+  milestone progression,
+  `drawer_wing_x4_live_galaxy_decisions_a376ced07a211aa8271352e6` and
+  `drawer_wing_dialogue_sessions_dd1780a21bd9ded3e9c4e997`.
+- **Verified reference plus hypotheses:** Bannerlord AI-mod architecture and
+  Live Galaxy adaptation candidates,
+  `drawer_wing_bannerlord_operations_7675741e0bb9147f4d2ed3f1` and the six
+  2026-08-28 `wing_x4_live_galaxy/observations` drawers. These inform seams but
+  do not establish product scope or X4 runtime behavior.
 - **Observed local precedent:** X4 Live protocol and bounded scheduling,
   `F:/Agent Projects/X4/tools/x4-live-protocol.md`, local revision available at
   research time; remote refresh was attempted but blocked by `.git/FETCH_HEAD`

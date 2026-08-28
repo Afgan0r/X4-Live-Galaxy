@@ -19,6 +19,7 @@ These are the minimum capabilities needed to answer the 0.1 product question. Mi
 | --- | --- | --- | --- |
 | Authoritative world-state observation | Minds need current, normalized facts about ZYA, ARG, XEN pressure, and observed KHK activity without mutating X4. | High | Capture stable identities, timestamps, freshness, quality, and source ownership; prove no game-state writes. |
 | Full ZYA and ARG Faction Minds | The experiment compares two persistent faction-specific executives under shared hostile pressure. | High | Both factions must maintain independent doctrine, motives, goals, short/long-term plans, and bounded historical context. |
+| Primitive faction institutions | The revised 0.1 scope must show that distinct internal roles can propose and own strategy without turning the prototype into political simulation. | High | Give each faction fixed-priority institutions, at most one active Shadow initiative per institution, Executive arbitration, bounded exceptional dialogue, and persistent lifecycle evidence. |
 | XEN-pressure and KHK recognition | XEN is the primary pressure in scope; KHK must be recognized when observed, without requiring a complete hostile-faction simulation. | Medium | Separate observed facts from inferred threat assessments; unknown/unseen KHK state must not become an empty or negative fact. |
 | Typed strategic decisions and plans | The kernel must evaluate strategy deterministically and keep model output outside the trust boundary. | High | Validate schema, semantics, safety, information boundaries, budgets, and current-state freshness; reject invalid output without partial effects. |
 | Explanations without hidden reasoning | Operators need useful rationale and players need concise reports, but private chain-of-thought and raw prompts must never leak. | Medium | Emit bounded public rationale fields derived from accepted decisions; diagnostics must redact secrets and hidden reasoning. |
@@ -37,6 +38,7 @@ These are the features that make the prototype useful as a research instrument r
 | Feature | Value Proposition | Complexity | Notes |
 | --- | --- | --- | --- |
 | Shared pressure, distinct faction doctrines | Demonstrates that ZYA and ARG produce meaningfully different strategies from common facts, rather than two copies of one prompt. | High | Evaluate divergence alongside consistency; avoid rewarding arbitrary personality prose. |
+| Auditable initiative ownership | Makes internal disagreement and responsibility measurable instead of hiding every choice inside one faction prompt. | High | Persist proposal, owner, disposition, preemption reason, validation result, and outcome without introducing majority rule or political sabotage. |
 | Information-bounded faction viewpoints | Preserves strategic credibility by limiting each mind to authoritative facts available to that faction. | High | Test hidden-information leakage and distinguish observed, derived, and unknown values. |
 | Replayable decision packets | Makes model behavior auditable and enables deterministic comparison across providers, prompts, and cache hits. | High | Preserve normalized snapshot, policy inputs, model metadata, validation result, and accepted report; exclude secrets and hidden reasoning. |
 | Cost/reliability/model benchmark matrix | Turns provider selection (likely Ollama initially, but not assumed) into measured evidence. | High | Compare latency, token usage, cache effectiveness, failure/retry behavior, and strategic quality under fixed fixtures. |
@@ -49,7 +51,8 @@ Explicitly do not build these in milestone 0.1.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 | --- | --- | --- |
-| Fleet, economy, diplomacy, or institution mutation | It would conflate strategic-quality and integration risks before observation, validation, persistence, and recovery are proven. | Emit typed proposals and reports only; reserve command application for a later milestone. |
+| Fleet, economy, diplomacy, or institution-initiative mutation | It would conflate strategic-quality and integration risks before observation, validation, persistence, and recovery are proven. | Model institutions and typed Shadow initiatives, but reserve command application for a later milestone. |
+| Open-ended council debate or internal politics | It would add unbounded model calls and political simulation before the initiative lifecycle is proven. | Use direct agreement by default and at most two Executive–institution dialogue cycles on material disagreement. |
 | Direct model access to X4 or arbitrary commands | Breaks the authority and trust-boundary invariants and makes replay/recovery unsafe. | Route all proposals through deterministic typed validation and a future application layer. |
 | Player missions or Player Influence | Product scope explicitly follows the autonomous faction core. | Keep interfaces open for a later milestone; do not add player-facing control now. |
 | Custom dossier, chronicle, or institution UI | High UI cost would obscure the research question and duplicate diagnostics. | Use concise Mail/Logbook sanity reports plus external structured diagnostics. |
@@ -64,6 +67,8 @@ Explicitly do not build these in milestone 0.1.
 The following are product capabilities, not 0.1 acceptance criteria:
 
 - Deterministic application of fleet, economy, institution, and eventually diplomacy effects after Shadow Director evidence is sufficient.
+- Private institutional knowledge, changing influence, refusal, sabotage, and power struggles.
+- First-alpha diplomacy beyond bilateral war declaration and termination.
 - Broader vanilla-plus-DLC faction coverage and compatibility gates for KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors.
 - Gameplay-ready autonomous faction core and later public-alpha packaging/release gates.
 - Missions, Player Influence, deeper diplomacy, historical simulations, and a custom in-game dossier/chronicle/institution interface.
@@ -75,7 +80,8 @@ The following are product capabilities, not 0.1 acceptance criteria:
 X4 observation adapter
   → normalized snapshots and freshness/quality metadata
   → faction information boundaries
-  → ZYA/ARG mind state and planning
+  → ZYA/ARG mind state and primitive institution priorities
+  → typed institution proposals + Executive initiative disposition
   → typed decision + explanation validation
   → deterministic cache/budget accounting
   → concise Mail/Logbook report
@@ -100,14 +106,14 @@ observed XEN/KHK signals
 Prioritize:
 
 1. A read-only X4 observation path producing normalized, timestamped, quality-marked snapshots for ZYA, ARG, XEN pressure, and observed KHK.
-2. Persistent ZYA/ARG minds with typed goals/plans, deterministic validation, bounded model calls, exact caching, and restart-safe recovery.
+2. Persistent ZYA/ARG minds and primitive institutions with typed goals and initiatives, bounded Executive arbitration, deterministic validation, exact caching, and restart-safe recovery.
 3. External correlated diagnostics and an AFK/SETA harness, with concise Mail/Logbook sanity reports as the only in-game output.
 
 Defer mutation, player-facing control, custom interfaces, broad faction coverage, and autonomous XEN/KHK behavior until the prototype has repeatable strategic-quality, cost, and reliability evidence.
 
 ## Complexity and Acceptance Summary
 
-The high-complexity work is not the report text; it is the end-to-end evidence chain: authoritative observation, typed boundaries, persistence/recovery, bounded model orchestration, and unattended SETA stability. Mail/Logbook output is medium complexity because it depends on a safe existing surface but must remain rate-bounded and non-authoritative. XEN/KHK parallel research is medium complexity and should be isolated so it cannot become a hidden dependency of ZYA/ARG acceptance.
+The high-complexity work is not the report text; it is the end-to-end evidence chain: authoritative observation, typed boundaries, institution initiative state, Executive arbitration, persistence/recovery, bounded model orchestration, and unattended SETA stability. Mail/Logbook output is medium complexity because it depends on a safe existing surface but must remain rate-bounded and non-authoritative. XEN/KHK parallel research is medium complexity and should be isolated so it cannot become a hidden dependency of ZYA/ARG acceptance.
 
 Acceptance must report three statuses separately: **verified locally**, **pending game smoke test**, and **observed in X4**. A passing unit or fake-adapter test cannot establish real X4 behavior; a successful short run cannot establish AFK/SETA durability; and a coherent report cannot establish model reliability or cost bounds.
 
@@ -122,7 +128,10 @@ Acceptance must report three statuses separately: **verified locally**, **pendin
 
 ## Sources
 
-- [`PROJECT.md`](../PROJECT.md) — active milestone 0.1 scope, requirements, out-of-scope capabilities, authority, trust-boundary, reliability, observability, and testing constraints (repository source; current checkout `master`, ahead of `origin/master` by 2 commits).
+- [`PROJECT.md`](../PROJECT.md) — active milestone 0.1 scope, requirements, out-of-scope capabilities, authority, trust-boundary, reliability, observability, and testing constraints.
+- MemPalace `drawer_wing_x4_live_galaxy_decisions_a376ced07a211aa8271352e6` — confirmed 0.1 primitive-institution scope extension.
+- MemPalace `drawer_wing_dialogue_sessions_dd1780a21bd9ded3e9c4e997` — confirmed small-milestone workflow and public-alpha boundary.
+- MemPalace `drawer_wing_bannerlord_operations_7675741e0bb9147f4d2ed3f1` — 103-item reference catalogue; candidates are not automatically product scope.
 - [`AGENTS.md`](../../AGENTS.md) — Live Galaxy evidence boundaries, compatibility policy, X4 research routing, and release maturity rules.
 - `F:\Agent Projects\X4\extensions`, `F:\Agent Projects\X4\tools`, and `F:\Agent Projects\X4\tests` — read-only X4 Live MCP integration precedent; dirty working tree and unavailable `FETCH_HEAD` make exact revision freshness unresolved.
 - [Egosoft X4: Foundations](https://www.egosoft.com/games/x4/info_en.php) — official product context and mod-supported single-player simulation context; version-specific runtime behavior is not inferred from this page.

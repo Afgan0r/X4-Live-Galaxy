@@ -8,8 +8,10 @@ institutions through validated game actions.
 
 Milestone `0.1` — Shadow Director is the active internal prototype. It observes
 X4 without mutating the game and validates persistent ZYA and ARG Faction Minds
-under shared XEN pressure. Phase 1, Read-Only Observation Spine, is ready for
-discussion and planning.
+with primitive fixed-priority institutions under shared XEN pressure. Each
+institution owns at most one typed Shadow initiative under bounded Executive
+arbitration. Phase 1, Read-Only Observation Spine, is ready for discussion and
+planning.
 
 See [PROJECT.md](.planning/PROJECT.md) for the product boundary and
 [ROADMAP.md](.planning/ROADMAP.md) for the milestone phases. All `0.x` versions

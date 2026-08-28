@@ -4,8 +4,9 @@
 
 Milestone 0.1 — Shadow Director is an internal observation-only prototype. The
 roadmap first proves a bounded, read-only X4 observation path, then builds
-replayable faction knowledge, persistent ZYA and ARG minds, provider-neutral
-shadow deliberation, correlated reporting, and unattended AFK/SETA evidence.
+replayable faction knowledge, persistent ZYA and ARG minds, primitive
+fixed-priority institutions, provider-neutral Shadow deliberation, correlated
+reporting, and unattended AFK/SETA evidence.
 XEN and KHK research proceeds as an independent parallel track and does not
 gate the ZYA/ARG implementation path. X4 remains authoritative throughout, and
 no phase introduces game-state mutation or public-ready claims.
@@ -13,7 +14,8 @@ no phase introduces game-state mutation or public-ready claims.
 ## Milestone 0.1 — Shadow Director
 
 **Milestone goal:** Demonstrate that full ZYA and ARG Faction Minds can maintain
-distinct, persistent, explainable shadow strategies under shared XEN pressure,
+distinct, persistent, explainable Shadow strategies under shared XEN pressure,
+coordinate primitive institutions through bounded Executive arbitration,
 recognize observed KHK activity, and remain bounded and recoverable during
 unattended X4 9.00 AFK/SETA operation without mutating the game.
 
@@ -21,9 +23,9 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 
 - [ ] **Phase 1: Read-Only Observation Spine** - Produce trustworthy, bounded, replayable X4 observations without mutation or game-thread stalls.
 - [ ] **Phase 2: Hostile-Faction Research Track** - Establish versioned XEN/KHK evidence independently of the ZYA/ARG critical path.
-- [ ] **Phase 3: Faction-Scoped Strategic State** - Turn frozen observations into deterministic, information-bounded strategic inputs for ZYA and ARG.
-- [ ] **Phase 4: Persistent Full Faction Minds** - Preserve distinct ZYA/ARG goals, plans, history, and recovery state across interruption boundaries.
-- [ ] **Phase 5: Bounded Shadow Deliberation** - Admit provider proposals only through deterministic validation, budgets, and exact replay contracts.
+- [ ] **Phase 3: Faction-Scoped Strategic State** - Turn frozen observations into deterministic faction and fixed-priority institution inputs for ZYA and ARG.
+- [ ] **Phase 4: Persistent Full Faction Minds** - Preserve distinct ZYA/ARG goals, institution initiatives, causal history, and recovery state across interruption boundaries.
+- [ ] **Phase 5: Bounded Shadow Deliberation** - Arbitrate and admit provider proposals and institution initiatives only through deterministic validation, budgets, and exact replay contracts.
 - [ ] **Phase 6: Correlated Reports and Diagnostics** - Emit safe concise X4 reports while retaining complete external decision evidence.
 - [ ] **Phase 7: X4 Operational Proof** - Demonstrate bounded normal-speed, SETA, reconnect, recovery, and unattended behavior in disposable X4 runs.
 - [ ] **Phase 8: Evaluation and Internal Prototype Gate** - Measure strategic quality and reliability and classify the 0.1 evidence without public-ready claims.
@@ -61,47 +63,53 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 
 ### Phase 3: Faction-Scoped Strategic State
 
-**Goal**: ZYA and ARG receive deterministic, replayable strategic state grounded in authoritative observations and their own permitted information.
+**Goal**: ZYA, ARG, and their primitive institutions receive deterministic, replayable strategic state grounded in authoritative observations and permitted faction information.
 **Depends on**: Phase 1
-**Requirements**: OBS-04, OBS-05, MIND-02, MIND-03, MIND-04
+**Requirements**: OBS-04, OBS-05, MIND-02, MIND-03, MIND-04, INST-01, INST-02
 **Success Criteria** (what must be TRUE):
 
 1. Frozen snapshots supply the supported economic, military, territorial, and threat facts needed by both factions, with XEN as shared primary pressure and KHK represented when observed.
 2. A verifier can inspect each faction's permitted information and the exact visibility policy used to construct it.
 3. Equivalent frozen snapshots and policies produce canonically ordered strategic facts, priorities, allowed shadow primitives, and identical admission inputs.
-4. Missing, stale, or faction-inaccessible facts cannot silently enter either faction's strategic packet.
+4. Each faction has a versioned primitive institution roster with fixed doctrine-conditioned priorities over the same authoritative faction-visible snapshot.
+5. Missing, stale, faction-inaccessible, private-institution, or unsupported facts cannot silently enter a faction or institution strategic packet.
 
 **Research**: Not normally required — use established typed-domain and deterministic-replay patterns; reopen research only for unresolved X4 fact semantics.
 **Plans**: TBD
 
 ### Phase 4: Persistent Full Faction Minds
 
-**Goal**: Full, distinct ZYA and ARG minds preserve coherent short- and long-term strategy across compaction, restart, retry, and schema transitions.
+**Goal**: Full, distinct ZYA and ARG minds preserve coherent short- and long-term strategy plus one-owner institution initiatives across compaction, restart, retry, and schema transitions.
 **Depends on**: Phase 3
-**Requirements**: MIND-01, MIND-05, MODEL-05, STATE-01, STATE-02, STATE-03, STATE-04, STATE-05
+**Requirements**: MIND-01, MIND-05, INST-03, INST-08, MODEL-05, STATE-01, STATE-02, STATE-03, STATE-04, STATE-05
 **Success Criteria** (what must be TRUE):
 
 1. An operator can inspect independent ZYA and ARG doctrine, motives, priorities, goals, short-term plans, and long-term plans that differ meaningfully on shared scenarios.
 2. Mind history compacts within model-relative budgets into versioned typed-plus-narrative capsules while typed facts remain authoritative.
-3. Accepted snapshots, mind state, replay inputs, admission state, and report intent recover transactionally without duplicating a plan, tick, or report.
-4. Corrupt, partial, incompatible, duplicate, out-of-order, and version-transition fixtures fail closed or recover the last valid state with structured evidence.
-5. The persistence boundary keeps compact authoritative runtime state under an X4-owned contract and never reads or modifies player save files.
+3. Every institution owns at most one active typed Shadow initiative with stable identity, objective, evidence, priority, lifecycle state, and owner.
+4. Proposal, objection, disposition, validation, ownership, preemption, and terminal outcome records persist as replayable causal evidence.
+5. Accepted snapshots, mind state, initiative state, replay inputs, admission state, and report intent recover transactionally without duplicating a plan, tick, initiative, or report.
+6. Corrupt, partial, incompatible, duplicate, out-of-order, and version-transition fixtures fail closed or recover the last valid state with structured evidence.
+7. The persistence boundary keeps compact authoritative runtime state under an X4-owned contract and never reads or modifies player save files.
 
 **Research**: Targeted — standard Rust/SQLite recovery patterns apply, but the X4-owned persistence contract requires exact evidence before implementation.
 **Plans**: TBD
 
 ### Phase 5: Bounded Shadow Deliberation
 
-**Goal**: ZYA and ARG can request, validate, and admit typed shadow plans from interchangeable providers without trusting provider output or affecting X4 state.
+**Goal**: ZYA and ARG can request, arbitrate, validate, and admit typed Shadow plans and institution initiatives from interchangeable providers without trusting provider output or affecting X4 state.
 **Depends on**: Phase 4
-**Requirements**: MIND-06, MIND-07, MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-06, MODEL-07
+**Requirements**: MIND-06, MIND-07, INST-04, INST-05, INST-06, INST-07, MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-06, MODEL-07
 **Success Criteria** (what must be TRUE):
 
 1. A strategic tick, relevant event, or cooldown can request deduplicated per-faction deliberation within explicit queue, time, retry, payload, context, call, and history bounds.
 2. Ollama or a deterministic fake can be exchanged behind the same typed provider boundary without changing strategic domain behavior.
 3. Only proposals passing schema, semantic, information, safety, budget, and current-state validation become typed shadow plans with goals, priorities, horizons, supporting facts, trade-offs, and safe explanations.
-4. Rejected or timed-out work records a bounded reason and cannot partially admit a plan, alter persistence, or mutate authoritative X4 state.
-5. Exact versioned cache keys and recorded fixtures make cache behavior and normal replay evaluation reproducible without a live provider.
+4. The Executive may originate, assign, approve, revise, preempt, reject, or terminate initiatives but cannot execute them directly or bypass deterministic admission.
+5. Aligned proposals proceed without dialogue; only material objection, mandate, preemption, or revision may open at most two full dialogue cycles before one final kernel-valid Executive disposition.
+6. Every replacement preserves the prior initiative, trigger, suspend-or-cancel disposition, replacement proposal, Executive decision, and reason.
+7. Rejected or timed-out work records a bounded reason and cannot partially admit a plan or initiative, alter authoritative persistence, or mutate X4 state.
+8. Exact versioned cache keys and recorded fixtures make cache behavior and normal replay evaluation reproducible without a live provider.
 
 **Research**: Required — benchmark current Ollama provider/model behavior and derive operating bounds from evidence rather than selecting them in advance.
 **Plans**: TBD
@@ -114,7 +122,7 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 **Success Criteria** (what must be TRUE):
 
 1. An accepted shadow decision can emit one concise deduplicated Mail or Logbook report through an existing X4 surface.
-2. Stable correlation IDs let an operator trace observation, snapshot, faction knowledge, provider request, cache result, validation, accepted plan, report intent, and acknowledgement end to end.
+2. Stable correlation IDs let an operator trace observation, snapshot, faction knowledge, institution proposal or objection, Executive disposition, provider request, cache result, validation, accepted plan and initiative, report intent, and acknowledgement end to end.
 3. Bounded diagnostics expose health, failures, latency, usage, cost, queues, recovery, and state quality during unattended operation.
 4. Player-visible and public output contains no credentials, machine-local paths, private prompts, hidden reasoning, or recipient-inaccessible information.
 5. Captured snapshots and traces reproduce decisions offline while remaining explicitly non-authoritative.
@@ -144,7 +152,7 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 **Requirements**: MODEL-08, MODEL-09, VAL-04, VAL-05
 **Success Criteria** (what must be TRUE):
 
-1. A versioned scenario corpus scores grounding, continuity, information discipline, faction divergence, strategic consistency, schema reliability, latency, cache behavior, and model cost.
+1. A versioned scenario corpus scores grounding, continuity, information discipline, faction divergence, institution contribution, initiative causality, strategic consistency, schema reliability, latency, cache behavior, and model cost.
 2. Strategic-quality acceptance is blocked unless an independently measured reliability floor passes, with all thresholds derived from recorded baselines.
 3. Representative pure high-risk Rust and Lua logic has measured mutation-tool baselines, reviewed survivors, and evidence-based operator and threshold decisions.
 4. The milestone package and evidence inventory separates implemented, locally verified, pending game smoke, and observed-in-X4 claims and never describes 0.1 as playable or public-ready.

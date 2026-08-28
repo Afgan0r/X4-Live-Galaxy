@@ -27,6 +27,8 @@ bounded by deterministic validation.
 - [ ] Observe the supported X4 world state without mutating the game.
 - [ ] Maintain persistent short- and long-term plans for full ZYA and ARG
   Faction Minds while treating XEN as the primary hostile pressure.
+- [ ] Exercise primitive ZYA and ARG institutions that propose and own typed
+  Shadow initiatives under bounded Executive arbitration.
 - [ ] Produce typed strategic decisions, explanations, and concise in-game
   reports without exposing hidden model reasoning.
 - [ ] Validate model routing, strategic quality, exact caching, token budgets,
@@ -41,7 +43,8 @@ bounded by deterministic validation.
 ### Out of Scope
 
 - Game-state mutation in milestone 0.1 — fleet, economy, diplomacy, and
-  institution effects begin only after Shadow Director evidence is sufficient.
+  institution initiatives remain Shadow state until the observation and
+  decision evidence is sufficient.
 - Player missions and the Player Influence system — deferred until after the
   autonomous faction core is proven and published.
 - A custom in-game dossier, chronicle, or institution interface — a separate
@@ -80,6 +83,14 @@ observed, emits concise strategic reports through existing X4 surfaces, and
 keeps detailed evidence in external diagnostics. Its primary acceptance path is
 an unattended AFK/SETA test stand, not normal play.
 
+Each 0.1 faction also has primitive institutions. They consume the same
+authoritative faction-visible snapshot, apply fixed faction-conditioned
+priorities, and propose typed Shadow initiatives. An institution owns at most
+one active initiative. The Executive Brain remains the final allocator and may
+originate, approve, revise, preempt, or reject an initiative, while an explicit
+bounded dialogue records material disagreement. Ownership, lifecycle, and
+outcome are retained for causal evaluation; no initiative mutates X4 in 0.1.
+
 The initial GSD roadmap describes only milestone 0.1. Later `0.x` milestones are
 internal prototypes that progressively validate fleet, economy, and institution
 autonomy. A private gameplay-ready build must cover the supported vanilla and
@@ -87,6 +98,19 @@ DLC faction roster and pass compatibility gates for KUDA AI Tweaks, More AI
 Economy Ships, and Add More Sectors. Version `1.0.0` is the first public alpha,
 not a stable release. It ships the autonomous faction core before missions;
 the custom interface and Player Influence follow as separate milestones.
+
+The first public alpha intentionally remains primitive. Its factions react to
+real economic, military, and territorial changes using a finite validated
+vocabulary of strategic primitives. Institutions execute bounded initiatives,
+and diplomacy is limited to declaring and ending bilateral wars. Rich treaties,
+private institutional knowledge, political resistance, misinformation, and
+mutable institutional power remain post-alpha. Publication requires a short
+normal-play campaign after automated and AFK/SETA gates pass.
+
+Development advances through small, visible, verified milestones. The project
+implements and tests one milestone in game before selecting and discussing the
+next; the Bannerlord-derived catalogue remains a reference source rather than a
+precommitted product backlog.
 
 Durable product decisions and historical planning evidence live in personal
 MemPalace wing `wing_x4_live_galaxy`. The repository owns active GSD state,
@@ -133,6 +157,9 @@ repository are read-only evidence sources.
 | Use Faction Minds under a deterministic kernel | Preserve faction agency without giving models arbitrary mutation authority | — Pending |
 | Make milestone 0.1 observation-only | Isolate strategy, ingestion, persistence, cost, and reliability before command integration | — Pending |
 | Run full ZYA and ARG minds with XEN pressure | Exercise contrasting factions and a shared existential threat without whole-galaxy scope | — Pending |
+| Include primitive institutions in milestone 0.1 | Test multi-role strategic disagreement and initiative ownership before any game mutation | — Pending |
+| Bound each institution to one active Shadow initiative | Keep concurrency, preemption, causality, and evaluation understandable in the first prototype | — Pending |
+| Keep Executive–institution dialogue exceptional and capped | Preserve useful disagreement without open-ended model loops, latency, or cost | — Pending |
 | Research XEN and KHK in parallel | Discover hostile-faction telemetry and architecture gaps while change is still cheap | — Pending |
 | Use AFK/SETA as the milestone 0.1 acceptance environment | Long-session diagnostics matter more than player-facing utility before mutations exist | — Pending |
 | Keep detailed evidence external and in-game reports concise | Use low-cost X4 integration while retaining full developer observability | — Pending |
@@ -145,8 +172,10 @@ repository are read-only evidence sources.
 | Gate strategic quality behind an independent reliability floor | Attractive plans cannot compensate for invalid schemas or information leakage | — Pending |
 | Derive evaluation thresholds from measured baselines | Avoid invented quality, cost, latency, and mutation-score targets | — Pending |
 | Detail only milestone 0.1 in the initial roadmap | Prevent later prototypes and alpha scope from diluting the first executable slice | — Pending |
+| Advance through one verified milestone at a time | Prevent the large idea catalogue from becoming premature scope and design debt | — Pending |
 | Treat all `0.x` versions as internal prototypes | Keep release claims aligned with actual gameplay evidence | — Pending |
 | Publish `1.0.0` as the first public alpha | Public release follows private closed-loop gameplay validation, not prototype completion | — Pending |
+| Keep first-alpha diplomacy primitive | Declare-war and end-war behavior is enough to prove dynamic political change before richer treaty systems | — Pending |
 | Ship the autonomous core before missions | The faction simulation is the product value and must work without player tasks | — Pending |
 | Keep MemPalace out of the public runtime core | Project memory aids development but is not a required mod dependency | — Pending |
 

@@ -26,6 +26,17 @@
 - [ ] **MIND-06**: Accepted shadow plans carry typed goals, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations.
 - [ ] **MIND-07**: A strategic tick, relevant event trigger, or cooldown can request deliberation while per-faction scheduling remains bounded and deduplicated.
 
+### Primitive Institutions
+
+- [ ] **INST-01**: ZYA and ARG each have a defined primitive institution roster whose fixed priorities are versioned and conditioned by faction doctrine.
+- [ ] **INST-02**: Every 0.1 institution reasons from the same authoritative faction-visible snapshot and cannot introduce private institutional knowledge or unsupported facts.
+- [ ] **INST-03**: Each institution owns at most one active typed Shadow initiative with stable identity, objective, supporting evidence, priority, lifecycle state, and owner.
+- [ ] **INST-04**: The Executive Brain may originate, assign, approve, revise, preempt, reject, or terminate an institution initiative but cannot execute it directly or bypass deterministic admission.
+- [ ] **INST-05**: Replacing active work requires an explicit preemption request containing the trigger, previous initiative state, suspend-or-cancel disposition, replacement, Executive decision, and preserved reason.
+- [ ] **INST-06**: Direct Executive–institution agreement proceeds without dialogue; only a material objection, forced mandate, preemption, or revision can open negotiation.
+- [ ] **INST-07**: Exceptional Executive–institution negotiation is capped at two full dialogue cycles and ends in one final kernel-valid Executive disposition without political refusal or sabotage.
+- [ ] **INST-08**: Proposal, objection, disposition, validation, ownership, preemption, and terminal outcome records persist as replayable causal evidence without mutating X4.
+
 ### Model Orchestration and Evaluation
 
 - [ ] **MODEL-01**: Model providers are isolated behind a provider-neutral typed interface; an Ollama adapter can be benchmarked first without becoming a domain dependency.
@@ -75,6 +86,8 @@
 
 - **AUTO-01**: Faction Minds can propose and execute bounded fleet, economy, diplomacy, and institution effects through deterministic game-side validation.
 - **AUTO-02**: Closed-loop outcomes feed back into faction state without duplicating or partially applying actions after recovery.
+- **AUTO-03**: Primitive institutions execute accepted initiatives while the Executive remains the brain and allocator rather than a direct game-world executor.
+- **AUTO-04**: First-public-alpha diplomacy is limited to declaring and ending bilateral wars under deterministic legality, cooldown, compatibility, and safety constraints.
 
 ### Product Expansion
 
@@ -83,6 +96,8 @@
 - **PROD-03**: Player missions and Player Influence are introduced only after the autonomous faction core is proven.
 - **PROD-04**: A custom dossier, chronicle, or institution interface is introduced in a separate post-alpha milestone.
 - **PROD-05**: Version 1.0.0 is released as the first public alpha only after private closed-loop gameplay, provenance, licensing, packaging, and recovery gates pass.
+- **PROD-06**: Before publication, the owner completes a bounded normal-play campaign after automated and AFK/SETA gates pass.
+- **PROD-07**: Public-alpha statements report material events truthfully while allowing faction-conditioned framing, and friendly-faction reports expose plan detail according to reputation.
 
 ## Out of Scope
 
@@ -90,6 +105,9 @@
 | --- | --- |
 | Game-state mutation in milestone 0.1 | Shadow Director must isolate observation, strategy, persistence, cost, and reliability first. |
 | Autonomous XEN or KHK minds | Milestone 0.1 only researches their future architecture and treats them as observed pressures. |
+| Private institutional knowledge or false beliefs | Primitive 0.1 institutions share the authoritative faction-visible snapshot; divergent epistemics remain later design work. |
+| Mutable institutional influence, refusal, sabotage, or power struggle | Alpha institutions are bounded executors under final Executive arbitration, not an internal political simulation. |
+| Rich diplomacy or treaty systems | First-public-alpha diplomacy is deliberately limited to declaring and ending bilateral wars. |
 | Player missions and Player Influence | The autonomous faction core must be proven before player-directed workflows. |
 | Custom in-game interface | Existing Mail or Logbook surfaces are sufficient for the observation prototype. |
 | Full vanilla, DLC, or mod-added faction rollout | The first prototype deliberately exercises only full ZYA and ARG minds. |
@@ -119,6 +137,14 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MIND-05 | Phase 4 | Pending |
 | MIND-06 | Phase 5 | Pending |
 | MIND-07 | Phase 5 | Pending |
+| INST-01 | Phase 3 | Pending |
+| INST-02 | Phase 3 | Pending |
+| INST-03 | Phase 4 | Pending |
+| INST-04 | Phase 5 | Pending |
+| INST-05 | Phase 5 | Pending |
+| INST-06 | Phase 5 | Pending |
+| INST-07 | Phase 5 | Pending |
+| INST-08 | Phase 4 | Pending |
 | MODEL-01 | Phase 5 | Pending |
 | MODEL-02 | Phase 5 | Pending |
 | MODEL-03 | Phase 5 | Pending |
@@ -148,9 +174,9 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | RES-02 | Phase 2 | Pending |
 | RES-03 | Phase 2 | Pending |
 
-**Coverage:** 43/43 milestone requirements mapped.
+**Coverage:** 51/51 milestone requirements mapped.
 
 ---
 
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after milestone 0.1 roadmap creation*
+*Last updated: 2026-08-28 after primitive-institution scope integration*

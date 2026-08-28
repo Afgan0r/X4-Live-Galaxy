@@ -23,7 +23,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 Phase: 1 of 8 (Read-Only Observation Spine)
 Plan: 0 of TBD in current phase
 Status: Ready for Phase 1 discussion and planning
-Last activity: 2026-08-28 — Initialized the milestone 0.1 roadmap with 43/43 requirements mapped.
+Last activity: 2026-08-28 — Integrated primitive institutions and remapped 51/51 milestone 0.1 requirements.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -57,6 +57,8 @@ Recent decisions affecting current work:
 
 - [Milestone 0.1]: Shadow Director is observation-only and internal; X4 remains authoritative and no mutation command is admitted.
 - [Milestone 0.1]: Full ZYA and ARG minds share XEN pressure, recognize observed KHK, and are accepted through AFK/SETA evidence.
+- [Milestone 0.1]: Primitive institutions share the authoritative faction-visible snapshot, apply fixed priorities, and own at most one active Shadow initiative under bounded Executive arbitration.
+- [Workflow]: The 103 Bannerlord-derived ideas remain a reference catalogue; development selects one small visible milestone, verifies it in game, and only then discusses the next.
 - [Milestone 0.1]: XEN/KHK research is an independent parallel track and cannot gate the ZYA/ARG implementation path.
 
 ### Pending Todos
@@ -67,6 +69,7 @@ None yet.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, and scheduling semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
+- [Phases 3–5]: Phase planning must define the concrete ZYA/ARG institution roster and typed initiative schema without importing private knowledge, mutable influence, or internal politics.
 
 ## Deferred Items
 
@@ -79,5 +82,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-08-28
-Stopped at: Roadmap baseline created; Phase 1 is ready for discussion and planning.
+Stopped at: Revised 0.1 baseline created with primitive institutions; Phase 1 remains ready for discussion and planning.
 Resume file: None
