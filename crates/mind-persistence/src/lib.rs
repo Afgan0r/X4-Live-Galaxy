@@ -1,8 +1,12 @@
 #![forbid(unsafe_code)]
 
 mod checkpoint;
+mod fake_port;
+mod port;
 
 pub use checkpoint::{CheckpointEnvelope, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
+pub use fake_port::FakeCheckpointPort;
+pub use port::{CheckpointAck, CheckpointPort, CompatibilityStatus, PortError};
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]

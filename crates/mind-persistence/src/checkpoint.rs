@@ -103,6 +103,15 @@ impl CheckpointEnvelope {
     }
 
     #[must_use]
+    pub fn reserved_report_id(&self) -> &str {
+        &self.payload.reserved_report_identity
+    }
+
+    pub(crate) fn predecessor_matches(&self, expected: Option<&CheckpointCursor>) -> bool {
+        self.predecessor.as_ref() == expected
+    }
+
+    #[must_use]
     pub fn cursor(&self) -> CheckpointCursor {
         CheckpointCursor::new(self.sequence, self.integrity_hash.clone())
     }
