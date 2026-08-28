@@ -1,7 +1,9 @@
 use observation_domain::SectionQuality;
 
+use crate::faction::FactOwner;
+
 #[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum FactFamily {
     Economic,
     Military,
@@ -10,14 +12,14 @@ pub enum FactFamily {
 }
 
 #[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ThreatSubject {
     Xen,
     Khk,
 }
 
 #[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum FactAvailability {
     Available,
     Unknown,
@@ -29,6 +31,7 @@ pub enum FactAvailability {
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StrategicFact {
+    reference: FactReference,
     family: FactFamily,
     subject: Option<ThreatSubject>,
     availability: FactAvailability,
@@ -36,15 +39,22 @@ pub struct StrategicFact {
 
 impl StrategicFact {
     pub(crate) const fn new(
+        reference: FactReference,
         family: FactFamily,
         subject: Option<ThreatSubject>,
         availability: FactAvailability,
     ) -> Self {
         Self {
+            reference,
             family,
             subject,
             availability,
         }
+    }
+
+    #[must_use]
+    pub const fn reference(&self) -> FactReference {
+        self.reference
     }
 
     pub const fn family(&self) -> FactFamily {
@@ -61,7 +71,39 @@ impl StrategicFact {
     }
 
     pub(crate) const fn with_availability(&self, availability: FactAvailability) -> Self {
-        Self::new(self.family, self.subject, availability)
+        Self::new(self.reference, self.family, self.subject, availability)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct FactReference {
+    owner: FactOwner,
+    family: FactFamily,
+    subject: Option<ThreatSubject>,
+}
+
+impl FactReference {
+    #[must_use]
+    pub const fn new(owner: FactOwner, family: FactFamily, subject: Option<ThreatSubject>) -> Self {
+        Self {
+            owner,
+            family,
+            subject,
+        }
+    }
+
+    #[must_use]
+    pub const fn owner(self) -> FactOwner {
+        self.owner
+    }
+
+    pub const fn family(self) -> FactFamily {
+        self.family
+    }
+
+    #[must_use]
+    pub const fn subject(self) -> Option<ThreatSubject> {
+        self.subject
     }
 }
 

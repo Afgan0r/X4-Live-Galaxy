@@ -1,7 +1,7 @@
 use observation_ingest::ProjectionSnapshot;
 
 use crate::fact::{
-    FactAvailability, FactFamily, StrategicFact, ThreatSubject, availability, family,
+    FactAvailability, FactFamily, FactReference, StrategicFact, ThreatSubject, availability, family,
 };
 use crate::faction::{FactOwner, Faction, is_own, owner};
 use crate::packet::{PairedPackets, StrategicPacket};
@@ -68,7 +68,12 @@ pub fn derive_with_policy(
             Ok((
                 owner,
                 kind == "resource_map",
-                StrategicFact::new(family, subject, availability(item.quality)),
+                StrategicFact::new(
+                    FactReference::new(owner, family, subject),
+                    family,
+                    subject,
+                    availability(item.quality),
+                ),
             ))
         })
         .collect::<Result<Vec<_>, _>>()?;
