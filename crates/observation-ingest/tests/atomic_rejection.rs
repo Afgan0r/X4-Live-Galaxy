@@ -19,12 +19,12 @@ fn accepted_projection() -> AcceptedProjection {
         "version": 2
     }"#;
 
-    match admit_batch(AcceptedProjection::empty(), &[payload, marker]) {
-        AdmissionOutcome::Accepted(projection) => projection,
-        outcome @ AdmissionOutcome::Rejected { .. } => {
-            panic!("fixture must create an accepted projection: {outcome:?}")
-        }
-    }
+    let outcome = admit_batch(AcceptedProjection::empty(), &[payload, marker]);
+    assert!(
+        matches!(outcome, AdmissionOutcome::Accepted(_)),
+        "fixture must create an accepted projection: {outcome:?}"
+    );
+    outcome.into_projection()
 }
 
 #[test]

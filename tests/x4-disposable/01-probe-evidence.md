@@ -48,6 +48,24 @@ replace them with a later stronger result.
 | Save access or modification | `none` |
 | Game-state effect, report, or acknowledgement path | `none` |
 
+## Local Preflight Baseline — 2026-08-29
+
+<!-- markdownlint-disable MD013 -->
+
+| Check | Result | Evidence level |
+| --- | --- | --- |
+| `01-install-guard.ps1 -VerifyPackageOnly` | Passed; no installation performed. | `documented-static` |
+| `cargo fmt --check` | Passed. | `fake-local` |
+| `cargo test --workspace` | Passed. | `fake-local` |
+| `cargo clippy --workspace --all-targets -- -D warnings` | Passed after replacing two explicit test-only `panic!` branches with asserted fixture preconditions. | `fake-local` |
+| `Get-Process X4,x4-bridge` | No matching process observed. | `documented-static` |
+
+<!-- markdownlint-enable MD013 -->
+
+Installation was not attempted. OBS-X4-01 through OBS-X4-04 remain `pending-X4`
+because no disposable Creative Custom campaign was run. No save, game
+installation, or game-state effect path was accessed.
+
 ## Classification Rules
 
 - `observed-in-X4`: qualifying disposable game evidence includes all required

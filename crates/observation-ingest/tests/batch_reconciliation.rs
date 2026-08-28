@@ -53,15 +53,15 @@ const ADDED_GAMMA_V2: &str = r#"{
 }"#;
 
 fn initially_accepted() -> AcceptedProjection {
-    match admit_batch(
+    let outcome = admit_batch(
         AcceptedProjection::empty(),
         &[INITIAL_ALPHA, INITIAL_BETA, COMPLETE_V1],
-    ) {
-        AdmissionOutcome::Accepted(projection) => projection,
-        outcome @ AdmissionOutcome::Rejected { .. } => {
-            panic!("initial complete scope must be accepted: {outcome:?}")
-        }
-    }
+    );
+    assert!(
+        matches!(outcome, AdmissionOutcome::Accepted(_)),
+        "initial complete scope must be accepted: {outcome:?}"
+    );
+    outcome.into_projection()
 }
 
 #[test]
