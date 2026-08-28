@@ -4,6 +4,7 @@ members = [
     "crates/observation-ingest",
     "crates/strategic-state",
     "crates/mind-domain",
+    "crates/mind-persistence",
     "crates/x4-bridge",
     "tools/source-size-lint",
 ]

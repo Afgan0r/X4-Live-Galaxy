@@ -48,6 +48,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mind-persistence"
+version = "0.1.0"
+dependencies = [
+ "mind-domain",
+ "serde",
+ "serde_json",
+ "strategic-state",
+]
+
+[[package]]
 name = "observation-domain"
 version = "0.1.0"
 
