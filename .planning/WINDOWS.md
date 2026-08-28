@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 1
+open_count: 3
 waived_count: 0
 fixed_count: 0
-total_count: 1
-last_updated: 2026-08-28T18:18:35.175Z
+total_count: 3
+last_updated: 2026-08-28T19:19:05.974Z
 ---
 
 # Broken Windows Ledger
@@ -16,6 +16,8 @@ last_updated: 2026-08-28T18:18:35.175Z
 | id | phase | kind | file | line | description | status | reason | recorded_at | resolved_at |
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
 | 1 | 01 | stub | extensions/live_galaxy/md/live_galaxy_observation.xml | 3 | The MD scheduler is intentionally an empty shell until a disposable X4 runtime probe proves the exact event syntax and cadence. | open |  | 2026-08-28T18:18:35.175Z |  |
+| 2 | 01 | unrun-verify | extensions/live_galaxy/tests/telemetry_contract.lua |  | Pure Lua contract execution remains pending a compatible X4-evidenced runner. | open |  | 2026-08-28T19:17:05.468Z |  |
+| 3 | 01 | unrun-verify | extensions/live_galaxy/tests/scheduler_contract.lua |  | Pure Lua scheduler contract execution remains pending a compatible X4-evidenced runner. | open |  | 2026-08-28T19:19:05.974Z |  |
 
 ````json
 [
@@ -29,6 +31,30 @@ last_updated: 2026-08-28T18:18:35.175Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-28T18:18:35.175Z",
+    "resolved_at": null
+  },
+  {
+    "id": 2,
+    "kind": "unrun-verify",
+    "phase": "01",
+    "file": "extensions/live_galaxy/tests/telemetry_contract.lua",
+    "line": null,
+    "description": "Pure Lua contract execution remains pending a compatible X4-evidenced runner.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-28T19:17:05.468Z",
+    "resolved_at": null
+  },
+  {
+    "id": 3,
+    "kind": "unrun-verify",
+    "phase": "01",
+    "file": "extensions/live_galaxy/tests/scheduler_contract.lua",
+    "line": null,
+    "description": "Pure Lua scheduler contract execution remains pending a compatible X4-evidenced runner.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-28T19:19:05.974Z",
     "resolved_at": null
   }
 ]

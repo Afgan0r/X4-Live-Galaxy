@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-08-28T18:54:06.817Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-08-28T19:17:08.052Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: cf280aabb78059ff7db4ec735ba930e73f4f3c79
+state_head: 6749766cb7f15f8bb67f2779e92a5a46082072d5
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 1 (Read-Only Observation Spine) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-08-29 — Phase 1 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 22 min | 2 tasks | 3 files |
 | Phase 01 P05 | 31 min | 2 tasks | 3 files |
 | Phase 01 P04 | 8 min | 2 tasks | 6 files |
+| Phase 01 P06 | 18 min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Queue and frame limits return explicit nonblocking outcomes before bridge admission.
 - [Phase 1]: Rejection evidence is bounded metadata separate from immutable accepted snapshot content.
 - [Phase 1]: Complete-scope reconciliation uses only incoming batch members, never inherited candidate records.
+- [Phase 1]: Plan 01-06 keeps X4 globals behind injected adapters and makes every producer outcome explicit.
+- [Phase 1]: Plan 01-06 defers embedded Lua and Mission Director runtime claims until a disposable X4 probe.
 
 ### Pending Todos
 
@@ -113,6 +116,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T18:54:06.804Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-08-28T19:17:08.038Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
