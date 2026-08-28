@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 03-02-PLAN.md
+stopped_at: Completed 03-03-PLAN.md
 last_updated: "2026-08-28T22:57:16.548Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
@@ -12,7 +12,7 @@ progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 17
-  completed_plans: 11
+  completed_plans: 12
   percent: 13
 ---
 
@@ -105,6 +105,7 @@ Recent decisions affecting current work:
 - [Phase 1]: Foreign changing facts stay inaccessible while static resource maps remain available under recorded policy.
 - [Phase 3]: Institution views expose only capability and faction-visible snapshot identity; raw projections and private facts remain unavailable.
 - [Phase 3]: Doctrine v1 labels and priorities are explicit Live Galaxy product policy, not official X4 numeric canon.
+- [Phase 3]: Shadow planning is limited to four typed primitives; replay identity covers canonical policy, doctrine, fact, primitive, and evidence inputs.
 
 ### Pending Todos
 

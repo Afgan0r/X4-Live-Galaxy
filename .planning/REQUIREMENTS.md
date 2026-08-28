@@ -21,7 +21,7 @@
 - [ ] **MIND-01**: ZYA and ARG each have an independent full Faction Mind with explicit doctrine, motives, priorities, goals, short-term plans, long-term plans, and an Executive-owned typed Shadow diplomatic posture for their mutual relationship.
 - [x] **MIND-02**: Each Faction Mind receives only authoritative truth and information available to that faction, with the applied visibility policy recorded for replay.
 - [x] **MIND-03**: The deterministic kernel derives bounded strategic facts, priorities, and allowed shadow primitives from a frozen normalized snapshot.
-- [ ] **MIND-04**: Equivalent replay inputs produce canonically ordered, reproducible deterministic inputs and admission results.
+- [x] **MIND-04**: Equivalent replay inputs produce canonically ordered, reproducible deterministic inputs and admission results.
 - [ ] **MIND-05**: ZYA and ARG exhibit measurably distinct strategic responses to shared scenarios rather than differing only by faction labels.
 - [ ] **MIND-06**: Accepted shadow plans and Executive diplomatic postures carry typed goals or dispositions, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations without opening inter-faction negotiation.
 - [ ] **MIND-07**: A strategic tick, relevant event trigger, or cooldown can request deliberation while per-faction scheduling remains bounded and deduplicated.
@@ -135,7 +135,7 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MIND-01 | Phase 4 | Pending |
 | MIND-02 | Phase 3 | Complete |
 | MIND-03 | Phase 3 | Complete |
-| MIND-04 | Phase 3 | Pending |
+| MIND-04 | Phase 3 | Complete |
 | MIND-05 | Phase 4 | Pending |
 | MIND-06 | Phase 5 | Pending |
 | MIND-07 | Phase 5 | Pending |
