@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mdscript name="live_galaxy_observation">
-  <!-- Runtime event syntax and cadence remain pending a disposable X4 probe. -->
+  <!--
+    Runtime event syntax, cadence, and save-sensitive detection remain pending
+    a disposable X4 probe. This cue remains telemetry-only: it declares no
+    actions, reports, acknowledgements, or game-state effect path.
+  -->
   <cues />
 </mdscript>
