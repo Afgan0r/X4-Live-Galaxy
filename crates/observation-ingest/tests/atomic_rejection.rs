@@ -1,6 +1,6 @@
 use observation_ingest::{
-    admit_batch, AcceptedProjection, AdmissionError, AdmissionOutcome, RejectionReason,
-    MAX_REJECTION_EVIDENCE,
+    AcceptedProjection, AdmissionError, AdmissionOutcome, MAX_REJECTION_EVIDENCE, RejectionReason,
+    admit_batch,
 };
 
 fn accepted_projection() -> AcceptedProjection {
@@ -28,7 +28,7 @@ fn accepted_projection() -> AcceptedProjection {
 #[test]
 fn hostile_fixture_frames_preserve_the_last_accepted_projection() {
     let accepted = accepted_projection();
-    let accepted_snapshot = accepted.snapshot();
+    let accepted_snapshot = accepted.snapshot().clone();
     let malformed = include_str!("../../../tests/fixtures/malformed-envelope.json");
     let oversized = include_str!("../../../tests/fixtures/oversized-envelope.json");
     let reordered = include_str!("../../../tests/fixtures/reordered-duplicate-sequence.json");
@@ -37,7 +37,8 @@ fn hostile_fixture_frames_preserve_the_last_accepted_projection() {
         vec![malformed],
         vec![oversized],
         vec![reordered],
-        vec![r#"{
+        vec![
+            r#"{
             "type": "observation",
             "scope": "runtime:sectors",
             "entity_id": "sector:alpha",
@@ -45,8 +46,10 @@ fn hostile_fixture_frames_preserve_the_last_accepted_projection() {
             "version": 1,
             "quality": "fresh",
             "content": "stale"
-        }"#],
-        vec![r#"{
+        }"#,
+        ],
+        vec![
+            r#"{
             "type": "observation",
             "scope": "runtime:sectors",
             "entity_id": "sector:alpha",
@@ -54,10 +57,11 @@ fn hostile_fixture_frames_preserve_the_last_accepted_projection() {
             "version": 2,
             "quality": "fresh",
             "content": "equal-version-conflict"
-        }"#],
+        }"#,
+        ],
     ] {
         let outcome = admit_batch(accepted.clone(), &hostile_batch);
-        assert_eq!(outcome.snapshot(), accepted_snapshot);
+        assert_eq!(outcome.snapshot(), &accepted_snapshot);
         assert!(matches!(outcome, AdmissionOutcome::Rejected { .. }));
     }
 }
@@ -65,7 +69,7 @@ fn hostile_fixture_frames_preserve_the_last_accepted_projection() {
 #[test]
 fn exact_duplicate_replay_is_idempotent_without_replacing_the_snapshot() {
     let accepted = accepted_projection();
-    let accepted_snapshot = accepted.snapshot();
+    let accepted_snapshot = accepted.snapshot().clone();
     let replay = r#"{
         "type": "observation",
         "scope": "runtime:sectors",
@@ -79,7 +83,7 @@ fn exact_duplicate_replay_is_idempotent_without_replacing_the_snapshot() {
     let outcome = admit_batch(accepted, &[replay]);
 
     assert!(matches!(outcome, AdmissionOutcome::Accepted(_)));
-    assert_eq!(outcome.snapshot(), accepted_snapshot);
+    assert_eq!(outcome.snapshot(), &accepted_snapshot);
     assert_eq!(outcome.rejection_reason(), None);
 }
 
@@ -90,15 +94,20 @@ fn rejection_evidence_is_bounded_and_never_retains_raw_payloads() {
 
     for _ in 0..=MAX_REJECTION_EVIDENCE {
         let outcome = admit_batch(accepted, &[malformed]);
-        assert_eq!(outcome.rejection_reason(), Some(RejectionReason::MalformedFrame));
+        assert_eq!(
+            outcome.rejection_reason(),
+            Some(RejectionReason::MalformedFrame)
+        );
         accepted = outcome.into_projection();
     }
 
     assert_eq!(accepted.rejection_evidence().len(), MAX_REJECTION_EVIDENCE);
-    assert!(accepted
-        .rejection_evidence()
-        .iter()
-        .all(|evidence| evidence.reason() == RejectionReason::MalformedFrame));
+    assert!(
+        accepted
+            .rejection_evidence()
+            .iter()
+            .all(|evidence| evidence.reason() == RejectionReason::MalformedFrame)
+    );
 }
 
 #[test]
