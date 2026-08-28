@@ -118,13 +118,19 @@ fn recover_crash(acknowledged: CheckpointEnvelope, _: CrashPoint) -> RecoveryOut
 fn recover_candidate(acknowledged: CheckpointEnvelope, candidate: &[u8]) -> RecoveryOutcome {
     match CheckpointEnvelope::decode(candidate) {
         Ok(decoded) if decoded == acknowledged => retained_valid(acknowledged, None),
+        Ok(decoded) if decoded.sequence() < acknowledged.sequence() => {
+            rejected(acknowledged, "stale-cursor")
+        }
+        Ok(decoded) if decoded.sequence() > acknowledged.sequence() => {
+            rejected(acknowledged, "out-of-order-cursor")
+        }
         Ok(_) => rejected(acknowledged, "content-collision"),
         Err(_) => rejected(acknowledged, "invalid-envelope"),
     }
 }
 
 fn migrate(acknowledged: CheckpointEnvelope, source: &str, target: &str) -> RecoveryOutcome {
-    if source == SCHEMA_VERSION && target == SCHEMA_VERSION {
+    if target == SCHEMA_VERSION && matches!(source, SCHEMA_VERSION | "mind-checkpoint-v0") {
         retained_valid(acknowledged, None)
     } else {
         RecoveryOutcome::retained(acknowledged, RecoveryDiagnostic::UnsupportedMigration)

@@ -14,6 +14,14 @@ const FRAMES: [&str; 4] = [
 ];
 
 fn checkpoint(report: &str) -> Result<CheckpointEnvelope, String> {
+    checkpoint_at(1, None, report)
+}
+
+fn checkpoint_at(
+    sequence: u64,
+    predecessor: Option<&mind_persistence::CheckpointCursor>,
+    report: &str,
+) -> Result<CheckpointEnvelope, String> {
     let snapshot = admit_batch(AcceptedProjection::empty(), &FRAMES)
         .into_projection()
         .snapshot;
@@ -26,8 +34,8 @@ fn checkpoint(report: &str) -> Result<CheckpointEnvelope, String> {
     )
     .map_err(|error| format!("{error:?}"))?;
     CheckpointEnvelope::from_pending_commit(
-        1,
-        None,
+        sequence,
+        predecessor.cloned(),
         &commit,
         CheckpointDraft::new(
             "snapshot-zya-1",
@@ -98,4 +106,50 @@ fn unsupported_migration_returns_only_the_last_valid_projection() {
         outcome,
         RecoveryOutcome::retained(acknowledged, RecoveryDiagnostic::UnsupportedMigration)
     );
+}
+
+#[test]
+fn ordered_legacy_migration_exposes_only_a_valid_target_copy() {
+    let result = checkpoint("report-zya-1");
+    assert!(result.is_ok());
+    let Ok(acknowledged) = result else { return };
+    let outcome = recover(RecoveryInput::migration(
+        acknowledged.clone(),
+        "mind-checkpoint-v0",
+        "1",
+    ));
+    assert_eq!(outcome.projection(), Some(&acknowledged));
+    assert_eq!(outcome.diagnostic(), None);
+    assert!(!outcome.port_write_requested());
+}
+
+#[test]
+fn rejects_duplicate_stale_and_out_of_order_candidates() {
+    let first = checkpoint("report-zya-1");
+    assert!(first.is_ok());
+    let Ok(first) = first else { return };
+    let second = checkpoint_at(2, Some(&first.cursor()), "report-zya-2");
+    assert!(second.is_ok());
+    let Ok(second) = second else { return };
+    let duplicate = checkpoint("report-zya-collision");
+    let stale = first.encode();
+    let third = checkpoint_at(3, Some(&second.cursor()), "report-zya-3");
+    assert!(duplicate.is_ok() && stale.is_ok() && third.is_ok());
+    let (Ok(duplicate), Ok(stale), Ok(third)) = (duplicate, stale, third) else {
+        return;
+    };
+    let duplicate = duplicate.encode();
+    let out_of_order = third.encode();
+    assert!(duplicate.is_ok() && out_of_order.is_ok());
+    let (Ok(duplicate), Ok(out_of_order)) = (duplicate, out_of_order) else {
+        return;
+    };
+    for candidate in [duplicate, stale, out_of_order] {
+        let outcome = recover(RecoveryInput::candidate(second.clone(), candidate));
+        assert_eq!(outcome.projection(), Some(&second));
+        assert!(matches!(
+            outcome.diagnostic(),
+            Some(RecoveryDiagnostic::Rejected { .. })
+        ));
+    }
 }

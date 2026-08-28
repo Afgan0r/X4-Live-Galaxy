@@ -1,10 +1,12 @@
 #![forbid(unsafe_code)]
 
+mod capsule;
 mod checkpoint;
 mod fake_port;
 mod port;
 mod recovery;
 
+pub use capsule::{BudgetProfile, Capsule, CapsuleError, CommitmentProjection, LedgerRange};
 pub use checkpoint::{CheckpointEnvelope, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
 pub use fake_port::FakeCheckpointPort;
 pub use port::{CheckpointAck, CheckpointPort, CompatibilityStatus, PortError};
