@@ -5,6 +5,22 @@ pub enum Faction {
     Arg,
 }
 
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Capability {
+    DefenseAndMilitaryStrategy,
+    EconomyAndLogistics,
+    TerritorialDevelopmentAndInfrastructure,
+}
+
+impl Capability {
+    pub const ALL: [Self; 3] = [
+        Self::DefenseAndMilitaryStrategy,
+        Self::EconomyAndLogistics,
+        Self::TerritorialDevelopmentAndInfrastructure,
+    ];
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FactOwner {
     Zya,

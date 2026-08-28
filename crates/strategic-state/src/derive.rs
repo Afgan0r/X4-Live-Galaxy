@@ -4,68 +4,8 @@ use crate::fact::{
     FactAvailability, FactFamily, StrategicFact, ThreatSubject, availability, family,
 };
 use crate::faction::{FactOwner, Faction, is_own, owner};
+use crate::packet::{PairedPackets, StrategicPacket};
 use crate::policy::VisibilityPolicy;
-
-const POLICY_VERSION: &str = "visibility-v1";
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StrategicPacket {
-    faction: Faction,
-    policy_version: &'static str,
-    facts: Vec<StrategicFact>,
-}
-
-impl StrategicPacket {
-    pub const fn faction(&self) -> Faction {
-        self.faction
-    }
-    #[must_use]
-    pub const fn facts(&self) -> &Vec<StrategicFact> {
-        &self.facts
-    }
-    #[must_use]
-    pub const fn policy_version(&self) -> &'static str {
-        self.policy_version
-    }
-    pub fn availability(&self, family: FactFamily) -> FactAvailability {
-        self.facts
-            .iter()
-            .find(|fact| fact.family() == family)
-            .map_or(FactAvailability::Unknown, StrategicFact::availability)
-    }
-    #[must_use]
-    pub fn has_shared_threat(&self, threat: ThreatSubject) -> bool {
-        self.facts
-            .iter()
-            .any(|fact| fact.family() == FactFamily::Threat && fact.subject() == Some(threat))
-    }
-    #[must_use]
-    pub fn has_observed_threat(&self, threat: ThreatSubject) -> bool {
-        self.facts.iter().any(|fact| {
-            fact.subject() == Some(threat) && fact.availability() != FactAvailability::Unsupported
-        })
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PairedPackets {
-    zya: StrategicPacket,
-    arg: StrategicPacket,
-}
-
-impl PairedPackets {
-    #[must_use]
-    pub const fn policy_version(&self) -> &'static str {
-        POLICY_VERSION
-    }
-    #[must_use]
-    pub const fn packet(&self, faction: Faction) -> &StrategicPacket {
-        match faction {
-            Faction::Zya => &self.zya,
-            Faction::Arg => &self.arg,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PacketLimits {
@@ -143,14 +83,14 @@ fn packet(
     policy: VisibilityPolicy,
     facts: &[(FactOwner, bool, StrategicFact)],
 ) -> StrategicPacket {
-    StrategicPacket {
+    StrategicPacket::new(
         faction,
-        policy_version: policy.version(),
-        facts: facts
+        policy.version(),
+        facts
             .iter()
             .map(|(owner, static_map, fact)| visible(faction, *owner, *static_map, fact))
             .collect(),
-    }
+    )
 }
 
 const fn visible(
