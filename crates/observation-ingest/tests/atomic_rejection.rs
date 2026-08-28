@@ -21,7 +21,9 @@ fn accepted_projection() -> AcceptedProjection {
 
     match admit_batch(AcceptedProjection::empty(), &[payload, marker]) {
         AdmissionOutcome::Accepted(projection) => projection,
-        outcome => panic!("fixture must create an accepted projection: {outcome:?}"),
+        outcome @ AdmissionOutcome::Rejected { .. } => {
+            panic!("fixture must create an accepted projection: {outcome:?}")
+        }
     }
 }
 

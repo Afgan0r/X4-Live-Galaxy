@@ -62,9 +62,9 @@ fn missing_capability_and_game_build_mismatch_name_exact_restart_owner() {
 #[test]
 fn compatible_session_rejects_stale_sequence_numbers() {
     let session = SessionState::new(1).admit_hello(compatible_hello());
-    let advanced = session
-        .accept_sequence(SequenceNumber::new(1))
-        .expect("first sequence is accepted");
+    let Some(advanced) = session.accept_sequence(SequenceNumber::new(1)) else {
+        panic!("first sequence is accepted");
+    };
 
     assert_eq!(advanced.accept_sequence(SequenceNumber::new(1)), None);
     assert_eq!(advanced.accept_sequence(SequenceNumber::new(0)), None);

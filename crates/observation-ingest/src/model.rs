@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 
-use observation_domain::{CanonicalObservationKey, EntityId, ObservationRecord, SectionQuality};
+use crate::snapshot::ProjectionSnapshot;
 
 pub const MAX_REJECTION_EVIDENCE: usize = 8;
 
@@ -18,6 +18,7 @@ pub enum AdmissionError {
     CollectionLimitExceeded,
 }
 
+#[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RejectionReason {
     MalformedFrame,
@@ -45,6 +46,7 @@ impl From<&AdmissionError> for RejectionReason {
     }
 }
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RejectionEvidence {
     reason: RejectionReason,
@@ -60,43 +62,7 @@ impl RejectionEvidence {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ScopedObservation {
-    pub scope: EntityId,
-    pub record: ObservationRecord,
-    pub quality: SectionQuality,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct ProjectionSnapshot {
-    pub observations: BTreeMap<EntityId, ScopedObservation>,
-}
-
-impl ProjectionSnapshot {
-    pub fn entity_ids(&self) -> Vec<&str> {
-        self.observations.keys().map(EntityId::as_str).collect()
-    }
-
-    pub fn keys_for_scope(&self, scope: &EntityId) -> Vec<CanonicalObservationKey> {
-        self.observations
-            .values()
-            .filter(|item| &item.scope == scope)
-            .map(|item| {
-                CanonicalObservationKey::new(item.record.entity_id().clone(), item.record.version())
-            })
-            .collect()
-    }
-
-    pub fn remove_tombstones(&mut self, scope: &EntityId, tombstones: &[CanonicalObservationKey]) {
-        self.observations.retain(|_, item| {
-            &item.scope != scope
-                || !tombstones
-                    .iter()
-                    .any(|tombstone| tombstone.entity_id() == item.record.entity_id())
-        });
-    }
-}
-
+#[must_use]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AcceptedProjection {
     pub snapshot: ProjectionSnapshot,
@@ -112,6 +78,7 @@ impl AcceptedProjection {
         &self.snapshot
     }
 
+    #[must_use]
     pub const fn rejection_evidence(&self) -> &VecDeque<RejectionEvidence> {
         &self.rejection_evidence
     }
@@ -123,7 +90,6 @@ impl AcceptedProjection {
         }
     }
 
-    #[must_use]
     pub fn record_rejection(mut self, reason: RejectionReason) -> Self {
         if self.rejection_evidence.len() == MAX_REJECTION_EVIDENCE {
             let _ = self.rejection_evidence.pop_front();
@@ -134,6 +100,7 @@ impl AcceptedProjection {
     }
 }
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AdmissionOutcome {
     Accepted(AcceptedProjection),
@@ -157,6 +124,7 @@ impl AdmissionOutcome {
         self.projection().snapshot()
     }
 
+    #[must_use]
     pub const fn rejection_reason(&self) -> Option<RejectionReason> {
         match self {
             Self::Accepted(_) => None,

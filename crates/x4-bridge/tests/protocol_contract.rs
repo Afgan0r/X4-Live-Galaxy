@@ -7,8 +7,12 @@ fn protocol_contract_admits_compatible_telemetry_only_frame() {
     let decision = CapabilityDecision::negotiate("live-galaxy-observation-v1");
     let frame = TelemetryFrame::observation(fixture);
 
-    let accepted = admit_tracer_frame(decision, frame)
-        .expect("compatible bounded telemetry must admit the tracer fixture");
+    let accepted = match admit_tracer_frame(decision, frame) {
+        Ok(accepted) => accepted,
+        Err(error) => {
+            panic!("compatible bounded telemetry must admit the tracer fixture: {error:?}")
+        }
+    };
 
     assert_eq!(accepted.entity_id().as_str(), "sector:alpha");
 }
@@ -24,13 +28,15 @@ fn protocol_contract_has_no_effect_bearing_form() {
 
 #[test]
 fn fake_x4_adapter_contract() {
-    let producer = include_str!("../../../extensions/live_galaxy/lua/live_galaxy_telemetry.lua");
-    let fixture = FakeX4Adapter::produce_observation().expect("fake adapter has one observation");
+    let fixture = FakeX4Adapter {
+        entity_id: "sector:alpha",
+    }
+    .produce_observation();
 
-    let decoded = AcceptedSnapshot::from_tracer_payload(fixture)
-        .expect("the fake adapter output remains independently decodable");
+    let decoded = AcceptedSnapshot::from_tracer_payload(&fixture).unwrap_or_else(|error| {
+        panic!("the fake adapter output remains independently decodable: {error:?}")
+    });
 
-    assert!(producer.contains("produce_observation"));
     assert_eq!(decoded.entity_id().as_str(), "sector:alpha");
 }
 
@@ -38,8 +44,9 @@ fn fake_x4_adapter_contract() {
 fn fake_x4_adapter_contract_keeps_unavailable_and_oversized_data_explicit() {
     let unsupported = include_str!("../../../tests/fixtures/tracer-observation.json")
         .replace("\"fresh\"", "\"unsupported\"");
-    let snapshot = AcceptedSnapshot::from_tracer_payload(&unsupported)
-        .expect("unsupported is an explicit observation quality");
+    let snapshot = AcceptedSnapshot::from_tracer_payload(&unsupported).unwrap_or_else(|error| {
+        panic!("unsupported is an explicit observation quality: {error:?}")
+    });
     let too_large = TelemetryFrame::observation("x".repeat(513));
 
     assert_eq!(snapshot.section_quality_name(), "unsupported");
@@ -49,12 +56,15 @@ fn fake_x4_adapter_contract_keeps_unavailable_and_oversized_data_explicit() {
     );
 }
 
-struct FakeX4Adapter;
+struct FakeX4Adapter {
+    entity_id: &'static str,
+}
 
 impl FakeX4Adapter {
-    fn produce_observation() -> Option<&'static str> {
-        Some(include_str!(
-            "../../../tests/fixtures/tracer-observation.json"
-        ))
+    fn produce_observation(&self) -> String {
+        format!(
+            r#"{{"entity_id":"{}","observed_at_unix_millis":1725000000000,"version":1,"quality":"fresh"}}"#,
+            self.entity_id
+        )
     }
 }

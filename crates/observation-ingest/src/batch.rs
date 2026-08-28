@@ -6,14 +6,20 @@ use observation_domain::{
     ReconciliationDecision, SectionQuality, classify_duplicate, reconcile_membership,
 };
 
+use crate::batch_budget::BatchBudget;
 use crate::model::{
-    AcceptedProjection, AdmissionError, AdmissionOutcome, ProjectionSnapshot, RejectionEvidence,
-    RejectionReason, ScopedObservation,
+    AcceptedProjection, AdmissionError, AdmissionOutcome, RejectionEvidence, RejectionReason,
 };
+use crate::snapshot::{ProjectionSnapshot, ScopedObservation};
 use crate::wire::{WireCompleteMarker, WireFrame, WireObservation};
 
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
 const MAX_SCOPE_MEMBERS: usize = 64;
+pub const MAX_BATCH_FRAMES: usize = 128;
+pub const MAX_BATCH_BYTES: usize = MAX_BATCH_FRAMES * MAX_TRACER_PAYLOAD_BYTES;
+pub const MAX_BATCH_SCOPES: usize = 16;
+pub const MAX_BATCH_MARKERS: usize = MAX_BATCH_SCOPES;
+pub const MAX_BATCH_OBSERVATIONS: usize = MAX_BATCH_FRAMES;
 
 pub fn validate_batch(
     accepted: &AcceptedProjection,
@@ -22,16 +28,25 @@ pub fn validate_batch(
     let mut candidate = accepted.snapshot.clone();
     let mut markers = Vec::new();
     let mut observed_members = BTreeMap::<EntityId, Vec<CanonicalObservationKey>>::new();
+    let mut budget = BatchBudget::new(frames.len())?;
     for frame in frames {
+        budget.record_frame(frame.len())?;
         if frame.len() > MAX_TRACER_PAYLOAD_BYTES {
             return Err(AdmissionError::FrameTooLarge);
         }
         match serde_json::from_str(frame).map_err(|_| AdmissionError::InvalidFixture)? {
             WireFrame::Observation(frame) => {
+                budget.record_observation()?;
                 let (scope, key) = apply_observation(&mut candidate, frame)?;
+                budget.register_scope(&scope)?;
                 observed_members.entry(scope).or_default().push(key);
             }
-            WireFrame::CompleteMarker(frame) => markers.push(complete_marker(frame)?),
+            WireFrame::CompleteMarker(frame) => {
+                budget.record_marker()?;
+                let marker = complete_marker(frame)?;
+                budget.register_scope(marker.scope())?;
+                markers.push(marker);
+            }
         }
     }
     for marker in &markers {
@@ -111,6 +126,20 @@ fn apply_reconciliation(
     observed: &[CanonicalObservationKey],
 ) -> Result<(), AdmissionError> {
     let scope = marker.scope();
+    if observed.iter().any(|key| key.version() != marker.version()) {
+        return Err(AdmissionError::OutOfOrderVersion);
+    }
+    if let Some(completed) = accepted.completed_scope(scope) {
+        if marker.version() < completed.version() {
+            return Err(AdmissionError::OutOfOrderVersion);
+        }
+        if marker.version() == completed.version() {
+            return completed
+                .is_exact_replay(marker.version(), observed)
+                .then_some(())
+                .ok_or(AdmissionError::OutOfOrderVersion);
+        }
+    }
     let limit =
         CollectionLimit::new(MAX_SCOPE_MEMBERS).ok_or(AdmissionError::CollectionLimitExceeded)?;
     match reconcile_membership(
@@ -122,6 +151,7 @@ fn apply_reconciliation(
     ) {
         ReconciliationDecision::Reconciled { tombstones, .. } => {
             candidate.remove_tombstones(scope, &tombstones);
+            candidate.record_completion(scope.clone(), marker.version(), observed.to_vec());
             Ok(())
         }
         ReconciliationDecision::RejectedCollectionLimit => {

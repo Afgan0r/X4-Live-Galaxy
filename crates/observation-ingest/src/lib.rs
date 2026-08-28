@@ -1,7 +1,10 @@
 #![forbid(unsafe_code)]
 
 mod batch;
+mod batch_budget;
+mod completion;
 mod model;
+mod snapshot;
 mod wire;
 
 use observation_domain::{
@@ -9,15 +12,20 @@ use observation_domain::{
     SectionQuality,
 };
 
-pub use batch::{admit_batch, validate_batch};
+pub use batch::{
+    MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
+    admit_batch, validate_batch,
+};
 pub use model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, MAX_REJECTION_EVIDENCE,
-    ProjectionSnapshot, RejectionEvidence, RejectionReason,
+    RejectionEvidence, RejectionReason,
 };
+pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;
 
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
 
+#[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AcceptedSnapshot {
     section: SectionDescriptor,
@@ -52,6 +60,7 @@ impl AcceptedSnapshot {
         self.section.version()
     }
 
+    #[must_use]
     pub const fn section_quality_name(&self) -> &'static str {
         match self.section.quality() {
             SectionQuality::Fresh => "fresh",
