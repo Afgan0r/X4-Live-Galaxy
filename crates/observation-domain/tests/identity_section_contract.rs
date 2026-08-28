@@ -1,7 +1,7 @@
 use observation_domain::{
-    classify_duplicate, quality_for_empty_section, CanonicalObservationKey, CompleteMarker,
-    DuplicateDecision, EntityId, ObservationRecord, ObservationSource, ObservationTime,
-    ObservationVersion, SectionCoverage, SectionFreshness, SectionQuality,
+    CanonicalObservationKey, CompleteMarker, DuplicateDecision, EntityId, ObservationRecord,
+    ObservationSource, ObservationTime, ObservationVersion, SectionCoverage, SectionFreshness,
+    SectionState, classify_duplicate, quality_for_empty_section,
 };
 
 fn entity(value: &str) -> EntityId {
@@ -45,25 +45,25 @@ fn known_empty_requires_a_successful_marker_for_the_same_scope() {
 
     assert_eq!(
         quality_for_empty_section(&scope, None),
-        SectionQuality::new(SectionFreshness::Fresh, SectionCoverage::Unknown)
+        SectionState::new(SectionFreshness::Fresh, SectionCoverage::Unknown)
     );
     assert_eq!(
         quality_for_empty_section(&scope, Some(&marker)),
-        SectionQuality::new(SectionFreshness::Fresh, SectionCoverage::Partial)
+        SectionState::new(SectionFreshness::Fresh, SectionCoverage::Partial)
     );
     assert_eq!(
         quality_for_empty_section(
             &scope,
             Some(&CompleteMarker::successful(scope.clone(), version(3)))
         ),
-        SectionQuality::new(SectionFreshness::Fresh, SectionCoverage::KnownEmpty)
+        SectionState::new(SectionFreshness::Fresh, SectionCoverage::KnownEmpty)
     );
 }
 
 #[test]
 fn freshness_is_independent_and_canonical_keys_are_stable() {
-    let fresh = SectionQuality::new(SectionFreshness::Fresh, SectionCoverage::Complete);
-    let stale = SectionQuality::new(SectionFreshness::Stale, SectionCoverage::Complete);
+    let fresh = SectionState::new(SectionFreshness::Fresh, SectionCoverage::Complete);
+    let stale = SectionState::new(SectionFreshness::Stale, SectionCoverage::Complete);
     let key_a = CanonicalObservationKey::new(entity("sector:alpha"), version(2));
     let key_b = CanonicalObservationKey::new(entity("sector:beta"), version(1));
 
