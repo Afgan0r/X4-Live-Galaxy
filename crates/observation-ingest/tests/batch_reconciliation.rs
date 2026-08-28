@@ -1,4 +1,4 @@
-use observation_ingest::{admit_batch, AcceptedProjection, AdmissionOutcome};
+use observation_ingest::{AcceptedProjection, AdmissionOutcome, admit_batch};
 
 const INITIAL_ALPHA: &str = r#"{
     "type": "observation",
@@ -43,7 +43,10 @@ const COMPLETE_V2: &str = r#"{
 }"#;
 
 fn initially_accepted() -> AcceptedProjection {
-    match admit_batch(AcceptedProjection::empty(), &[INITIAL_ALPHA, INITIAL_BETA, COMPLETE_V1]) {
+    match admit_batch(
+        AcceptedProjection::empty(),
+        &[INITIAL_ALPHA, INITIAL_BETA, COMPLETE_V1],
+    ) {
         AdmissionOutcome::Accepted(projection) => projection,
         outcome => panic!("initial complete scope must be accepted: {outcome:?}"),
     }
