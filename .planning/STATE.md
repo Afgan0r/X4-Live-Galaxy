@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 01-06-PLAN.md
+stopped_at: Completed 01-07-PLAN.md evidence contract; runtime harness gap closure planned
 last_updated: "2026-08-28T19:17:08.052Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
@@ -11,8 +11,8 @@ state_head: 6749766cb7f15f8bb67f2779e92a5a46082072d5
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 7
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
   percent: 0
 ---
 
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 1 (Read-Only Observation Spine) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
+Plan: 8 of 9
+Status: Ready to execute runtime harness gap closure
 Last activity: 2026-08-29 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -38,20 +38,20 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 1
-- Average duration: 31 min
-- Total execution time: 0.5 hours
+- Total plans completed: 7
+- Average duration: 24.2 min across 6 recorded durations
+- Total execution time: 2 hours 25 min across 6 recorded durations; Plan 01-07 duration not recorded
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 | --- | --- | --- | --- |
-| 01 | 1 | 31 min | 31 min |
+| 01 | 7 | 2 hours 25 min recorded | 24.2 min (6 recorded) |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (31 min)
-- Trend: Not available (one completed plan)
+- Last 5 plans: 01-03 (22 min), 01-05 (31 min), 01-04 (8 min), 01-06 (18 min), 01-07 (not recorded)
+- Trend: Partial; one of seven completed-plan durations is not recorded
 
 *Updated after each plan completion*
 **Per-Plan Metrics:**
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P05 | 31 min | 2 tasks | 3 files |
 | Phase 01 P04 | 8 min | 2 tasks | 6 files |
 | Phase 01 P06 | 18 min | 2 tasks | 7 files |
+| Phase 01 P07 | not recorded | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Complete-scope reconciliation uses only incoming batch members, never inherited candidate records.
 - [Phase 1]: Plan 01-06 keeps X4 globals behind injected adapters and makes every producer outcome explicit.
 - [Phase 1]: Plan 01-06 defers embedded Lua and Mission Director runtime claims until a disposable X4 probe.
+- [Phase 1]: The completed 01-07 procedure is local planning evidence only; it found no active MD cue, registered UI Lua, or runnable Rust named-pipe server, so OBS-X4-01 through OBS-X4-04 cannot yet run.
+- [Phase 1]: Plan 01-08 must create the telemetry-only UI-Lua/MD/named-pipe harness before Plan 01-09 performs the sole human X4 gate.
 
 ### Pending Todos
 
