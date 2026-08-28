@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-08-28T18:37:35.909Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-08-28T18:54:06.817Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: d0c4033ccb0581069f11688196675404c02dc4b2
+state_head: cf280aabb78059ff7db4ec735ba930e73f4f3c79
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 1 (Read-Only Observation Spine) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-08-29 — Phase 1 execution started
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 35 min | 2 tasks | 13 files |
 | Phase 01 P03 | 22 min | 2 tasks | 3 files |
 | Phase 01 P05 | 31 min | 2 tasks | 3 files |
+| Phase 01 P04 | 8 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Compatible Rust reconnects increment bridge generation without demanding an X4 restart.
 - [Phase 1]: Protocol major, capability, and game build mismatches remain terminal until X4 restarts.
 - [Phase 1]: Queue and frame limits return explicit nonblocking outcomes before bridge admission.
+- [Phase 1]: Rejection evidence is bounded metadata separate from immutable accepted snapshot content.
+- [Phase 1]: Complete-scope reconciliation uses only incoming batch members, never inherited candidate records.
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T18:37:35.897Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-08-28T18:54:06.804Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None

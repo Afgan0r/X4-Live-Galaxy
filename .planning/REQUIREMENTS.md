@@ -13,7 +13,7 @@
 - [ ] **OBS-04**: The observation model provides the supported economic, military, territorial, and threat facts required by the ZYA and ARG minds.
 - [ ] **OBS-05**: XEN is represented as the primary hostile pressure shared by ZYA and ARG, and KHK is recognized when authoritative observations contain it.
 - [x] **OBS-06**: Runtime sectors, assets, capacity, and ownership are discovered from observed state rather than assumed from a fixed vanilla map or job count.
-- [ ] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
+- [x] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
 - [x] **OBS-08**: Milestone 0.1 X4 integration exposes no fleet, economy, diplomacy, institution, or other game-state mutation command.
 
 ### Faction Minds and Deterministic Strategy
@@ -130,7 +130,7 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | OBS-04 | Phase 3 | Pending |
 | OBS-05 | Phase 3 | Pending |
 | OBS-06 | Phase 1 | Complete |
-| OBS-07 | Phase 1 | Pending |
+| OBS-07 | Phase 1 | Complete |
 | OBS-08 | Phase 1 | Complete |
 | MIND-01 | Phase 4 | Pending |
 | MIND-02 | Phase 3 | Pending |
