@@ -1,6 +1,6 @@
 {
   "mode": "yolo",
-  "granularity": "fine",
+  "granularity": "standard",
   "model_profile": "budget",
   "effort": {
     "routing_tier_defaults": {
