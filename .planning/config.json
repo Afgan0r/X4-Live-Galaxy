@@ -1,0 +1,113 @@
+{
+  "model_profile": "budget",
+  "model_policy": {
+    "provider": "custom",
+    "budget": null,
+    "high": "gpt-5.6-sol",
+    "medium": "gpt-5.6-sol",
+    "low": "gpt-5.6-luna"
+  },
+  "effort": {
+    "routing_tier_defaults": {
+      "heavy": "medium",
+      "standard": "low",
+      "light": "medium"
+    }
+  },
+  "commit_docs": true,
+  "parallelization": true,
+  "search_gitignored": false,
+  "brave_search": false,
+  "firecrawl": false,
+  "exa_search": false,
+  "tavily_search": false,
+  "ref_search": false,
+  "perplexity": false,
+  "jina": false,
+  "git": {
+    "branching_strategy": "milestone",
+    "create_tag": true,
+    "phase_branch_template": "codex/phase-{phase}-{slug}",
+    "milestone_branch_template": "codex/{milestone}-{slug}",
+    "quick_branch_template": null,
+    "base_branch": "master"
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "nyquist_validation": true,
+    "auto_advance": true,
+    "node_repair": true,
+    "node_repair_budget": 2,
+    "ui_phase": false,
+    "ui_safety_gate": false,
+    "ai_integration_phase": true,
+    "api_coverage_gate": true,
+    "human_verify_mode": "end-of-phase",
+    "context_guard_mode": "warn",
+    "text_mode": false,
+    "research_before_questions": true,
+    "discuss_mode": "discuss",
+    "skip_discuss": false,
+    "code_review": true,
+    "code_review_depth": "deep",
+    "code_review_command": null,
+    "pattern_mapper": true,
+    "plan_bounce": false,
+    "plan_bounce_script": null,
+    "plan_bounce_passes": 2,
+    "auto_prune_state": false,
+    "post_planning_gaps": true,
+    "security_enforcement": true,
+    "security_asvs_level": 1,
+    "security_block_on": "high",
+    "tdd_mode": true,
+    "use_worktrees": true,
+    "context_coverage_gate": true
+  },
+  "ship": {
+    "pr_body_sections": []
+  },
+  "hooks": {
+    "context_warnings": true
+  },
+  "project_code": "live-galaxy",
+  "phase_naming": "sequential",
+  "agent_skills": {
+    "gsd-phase-researcher": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-x4-integration",
+    "gsd-planner": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-x4-integration",
+    "gsd-plan-checker": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-code-review,live-galaxy-x4-integration",
+    "gsd-executor": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-x4-integration",
+    "gsd-verifier": "live-galaxy-rust-tests,live-galaxy-code-review,live-galaxy-x4-integration,live-galaxy-skill-evolution",
+    "gsd-nyquist-auditor": "live-galaxy-rust-tests,live-galaxy-code-review,live-galaxy-x4-integration",
+    "gsd-code-reviewer": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-code-review,live-galaxy-x4-integration,live-galaxy-skill-evolution",
+    "gsd-code-fixer": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-x4-integration",
+    "gsd-debugger": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-x4-integration",
+    "gsd-security-auditor": "live-galaxy-rust-conventions,live-galaxy-code-review,live-galaxy-x4-integration",
+    "gsd-integration-checker": "live-galaxy-rust-conventions,live-galaxy-rust-tests,live-galaxy-code-review,live-galaxy-x4-integration",
+    "gsd-ai-researcher": "live-galaxy-rust-conventions,openai-docs",
+    "gsd-eval-planner": "live-galaxy-rust-tests,live-galaxy-code-review,openai-docs",
+    "gsd-eval-auditor": "live-galaxy-rust-tests,live-galaxy-code-review,live-galaxy-skill-evolution,openai-docs"
+  },
+  "claude_md_path": "./CLAUDE.md",
+  "plan_review": {
+    "source_grounding": true,
+    "source_grounding_authority": "grep"
+  },
+  "resolve_model_ids": "omit",
+  "response_language": "Russian",
+  "mempalace": {
+    "enabled": true,
+    "memory_mode": "augment",
+    "wing": "wing_x4_live_galaxy",
+    "recall_on_discuss": true,
+    "recall_on_plan": true,
+    "capture_artifacts": true,
+    "mirror_kg": true,
+    "cross_project_tunnels": true,
+    "diary_journal": true,
+    "auto_capture_hooks": true
+  },
+  "runtime": "codex"
+}

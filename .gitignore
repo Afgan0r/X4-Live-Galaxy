@@ -1,0 +1,43 @@
+# Agent-local and temporary state
+.codex/agents/
+.codex/.gsd-routing-state.json
+.codex/.gsd-routing-restart-required
+.tmp/
+PENDING-MEMORY.md
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.local.json
+*.local.toml
+*.local.yaml
+*.local.yml
+
+# Rust and build output
+target/
+build/
+dist/
+coverage/
+
+# Runtime state
+*.db
+*.db-shm
+*.db-wal
+*.log
+logs/
+runtime/
+
+# X4 packages, captures, and saves
+*.cat
+*.dat
+*.sav
+*.xml.gz
+captures/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
