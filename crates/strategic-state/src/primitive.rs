@@ -176,4 +176,25 @@ impl ShadowPrimitive {
             | Self::BilateralPostureDisposition { evidence, .. } => evidence,
         }
     }
+
+    #[must_use]
+    pub fn canonical_key(
+        &self,
+    ) -> (
+        ShadowPrimitiveKind,
+        PrimitiveOwner,
+        u8,
+        PlanningHorizon,
+        Option<BilateralPosture>,
+        Vec<FactReference>,
+    ) {
+        (
+            self.kind(),
+            self.owner(),
+            self.priority(),
+            self.horizon(),
+            self.posture(),
+            self.evidence().to_vec(),
+        )
+    }
 }

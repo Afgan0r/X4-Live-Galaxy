@@ -1,5 +1,6 @@
 use crate::fact::{FactAvailability, FactFamily, StrategicFact, ThreatSubject};
 use crate::faction::{Capability, Faction, FactionProfile};
+use crate::{AdmissionInputs, ReplayFingerprint, ShadowPrimitive};
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -11,6 +12,10 @@ impl VisibleSnapshotId {
             Faction::Zya => Self(1),
             Faction::Arg => Self(2),
         }
+    }
+
+    pub(crate) const fn value(self) -> u8 {
+        self.0
     }
 }
 
@@ -102,6 +107,23 @@ impl StrategicPacket {
 
     pub fn facts(&self) -> &[StrategicFact] {
         self.visible_snapshot.facts()
+    }
+
+    #[must_use]
+    pub fn canonical_facts(&self) -> Vec<StrategicFact> {
+        let mut facts = self.facts().to_vec();
+        facts.sort_unstable_by_key(|fact| (fact.reference(), fact.availability()));
+        facts
+    }
+
+    #[must_use]
+    pub fn admission_inputs(&self, primitives: &[ShadowPrimitive]) -> AdmissionInputs {
+        crate::fingerprint::admission_inputs(self, primitives)
+    }
+
+    #[must_use]
+    pub fn replay_fingerprint(&self, primitives: &[ShadowPrimitive]) -> ReplayFingerprint {
+        crate::fingerprint::replay_fingerprint(self, primitives)
     }
 
     #[must_use]

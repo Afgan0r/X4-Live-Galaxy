@@ -1,0 +1,51 @@
+use observation_ingest::{AcceptedProjection, admit_batch};
+use strategic_state::{Faction, PacketLimits, ShadowPrimitive, derive_packets};
+
+const ORDERED: [&str; 4] = [
+    r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:military:fleet","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
+    r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
+    r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:territorial:station","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
+    r#"{"type":"observation","scope":"XEN","entity_id":"XEN:threat:XEN","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"shared"}"#,
+];
+
+fn packet(
+    frames: &[&str],
+) -> Result<strategic_state::StrategicPacket, strategic_state::DerivationError> {
+    let snapshot = admit_batch(AcceptedProjection::empty(), frames)
+        .into_projection()
+        .snapshot;
+    derive_packets(&snapshot, PacketLimits::tracer())
+        .map(|packets| packets.packet(Faction::Zya).clone())
+}
+
+#[test]
+fn permutations_have_one_canonical_packet_and_replay_identity() {
+    let ordered_result = packet(&ORDERED);
+    let permuted_result = packet(&[ORDERED[3], ORDERED[1], ORDERED[0], ORDERED[2]]);
+    assert!(ordered_result.is_ok());
+    assert!(permuted_result.is_ok());
+    let Ok(ordered) = ordered_result else { return };
+    let Ok(permuted) = permuted_result else {
+        return;
+    };
+    let ordered_result = ShadowPrimitive::derive(&ordered);
+    let permuted_result = ShadowPrimitive::derive(&permuted);
+    assert!(ordered_result.is_ok());
+    assert!(permuted_result.is_ok());
+    let Ok(ordered_primitives) = ordered_result else {
+        return;
+    };
+    let Ok(permuted_primitives) = permuted_result else {
+        return;
+    };
+
+    assert_eq!(ordered.canonical_facts(), permuted.canonical_facts());
+    assert_eq!(
+        ordered.admission_inputs(&ordered_primitives),
+        permuted.admission_inputs(&permuted_primitives)
+    );
+    assert_eq!(
+        ordered.replay_fingerprint(&ordered_primitives),
+        permuted.replay_fingerprint(&permuted_primitives)
+    );
+}
