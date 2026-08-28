@@ -43,7 +43,7 @@
 - [ ] **MODEL-02**: Provider output remains untrusted until schema, semantic, information, safety, budget, and current-state validation all succeed.
 - [ ] **MODEL-03**: Rejected or timed-out provider work records a bounded reason and cannot partially admit a plan or alter authoritative X4 state.
 - [ ] **MODEL-04**: Cache entries use exact versioned keys covering faction, snapshot, policy, prompt package, schema, provider, model, and relevant generation settings.
-- [ ] **MODEL-05**: Context and history compaction uses model-relative token budgets and produces versioned typed-plus-narrative capsules whose typed facts remain authoritative.
+- [x] **MODEL-05**: Context and history compaction uses model-relative token budgets and produces versioned typed-plus-narrative capsules whose typed facts remain authoritative.
 - [ ] **MODEL-06**: Provider calls, retries, time, payload size, context size, queue depth, and retained history have explicit enforceable bounds.
 - [ ] **MODEL-07**: Recorded fixtures and deterministic fakes allow normal tests and replay evaluation to run without a live model, but fake output cannot satisfy real-model strategic-quality acceptance.
 - [ ] **MODEL-08**: A scenario corpus scores factual grounding, continuity, information discipline, faction divergence, strategic consistency, schema reliability, latency, cache behavior, and model cost.
@@ -54,8 +54,8 @@
 - [x] **STATE-01**: Compact authoritative runtime state has a versioned X4-owned persistence contract, while external cache, diagnostics, and prose remain explicitly non-authoritative.
 - [x] **STATE-02**: The Rust bridge persists accepted snapshots, mind state, replay inputs, admission state, and report intent transactionally with schema-version metadata.
 - [x] **STATE-03**: Restart recovery is idempotent: replay, reconnect, and retry cannot duplicate an accepted plan, strategic tick, or report.
-- [ ] **STATE-04**: A corrupt, incompatible, or partial persisted record fails closed with structured diagnostics while preserving the last recoverable state.
-- [ ] **STATE-05**: Recovery and migration behavior is executable against crash-point, duplicate, out-of-order, and version-transition fixtures without reading or modifying player save files.
+- [x] **STATE-04**: A corrupt, incompatible, or partial persisted record fails closed with structured diagnostics while preserving the last recoverable state.
+- [x] **STATE-05**: Recovery and migration behavior is executable against crash-point, duplicate, out-of-order, and version-transition fixtures without reading or modifying player save files.
 - [x] **STATE-06**: A protocol-compatible Rust bridge release can restart, update, and reconnect without restarting X4 or losing or duplicating accepted state; an incompatible game-side protocol revision fails closed with an explicit X4-restart requirement.
 
 ### Reports and Diagnostics
@@ -151,7 +151,7 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MODEL-02 | Phase 5 | Pending |
 | MODEL-03 | Phase 5 | Pending |
 | MODEL-04 | Phase 5 | Pending |
-| MODEL-05 | Phase 4 | Pending |
+| MODEL-05 | Phase 4 | Complete |
 | MODEL-06 | Phase 5 | Pending |
 | MODEL-07 | Phase 5 | Pending |
 | MODEL-08 | Phase 8 | Pending |
@@ -159,8 +159,8 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | STATE-01 | Phase 4 | Complete |
 | STATE-02 | Phase 4 | Complete |
 | STATE-03 | Phase 4 | Complete |
-| STATE-04 | Phase 4 | Pending |
-| STATE-05 | Phase 4 | Pending |
+| STATE-04 | Phase 4 | Complete |
+| STATE-05 | Phase 4 | Complete |
 | STATE-06 | Phase 4 | Complete |
 | DIAG-01 | Phase 6 | Pending |
 | DIAG-02 | Phase 6 | Pending |

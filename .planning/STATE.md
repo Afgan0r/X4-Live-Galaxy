@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-08-28T23:42:57.690Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-08-28T23:55:33.516Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: 4ff98d96d6107fb52f29ccb82c852bc487053967
+state_head: 638d2ebbb23adabab7edfef77cdc347bad4c4a02
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 25
 ---
 
@@ -32,7 +32,7 @@ Plan: 9 of 9
 Status: Plan 01-09 pending human X4 verification
 Last activity: 2026-08-29 — Phase 1 execution started
 
-Progress: [█░░░░░░░░░] 13%
+Progress: [███░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [█░░░░░░░░░] 13%
 | Phase 02 P01 | 5 min | 3 tasks | 4 files |
 | Phase 03-faction-scoped-strategic-state P01 | 40 min | 2 tasks | 10 files |
 | Phase 03-faction-scoped-strategic-state P02 | 20min | 2 tasks | 6 files |
+| Phase 04-persistent-full-faction-minds P04 | resumed execution | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 3]: Doctrine v1 labels and priorities are explicit Live Galaxy product policy, not official X4 numeric canon.
 - [Phase 3]: Shadow planning is limited to four typed primitives; replay identity covers canonical policy, doctrine, fact, primitive, and evidence inputs.
 - [Phase 4]: Checkpoint integrity binds authoritative identities, while durable advancement requires exact reread acknowledgement.
+- [Phase 4]: Recovery retains the last acknowledged checkpoint and never exposes speculative state.
+- [Phase 4]: Capsule compaction is provider/model budget-profile relative; narrative is non-authoritative.
 
 ### Pending Todos
 
@@ -128,6 +131,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T23:42:57.501Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-08-28T23:55:33.327Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
