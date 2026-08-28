@@ -1,4 +1,6 @@
 {
+  "mode": "yolo",
+  "granularity": "fine",
   "model_profile": "budget",
   "model_policy": {
     "provider": "custom",
