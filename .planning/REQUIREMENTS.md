@@ -51,12 +51,12 @@
 
 ### Persistence and Recovery
 
-- [ ] **STATE-01**: Compact authoritative runtime state has a versioned X4-owned persistence contract, while external cache, diagnostics, and prose remain explicitly non-authoritative.
-- [ ] **STATE-02**: The Rust bridge persists accepted snapshots, mind state, replay inputs, admission state, and report intent transactionally with schema-version metadata.
-- [ ] **STATE-03**: Restart recovery is idempotent: replay, reconnect, and retry cannot duplicate an accepted plan, strategic tick, or report.
+- [x] **STATE-01**: Compact authoritative runtime state has a versioned X4-owned persistence contract, while external cache, diagnostics, and prose remain explicitly non-authoritative.
+- [x] **STATE-02**: The Rust bridge persists accepted snapshots, mind state, replay inputs, admission state, and report intent transactionally with schema-version metadata.
+- [x] **STATE-03**: Restart recovery is idempotent: replay, reconnect, and retry cannot duplicate an accepted plan, strategic tick, or report.
 - [ ] **STATE-04**: A corrupt, incompatible, or partial persisted record fails closed with structured diagnostics while preserving the last recoverable state.
 - [ ] **STATE-05**: Recovery and migration behavior is executable against crash-point, duplicate, out-of-order, and version-transition fixtures without reading or modifying player save files.
-- [ ] **STATE-06**: A protocol-compatible Rust bridge release can restart, update, and reconnect without restarting X4 or losing or duplicating accepted state; an incompatible game-side protocol revision fails closed with an explicit X4-restart requirement.
+- [x] **STATE-06**: A protocol-compatible Rust bridge release can restart, update, and reconnect without restarting X4 or losing or duplicating accepted state; an incompatible game-side protocol revision fails closed with an explicit X4-restart requirement.
 
 ### Reports and Diagnostics
 
@@ -156,12 +156,12 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MODEL-07 | Phase 5 | Pending |
 | MODEL-08 | Phase 8 | Pending |
 | MODEL-09 | Phase 8 | Pending |
-| STATE-01 | Phase 4 | Pending |
-| STATE-02 | Phase 4 | Pending |
-| STATE-03 | Phase 4 | Pending |
+| STATE-01 | Phase 4 | Complete |
+| STATE-02 | Phase 4 | Complete |
+| STATE-03 | Phase 4 | Complete |
 | STATE-04 | Phase 4 | Pending |
 | STATE-05 | Phase 4 | Pending |
-| STATE-06 | Phase 4 | Pending |
+| STATE-06 | Phase 4 | Complete |
 | DIAG-01 | Phase 6 | Pending |
 | DIAG-02 | Phase 6 | Pending |
 | DIAG-03 | Phase 6 | Pending |

@@ -116,13 +116,13 @@ Plans:
 8. A protocol-compatible Rust release can restart, update, and reconnect while X4 remains running, preserving accepted state and report identity; an incompatible game-side protocol revision fails closed and names the X4-restart requirement.
 
 **Research**: Targeted — standard Rust recovery patterns apply; documented Mission Director save-state semantics support the X4-owned checkpoint contract, while payload and interruption behavior remain pending the existing Phase 7 runtime gate.
-**Plans**: 4 plans
+**Plans**: 3/4 plans executed
 
 Plans:
 
-- [ ] 04-01-PLAN.md — Build deterministic independent mind aggregates and causal initiative lifecycle.
-- [ ] 04-02-PLAN.md — Declare and statically validate the X4-owned MD checkpoint contract.
-- [ ] 04-03-PLAN.md — Add canonical checkpoint codec and acknowledged fake-port recovery contract.
+- [x] 04-01-PLAN.md — Build deterministic independent mind aggregates and causal initiative lifecycle.
+- [x] 04-02-PLAN.md — Declare and statically validate the X4-owned MD checkpoint contract.
+- [x] 04-03-PLAN.md — Add canonical checkpoint codec and acknowledged fake-port recovery contract.
 - [ ] 04-04-PLAN.md — Add fail-closed recovery, schema migration, and typed-authoritative compaction.
 
 ### Phase 5: Bounded Shadow Deliberation
@@ -205,7 +205,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 1. Read-Only Observation Spine | 8/9 | In Progress |  |
 | 2. Hostile-Faction Research Track | 1/1 | Complete | 2026-08-29 |
 | 3. Faction-Scoped Strategic State | 3/3 | Complete | 2026-08-29 |
-| 4. Persistent Full Faction Minds | 0/4 | Not started | - |
+| 4. Persistent Full Faction Minds | 3/4 | In Progress |  |
 | 5. Bounded Shadow Deliberation | 0/TBD | Not started | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |

@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-08-28T22:57:16.548Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-08-28T23:42:57.690Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: 6cfe407ac8f7f533944cd978a63e465bff5dc777
+state_head: 4ff98d96d6107fb52f29ccb82c852bc487053967
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 17
-  completed_plans: 12
-  percent: 71
+  completed_plans: 15
+  percent: 25
 ---
 
 # Project State
@@ -106,6 +106,7 @@ Recent decisions affecting current work:
 - [Phase 3]: Institution views expose only capability and faction-visible snapshot identity; raw projections and private facts remain unavailable.
 - [Phase 3]: Doctrine v1 labels and priorities are explicit Live Galaxy product policy, not official X4 numeric canon.
 - [Phase 3]: Shadow planning is limited to four typed primitives; replay identity covers canonical policy, doctrine, fact, primitive, and evidence inputs.
+- [Phase 4]: Checkpoint integrity binds authoritative identities, while durable advancement requires exact reread acknowledgement.
 
 ### Pending Todos
 
@@ -127,6 +128,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T22:57:16.450Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-08-28T23:42:57.501Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
