@@ -46,7 +46,7 @@ pub fn derive_with_policy(
     if snapshot.observations.len() > limits.facts {
         return Err(DerivationError::FactLimitExceeded);
     }
-    if limits.primitives == 0 {
+    if limits.primitives < 4 {
         return Err(DerivationError::PrimitiveLimitExceeded);
     }
     let facts = snapshot
@@ -69,7 +69,7 @@ pub fn derive_with_policy(
                 owner,
                 kind == "resource_map",
                 StrategicFact::new(
-                    FactReference::new(owner, family, subject),
+                    FactReference::new(owner, family, subject, item.record.replay_fingerprint()),
                     family,
                     subject,
                     availability(item.quality),

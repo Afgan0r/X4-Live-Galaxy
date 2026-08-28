@@ -49,3 +49,35 @@ fn permutations_have_one_canonical_packet_and_replay_identity() {
         permuted.replay_fingerprint(&permuted_primitives)
     );
 }
+
+#[test]
+fn configured_primitive_budget_rejects_below_four() {
+    let snapshot = admit_batch(AcceptedProjection::empty(), &ORDERED)
+        .into_projection()
+        .snapshot;
+    for limit in [1, 2, 3] {
+        assert_eq!(
+            derive_packets(&snapshot, PacketLimits::new(32, limit)),
+            Err(strategic_state::DerivationError::PrimitiveLimitExceeded)
+        );
+    }
+    assert!(derive_packets(&snapshot, PacketLimits::new(32, 4)).is_ok());
+    assert!(derive_packets(&snapshot, PacketLimits::new(32, 5)).is_ok());
+}
+
+#[test]
+fn replay_fingerprint_changes_for_identity_content_and_version() {
+    let baseline = packet(&ORDERED).expect("baseline packet");
+    let primitives = ShadowPrimitive::derive(&baseline).expect("baseline primitives");
+    let fingerprint = baseline.replay_fingerprint(&primitives);
+    for changed in [
+        r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:energy","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
+        r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"changed"}"#,
+        r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":2,"quality":"fresh","content":"own"}"#,
+    ] {
+        let candidate =
+            packet(&[ORDERED[0], changed, ORDERED[2], ORDERED[3]]).expect("candidate packet");
+        let primitives = ShadowPrimitive::derive(&candidate).expect("candidate primitives");
+        assert_ne!(fingerprint, candidate.replay_fingerprint(&primitives));
+    }
+}

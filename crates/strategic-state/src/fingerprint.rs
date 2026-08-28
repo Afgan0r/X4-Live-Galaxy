@@ -68,15 +68,17 @@ fn primitive_bytes(primitive: &ShadowPrimitive) -> Vec<u8> {
     bytes
 }
 
-const fn reference_bytes(reference: FactReference) -> [u8; 3] {
-    [
+fn reference_bytes(reference: FactReference) -> Vec<u8> {
+    let mut bytes = vec![
         fact_owner(reference.owner()),
         family(reference.family()),
         match reference.subject() {
             Some(value) => subject(value),
             None => 0,
         },
-    ]
+    ];
+    bytes.extend_from_slice(&reference.source_fingerprint().to_le_bytes());
+    bytes
 }
 
 fn fnv1a(bytes: &[u8]) -> u64 {

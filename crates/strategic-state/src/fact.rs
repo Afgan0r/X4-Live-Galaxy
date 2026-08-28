@@ -80,15 +80,22 @@ pub struct FactReference {
     owner: FactOwner,
     family: FactFamily,
     subject: Option<ThreatSubject>,
+    source_fingerprint: u64,
 }
 
 impl FactReference {
     #[must_use]
-    pub const fn new(owner: FactOwner, family: FactFamily, subject: Option<ThreatSubject>) -> Self {
+    pub const fn new(
+        owner: FactOwner,
+        family: FactFamily,
+        subject: Option<ThreatSubject>,
+        source_fingerprint: u64,
+    ) -> Self {
         Self {
             owner,
             family,
             subject,
+            source_fingerprint,
         }
     }
 
@@ -104,6 +111,10 @@ impl FactReference {
     #[must_use]
     pub const fn subject(self) -> Option<ThreatSubject> {
         self.subject
+    }
+    #[must_use]
+    pub const fn source_fingerprint(self) -> u64 {
+        self.source_fingerprint
     }
 }
 

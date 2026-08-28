@@ -52,6 +52,25 @@ impl ObservationRecord {
     pub const fn version(&self) -> ObservationVersion {
         self.version
     }
+    #[must_use]
+    pub fn replay_fingerprint(&self) -> u64 {
+        let mut bytes = Vec::new();
+        framed(&mut bytes, self.entity_id.as_str().as_bytes());
+        bytes.push(match self.source {
+            ObservationSource::X4Runtime => 1,
+        });
+        bytes.extend_from_slice(&self.observed_at.unix_millis().to_le_bytes());
+        bytes.extend_from_slice(&self.version.get().to_le_bytes());
+        framed(&mut bytes, self.content.as_bytes());
+        bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+        })
+    }
+}
+
+fn framed(bytes: &mut Vec<u8>, value: &[u8]) {
+    bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    bytes.extend_from_slice(value);
 }
 
 #[must_use]

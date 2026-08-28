@@ -52,6 +52,10 @@ impl ObservationTime {
     pub const fn from_unix_millis(value: u64) -> Self {
         Self(value)
     }
+    #[must_use]
+    pub const fn unix_millis(self) -> u64 {
+        self.0
+    }
 }
 
 #[must_use]
