@@ -49,6 +49,14 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 **Research**: Required — confirm exact X4 9.00 observation, identity, scheduling, transport, embedded Lua, Mission Director, compatibility-negotiation, degraded-mode, and restart-condition semantics before relying on them.
 **Plans**: TBD
 
+- [x] 01-01-PLAN.md
+- [ ] 01-02-PLAN.md
+- [ ] 01-03-PLAN.md
+- [ ] 01-04-PLAN.md
+- [ ] 01-05-PLAN.md
+- [ ] 01-06-PLAN.md
+- [ ] 01-07-PLAN.md
+
 ### Phase 2: Hostile-Faction Research Track
 
 **Goal**: Future hostile-mind design has versioned XEN/KHK evidence without expanding or delaying the ZYA/ARG Shadow Director implementation.
@@ -175,7 +183,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
-| 1. Read-Only Observation Spine | 0/TBD | Not started | - |
+| 1. Read-Only Observation Spine | 1/7 | In Progress|  |
 | 2. Hostile-Faction Research Track | 0/TBD | Not started | - |
 | 3. Faction-Scoped Strategic State | 0/TBD | Not started | - |
 | 4. Persistent Full Faction Minds | 0/TBD | Not started | - |
