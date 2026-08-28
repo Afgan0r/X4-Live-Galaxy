@@ -3,10 +3,12 @@
 mod checkpoint;
 mod fake_port;
 mod port;
+mod recovery;
 
 pub use checkpoint::{CheckpointEnvelope, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
 pub use fake_port::FakeCheckpointPort;
 pub use port::{CheckpointAck, CheckpointPort, CompatibilityStatus, PortError};
+pub use recovery::{CrashPoint, RecoveryDiagnostic, RecoveryInput, RecoveryOutcome, recover};
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
