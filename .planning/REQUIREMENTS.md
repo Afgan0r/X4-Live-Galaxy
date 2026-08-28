@@ -7,7 +7,7 @@
 
 ### Observation and Normalization
 
-- [ ] **OBS-01**: The system can ingest bounded, versioned observation envelopes from X4 without blocking the game thread on bridge or model work.
+- [ ] **OBS-01**: The system can ingest bounded, versioned observation envelopes from X4 without blocking the game thread on bridge or model work, and the X4 adapter and Rust bridge negotiate explicit transport/session capabilities before accepting traffic.
 - [ ] **OBS-02**: Every observed entity and event used by strategy has a stable typed identity, source, observation time, and monotonic state or event version.
 - [ ] **OBS-03**: Normalized world-state sections preserve freshness, coverage, quality, and explicit unknown or unsupported states instead of fabricating missing facts.
 - [ ] **OBS-04**: The observation model provides the supported economic, military, territorial, and threat facts required by the ZYA and ARG minds.
@@ -18,17 +18,17 @@
 
 ### Faction Minds and Deterministic Strategy
 
-- [ ] **MIND-01**: ZYA and ARG each have an independent full Faction Mind with explicit doctrine, motives, priorities, goals, short-term plans, and long-term plans.
+- [ ] **MIND-01**: ZYA and ARG each have an independent full Faction Mind with explicit doctrine, motives, priorities, goals, short-term plans, long-term plans, and an Executive-owned typed Shadow diplomatic posture for their mutual relationship.
 - [ ] **MIND-02**: Each Faction Mind receives only authoritative truth and information available to that faction, with the applied visibility policy recorded for replay.
 - [ ] **MIND-03**: The deterministic kernel derives bounded strategic facts, priorities, and allowed shadow primitives from a frozen normalized snapshot.
 - [ ] **MIND-04**: Equivalent replay inputs produce canonically ordered, reproducible deterministic inputs and admission results.
 - [ ] **MIND-05**: ZYA and ARG exhibit measurably distinct strategic responses to shared scenarios rather than differing only by faction labels.
-- [ ] **MIND-06**: Accepted shadow plans carry typed goals, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations.
+- [ ] **MIND-06**: Accepted shadow plans and Executive diplomatic postures carry typed goals or dispositions, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations without opening inter-faction negotiation.
 - [ ] **MIND-07**: A strategic tick, relevant event trigger, or cooldown can request deliberation while per-faction scheduling remains bounded and deduplicated.
 
 ### Primitive Institutions
 
-- [ ] **INST-01**: ZYA and ARG each have a defined primitive institution roster whose fixed priorities are versioned and conditioned by faction doctrine.
+- [ ] **INST-01**: ZYA and ARG each have exactly three primitive institutions mapped to defense and military strategy, economy and logistics, and territorial development and infrastructure; their canon-grounded identities and fixed priorities are versioned and conditioned by faction doctrine.
 - [ ] **INST-02**: Every 0.1 institution reasons from the same authoritative faction-visible snapshot and cannot introduce private institutional knowledge or unsupported facts.
 - [ ] **INST-03**: Each institution owns at most one active typed Shadow initiative with stable identity, objective, supporting evidence, priority, lifecycle state, and owner.
 - [ ] **INST-04**: The Executive Brain may originate, assign, approve, revise, preempt, reject, or terminate an institution initiative but cannot execute it directly or bypass deterministic admission.
@@ -39,15 +39,15 @@
 
 ### Model Orchestration and Evaluation
 
-- [ ] **MODEL-01**: Model providers are isolated behind a provider-neutral typed interface; an Ollama adapter can be benchmarked first without becoming a domain dependency.
+- [ ] **MODEL-01**: Real-model prototype deliberation is isolated behind a provider-neutral typed interface and uses a developer-controlled subscription harness before `1.0.0`; public runtime API integration is not required by milestone 0.1.
 - [ ] **MODEL-02**: Provider output remains untrusted until schema, semantic, information, safety, budget, and current-state validation all succeed.
 - [ ] **MODEL-03**: Rejected or timed-out provider work records a bounded reason and cannot partially admit a plan or alter authoritative X4 state.
 - [ ] **MODEL-04**: Cache entries use exact versioned keys covering faction, snapshot, policy, prompt package, schema, provider, model, and relevant generation settings.
 - [ ] **MODEL-05**: Context and history compaction uses model-relative token budgets and produces versioned typed-plus-narrative capsules whose typed facts remain authoritative.
 - [ ] **MODEL-06**: Provider calls, retries, time, payload size, context size, queue depth, and retained history have explicit enforceable bounds.
-- [ ] **MODEL-07**: Recorded fixtures and deterministic fakes allow normal tests and replay evaluation to run without a live model provider.
+- [ ] **MODEL-07**: Recorded fixtures and deterministic fakes allow normal tests and replay evaluation to run without a live model, but fake output cannot satisfy real-model strategic-quality acceptance.
 - [ ] **MODEL-08**: A scenario corpus scores factual grounding, continuity, information discipline, faction divergence, strategic consistency, schema reliability, latency, cache behavior, and model cost.
-- [ ] **MODEL-09**: Strategic-quality acceptance is gated by an independently measured reliability floor; thresholds are derived from recorded baselines rather than invented.
+- [ ] **MODEL-09**: Strategic-quality acceptance uses complete subscription-backed real-model trajectories, is gated by an independently measured reliability floor, and derives thresholds from recorded baselines rather than invented targets.
 
 ### Persistence and Recovery
 
@@ -56,10 +56,11 @@
 - [ ] **STATE-03**: Restart recovery is idempotent: replay, reconnect, and retry cannot duplicate an accepted plan, strategic tick, or report.
 - [ ] **STATE-04**: A corrupt, incompatible, or partial persisted record fails closed with structured diagnostics while preserving the last recoverable state.
 - [ ] **STATE-05**: Recovery and migration behavior is executable against crash-point, duplicate, out-of-order, and version-transition fixtures without reading or modifying player save files.
+- [ ] **STATE-06**: A protocol-compatible Rust bridge release can restart, update, and reconnect without restarting X4 or losing or duplicating accepted state; an incompatible game-side protocol revision fails closed with an explicit X4-restart requirement.
 
 ### Reports and Diagnostics
 
-- [ ] **DIAG-01**: Accepted shadow decisions can emit concise, deduplicated Mail or Logbook reports through an existing X4 surface without a custom interface.
+- [ ] **DIAG-01**: A materially changed completed strategic cycle emits one concise deduplicated faction Logbook summary, while Mail is reserved for critical strategic changes and bridge or model degradation and recovery; both use a bounded allowlisted Rust-to-X4 return channel with no mutation command.
 - [ ] **DIAG-02**: External diagnostics correlate observation, snapshot, faction view, model request, cache result, validation, accepted plan, report intent, and acknowledgement by stable IDs.
 - [ ] **DIAG-03**: Diagnostics expose bounded health, failure, latency, usage, cost, queue, recovery, and state-quality evidence suitable for unattended runs.
 - [ ] **DIAG-04**: Public or player-visible output excludes credentials, machine-local paths, private prompts, raw hidden reasoning, and information unavailable to the recipient.
@@ -110,6 +111,7 @@
 | Rich diplomacy or treaty systems | First-public-alpha diplomacy is deliberately limited to declaring and ending bilateral wars. |
 | Player missions and Player Influence | The autonomous faction core must be proven before player-directed workflows. |
 | Custom in-game interface | Existing Mail or Logbook surfaces are sufficient for the observation prototype. |
+| Public runtime API integration in milestone 0.1 | Real-model prototype evidence uses developer-controlled subscription tooling until the public-alpha path begins. |
 | Full vanilla, DLC, or mod-added faction rollout | The first prototype deliberately exercises only full ZYA and ARG minds. |
 | Faction Enhancer compatibility | It is an explicit first-public-alpha incompatibility, not a milestone 0.1 target. |
 | XRSGE compatibility | No product commitment exists; a later evidence-based spike is required. |
@@ -159,6 +161,7 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | STATE-03 | Phase 4 | Pending |
 | STATE-04 | Phase 4 | Pending |
 | STATE-05 | Phase 4 | Pending |
+| STATE-06 | Phase 4 | Pending |
 | DIAG-01 | Phase 6 | Pending |
 | DIAG-02 | Phase 6 | Pending |
 | DIAG-03 | Phase 6 | Pending |
@@ -174,9 +177,9 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | RES-02 | Phase 2 | Pending |
 | RES-03 | Phase 2 | Pending |
 
-**Coverage:** 51/51 milestone requirements mapped.
+**Coverage:** 52/52 milestone requirements mapped.
 
 ---
 
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after primitive-institution scope integration*
+*Last updated: 2026-08-28 after milestone 0.1 product brainstorm*

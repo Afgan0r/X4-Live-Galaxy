@@ -2,18 +2,29 @@
   "mode": "yolo",
   "granularity": "fine",
   "model_profile": "budget",
-  "model_policy": {
-    "provider": "custom",
-    "budget": null,
-    "high": "gpt-5.6-sol",
-    "medium": "gpt-5.6-sol",
-    "low": "gpt-5.6-luna"
-  },
   "effort": {
     "routing_tier_defaults": {
       "heavy": "medium",
       "standard": "low",
       "light": "medium"
+    }
+  },
+  "dynamic_routing": {
+    "enabled": true,
+    "tier_models": {
+      "heavy": "gpt-5.6-terra",
+      "standard": "gpt-5.6-terra",
+      "light": "gpt-5.6-luna"
+    },
+    "escalate_on_failure": false,
+    "max_escalations": 0
+  },
+  "fast_mode": {
+    "enabled": true,
+    "routing_tier_defaults": {
+      "light": true,
+      "standard": true,
+      "heavy": false
     }
   },
   "commit_docs": true,
@@ -51,7 +62,7 @@
     "text_mode": false,
     "research_before_questions": true,
     "discuss_mode": "discuss",
-    "skip_discuss": false,
+    "skip_discuss": true,
     "code_review": true,
     "code_review_depth": "deep",
     "code_review_command": null,

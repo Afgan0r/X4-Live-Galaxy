@@ -6,7 +6,7 @@
 
 ## Recommendation
 
-Use a small Rust workspace for the deterministic kernel and bridge, with thin Mission Director/Lua adapters in the X4 extension. Keep SQLite as the local durable store, JSON Lines plus structured tracing for diagnostics, and a provider-neutral async interface around Ollama first. Use recorded fixtures and deterministic fakes for offline evaluation; reserve live-provider and in-game probes for explicit smoke/evaluation jobs. Do not add mutation commands, save-file readers, or a custom UI in 0.1.
+Use a small Rust workspace for the deterministic kernel and bridge, with thin Mission Director/Lua adapters in the X4 extension. Keep SQLite as the local durable store, JSON Lines plus structured tracing for diagnostics, and a provider-neutral async interface around a developer-controlled subscription harness for all pre-alpha real-model work. Use recorded fixtures and deterministic fakes for offline tests and replay, but require subscription-backed trajectories for strategic-quality acceptance. Public runtime API integration begins on the alpha path. Do not add mutation commands, save-file readers, or a custom UI in 0.1.
 
 Confidence labels below are **HIGH** for stable official tool documentation, **MEDIUM** for ecosystem choices that remain phase benchmarks, and **OBSERVED** for exact local X4 precedent.
 
@@ -44,9 +44,10 @@ Confidence labels below are **HIGH** for stable official tool documentation, **M
 
 | Technology | Version | Purpose | Why |
 | --- | --- | --- | --- |
-| Provider trait owned by Live Galaxy | Project API | Uniform typed request/result, usage, timeout, retry, and failure metadata | Prevent vendor response types leaking into domain code; permits Ollama and later providers without changing the kernel. **HIGH** |
-| Ollama local HTTP API | Exact server/model version benchmarked in phase | Initial offline/local model backend | Likely lowest-friction early backend and supports no-network evaluation, but quality/latency/context must be measured against fixtures before selection. **MEDIUM** |
-| OpenAI-compatible adapter (deferred benchmark) | Verify current API/model at phase time | Optional hosted-provider comparison | Keep behind the same trait; no provider, model, or credentials are committed as 0.1 requirements. **MEDIUM** |
+| Provider trait owned by Live Galaxy | Project API | Uniform typed request/result, usage, timeout, retry, and failure metadata | Prevent subscription-harness or later API response types from leaking into domain code. **HIGH** |
+| Developer-controlled subscription harness | Pin the invoked client and model identity in each benchmark | Pre-alpha real-model deliberation and evaluation | Uses the owner's subscriptions for prototypes while retaining typed requests, structured results, usage evidence, and reproducible run identity. It is not a public runtime dependency. **HIGH** |
+| Deterministic fake | Project-versioned fixtures | Contract, replay, failure, and normal automated tests | Keeps normal tests offline and deterministic but cannot satisfy strategic-quality acceptance. **HIGH** |
+| Public runtime API adapter | Deferred to the alpha path | Supported public model access | Keep behind the same provider trait; credentials and API billing are not milestone 0.1 requirements. **HIGH** |
 | JSON Schema or equivalent typed output contract | Project-versioned schema | Constrain goals/plans/reports | Parse into typed values, then apply semantic, information, safety, budget, and current-state checks. **HIGH** |
 
 ### Testing, Evaluation, Packaging, and Tooling
@@ -67,7 +68,7 @@ Confidence labels below are **HIGH** for stable official tool documentation, **M
 | --- | --- | --- | --- |
 | Bridge language | Rust | Python | Python is useful as a reference/tooling language, but Rust better enforces bounded typed runtime boundaries and single-binary Windows packaging. **MEDIUM** |
 | Persistence | SQLite | JSON-only files | JSONL is excellent evidence, but SQLite transactions/unique constraints are needed for restart recovery and idempotency. **HIGH** |
-| Model runtime | Provider trait + Ollama first | Hard-code one hosted SDK | Couples domain to vendor, requires credentials/network, and prevents offline evaluation. **HIGH** |
+| Model runtime | Provider trait + subscription harness before alpha | Hard-code the development client into the domain | Couples strategic state to a developer tool and makes the later API migration invasive. **HIGH** |
 | Game integration | Thin MD/Lua adapter | Broad game-thread polling/hook | Risks SETA stalls and simulation impact; cooperative bounded scheduling is the observed safer precedent. **HIGH** |
 | Lua testing | Busted pure-module tests + fakes | In-game-only testing | Slow, nondeterministic, and unable to isolate malformed/budget/retry cases. **HIGH** |
 | Evaluation | Recorded fixtures and replay | Live model calls in normal tests | Live calls are nondeterministic, costly, and conceal regressions. **HIGH** |
@@ -94,7 +95,7 @@ Busted
 - No custom dossier/chronicle/institution UI; use low-cost Mail/Logbook reports and external diagnostics.
 - No fixed vanilla map, hard-coded asset counts, or mod-added-faction assumptions.
 - No Faction Enhancer compatibility claim; KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors require later compatibility tests.
-- No final Rust toolchain, crate versions, Ollama model, OpenAI model, CI image, or Lua runner version until phase benchmarks verify them.
+- No final Rust toolchain, crate versions, subscription model, public API model, CI image, or Lua runner version until phase benchmarks verify them.
 
 ## Sources
 
@@ -105,7 +106,6 @@ Busted
 - SQLite transactions and atomic commit: <https://www.sqlite.org/lang_transaction.html>
 - `rusqlite` crate documentation: <https://docs.rs/rusqlite/latest/rusqlite/>
 - `tracing` crate documentation: <https://docs.rs/tracing/latest/tracing/>
-- Ollama API documentation: <https://github.com/ollama/ollama/blob/main/docs/api.md>
 - Local X4 9.00 observation: `F:\SteamLibrary\steamapps\common\X4 Foundations\version.dat` (`900`) (**OBSERVED**, read-only).
 - Local X4 adapter precedent: `F:\Agent Projects\X4\extensions\x4_live_mcp\content.xml`, extension v051 (**OBSERVED**; reference repository Git refresh blocked by ownership/FETCH_HEAD permissions).
 - Local transport/scheduling precedent: `F:\Agent Projects\X4\tools\x4-live-protocol.md` (**OBSERVED**).

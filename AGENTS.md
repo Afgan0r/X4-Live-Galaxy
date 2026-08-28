@@ -19,8 +19,9 @@ alpha. Do not describe a prototype as playable or public-ready without evidence.
   model orchestration, caching, and structured diagnostics.
 - Models propose typed goals, plans, and strategic primitives. They must not
   directly mutate game state or bypass deterministic validation.
-- Milestone and phase product scope must be discussed with the owner before
-  planning. Do not silently promote deferred ideas into the active milestone.
+- Milestone and phase product scope must be locked with the owner during the
+  milestone-level product brainstorm before autonomous planning begins. Do not
+  silently promote deferred ideas into the active milestone.
 - Missions, player influence, news, deeper diplomacy, historical simulations,
   and special XEN/KHK architecture remain outside the first autonomous-director
   slice unless a later milestone explicitly admits them.
@@ -54,8 +55,19 @@ documentation and repository evidence outrank memory.
 
 - GSD owns project discovery, requirements, roadmap, phase discussion, planning,
   execution, verification, review, and milestone closure.
-- Run a deep product brainstorm before each new milestone and before locking the
-  product scope of each phase.
+- Run one deep product brainstorm before each new milestone. It must lock the
+  milestone product contract, every phase boundary, acceptance criteria, and
+  non-goals deeply enough for bounded autonomous execution.
+- Persist that discussion through GSD-owned artifacts rather than a standalone
+  brainstorm file: update `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, and
+  `STATE.md`, then create every planned phase's `CONTEXT.md` in one batch after
+  the roadmap is fixed. Those phase context files are the downstream planning
+  inputs and make autonomous mode skip routine Smart Discuss prompts.
+- After that contract is locked, do not require routine product discussion per
+  phase. Agents own technical decisions within the contract. Pause only for a
+  newly discovered P0 product fork that would change milestone scope, human-only
+  X4 validation, new external authority, or a blocker that survives the
+  workflow's retry ceiling.
 - `.planning/config.json` is the GSD configuration source of truth.
 - Project-local `.codex/agents/gsd-*.toml` files are generated machine-local
   routing artifacts. Never commit them.
@@ -234,7 +246,10 @@ owner approval.
 - For X4 integration, require layered static, pure Lua, fake-adapter contract,
   and disposable in-game evidence as applicable. Source-text assertions are not
   primary behavioral evidence when executable verification is possible.
-- Format every edited Markdown file with `markdownlint-cli2 --fix`.
+- Format edited Markdown files with `markdownlint-cli2 --fix` unless the nearest
+  repository Markdownlint configuration intentionally ignores them.
+  `.planning/**` is deliberately ignored in this repository and must not be
+  forced through Markdownlint with an alternate configuration.
 - Before claiming completion, inspect the diff and separate implemented facts,
   verified behavior, open risks, and deferred work.
 

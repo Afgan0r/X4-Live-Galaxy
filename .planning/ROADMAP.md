@@ -16,8 +16,9 @@ no phase introduces game-state mutation or public-ready claims.
 **Milestone goal:** Demonstrate that full ZYA and ARG Faction Minds can maintain
 distinct, persistent, explainable Shadow strategies under shared XEN pressure,
 coordinate primitive institutions through bounded Executive arbitration,
-recognize observed KHK activity, and remain bounded and recoverable during
-unattended X4 9.00 AFK/SETA operation without mutating the game.
+maintain an Executive-owned ZYA–ARG Shadow diplomatic posture, recognize
+observed KHK activity, and remain bounded and recoverable during unattended X4
+9.00 AFK/SETA operation without mutating the game.
 
 ## Phases
 
@@ -42,9 +43,10 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 1. A verifier can capture a versioned observation whose entities and events carry stable typed identities, source, time, and monotonic versions.
 2. Captured sections distinguish fresh, stale, partial, unknown, and unsupported data while discovering sectors, assets, capacity, and ownership from runtime state.
 3. Malformed, oversized, duplicate, stale, and out-of-order input leaves the last accepted snapshot intact and produces bounded rejection or reconciliation evidence.
-4. Disposable X4 9.00 evidence shows observation and transport work is bounded and no mutation command exists or can be emitted.
+4. The X4 adapter and Rust bridge negotiate protocol and capability identities before accepting traffic, and unsupported combinations enter a bounded fail-closed degraded state with an explicit restart condition.
+5. Disposable X4 9.00 evidence shows observation and transport work is bounded and no mutation command exists or can be emitted.
 
-**Research**: Required — confirm exact X4 9.00 observation, identity, scheduling, transport, embedded Lua, and Mission Director semantics before relying on them.
+**Research**: Required — confirm exact X4 9.00 observation, identity, scheduling, transport, embedded Lua, Mission Director, compatibility-negotiation, degraded-mode, and restart-condition semantics before relying on them.
 **Plans**: TBD
 
 ### Phase 2: Hostile-Faction Research Track
@@ -71,26 +73,27 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 1. Frozen snapshots supply the supported economic, military, territorial, and threat facts needed by both factions, with XEN as shared primary pressure and KHK represented when observed.
 2. A verifier can inspect each faction's permitted information and the exact visibility policy used to construct it.
 3. Equivalent frozen snapshots and policies produce canonically ordered strategic facts, priorities, allowed shadow primitives, and identical admission inputs.
-4. Each faction has a versioned primitive institution roster with fixed doctrine-conditioned priorities over the same authoritative faction-visible snapshot.
+4. Each faction has exactly three versioned primitive institutions mapped to defense and military strategy, economy and logistics, and territorial development and infrastructure, with canon-grounded identities and fixed doctrine-conditioned priorities over the same authoritative faction-visible snapshot.
 5. Missing, stale, faction-inaccessible, private-institution, or unsupported facts cannot silently enter a faction or institution strategic packet.
 
-**Research**: Not normally required — use established typed-domain and deterministic-replay patterns; reopen research only for unresolved X4 fact semantics.
+**Research**: Targeted — use established typed-domain and deterministic-replay patterns, but verify canon-grounded ZYA/ARG institution identities and reopen X4 fact research only for unresolved semantics.
 **Plans**: TBD
 
 ### Phase 4: Persistent Full Faction Minds
 
 **Goal**: Full, distinct ZYA and ARG minds preserve coherent short- and long-term strategy plus one-owner institution initiatives across compaction, restart, retry, and schema transitions.
 **Depends on**: Phase 3
-**Requirements**: MIND-01, MIND-05, INST-03, INST-08, MODEL-05, STATE-01, STATE-02, STATE-03, STATE-04, STATE-05
+**Requirements**: MIND-01, MIND-05, INST-03, INST-08, MODEL-05, STATE-01, STATE-02, STATE-03, STATE-04, STATE-05, STATE-06
 **Success Criteria** (what must be TRUE):
 
-1. An operator can inspect independent ZYA and ARG doctrine, motives, priorities, goals, short-term plans, and long-term plans that differ meaningfully on shared scenarios.
+1. An operator can inspect independent ZYA and ARG doctrine, motives, priorities, goals, short-term plans, long-term plans, and Executive-owned typed diplomatic postures that differ meaningfully on shared scenarios.
 2. Mind history compacts within model-relative budgets into versioned typed-plus-narrative capsules while typed facts remain authoritative.
 3. Every institution owns at most one active typed Shadow initiative with stable identity, objective, evidence, priority, lifecycle state, and owner.
 4. Proposal, objection, disposition, validation, ownership, preemption, and terminal outcome records persist as replayable causal evidence.
 5. Accepted snapshots, mind state, initiative state, replay inputs, admission state, and report intent recover transactionally without duplicating a plan, tick, initiative, or report.
 6. Corrupt, partial, incompatible, duplicate, out-of-order, and version-transition fixtures fail closed or recover the last valid state with structured evidence.
 7. The persistence boundary keeps compact authoritative runtime state under an X4-owned contract and never reads or modifies player save files.
+8. A protocol-compatible Rust release can restart, update, and reconnect while X4 remains running, preserving accepted state and report identity; an incompatible game-side protocol revision fails closed and names the X4-restart requirement.
 
 **Research**: Targeted — standard Rust/SQLite recovery patterns apply, but the X4-owned persistence contract requires exact evidence before implementation.
 **Plans**: TBD
@@ -103,15 +106,16 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 **Success Criteria** (what must be TRUE):
 
 1. A strategic tick, relevant event, or cooldown can request deduplicated per-faction deliberation within explicit queue, time, retry, payload, context, call, and history bounds.
-2. Ollama or a deterministic fake can be exchanged behind the same typed provider boundary without changing strategic domain behavior.
+2. A developer-controlled subscription harness or a deterministic fake can be exchanged behind the same typed provider boundary without changing strategic domain behavior; the fake is contract-test evidence only.
 3. Only proposals passing schema, semantic, information, safety, budget, and current-state validation become typed shadow plans with goals, priorities, horizons, supporting facts, trade-offs, and safe explanations.
 4. The Executive may originate, assign, approve, revise, preempt, reject, or terminate initiatives but cannot execute them directly or bypass deterministic admission.
-5. Aligned proposals proceed without dialogue; only material objection, mandate, preemption, or revision may open at most two full dialogue cycles before one final kernel-valid Executive disposition.
-6. Every replacement preserves the prior initiative, trigger, suspend-or-cancel disposition, replacement proposal, Executive decision, and reason.
-7. Rejected or timed-out work records a bounded reason and cannot partially admit a plan or initiative, alter authoritative persistence, or mutate X4 state.
-8. Exact versioned cache keys and recorded fixtures make cache behavior and normal replay evaluation reproducible without a live provider.
+5. The Executive may maintain, de-escalate, intensify, or seek limited threat-driven coordination in its typed ZYA–ARG Shadow diplomatic posture, but no inter-faction negotiation or X4 relationship mutation occurs.
+6. Aligned proposals proceed without dialogue; only material objection, mandate, preemption, or revision may open at most two full dialogue cycles before one final kernel-valid Executive disposition.
+7. Every replacement preserves the prior initiative, trigger, suspend-or-cancel disposition, replacement proposal, Executive decision, and reason.
+8. Rejected or timed-out work records a bounded reason and cannot partially admit a plan or initiative, alter authoritative persistence, or mutate X4 state.
+9. Exact versioned cache keys and recorded fixtures make cache behavior and normal replay evaluation reproducible without a live provider.
 
-**Research**: Required — benchmark current Ollama provider/model behavior and derive operating bounds from evidence rather than selecting them in advance.
+**Research**: Required — benchmark available subscription-backed models and harness behavior, then derive operating bounds from evidence rather than selecting a public runtime API or local provider in advance.
 **Plans**: TBD
 
 ### Phase 6: Correlated Reports and Diagnostics
@@ -121,13 +125,13 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 **Requirements**: DIAG-01, DIAG-02, DIAG-03, DIAG-04, DIAG-05
 **Success Criteria** (what must be TRUE):
 
-1. An accepted shadow decision can emit one concise deduplicated Mail or Logbook report through an existing X4 surface.
+1. A materially changed completed strategic cycle emits one concise deduplicated faction Logbook summary; Mail is reserved for critical strategic changes and bridge or model degradation and recovery. Both use the bounded allowlisted return channel, and no mutation command is admitted.
 2. Stable correlation IDs let an operator trace observation, snapshot, faction knowledge, institution proposal or objection, Executive disposition, provider request, cache result, validation, accepted plan and initiative, report intent, and acknowledgement end to end.
 3. Bounded diagnostics expose health, failures, latency, usage, cost, queues, recovery, and state quality during unattended operation.
 4. Player-visible and public output contains no credentials, machine-local paths, private prompts, hidden reasoning, or recipient-inaccessible information.
 5. Captured snapshots and traces reproduce decisions offline while remaining explicitly non-authoritative.
 
-**Research**: Required — verify exact Mail or Logbook emission, acknowledgement, deduplication, and recipient-information semantics in disposable X4 9.00 scenarios.
+**Research**: Required — verify the exact bounded report return channel, Mail or Logbook emission, acknowledgement, deduplication, and recipient-information semantics in disposable X4 9.00 scenarios.
 **Plans**: TBD
 
 ### Phase 7: X4 Operational Proof
@@ -139,10 +143,11 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 
 1. Static, pure Lua where applicable, fake-adapter, Rust, and disposable in-game checks report their evidence levels separately.
 2. Disposable normal-speed and SETA runs show bounded game-side work, bridge backlog, and reconnect behavior with no observable Live Galaxy-caused vanilla simulation stall.
-3. A defined unattended AFK/SETA soak continues observation, deliberation, persistence, recovery, reporting, and diagnostics for the measured duration and workload.
-4. Failures during the soak degrade safely and retain enough correlated evidence to identify the affected boundary without corrupting X4 state.
+3. A compatible Rust process restart and update reconnects to the same running X4 process without loss or duplication of accepted state, strategic ticks, or reports; an incompatible protocol fails closed under the defined X4-restart condition.
+4. A defined unattended AFK/SETA soak continues observation, deliberation, persistence, recovery, reporting, and diagnostics for the measured duration and workload.
+5. Failures during the soak degrade safely and retain enough correlated evidence to identify the affected boundary without corrupting X4 state.
 
-**Research**: Required — determine feasible X4 automation, SETA workload limits, reconnect semantics, and evidence capture from disposable scenarios rather than assuming headless support.
+**Research**: Required — determine feasible X4 automation, SETA workload limits, compatible Rust restart and reconnect semantics, exact incompatible-protocol restart conditions, and evidence capture from disposable scenarios rather than assuming headless support.
 **Plans**: TBD
 
 ### Phase 8: Evaluation and Internal Prototype Gate
@@ -152,7 +157,7 @@ unattended X4 9.00 AFK/SETA operation without mutating the game.
 **Requirements**: MODEL-08, MODEL-09, VAL-04, VAL-05
 **Success Criteria** (what must be TRUE):
 
-1. A versioned scenario corpus scores grounding, continuity, information discipline, faction divergence, institution contribution, initiative causality, strategic consistency, schema reliability, latency, cache behavior, and model cost.
+1. A versioned scenario corpus scores complete subscription-backed real-model trajectories for grounding, continuity, information discipline, faction divergence, institution contribution, initiative causality, strategic consistency, schema reliability, latency, cache behavior, and model cost; fake trajectories remain test-only.
 2. Strategic-quality acceptance is blocked unless an independently measured reliability floor passes, with all thresholds derived from recorded baselines.
 3. Representative pure high-risk Rust and Lua logic has measured mutation-tool baselines, reviewed survivors, and evidence-based operator and threshold decisions.
 4. The milestone package and evidence inventory separates implemented, locally verified, pending game smoke, and observed-in-X4 claims and never describes 0.1 as playable or public-ready.

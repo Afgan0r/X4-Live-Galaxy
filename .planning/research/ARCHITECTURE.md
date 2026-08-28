@@ -7,12 +7,14 @@
 
 ## Recommended Architecture
 
-Use a one-way, replayable pipeline with X4 as the authority and Rust as the
-trust boundary:
+Use an asymmetric bidirectional, replayable integration with X4 as the
+authority and Rust as the trust boundary. The broad path is X4-to-Rust
+telemetry; the only 0.1 return path is an allowlisted report-and-acknowledgement
+channel:
 
 ```text
 X4 Lua/MD producers
-  -> bounded observation envelopes (pipe)
+  -> bounded observation envelopes (transport/session)
   -> Rust ingest + normalization
   -> immutable snapshot/checkpoint store
   -> deterministic faction kernel
@@ -21,8 +23,10 @@ X4 Lua/MD producers
   -> bounded Executive arbitration
   -> schema/semantic/information/budget/current-state validation
   -> typed shadow plan + institution initiative lifecycle + explanation
-  -> idempotent report outbox -> low-cost X4 Mail/Logbook
-                         \-> diagnostics/evaluation/replay artifacts
+  -> idempotent report outbox
+       -> allowlisted return channel -> low-cost X4 Mail/Logbook
+       <- delivery acknowledgement
+  -> diagnostics/evaluation/replay artifacts
 ```
 
 The milestone has no game-mutating command path. Keep a future command
@@ -34,7 +38,7 @@ economy, diplomacy, missions, custom UI, or full-faction rollout now.
 | Component | Responsibility | Communicates With |
 | --- | --- | --- |
 | X4 observation adapter (Lua/MD) | Read-only, player-visible/authorized facts; stable IDs; timestamps; freshness and quality; cooperative scheduling and bounded serialization | Pipe transport |
-| Transport/session layer | One-way frames, correlation, retry/backpressure, health; no domain interpretation | X4 adapter, Rust ingest |
+| Transport/session layer | Asymmetric versioned frames, capability negotiation, correlation, retry/backpressure, reconnect, degraded-mode health, and explicit compatibility failure; no domain interpretation | X4 adapter, Rust ingest, report outbox |
 | Ingest/normalizer | Decode and validate envelopes; canonicalize IDs/quantities/time; reject malformed or oversized input; assign monotonic state versions | Transport, snapshot store |
 | Snapshot/checkpoint store | Atomic section replacement, immutable event log, current projection, retention, recovery markers | Ingest, kernel, replay, diagnostics |
 | Deterministic strategic kernel | Derive bounded facts, faction information views, goals, priorities, budgets, and allowed strategic primitives from typed snapshots | Snapshot store, provider orchestration, evaluator |
@@ -77,8 +81,18 @@ candidates produce diagnostics and no plan, initiative, or report side effect.
 
 Accepted plans are persisted transactionally with the decision input hash,
 provider/model identity, schema version, validation result, and report identity.
-The report outbox then emits only a short player-safe summary. Detailed traces,
+The report outbox then emits only a short player-safe summary through the
+allowlisted return channel and correlates its acknowledgement. Detailed traces,
 quality gaps, and evaluation data remain external diagnostics.
+
+The X4 adapter and Rust bridge negotiate protocol and capability identities
+before accepting traffic. A protocol-compatible Rust release may restart,
+update, and reconnect while the X4 process continues running; accepted state
+and report identity survive the interruption. Unsupported combinations enter a
+bounded fail-closed degraded mode. X4 restart is required only when game-facing
+code changes or the game-side protocol is incompatible. Pipe topology,
+negotiation schema, buffering, and acknowledgement framing are phase-level
+technical decisions.
 
 ### Trust and Ownership Rules
 
@@ -190,7 +204,8 @@ hypotheses.
 
 1. Define typed envelope, normalized snapshot, quality, identity, and version
    contracts; add fixture/replay tests.
-2. Build the thin X4 adapter and bounded transport/health surface; prove static,
+2. Build the thin X4 adapter and bounded transport/health surface, including
+   capability negotiation and fail-closed degraded behavior; prove static,
    fake-adapter, and disposable in-game observation behavior.
 3. Implement atomic persistence, section freshness, checkpoints, restart
    recovery, and idempotent ingestion before model integration.
@@ -200,8 +215,10 @@ hypotheses.
 5. Add provider ports, Executive arbitration, exceptional two-cycle dialogue,
    exact cache keys, typed candidate parsing, and complete validation/admission;
    evaluate with recorded fixtures only.
-6. Add report outbox and external diagnostics, then run AFK/SETA soak with
-   health evidence. Keep future mutation seams as interfaces only.
+6. Add the bounded report return channel, report outbox, acknowledgements, and
+   external diagnostics, then prove compatible Rust restart/reconnect and run
+   AFK/SETA soak with health evidence. Keep future mutation seams as interfaces
+   only.
 
 ## Sources
 

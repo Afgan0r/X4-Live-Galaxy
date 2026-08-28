@@ -10,7 +10,7 @@
 
 Live Galaxy is an internal 0.1 prototype for persistent, faction-specific strategic minds and primitive institutions observing an X4 galaxy. X4 remains authoritative: the Lua/Mission Director adapter only extracts bounded observations, Rust owns normalization, deterministic policy, initiative lifecycle, persistence, recovery, model orchestration, validation, evaluation, and diagnostics, and providers produce untrusted proposals. The acceptance question is whether full ZYA and ARG minds can maintain coherent short- and long-term plans under shared XEN pressure, coordinate fixed-priority institutions through bounded Executive arbitration, recognize KHK when observed, and remain explainable and recoverable during unattended AFK/SETA runs.
 
-The recommended implementation is a one-way replayable pipeline: bounded X4 envelopes over a versioned transport, typed Rust ingest and quality-aware snapshots, a pure deterministic faction kernel, primitive institution views and one-active-initiative state machines, bounded Executive arbitration, provider-neutral model adapters with Ollama evaluated first, complete proposal admission, transactional state plus an idempotent report outbox, and external correlated evidence. Use SQLite for compact authoritative runtime state, JSONL/tracing for non-authoritative diagnostics and evaluation, exact content-addressed cache keys, recorded fixtures, and deterministic fakes. Do not add mutation, player control, custom UI, save-file access, internal political simulation, or autonomous XEN/KHK minds to 0.1.
+The recommended implementation is an asymmetric bidirectional, replayable integration: bounded X4 telemetry envelopes flow to versioned Rust ingest and quality-aware snapshots, while only an allowlisted report-and-acknowledgement channel returns to X4. Rust hosts the pure deterministic faction kernel, three primitive institution views and one-active-initiative state machines, bounded Executive arbitration, a typed provider boundary backed by developer-controlled subscription tooling before alpha, complete proposal admission, transactional state, an idempotent report outbox, and external correlated evidence. Keep the X4 adapter thin and stable so compatible Rust releases can restart, update, and reconnect without restarting X4; incompatible game-side protocol changes fail closed. Use SQLite for compact authoritative runtime state, JSONL/tracing for non-authoritative diagnostics and evaluation, exact content-addressed cache keys, recorded fixtures, and deterministic fakes. Fakes are test-only; strategic-quality acceptance requires complete subscription-backed trajectories. Public runtime API integration begins on the alpha path. Do not add mutation, player control, custom UI, save-file access, internal political simulation, or autonomous XEN/KHK minds to 0.1.
 
 The main risks are fabricated truth from stale or partial observations, identity/order and recovery errors, hidden-information or privacy leakage, contract drift, and unbounded SETA workload. Prevent them with explicit unknown/stale/quality states, typed stable identities and monotonic versions, frozen replay inputs, schema and information filtering before model context construction, atomic admission/outbox state machines, hard game/queue/payload/retry/model budgets, and layered tests that distinguish local verification, pending game smoke, and observed-in-X4 evidence.
 
@@ -28,7 +28,7 @@ The stack recommendation is strong on boundaries but intentionally leaves versio
 - Mission Director XML plus embedded X4 Lua: thin cooperative observation producers with bounded serialization; confirm runtime syntax and semantics in a disposable probe.
 - Versioned JSON envelopes over the installed named-pipe support seam: adapt the local X4 Live MCP precedent, without making that campaign repository a runtime dependency or claiming compatibility before tests.
 - SQLite via `rusqlite`: transactional compact runtime projection, event/checkpoint data, idempotency, and restart recovery; external JSONL plus `tracing` carries bounded diagnostics/evaluation.
-- Provider-owned trait plus Ollama-first evaluation: preserve provider neutrality, offline fixtures, usage/timeout/retry metadata, and later benchmark alternatives without leaking vendor types into the domain.
+- Provider-owned trait plus a developer-controlled subscription harness before alpha: preserve provider neutrality, usage/timeout/retry metadata, offline deterministic tests, and a bounded later migration to public API adapters without leaking client types into the domain.
 - `cargo test`, focused contract tests, Busted for pure Lua after runtime confirmation, XML/package checks, and measured `cargo-mutants`/Lua mutation spikes only after representative pure logic exists.
 
 ### Expected Features
@@ -59,7 +59,7 @@ The stack recommendation is strong on boundaries but intentionally leaves versio
 
 ### Architecture Approach
 
-Use a one-way pipeline from X4 observation producers through bounded transport, Rust ingest/normalization, immutable sectioned snapshots/checkpoints, deterministic faction views and kernel, primitive institution proposals, bounded Executive disposition, schema/semantic/information/safety/budget/freshness admission, typed shadow plan and initiative lifecycle, and an idempotent report outbox. Reports are projections only; detailed traces and replay/evaluation artifacts stay external, while compact authoritative runtime state follows the X4-owned persistence boundary and external cache/diagnostics remain non-authoritative.
+Use an asymmetric bidirectional integration: the broad path runs from X4 observation producers through bounded transport, Rust ingest/normalization, immutable sectioned snapshots/checkpoints, deterministic faction views and kernel, primitive institution proposals, bounded Executive disposition, schema/semantic/information/safety/budget/freshness admission, typed shadow plan and initiative lifecycle, and an idempotent report outbox. Only a narrow allowlisted return path carries reports and acknowledgements to X4; it admits no mutation commands. Protocol and capability negotiation must let compatible Rust releases restart and reconnect independently, while incompatible game-side protocol revisions fail closed with an explicit X4-restart condition. Reports are projections only; detailed traces and replay/evaluation artifacts stay external, while compact authoritative runtime state follows the X4-owned persistence boundary and external cache/diagnostics remain non-authoritative.
 
 **Major components:**
 
@@ -89,8 +89,10 @@ political-simulation workstream.
 ### Phase 1: Read-Only Observation Spine
 
 Deliver versioned observations, stable identities, explicit data quality,
-bounded Lua/MD scheduling, and proof that no mutation path exists. Institution
-work must not pull private knowledge or council design into this phase.
+bounded Lua/MD scheduling, protocol/capability negotiation, fail-closed degraded
+behavior, explicit restart conditions, and proof that no mutation path exists.
+Institution work must not pull private knowledge or council design into this
+phase.
 
 ### Phase 2: Hostile-Faction Research Track
 
@@ -108,7 +110,8 @@ and false beliefs remain later-scope candidates.
 
 Persist full ZYA/ARG mind state plus institution identity, priority version,
 one active initiative, owner, lifecycle, preemption history, and outcome. This
-phase establishes recovery and causal continuity before live providers.
+phase establishes recovery and causal continuity before live providers and
+guarantees compatible Rust restart/update/reconnect without restarting X4.
 
 ### Phase 5: Bounded Shadow Deliberation
 
@@ -119,13 +122,15 @@ Aligned proposals bypass dialogue; no proposal or initiative mutates X4.
 ### Phase 6: Correlated Reports and Diagnostics
 
 Correlate institution proposal, objection, Executive disposition, validation,
-initiative lifecycle, and report output while keeping player-visible Mail and
-Logbook concise and safe.
+initiative lifecycle, report intent, bounded Rust-to-X4 delivery, and
+acknowledgement while keeping player-visible Mail and Logbook concise and safe.
 
 ### Phase 7: X4 Operational Proof
 
 Demonstrate bounded normal-speed, SETA, reconnect, recovery, and unattended
-behavior with primitive institutions active in Shadow mode.
+behavior with primitive institutions active in Shadow mode. Keep the X4 process
+running while a compatible Rust release restarts and reconnects, and verify no
+accepted state or report is lost or duplicated.
 
 ### Phase 8: Evaluation and Internal Prototype Gate
 
@@ -147,12 +152,12 @@ acceptance gate.
 
 Phases likely needing deeper research during planning:
 
-- **Phase 1:** Exact X4 9.00 observation APIs, embedded Lua/MD behavior, transport dependency, event identity, and scheduling caps.
+- **Phase 1:** Exact X4 9.00 observation APIs, embedded Lua/MD behavior, transport dependency, event identity, scheduling caps, capability negotiation, degraded behavior, and X4-restart conditions.
 - **Phase 3:** Exact faction-visible fact semantics; private institutional knowledge is explicitly not a 0.1 research requirement.
 - **Phase 4:** X4-owned persistence contract and initiative recovery semantics.
-- **Phase 5:** Ollama/provider benchmark and current schema/usage behavior; keep provider choice evidence-based.
-- **Phase 6:** Mail/Logbook integration and safe initiative/report correlation.
-- **Phase 7:** SETA soak, reconnect semantics, installed-mod ownership/load order, and compatibility probes.
+- **Phase 5:** Subscription-harness/model benchmark and current structured-output/usage behavior; keep model and role choice evidence-based and public API integration deferred.
+- **Phase 6:** Bounded Rust-to-X4 report delivery, Mail/Logbook integration, acknowledgements, and safe initiative/report correlation.
+- **Phase 7:** SETA soak, compatible Rust restart/reconnect semantics, incompatible-protocol restart conditions, installed-mod ownership/load order, and compatibility probes.
 - **Phase 8:** Only targeted tool validation and corpus adequacy review; mutation gates require a measured baseline.
 
 Phases with standard patterns (skip research-phase unless scope changes):
@@ -177,12 +182,12 @@ Phases with standard patterns (skip research-phase unless scope changes):
 - Exact X4 9.00 event, identity, Lua, Mission Director, Mail/Logbook, and named-pipe semantics need clean-revision or disposable in-game confirmation.
 - The local X4 Live MCP precedent was dirty and remote refresh was blocked; treat its protocol and test details as observed local precedent, not compatibility guarantees.
 - X4-owned compact save persistence integration is a boundary decision; no player save files may be read or modified during research.
-- Ollama server/model choice, latency/context quality, hosted-provider comparison, and token/cost budgets need recorded benchmark evidence.
+- Subscription client/model choice, latency/context quality, token usage, quota behavior, and operating budgets need recorded benchmark evidence.
 - Headless X4 automation capability is unknown; plan black-box evidence as disposable scenarios and do not assume a headless runner.
 - Initial AFK/SETA budget thresholds, evaluation corpus size, mutation thresholds, and compatibility matrix must be measured rather than invented.
-- Phase planning must define the concrete primitive institution roster and
-  initiative schema without adding private knowledge, mutable influence, or
-  political resistance to 0.1.
+- Phase planning must ground ZYA/ARG names and priorities for the locked three
+  institution capabilities and define the initiative schema without adding
+  private knowledge, mutable influence, or political resistance to 0.1.
 - No project licence is selected; provenance/licensing review remains a release gate before 1.0.0.
 
 ## Sources
@@ -195,7 +200,7 @@ Phases with standard patterns (skip research-phase unless scope changes):
 - Live Galaxy project skills under `.agents/skills/` — Rust conventions/tests and X4 integration/testing contracts.
 - `drawer_wing_x4_live_galaxy_decisions_a376ced07a211aa8271352e6` and related 2026-08-28 decisions — confirmed 0.1 primitive-institution lifecycle.
 - `drawer_wing_dialogue_sessions_dd1780a21bd9ded3e9c4e997` — confirmed public-alpha boundary and one-verified-milestone-at-a-time principle.
-- [Rust Book](https://doc.rust-lang.org/book/), [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html), [Serde](https://serde.rs/), [Tokio](https://tokio.rs/), [SQLite transactions](https://www.sqlite.org/lang_transaction.html), [rusqlite](https://docs.rs/rusqlite/latest/rusqlite/), [tracing](https://docs.rs/tracing/latest/tracing/), and [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md) — official/primary technology guidance.
+- [Rust Book](https://doc.rust-lang.org/book/), [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html), [Serde](https://serde.rs/), [Tokio](https://tokio.rs/), [SQLite transactions](https://www.sqlite.org/lang_transaction.html), [rusqlite](https://docs.rs/rusqlite/latest/rusqlite/), and [tracing](https://docs.rs/tracing/latest/tracing/) — official/primary technology guidance.
 
 ### Secondary (MEDIUM confidence)
 

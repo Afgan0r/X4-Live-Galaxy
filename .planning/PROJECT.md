@@ -27,10 +27,15 @@ bounded by deterministic validation.
 - [ ] Observe the supported X4 world state without mutating the game.
 - [ ] Maintain persistent short- and long-term plans for full ZYA and ARG
   Faction Minds while treating XEN as the primary hostile pressure.
-- [ ] Exercise primitive ZYA and ARG institutions that propose and own typed
-  Shadow initiatives under bounded Executive arbitration.
+- [ ] Exercise three primitive institutions per faction — defense and military
+  strategy, economy and logistics, and territorial development and
+  infrastructure — that propose and own typed Shadow initiatives under bounded
+  Executive arbitration.
 - [ ] Produce typed strategic decisions, explanations, and concise in-game
   reports without exposing hidden model reasoning.
+- [ ] Maintain an Executive-owned typed Shadow diplomatic posture for the
+  ZYA–ARG relationship without creating a diplomacy institution, inter-faction
+  negotiation, or game-state mutation.
 - [ ] Validate model routing, strategic quality, exact caching, token budgets,
   context compaction, persistence, and restart recovery.
 - [ ] Provide structured external diagnostics, captured world-state snapshots,
@@ -60,6 +65,9 @@ bounded by deterministic validation.
   integration and disposable test campaigns may be designed later.
 - A public licence or public-ready stability claim before the provenance and
   release gates are complete.
+- Public runtime API integration in milestone 0.1 — all real-model prototype
+  evidence before `1.0.0` uses developer-controlled subscription tooling;
+  public API runtime work starts with the alpha release path.
 
 ## Context
 
@@ -68,14 +76,26 @@ authority for live world state and for the final application of any future
 action. The Rust bridge owns normalized state, validation, persistence,
 recovery, model orchestration, caching, evaluation inputs, and structured
 diagnostics. Lua and Mission Director adapters expose bounded X4 integration
-surfaces; model output remains outside the trust boundary.
+surfaces; model output remains outside the trust boundary. The integration is
+asymmetric and bidirectional: bounded telemetry flows from X4 to Rust, while a
+narrow allowlisted return channel carries report delivery and acknowledgements
+without admitting game-state mutation commands.
+
+The X4-facing adapter is intentionally thin and stable so protocol-compatible
+Rust releases can restart, update, and reconnect without restarting X4. X4
+restart is required only when game-facing code changes or an incompatible
+game-side protocol revision fails closed; exact negotiation, buffering, and
+acknowledgement mechanisms remain implementation decisions.
 
 The product core is **Faction Minds**: faction-specific executives and advisers
 with motives, doctrine, goals, plans, explanations, and persistent historical
 context. The deterministic kernel supplies current facts and allowed strategic
 primitives, enforces information boundaries, and rejects invalid or stale
-proposals. Model providers are pluggable; Ollama is a likely early backend, but
-provider and model choices are benchmarked rather than assumed.
+proposals. Model access stays behind a typed boundary. Before `1.0.0`, real-model
+prototype and benchmark evidence uses developer-controlled subscription
+tooling; deterministic fakes cover contracts and replay but cannot satisfy the
+milestone quality gate. Public runtime API integration begins on the alpha
+release path.
 
 Milestone **0.1 — Shadow Director** is an internal observation-only prototype.
 It runs full ZYA and ARG minds against shared XEN pressure, recognizes KHK when
@@ -83,13 +103,30 @@ observed, emits concise strategic reports through existing X4 surfaces, and
 keeps detailed evidence in external diagnostics. Its primary acceptance path is
 an unattended AFK/SETA test stand, not normal play.
 
-Each 0.1 faction also has primitive institutions. They consume the same
-authoritative faction-visible snapshot, apply fixed faction-conditioned
-priorities, and propose typed Shadow initiatives. An institution owns at most
-one active initiative. The Executive Brain remains the final allocator and may
-originate, approve, revise, preempt, or reject an initiative, while an explicit
-bounded dialogue records material disagreement. Ownership, lifecycle, and
-outcome are retained for causal evaluation; no initiative mutates X4 in 0.1.
+Each 0.1 faction also has exactly three primitive institutions: defense and
+military strategy, economy and logistics, and territorial development and
+infrastructure. Their canon-grounded names and doctrine-conditioned priorities
+may differ between ZYA and ARG, but they map to the same three capability
+contracts. They consume the same authoritative faction-visible snapshot and
+propose typed Shadow initiatives. An institution owns at most one active
+initiative. The Executive Brain remains the final allocator and may originate,
+approve, revise, preempt, or reject an initiative, while an explicit bounded
+dialogue records material disagreement. Ownership, lifecycle, and outcome are
+retained for causal evaluation; no initiative mutates X4 in 0.1.
+
+The Executive Brain, rather than a fourth institution, owns a typed Shadow
+diplomatic posture for the ZYA–ARG relationship. It may preserve the current
+posture, seek limited coordination against a shared threat, reduce tension, or
+increase pressure when supported by faction-visible facts and doctrine.
+Institutions may contribute arguments, but milestone 0.1 performs no
+inter-faction negotiation and changes no X4 relationship state.
+
+Milestone 0.1 routes one concise faction summary to the Logbook when a
+strategic cycle completes with a material plan change. Mail is reserved for a
+critical strategic change or a bridge/provider degradation and recovery.
+Intermediate, duplicate, and routine decisions remain in bounded external
+diagnostics. Exact timing, deduplication windows, and message layout are
+evidence-driven implementation choices.
 
 The initial GSD roadmap describes only milestone 0.1. Later `0.x` milestones are
 internal prototypes that progressively validate fleet, economy, and institution
@@ -128,6 +165,9 @@ repository are read-only evidence sources.
   game-side work must be explicitly bounded.
 - **Recovery**: Accepted work is idempotent; restart and retry cannot duplicate
   an action or partially mutate game state.
+- **Restart boundary**: A protocol-compatible Rust bridge can restart, update,
+  and reconnect independently; incompatible game-side protocol changes fail
+  closed and explicitly require an X4 restart.
 - **Persistence**: Compact authoritative runtime state belongs with the X4 save;
   external caches, diagnostics, and prose are non-authoritative.
 - **Observability**: Correlation IDs connect observation, decision, validation,
@@ -157,13 +197,17 @@ repository are read-only evidence sources.
 | Use Faction Minds under a deterministic kernel | Preserve faction agency without giving models arbitrary mutation authority | — Pending |
 | Make milestone 0.1 observation-only | Isolate strategy, ingestion, persistence, cost, and reliability before command integration | — Pending |
 | Run full ZYA and ARG minds with XEN pressure | Exercise contrasting factions and a shared existential threat without whole-galaxy scope | — Pending |
-| Include primitive institutions in milestone 0.1 | Test multi-role strategic disagreement and initiative ownership before any game mutation | — Pending |
+| Include exactly three primitive institutions per faction in milestone 0.1 | Cover military, economic, and territorial strategy without multiplying agents that add little observation-only evidence | — Pending |
 | Bound each institution to one active Shadow initiative | Keep concurrency, preemption, causality, and evaluation understandable in the first prototype | — Pending |
 | Keep Executive–institution dialogue exceptional and capped | Preserve useful disagreement without open-ended model loops, latency, or cost | — Pending |
+| Keep the ZYA–ARG diplomatic posture in the Executive Brain | Exercise the chosen factions' mutual relationship without adding a fourth institution or cross-faction negotiation | — Pending |
 | Research XEN and KHK in parallel | Discover hostile-faction telemetry and architecture gaps while change is still cheap | — Pending |
 | Use AFK/SETA as the milestone 0.1 acceptance environment | Long-session diagnostics matter more than player-facing utility before mutations exist | — Pending |
-| Keep detailed evidence external and in-game reports concise | Use low-cost X4 integration while retaining full developer observability | — Pending |
+| Route material summaries to Logbook and critical transitions to Mail | Verify both existing X4 surfaces without flooding unattended SETA runs | — Pending |
+| Keep the X4 adapter thin and independently restart Rust | Shorten the development loop while keeping game-facing compatibility explicit and fail-closed | — Pending |
+| Use an asymmetric bidirectional integration boundary | Observation remains X4-to-Rust while a narrow allowlisted Rust-to-X4 path carries reports and acknowledgements | — Pending |
 | Prefer a Rust bridge, subject to phase evidence | Typed state, recovery, and bounded orchestration need a strong deterministic host | — Pending |
+| Use subscription-backed real models throughout pre-alpha prototypes | Keep development and benchmark cost bounded; deterministic fakes remain test-only and public API runtime begins on the alpha path | — Pending |
 | Keep compact runtime state save-authoritative | The campaign must remain coherent when external caches or services disappear | — Pending |
 | Combine strategic ticks with event triggers and cooldowns | Avoid both polling-only latency and event-storm instability | — Pending |
 | Use exact, versioned cache keys only | Approximate reuse can erase faction identity or replay stale strategy | — Pending |
@@ -200,4 +244,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 
-*Last updated: 2026-08-28 after project initialization*
+*Last updated: 2026-08-28 after milestone 0.1 product brainstorm*
