@@ -1,4 +1,4 @@
-use x4_bridge::{admit_tracer_frame, CapabilityDecision, TelemetryFrame};
+use x4_bridge::{CapabilityDecision, TelemetryFrame, admit_tracer_frame};
 
 #[test]
 fn protocol_contract_admits_compatible_telemetry_only_frame() {

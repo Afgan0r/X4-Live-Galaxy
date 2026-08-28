@@ -10,6 +10,10 @@ impl EntityId {
         let value = value.into();
         (!value.trim().is_empty()).then_some(Self(value))
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -41,6 +45,10 @@ impl ObservationVersion {
             Some(value) => Some(Self(value)),
             None => None,
         }
+    }
+
+    pub const fn get(self) -> u64 {
+        self.0.get()
     }
 }
 
