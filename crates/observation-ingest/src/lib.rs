@@ -54,6 +54,17 @@ impl AcceptedSnapshot {
     pub const fn version(&self) -> ObservationVersion {
         self.section.version()
     }
+
+    pub const fn section_quality_name(&self) -> &'static str {
+        match self.section.quality() {
+            SectionQuality::Fresh => "fresh",
+            SectionQuality::KnownEmpty => "known_empty",
+            SectionQuality::Unknown => "unknown",
+            SectionQuality::Partial => "partial",
+            SectionQuality::Stale => "stale",
+            SectionQuality::Unsupported => "unsupported",
+        }
+    }
 }
 
 fn required_string(payload: &str, field: &str) -> Result<String, AdmissionError> {
