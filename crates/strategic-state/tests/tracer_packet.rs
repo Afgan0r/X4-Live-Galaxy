@@ -33,8 +33,16 @@ fn derives_paired_packets_with_explicit_four_family_availability() {
     assert_eq!(packets.policy_version(), "visibility-v1");
     assert_eq!(packets.packet(Faction::Zya).facts().len(), 17);
     assert_eq!(packets.packet(Faction::Arg).facts().len(), 17);
-    assert!(packets.packet(Faction::Zya).has_shared_threat(ThreatSubject::Xen));
-    assert!(packets.packet(Faction::Arg).has_observed_threat(ThreatSubject::Khk));
+    assert!(
+        packets
+            .packet(Faction::Zya)
+            .has_shared_threat(ThreatSubject::Xen)
+    );
+    assert!(
+        packets
+            .packet(Faction::Arg)
+            .has_observed_threat(ThreatSubject::Khk)
+    );
 }
 
 #[test]
