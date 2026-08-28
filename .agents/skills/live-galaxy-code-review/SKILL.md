@@ -8,8 +8,10 @@ description: Risk-first code review for the Live Galaxy Rust and X4 integration 
 Use this skill for review of implementation, tests, protocols, or integration
 changes.
 
-Read the matching convention and test skills before reviewing. Read
-`.agents/skills/live-galaxy-x4-integration/SKILL.md` for any X4-facing change.
+Read the matching convention and test skills before reviewing. For any
+X4-facing change, read both
+`.agents/skills/live-galaxy-x4-integration/SKILL.md` and
+`.agents/skills/live-galaxy-x4-tests/SKILL.md`.
 
 ## Review Order
 
@@ -20,7 +22,10 @@ Read the matching convention and test skills before reviewing. Read
    replay, resource bounds, and observability.
 4. Verify tests exercise behavior and failure paths rather than only happy-path
    structure.
-5. Check compatibility and provenance claims against evidence.
+5. Reject source-text assertions as primary behavioral evidence when executable
+   pure, contract, or in-game verification is possible.
+6. Check applicable mutation-test survivors and their dispositions.
+7. Check compatibility and provenance claims against evidence.
 
 ## Severity
 

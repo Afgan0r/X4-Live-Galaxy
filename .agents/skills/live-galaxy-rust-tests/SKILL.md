@@ -43,8 +43,27 @@ Read `.agents/skills/live-galaxy-rust-conventions/SKILL.md` first.
 - Avoid timing sleeps, network dependencies, order-dependent fixtures, and
   assertions that merely repeat implementation details.
 
+## Mutation Testing
+
+- Apply mutation testing to pure high-risk domain code: validation, state
+  transitions, budgets, idempotency, reconciliation, and strategic primitives.
+- Run it after a relevant phase and before a release gate, not on every commit.
+- Establish a measured baseline before choosing a required mutation score. Do
+  not invent a threshold before representative code and runtime cost exist.
+- Review every surviving mutant. Add a behavioral test, justify an equivalent
+  mutant, or record a bounded gap; a headline score alone is not acceptance.
+- Exclude generated code and side-effect-heavy provider or game adapters unless
+  a phase proves that mutation testing produces actionable evidence there.
+- Use `cargo-mutants` as the Rust mutation runner and pin its version in the
+  repository's development or CI tooling when the Cargo workspace is created.
+  Run it against the normal `cargo test` or approved `cargo nextest` contract.
+- Revisit the runner only when repository evidence shows unsupported syntax,
+  unacceptable runtime cost, or systematically misleading mutants.
+
 ## Workflow
 
 Follow red-green-refactor when a phase enables implementation. Record the exact
 focused command in the phase plan. Once the Cargo workspace exists, run focused
-tests first and the full repository test suite before completion.
+tests first and the full repository test suite before completion. Record the
+mutation command, scope, baseline, survivors, and disposition when the mutation
+gate applies.

@@ -38,6 +38,8 @@ acting:
   implementation, or review.
 - `.agents/skills/live-galaxy-rust-tests/SKILL.md` for test design,
   implementation, or review.
+- `.agents/skills/live-galaxy-x4-tests/SKILL.md` for Lua, Mission Director,
+  adapter, in-game, or X4 mutation testing.
 - `.agents/skills/live-galaxy-code-review/SKILL.md` for code review.
 - `.agents/skills/live-galaxy-x4-integration/SKILL.md` for X4 XML, Mission
   Director, Lua, game-data, installed-mod, or compatibility work.
@@ -80,6 +82,114 @@ documentation and repository evidence outrank memory.
   public alpha. It should support KUDA AI Tweaks, More AI Economy Ships, and
   Add More Sectors, subject to verified compatibility tests.
 
+## Reference Map
+
+These sources are precedents and evidence, not Live Galaxy authorities. Current
+Live Galaxy decisions, requirements, contracts, and code win whenever a
+reference differs. Establish Git freshness before relying on a repository, keep
+machine-local paths out of public runtime output, and never read secret files.
+
+### TALKER Repository
+
+Location: `F:\Agent Projects\TALKER`.
+
+Use it as the closest development-process precedent for GSD project slicing,
+project-local skills, typed domain/application boundaries, immutable Facts and
+Claims, provenance and visibility, deterministic rumor propagation and ranking,
+atomic admission, idempotency, property tests, and mutation gates.
+
+Start with `AGENTS.md`, `.planning/PROJECT.md`,
+`.planning/REQUIREMENTS.md`, `.planning/ROADMAP.md`, the relevant phase
+`CONTEXT.md`, `RESEARCH.md`, `PLAN.md`, and `VALIDATION.md`, then
+`.agents/skills/`, `cosmic-ray.toml`, and
+`scripts/phase1-mutation-tests.cmd`.
+
+TALKER is not X4 runtime evidence or a Rust design mandate. Its active phases
+may intentionally defer the real LLM/game bridge. Do not copy its code
+mechanically.
+
+### X4 Campaign and Live MCP Repository
+
+Location: `F:\Agent Projects\X4`.
+
+Use it for existing X4 9.00 integration evidence: UI Lua, Mission Director XML,
+native `ffi.C` calls, `sn_mod_support_apis` named pipes, event identity and
+quality, SQLite ingestion, MCP contracts, pagination, release identity,
+diagnostics, SETA behavior, packaging, and current testing limitations.
+
+Start with its `AGENTS.md` profile `x4-live-development`,
+`.agents/skills/x4-live-mcp-development/`, `extensions/x4_live_mcp/`,
+`tools/x4-live-protocol.md`, `tools/README.md`, and
+`tests/test_x4_live.py`.
+
+Do not treat its campaign state as Live Galaxy product scope unless the task
+explicitly needs it. Do not modify the repository while using it as a reference.
+
+### Installed Vanilla X4
+
+Location: `F:\SteamLibrary\steamapps\common\X4 Foundations`.
+
+Use it for exact installed-version evidence about vanilla catalogs, scripts, UI
+and Mission Director behavior, library identifiers, schemas, and runtime API
+call shapes when repository examples or remembered APIs are insufficient.
+
+This is not a writable development checkout. Never patch installed vanilla
+files or inspect saves.
+
+### Installed X4 Extensions
+
+Location: `F:\SteamLibrary\steamapps\common\X4 Foundations\extensions`.
+
+Use it for the actual installed mod stack, each extension's `content.xml`,
+patches, UI/MD/Lua hooks, dependencies, load-order assumptions, and behavioral
+ownership. This is the primary local source for compatibility research involving
+KUDA AI Tweaks, More AI Economy Ships, Add More Sectors, Faction Enhancer, and
+other installed mods.
+
+Installed extensions are not licensed source to copy. Treat them as read-only
+and resolve license and provenance before implementation influence.
+
+### TALKER MemPalace
+
+Location: personal wing `wing_talker`.
+
+Use it for durable product decisions and historical GSD evidence that may not be
+obvious from the current checkout. Search `decisions`, `product-decisions`,
+`roadmap`, `planning`, and `workflow` for Fact/Claim identity, provenance,
+visibility, relationship policy, rumor transfer, LLM-facing packet selection,
+deterministic and property testing, mutation gates, and workflow lessons.
+
+Memory is not current TALKER code truth. Fetch the relevant drawer, then verify
+it against the checkout when staleness matters.
+
+### Bannerlord MemPalace
+
+Location: personal wing `wing_bannerlord`.
+
+Use it for research on existing broad-scope LLM game mods, especially AI
+Influence 6.0.2: dialogue, diplomacy, events, territorial, economic and
+relationship consequences, backend adapters, local versus API models,
+dependencies, compatibility, save persistence, reversibility, and operational
+risk. Search `operations` first for verified mod/backend facts, `observations`
+for comparisons, and `decisions` for accepted user direction.
+
+Bannerlord evidence is an analogy and risk catalogue. It does not prove that a
+mechanism can work in X4 or permit reproducing another mod's implementation.
+
+Route reference work by question:
+
+1. For X4 API availability or event semantics, inspect installed vanilla X4,
+   then the X4 Live MCP repository and its runtime evidence.
+2. For installed-mod conflicts or coexistence, inspect the exact extension under
+   the installed `extensions` directory, then verify source license and version.
+3. For deterministic LLM-domain architecture, testing, and GSD execution
+   precedent, inspect TALKER and then relevant `wing_talker` drawers.
+4. For an existing global LLM-mod analogue and its product or operational
+   failure modes, inspect `wing_bannerlord`, especially AI Influence records.
+5. Record only the distilled Live Galaxy conclusion in its current GSD artifact
+   or `wing_x4_live_galaxy`; do not copy a foreign corpus into this repository or
+   duplicate the reference source itself.
+
 ## X4 Reference Researcher
 
 The canonical read-only role is
@@ -118,9 +228,12 @@ owner approval.
 
 - Follow the selected project skills' focused checks first.
 - For Rust changes, run formatting, linting, focused tests, and the full test
-  suite once the Cargo workspace exists.
-- For X4 integration, verify schemas and use the smallest disposable in-game
-  probe that can answer the question.
+  suite once the Cargo workspace exists. Run targeted mutation testing after
+  relevant phases and before releases, using a measured baseline rather than an
+  invented initial threshold.
+- For X4 integration, require layered static, pure Lua, fake-adapter contract,
+  and disposable in-game evidence as applicable. Source-text assertions are not
+  primary behavioral evidence when executable verification is possible.
 - Format every edited Markdown file with `markdownlint-cli2 --fix`.
 - Before claiming completion, inspect the diff and separate implemented facts,
   verified behavior, open risks, and deferred work.
@@ -128,6 +241,15 @@ owner approval.
 ## Git and Releases
 
 - The base branch is `master`; GSD uses milestone branches after bootstrap.
+- Direct commits and pushes to `master` are allowed in this repository when the
+  user explicitly requests `commit`, `push`, or their equivalent. Do not create
+  a branch merely because the current branch is `master`. Use a separate branch
+  when the active GSD workflow requires one or the user explicitly requests it.
+- Leave no agent-created unstaged changes when an agent finishes its work.
+  Commit durable work only through the active GSD workflow or separate explicit
+  user authorization; remove or locally ignore disposable artifacts instead.
+  Preserve pre-existing user changes and never stage or absorb them into an
+  agent commit.
 - Do not commit or push unless explicitly requested. The initial empty-repository
   bootstrap is explicitly authorized for direct commit and push to `master`.
 - Never commit runtime state, saves, databases, logs, credentials, generated
