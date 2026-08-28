@@ -1,6 +1,6 @@
 use observation_domain::{
-    reconcile_membership, CanonicalObservationKey, CollectionLimit, CollectionSize, CompleteMarker,
-    CountError, EntityId, ObservationVersion, ReconciliationDecision,
+    CanonicalObservationKey, CollectionLimit, CollectionSize, CompleteMarker, CountError, EntityId,
+    ObservationVersion, ReconciliationDecision, reconcile_membership,
 };
 
 fn entity(value: &str) -> EntityId {
@@ -43,7 +43,10 @@ fn incomplete_or_other_scope_preserves_previous_membership() {
 
     for marker in [
         None,
-        Some(CompleteMarker::successful(entity("scope:assets"), version(1))),
+        Some(CompleteMarker::successful(
+            entity("scope:assets"),
+            version(1),
+        )),
     ] {
         assert_eq!(
             reconcile_membership(
@@ -81,7 +84,7 @@ fn explicit_collection_boundaries_reject_overflow_without_precision_loss() {
             &[],
             vec![key("sector:alpha", 1), key("sector:beta", 1)],
             &scope,
-            Some(&CompleteMarker::successful(scope, version(1))),
+            Some(&CompleteMarker::successful(scope.clone(), version(1))),
             limit,
         ),
         ReconciliationDecision::RejectedCollectionLimit
