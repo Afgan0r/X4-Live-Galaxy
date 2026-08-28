@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-08-28T17:59:07.454Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-08-28T18:18:55.278Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: 24540c18f314e8fedb376a15d2b6c0f5e7e7445e
+state_head: 78d135d79b7e1211cad616471b6b274668560e9d
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 7
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 1 (Read-Only Observation Spine) — EXECUTING
-Plan: 2 of 7
-Status: Executing Phase 1
+Plan: 3 of 7
+Status: Ready to execute
 Last activity: 2026-08-29 — Phase 1 execution started
 
-Progress: [█░░░░░░░░░] 14%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [█░░░░░░░░░] 14%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 31 min | 2 tasks | 5 files |
+| Phase 01 P02 | 35 min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Material cycle summaries go to Logbook; Mail is reserved for critical strategy changes and bridge/model degradation or recovery. — The X4 channel is verified without flooding unattended SETA runs.
 - [Phase 1]: All real-model prototype evidence before 1.0.0 uses developer-controlled subscription tooling; deterministic fakes are test-only and public API runtime begins on the alpha path. — Pre-alpha iteration uses existing subscriptions while preserving a typed provider boundary.
 - [Phase 1]: Initial observation contracts remain dependency-free and transport-free.
+- [Phase 1]: Phase 1 bridge admission remains closed to bounded telemetry; incompatible capabilities require an X4 restart.
+- [Phase 1]: Telemetry JSON decoding uses pinned serde contracts with strict unknown-field rejection.
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T17:59:07.440Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-08-28T18:18:55.262Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
