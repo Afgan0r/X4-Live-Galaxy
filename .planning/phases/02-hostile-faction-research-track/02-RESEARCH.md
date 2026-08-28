@@ -166,15 +166,19 @@ Run only after Phase 1's read-only adapter contract exists, in a disposable Crea
 2. Independently read back identity, faction/true owner, sector/cluster/zone, visibility/discovery state, and source timestamp; classify absent KHK as `unknown/absent observation`, never a claim that KHK cannot exist. **[INFERRED: D-04/D-05 evidence discipline]**
 3. Observe one KHK activity-related transition only if safely attributable; compare exported evidence to authoritative game readback, without injecting commands or changing save data. **[DOCUMENTED: `AGENTS.md`; `live-galaxy-x4-integration/SKILL.md`]**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-| Question | Current status | Non-gating disposition |
-| --- | --- | --- |
-| Which exact runtime event/API surface exports XEN/KHK identity and lifecycle? | **[UNKNOWN]** | Phase 1/7 validation concern; Phases 3–7 proceed with bounded observed facts only. |
-| Can KHK activity, cooldown, hive/outpost quota, or spawn cause be observed without inspecting MD internals? | **[UNKNOWN]** | Future hostile-design input only; no 0.1 requirement depends on it. |
-| What visibility semantics are available to each faction, rather than the player? | **[UNKNOWN]** | Phase 3 records a policy over authoritative observations; this phase does not define it. |
-| How do installed extensions modify hostile jobs, MD logic, or map scope in a live campaign? | **[UNKNOWN]** | Compatibility research is deferred; no guarantee is created. |
-| What hostile architecture or primitives should exist after 0.1? | **[UNKNOWN]** | Explicitly deferred by D-03/D-07/D-08; no decision requested. |
+These runtime unknowns are deliberately unresolved by this read-only phase.
+Their disposition closes Phase 2 scope only; it does not answer the underlying
+fact or block the ZYA/ARG critical path.
+
+| Question | Current status | Future owner | Evidence needed | Non-gating disposition |
+| --- | --- | --- | --- | --- |
+| Which exact runtime event/API surface exports XEN/KHK identity and lifecycle? | RESOLVED: deferred — **[UNKNOWN]** | Phase 1 and Phase 7 X4 validation | Attributable disposable X4 9.00 observation and independent readback | RESOLVED: deferred; Phases 3–7 proceed with bounded observed facts only. |
+| Can KHK activity, cooldown, hive/outpost quota, or spawn cause be observed without inspecting MD internals? | RESOLVED: deferred — **[UNKNOWN]** | Later hostile-design research | Disposable X4 9.00 probe with authoritative readback | RESOLVED: deferred; future hostile-design input only and no 0.1 requirement depends on it. |
+| What visibility semantics are available to each faction, rather than the player? | RESOLVED: deferred — **[UNKNOWN]** | Phase 3 information-boundary work | Authoritative observation contract plus recorded visibility-policy tests | RESOLVED: deferred; Phase 3 records a policy over authoritative observations and this phase does not define it. |
+| How do installed extensions modify hostile jobs, MD logic, or map scope in a live campaign? | RESOLVED: deferred — **[UNKNOWN]** | Later compatibility research | Versioned extension inventory and disposable compatibility scenario | RESOLVED: deferred; compatibility research is deferred and no guarantee is created. |
+| What hostile architecture or primitives should exist after 0.1? | RESOLVED: deferred — **[UNKNOWN]** | A later milestone product discussion | Explicit owner decision backed by then-current evidence | RESOLVED: deferred; D-03/D-07/D-08 defer the decision and no 0.1 requirement depends on it. |
 
 ## Validation Architecture
 

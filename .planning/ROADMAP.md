@@ -70,8 +70,12 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 2. Every claim is labeled documented, observed, inferred, or unknown and cites only materially influential provenance.
 3. The ZYA/ARG critical path can proceed with unresolved hostile-faction questions explicitly bounded rather than promoted into implementation scope.
 
-**Research**: Required — use current X4 9.00 vanilla and disposable runtime evidence; treat installed mods and third-party code as read-only sources.
-**Plans**: TBD
+**Research**: Required — produce installed X4 9.00 static vanilla evidence now; Phase 1 and Phase 7 gather disposable runtime evidence through their scheduled X4 gates, which remains versioned non-gating input until observed. Treat installed mods and third-party code as read-only sources; no separate Phase 2 human gate.
+**Plans**: 1 plan
+
+Plans:
+
+- [ ] 02-01-PLAN.md — Produce and audit the versioned XEN/KHK static-evidence record.
 
 ### Phase 3: Faction-Scoped Strategic State
 
@@ -186,7 +190,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
 | 1. Read-Only Observation Spine | 8/9 | In Progress |  |
-| 2. Hostile-Faction Research Track | 0/TBD | Not started | - |
+| 2. Hostile-Faction Research Track | 0/1 | Not started | - |
 | 3. Faction-Scoped Strategic State | 0/TBD | Not started | - |
 | 4. Persistent Full Faction Minds | 0/TBD | Not started | - |
 | 5. Bounded Shadow Deliberation | 0/TBD | Not started | - |
