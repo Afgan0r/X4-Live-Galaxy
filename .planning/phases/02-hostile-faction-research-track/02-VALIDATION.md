@@ -30,3 +30,38 @@ This matrix defines deterministic, read-only validation for the Phase 2 XEN/KHK 
 ## Runtime Deferrals
 
 The first attributable disposable X4 9.00 probe may update claim rows with observed runtime evidence only after Phase 1 provides the read-only adapter contract. This is not a Phase 2 checkpoint and does not delay Phases 1 or 3–7.
+
+## Deterministic Fixture Checks
+
+Run the parser fixtures with the installed Pester version:
+
+```powershell
+Invoke-Pester -Path tools/verify_xen_khk_evidence.Tests.ps1
+```
+
+The fixtures prove that the parser accepts a valid skeleton and rejects duplicate
+source IDs, unknown claim sources, unallowlisted source descriptors, and
+conclusions outside a source's permitted scope. The local Pester 3.4 installation
+does not provide the newer `-CI` switch; this command is the compatible equivalent
+and still reports pass/fail deterministically.
+
+## Evidence Boundary Audit
+
+| Audit question | Result | Evidence level | Action if invalidated |
+| --- | --- | --- | --- |
+| Is every installed source material to a claim? | Yes: X4 jobs support XEN configuration, KHK activity supports KHK configuration, and the Finder is limited to a visibility precedent. | Verified static installation evidence | Rebuild the registry after a catalog or extension version change. |
+| Does each runtime unknown have an owner, evidence need, and non-gating disposition? | Yes: event export, faction visibility, KHK quota/activity observability, and extension interaction are structured unknown claims. | Repository-structure evidence | Keep the claim unknown until an attributable disposable probe succeeds. |
+| Do scope fields prohibit hostile implementation? | Yes: autonomy, government institutions, motives, diplomacy, architecture, writes, controls, and critical-path dependency are false. | Documented scope evidence | Reject the artifact until a later milestone explicitly changes the product contract. |
+| Can narrative prose bypass the validator? | No: the parser consumes only the named fenced JSON payload. | Verified parser behavior | Correct the structured register; narrative remains explanatory. |
+
+## Required Final Commands
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/verify_xen_khk_evidence.ps1 -EvidencePath .planning/phases/02-hostile-faction-research-track/02-XEN-KHK-EVIDENCE.md -Stage full
+Invoke-Pester -Path tools/verify_xen_khk_evidence.Tests.ps1
+git diff --check
+```
+
+These checks never launch X4, read saves, modify the installed game, contact a
+network service, or install a package. They validate only repository-owned
+structured evidence and its read-only scope boundary.
