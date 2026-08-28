@@ -1,5 +1,5 @@
 use crate::fact::{FactAvailability, FactFamily, StrategicFact, ThreatSubject};
-use crate::faction::{Capability, Faction};
+use crate::faction::{Capability, Faction, FactionProfile};
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -37,19 +37,30 @@ impl FactionVisibleSnapshot {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct InstitutionView {
     capability: Capability,
+    label: &'static str,
     snapshot_id: VisibleSnapshotId,
 }
 
 impl InstitutionView {
-    pub(crate) const fn new(capability: Capability, snapshot_id: VisibleSnapshotId) -> Self {
+    pub(crate) const fn new(
+        capability: Capability,
+        label: &'static str,
+        snapshot_id: VisibleSnapshotId,
+    ) -> Self {
         Self {
             capability,
+            label,
             snapshot_id,
         }
     }
 
     pub const fn capability(&self) -> Capability {
         self.capability
+    }
+
+    #[must_use]
+    pub const fn label(&self) -> &'static str {
+        self.label
     }
 
     pub const fn snapshot_id(&self) -> VisibleSnapshotId {
@@ -61,6 +72,7 @@ impl InstitutionView {
 pub struct StrategicPacket {
     faction: Faction,
     policy_version: &'static str,
+    profile: FactionProfile,
     visible_snapshot: FactionVisibleSnapshot,
     institution_views: [InstitutionView; 3],
 }
@@ -72,12 +84,15 @@ impl StrategicPacket {
         facts: Vec<StrategicFact>,
     ) -> Self {
         let snapshot_id = VisibleSnapshotId::for_faction(faction);
+        let profile = FactionProfile::for_faction(faction);
         Self {
             faction,
             policy_version,
+            profile,
             visible_snapshot: FactionVisibleSnapshot::new(snapshot_id, facts),
-            institution_views: Capability::ALL
-                .map(|capability| InstitutionView::new(capability, snapshot_id)),
+            institution_views: Capability::ALL.map(|capability| {
+                InstitutionView::new(capability, profile.label(capability), snapshot_id)
+            }),
         }
     }
 
@@ -92,6 +107,16 @@ impl StrategicPacket {
     #[must_use]
     pub const fn policy_version(&self) -> &'static str {
         self.policy_version
+    }
+
+    #[must_use]
+    pub const fn profile(&self) -> FactionProfile {
+        self.profile
+    }
+
+    #[must_use]
+    pub const fn profile_version(&self) -> &'static str {
+        self.profile.version()
     }
 
     pub const fn visible_snapshot_id(&self) -> VisibleSnapshotId {
