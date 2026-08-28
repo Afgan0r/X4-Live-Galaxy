@@ -28,8 +28,8 @@
 
 ### Primitive Institutions
 
-- [ ] **INST-01**: ZYA and ARG each have exactly three primitive institutions mapped to defense and military strategy, economy and logistics, and territorial development and infrastructure; their canon-grounded identities and fixed priorities are versioned and conditioned by faction doctrine.
-- [ ] **INST-02**: Every 0.1 institution reasons from the same authoritative faction-visible snapshot and cannot introduce private institutional knowledge or unsupported facts.
+- [x] **INST-01**: ZYA and ARG each have exactly three primitive institutions mapped to defense and military strategy, economy and logistics, and territorial development and infrastructure; their canon-grounded identities and fixed priorities are versioned and conditioned by faction doctrine.
+- [x] **INST-02**: Every 0.1 institution reasons from the same authoritative faction-visible snapshot and cannot introduce private institutional knowledge or unsupported facts.
 - [ ] **INST-03**: Each institution owns at most one active typed Shadow initiative with stable identity, objective, supporting evidence, priority, lifecycle state, and owner.
 - [ ] **INST-04**: The Executive Brain may originate, assign, approve, revise, preempt, reject, or terminate an institution initiative but cannot execute it directly or bypass deterministic admission.
 - [ ] **INST-05**: Replacing active work requires an explicit preemption request containing the trigger, previous initiative state, suspend-or-cancel disposition, replacement, Executive decision, and preserved reason.
@@ -139,8 +139,8 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MIND-05 | Phase 4 | Pending |
 | MIND-06 | Phase 5 | Pending |
 | MIND-07 | Phase 5 | Pending |
-| INST-01 | Phase 3 | Pending |
-| INST-02 | Phase 3 | Pending |
+| INST-01 | Phase 3 | Complete |
+| INST-02 | Phase 3 | Complete |
 | INST-03 | Phase 4 | Pending |
 | INST-04 | Phase 5 | Pending |
 | INST-05 | Phase 5 | Pending |

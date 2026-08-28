@@ -271,14 +271,14 @@ These are proposed interfaces, not existing APIs. [ASSUMED]
 | A1 | A stable long-lived root cue can retain the complete checkpoint variable with the documented saved MD state. | Exact X4-Owned Contract | Runtime evidence could require a different cue layout, while preserving the same port. |
 | A2 | A single opaque checkpoint payload fits within the practical MD persistence surface. | Exact X4-Owned Contract | The contract may need bounded chunking or stricter compaction after Phase 7 measurement. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What payload size and interruption semantics does the saved MD variable surface exhibit in X4 9.00?**
    - Recommendation: measure maximum safe bounded payload, write interruption behavior, and last-good retention before choosing checkpoint encoding/chunking.
-   - Status: pending Phase 7 runtime evidence; not a blocker to bounded local implementation.
+   - Status: assigned to existing Phase 7 runtime evidence; not a blocker and no Phase 4 human gate is required.
 2. **Can the MD adapter's logical compare-and-set survive every required lifecycle point?**
    - Recommendation: locally verify duplicate/stale rejection and re-read acknowledgement; Phase 7 exercises actual save/load and reconnect boundaries. If runtime evidence disproves it, retain only the strongest observed append/ack semantics and do not let a local store fill the gap.
-   - Status: local contract required in Phase 4; runtime proof pending Phase 7.
+   - Status: local contract required in Phase 4; runtime proof assigned to Phase 7 with no Phase 4 human gate.
 
 ## Environment Availability
 

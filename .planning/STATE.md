@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 1
 current_phase_name: Read-Only Observation Spine
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-08-28T22:46:40.055Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-08-28T22:57:16.548Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 1 execution started
-state_head: e932eaa5b3fca90ddd06dbc0916bdb5d74579b33
+state_head: 6cfe407ac8f7f533944cd978a63e465bff5dc777
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 13
-  completed_plans: 10
+  total_plans: 17
+  completed_plans: 11
   percent: 13
 ---
 
@@ -67,6 +67,7 @@ Progress: [█░░░░░░░░░] 13%
 | Phase 01 P07 | not recorded | 2 tasks | 2 files |
 | Phase 02 P01 | 5 min | 3 tasks | 4 files |
 | Phase 03-faction-scoped-strategic-state P01 | 40 min | 2 tasks | 10 files |
+| Phase 03-faction-scoped-strategic-state P02 | 20min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Plan 01-08 must create the telemetry-only UI-Lua/MD/named-pipe harness before Plan 01-09 performs the sole human X4 gate.
 - [Phase 2]: Phase 2 validates only structured static XEN/KHK evidence; runtime unknowns remain non-gating.
 - [Phase 1]: Foreign changing facts stay inaccessible while static resource maps remain available under recorded policy.
+- [Phase 3]: Institution views expose only capability and faction-visible snapshot identity; raw projections and private facts remain unavailable.
+- [Phase 3]: Doctrine v1 labels and priorities are explicit Live Galaxy product policy, not official X4 numeric canon.
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-28T22:46:39.960Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-08-28T22:57:16.450Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
