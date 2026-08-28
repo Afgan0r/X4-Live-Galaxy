@@ -4,11 +4,7 @@ use x4_bridge::{
 };
 
 fn compatible_hello() -> SessionHello {
-    SessionHello::new(
-        1,
-        "live-galaxy-x4-build-1",
-        ["live-galaxy-observation-v1"],
-    )
+    SessionHello::new(1, "live-galaxy-x4-build-1", ["live-galaxy-observation-v1"])
 }
 
 #[test]
