@@ -81,6 +81,13 @@ impl BoundedIngress {
         })
     }
 
+    pub const fn release(self) -> Self {
+        Self {
+            queued_frames: self.queued_frames.saturating_sub(1),
+            ..self
+        }
+    }
+
     fn bind_generation(&self, generation: SessionGeneration) -> Result<Self, BackpressureOutcome> {
         if self
             .session_generation

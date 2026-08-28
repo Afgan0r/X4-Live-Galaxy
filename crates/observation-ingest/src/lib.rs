@@ -22,6 +22,7 @@ pub use model::{
 };
 pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;
+pub use wire::{FrameHeader, inspect_frame};
 
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
 

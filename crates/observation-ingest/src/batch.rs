@@ -35,6 +35,9 @@ pub fn validate_batch(
             return Err(AdmissionError::FrameTooLarge);
         }
         match serde_json::from_str(frame).map_err(|_| AdmissionError::InvalidFixture)? {
+            WireFrame::Hello(_) => return Err(AdmissionError::InvalidFixture),
+            WireFrame::Heartbeat(frame) => validate_telemetry(frame.scope, frame.version)?,
+            WireFrame::RuntimeHealth(frame) => validate_health(frame)?,
             WireFrame::Observation(frame) => {
                 budget.record_observation()?;
                 let (scope, key) = apply_observation(&mut candidate, frame)?;
@@ -57,6 +60,19 @@ pub fn validate_batch(
         apply_reconciliation(&accepted.snapshot, &mut candidate, marker, observed)?;
     }
     Ok(candidate)
+}
+
+fn validate_telemetry(scope: String, version: u64) -> Result<(), AdmissionError> {
+    let _ = EntityId::new(scope).ok_or(AdmissionError::InvalidScope)?;
+    let _ = ObservationVersion::new(version).ok_or(AdmissionError::InvalidVersion)?;
+    Ok(())
+}
+
+fn validate_health(frame: crate::wire::WireRuntimeHealth) -> Result<(), AdmissionError> {
+    validate_telemetry(frame.scope, frame.version)?;
+    (!frame.status.is_empty())
+        .then_some(())
+        .ok_or(AdmissionError::InvalidFixture)
 }
 
 pub fn admit_batch(accepted: AcceptedProjection, frames: &[&str]) -> AdmissionOutcome {

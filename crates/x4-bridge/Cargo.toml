@@ -9,3 +9,7 @@ workspace = true
 
 [dependencies]
 observation-ingest = { path = "../observation-ingest" }
+
+[target.'cfg(windows)'.dependencies]
+interprocess = "=2.4.3"
+recvmsg = "=1.0.0"

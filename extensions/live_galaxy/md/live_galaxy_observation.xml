@@ -5,5 +5,18 @@
     a disposable X4 probe. This cue remains telemetry-only: it declares no
     actions, reports, acknowledgements, or game-state effect path.
   -->
-  <cues />
+  <cues>
+    <cue name="live_galaxy_root" instantiate="true">
+      <conditions>
+        <event_game_started />
+      </conditions>
+      <cues>
+        <cue name="live_galaxy_observation" checkinterval="30s">
+          <actions>
+            <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_tick'" />
+          </actions>
+        </cue>
+      </cues>
+    </cue>
+  </cues>
 </mdscript>

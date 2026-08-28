@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<addon name="live_galaxy">
+  <environment type="menus">
+    <file name="lua/live_galaxy_runtime.lua" />
+  </environment>
+</addon>
