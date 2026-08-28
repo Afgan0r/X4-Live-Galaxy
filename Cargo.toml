@@ -3,8 +3,37 @@ members = [
     "crates/observation-domain",
     "crates/observation-ingest",
     "crates/x4-bridge",
+    "tools/source-size-lint",
 ]
 resolver = "3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+warnings = "deny"
+
+[workspace.lints.clippy]
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+
+panic_in_result_fn = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+await_holding_lock = "deny"
+large_futures = "deny"
+exit = "deny"
+mem_forget = "deny"
+large_stack_arrays = "deny"
+large_types_passed_by_value = "deny"
+
+cognitive_complexity = "deny"
+excessive_nesting = "deny"
+too_many_lines = "deny"
 
 [workspace.package]
 edition = "2024"

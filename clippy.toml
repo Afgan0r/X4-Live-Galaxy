@@ -1,0 +1,21 @@
+cognitive-complexity-threshold = 15
+excessive-nesting-threshold = 3
+too-many-lines-threshold = 60
+type-complexity-threshold = 200
+
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true
+
+doc-valid-idents = [
+    "AI",
+    "API",
+    "FFI",
+    "JSON",
+    "LLM",
+    "Lua",
+    "MCP",
+    "SETA",
+    "TOML",
+    "X4",
+]

@@ -1,0 +1,2 @@
+[alias]
+lint = "run --quiet --manifest-path tools/source-size-lint/Cargo.toml --"
