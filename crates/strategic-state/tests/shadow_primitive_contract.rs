@@ -55,3 +55,29 @@ fn finite_allowlist_is_bounded_and_executive_posture_is_not_an_institution_view(
         Err(ShadowPrimitiveError::UnsupportedKind)
     );
 }
+
+#[test]
+fn rejects_required_primitive_evidence_when_quality_is_unavailable() {
+    for quality in ["unknown", "stale", "unsupported"] {
+        let military = format!(
+            r#"{{"type":"observation","scope":"ZYA","entity_id":"ZYA:military:fleet","observed_at_unix_millis":1,"version":1,"quality":"{quality}","content":"unavailable"}}"#
+        );
+        let frames = [
+            military,
+            r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#.to_owned(),
+            r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:territorial:station","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#.to_owned(),
+            r#"{"type":"observation","scope":"XEN","entity_id":"XEN:threat:XEN","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"shared"}"#.to_owned(),
+        ];
+        let input = frames.iter().map(String::as_str).collect::<Vec<_>>();
+        let snapshot = admit_batch(AcceptedProjection::empty(), &input)
+            .into_projection()
+            .snapshot;
+        let packets = derive_packets(&snapshot, PacketLimits::tracer()).expect("packet input");
+
+        assert_eq!(
+            ShadowPrimitive::derive(packets.packet(Faction::Zya)),
+            Err(ShadowPrimitiveError::UnavailableRequiredFact),
+            "military quality {quality} must not become a usable primitive input"
+        );
+    }
+}

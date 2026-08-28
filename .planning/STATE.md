@@ -10,10 +10,10 @@ last_activity_desc: Phase 1 execution started
 state_head: 6cfe407ac8f7f533944cd978a63e465bff5dc777
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 17
   completed_plans: 12
-  percent: 13
+  percent: 71
 ---
 
 # Project State

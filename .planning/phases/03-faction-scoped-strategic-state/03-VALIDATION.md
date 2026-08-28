@@ -1,7 +1,7 @@
 ---
 phase: 03
 slug: faction-scoped-strategic-state
-status: planned
+status: verified
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-08-29
@@ -31,13 +31,13 @@ created: 2026-08-29
 
 | Task ID | Plan | Wave | Requirements | Threat Ref | Secure behavior | Test type | Automated command | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 03-01-01 | 01 | 1 | OBS-04, OBS-05, MIND-03 | T-03-02 | One four-family accepted projection derives paired ZYA/ARG packets with XEN/KHK semantics and explicit availability | Rust tracer integration | `cargo test -p strategic-state --test tracer_packet` | pending |
-| 03-01-02 | 01 | 1 | MIND-02 | T-03-01/T-03-02 | Paired faction policies preserve the same authorized base while making visibility differences explicit | Rust contract | `cargo test -p strategic-state --test visibility_contract` | pending |
-| 03-02-01 | 02 | 2 | INST-01, INST-02 | T-03-04 | Exactly three shared capabilities read one shared visible snapshot | Rust contract | `cargo test -p strategic-state --test capability_contract` | pending |
-| 03-02-02 | 02 | 2 | MIND-03, INST-01 | T-03-03 | Six internal labels and two doctrine orders are versioned product-policy fixtures | Rust deterministic fixture | `cargo test -p strategic-state --test doctrine_priority` | pending |
-| 03-03-01 | 03 | 3 | OBS-04, OBS-05, MIND-03 | T-03-05 | Four typed planning-only primitives are exhaustive, owned, non-mutating, capped at four candidates, priority 1..100, and eight evidence references each | Rust contract | `cargo test -p strategic-state --test shadow_primitive_contract` | pending |
-| 03-03-02 | 03 | 3 | MIND-04 | T-03-06 | Primitive/evidence permutations preserve canonical packet/fingerprint; unsupported or ambiguous input fails closed | Rust property-style fixture | `cargo test -p strategic-state --test packet_determinism` | pending |
-| 03-03-03 | 03 | 3 | MIND-04, INST-01, INST-02 | T-03-07 | Visibility/order/capability/primitive regressions receive measured mutation evidence | Rust mutation baseline | `cargo test -p strategic-state --test mutation_baseline && cargo mutants -p strategic-state -- --test mutation_baseline` | pending |
+| 03-01-01 | 01 | 1 | OBS-04, OBS-05, MIND-03 | T-03-02 | One four-family accepted projection derives paired ZYA/ARG packets with XEN/KHK semantics and explicit availability | Rust tracer integration | `cargo test -p strategic-state --test tracer_packet` | green |
+| 03-01-02 | 01 | 1 | MIND-02 | T-03-01/T-03-02 | Paired faction policies preserve the same authorized base while making visibility differences explicit | Rust contract | `cargo test -p strategic-state --test visibility_contract` | green |
+| 03-02-01 | 02 | 2 | INST-01, INST-02 | T-03-04 | Exactly three shared capabilities read one shared visible snapshot | Rust contract | `cargo test -p strategic-state --test capability_contract` | green |
+| 03-02-02 | 02 | 2 | MIND-03, INST-01 | T-03-03 | Six internal labels and two doctrine orders are versioned product-policy fixtures | Rust deterministic fixture | `cargo test -p strategic-state --test doctrine_priority` | green |
+| 03-03-01 | 03 | 3 | OBS-04, OBS-05, MIND-03 | T-03-05 | Four typed planning-only primitives are exhaustive, owned, non-mutating, capped at four candidates, priority 1..100, and eight evidence references each; unavailable required evidence is rejected | Rust contract | `cargo test -p strategic-state --test shadow_primitive_contract` | green |
+| 03-03-02 | 03 | 3 | MIND-04 | T-03-06 | Primitive/evidence permutations preserve canonical packet/fingerprint; unsupported or ambiguous input fails closed | Rust property-style fixture | `cargo test -p strategic-state --test packet_determinism` | green |
+| 03-03-03 | 03 | 3 | MIND-04, INST-01, INST-02 | T-03-07 | Visibility/order/capability/primitive regressions receive measured mutation evidence | Rust mutation baseline | `cargo test -p strategic-state --test mutation_baseline` plus unavailable `cargo mutants -p strategic-state -- --test mutation_baseline` | warning |
 
 ## Requirement and Decision Coverage
 
@@ -68,11 +68,11 @@ Deferred private institutional knowledge, mutable influence, sabotage, internal 
 
 ## Validation Sign-Off
 
-- [ ] Focused targets pass after each task.
-- [ ] Source-size lint confirms every Rust source file is no more than 200 physical lines and strict Clippy is green.
-- [ ] Workspace suite passes after every wave.
-- [ ] Current Phase 1 runtime-semantics assumption remains visible and compatibility-tested.
-- [ ] Mutation baseline reports measured survivor dispositions or an explicit tool-availability failure.
-- [ ] Local verification is reported separately from pending Phase 1 X4 runtime evidence.
+- [x] Focused targets pass after each task and the complete strategic-state target set passes.
+- [x] Source-size lint confirms every Rust source file is no more than 200 physical lines and strict Clippy is green.
+- [x] Workspace suite passes after the phase wave.
+- [x] Current Phase 1 runtime-semantics assumption remains visible and compatibility-tested.
+- [x] Mutation baseline records the measured `cargo-mutants` tool-availability failure; no score is inferred.
+- [x] Local verification is reported separately from pending Phase 1 X4 runtime evidence.
 
-**Approval:** pending execution
+**Approval:** verified locally; mutation score pending reviewed runner availability
