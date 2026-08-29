@@ -272,18 +272,17 @@ The actual wrapper must supply a dedicated, non-secret benchmark working directo
 | A2 | The proposed provider trait and validator identifiers are suitable names. | Architecture Patterns / Code Examples | Naming may conflict with existing conventions. |
 | A3 | The manual wrapper can disable/avoid all Codex tool behavior through its prompt and sandbox configuration. | Manual harness invocation contract | Must be verified by an actual controlled benchmark before relying on it. |
 
-## Open Questions
+## Resolved Execution Decisions
 
-1. **Which local subscription model/configuration is both available and benchmark-worthy?**
-   - What we know: local Codex CLI is version `0.149.0` and exposes a non-interactive JSON/schema interface. [VERIFIED: local CLI, 2026-08-29]
-   - What's unclear: account-specific model availability, limits, response usage metadata, latency, and structured-output reliability.
-   - Recommendation: run the versioned manual corpus first; record availability/failure evidence without promoting it to a product promise.
-2. **What bounds should the scheduler enforce?**
-   - What we know: bounds are mandatory.
-   - What's unclear: queue, payload, context, timeout, retry, call, and retained-history values.
-   - Recommendation: define required configuration fields and fail closed if absent; populate values only from measured harness and later X4 evidence.
-3. **Where should non-authoritative cache/benchmark traces persist?**
-   - Recommendation: keep them outside the X4-owned checkpoint authority, keyed by exact identity and safe to delete; choose storage only after Phase 6 diagnostics design.
+1. **Subscription availability and model selection — resolved by a manual preflight, not an assumed model.**
+   - Plan 05 must expose a developer-only preflight that invokes the locally authenticated `codex exec --json --output-schema` path against one schema-valid corpus request and records the CLI version plus any exposed provider/model/generation metadata.
+   - If authentication, model selection, structured output, or required metadata is unavailable, the harness returns a typed `Unavailable` result and writes a redacted availability record. It neither retries through an API nor substitutes a different provider. A successful preflight selects only that recorded model/configuration for the matching manual corpus run; it creates no runtime support or quality claim.
+2. **Scheduler bounds — resolved as required versioned configuration with a disabled-until-measured real-model path.**
+   - Plans 02–04 must define checked `RequestBounds` fields for queue depth, request/context/output bytes, provider calls, retries, timeout, retained history, and dialogue cycles. Missing, zero, malformed, or over-cap values are a deterministic fail-closed disposition before provider invocation.
+   - CI fixtures declare bounded values solely to prove enforcement. The manual harness accepts a versioned measured profile tied to corpus/model/configuration fingerprints; until a profile exists, it remains unavailable for real-model runs. No benchmark result or numeric performance claim is invented by this phase.
+3. **Non-authoritative traces — resolved as a deletable redacted sidecar.**
+   - Plan 05 must write manual benchmark traces only beneath an explicit harness `--evidence-dir`, outside the X4-owned checkpoint and excluded from normal runtime/CI. Each record is keyed by exact request/cache identity and contains only the redacted monitoring tuple, availability/failure class, and corpus/configuration fingerprint.
+   - The sidecar is safe to delete without changing admitted state. Phase 6 may consume a derived diagnostic projection later; Phase 5 does not add a second authoritative persistence writer or put raw provider material in the checkpoint.
 
 ## Environment Availability
 
