@@ -20,7 +20,7 @@ pub enum DialogueState {
 }
 
 impl DialogueState {
-    pub fn advance(self) -> Result<Self, ArbitrationError> {
+    pub const fn advance(self) -> Result<Self, ArbitrationError> {
         match self {
             Self::DirectAgreement => Ok(Self::FinalDisposition),
             Self::MaterialObjection { cycles } if cycles < 2 => {
@@ -56,10 +56,6 @@ pub struct PreemptionRequest {
 }
 
 impl PreemptionRequest {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the constructor requires every causal field at the admission boundary"
-    )]
     pub fn new(
         command: CommandId,
         trigger: &str,
