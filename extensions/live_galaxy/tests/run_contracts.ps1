@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-verification')]
+    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-candidate-runner', 'x4-verification')]
     [string]$Suite = 'all',
     [string]$LuaPath
 )
@@ -107,6 +107,8 @@ $tests = if ($Suite -eq 'x4_discovery') {
     @('x4_discovery_contract.lua')
 } elseif ($Suite -eq 'component_discovery') {
     @('component_discovery_contract.lua')
+} elseif ($Suite -eq 'x4-candidate-runner') {
+    @('x4_candidate_runner_contract.lua')
 } else {
     Get-ChildItem $PSScriptRoot -Filter '*_contract.lua' | ForEach-Object Name
 }
