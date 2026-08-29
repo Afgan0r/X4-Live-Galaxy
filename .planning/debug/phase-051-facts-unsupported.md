@@ -1,31 +1,21 @@
 ---
-status: investigating
+status: resolved
 trigger: "Phase 05.1 disposable X4 verification reaches facts_unsupported after native station enumeration."
 created: 2026-08-30
 updated: 2026-08-30
 ---
 
-# Phase 05.1 facts unsupported classification
+# Phase 05.1 faction token diagnosis
 
 ## Symptoms
 
 - **Expected:** The bounded Argon station observation is emitted after all
   candidate metadata and capacity facts validate.
-- **Actual:** The runtime reaches discovery and returns `facts_unsupported`.
-  The bridge receives health-only frames and no completion marker.
+- **Actual:** The original faction token was rejected before enumeration. The
+  corrected token reaches enumeration, which then rejects the complete scope at
+  the obsolete 16-station bound.
 - **Known:** The previous extension-relative import and module-local `ffi.C`
   binding defects are resolved; native enumeration now advances beyond them.
-
-## Current Focus
-
-- hypothesis: The native station call requires the X4 faction token while the
-  emitted observation uses a distinct canonical ownership identifier.
-- test: Pass the native faction token only to native enumeration, then
-  canonicalize the returned owner fact before its existing validation.
-- constraints: No raw IDs, native text, values, payloads, retries, or wider
-  native seams may be added.
-- expecting: A disposable X4 run advances beyond native owner resolution; any
-  subsequent failure remains a closed class and the bridge stays health-only.
 
 ## Evidence
 
@@ -44,9 +34,14 @@ updated: 2026-08-30
   found: The native station function rejects the configured ownership token
     before candidate enumeration. The owner scope was not empty because of the
     fresh save; the token has the wrong native representation.
+- timestamp: 2026-08-30
+  checked: Disposable attempt `obs-x4-component-discovery-051-05`
+  found: The corrected native token reaches the count/fill seam, but the
+    complete owner scope exceeds the fixed 16-station bound. The bridge remains
+    health-only with no observation or completion marker.
 
-## Next Action
+## Resolution
 
-Deploy the corrected native-token revision after X4 closes, enable trace for
-one disposable attempt, reload the already-authorized disposable test save, and
-record only the emitted closed diagnostic class.
+The native faction-token diagnosis is resolved. The successor is the separately
+planned 64-station bounded-scope revision in `05.1-04-PLAN.md`; it retains the
+pre-allocation overflow boundary and requires a new disposable X4 smoke test.

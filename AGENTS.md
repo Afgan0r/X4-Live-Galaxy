@@ -218,6 +218,12 @@ The canonical read-only role is
 `.agents/agents/live-galaxy-x4-reference-researcher.md`. It supports four modes:
 vanilla files, installed mods, compatibility, and provenance/licensing.
 
+Assign every substantive X4 vanilla, installed-mod, compatibility, or
+provenance research task to this specialized subagent. The main agent may
+perform only the task bootstrap, narrowly targeted implementation reads, and
+final synthesis; it must not replace the specialist with a broad inline
+research pass.
+
 The agent must write research into the current GSD-owned artifact requested by
 the caller. Durable semantic conclusions belong in personal MemPalace wing
 `wing_x4_live_galaxy`; raw copied corpora do not. The role must never edit the
