@@ -1,7 +1,7 @@
 use crate::{CommandId, InitiativeId, PreemptionDisposition};
+use serde::{Deserialize, Serialize};
 use strategic_state::Faction;
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum CausalKind {
     MindUpdated,
     Proposal,
@@ -15,17 +15,16 @@ pub enum CausalKind {
     Rejected,
     Failed,
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CausalEvent {
-    kind: CausalKind,
-    faction: Faction,
-    command: CommandId,
-    sequence: u8,
-    initiative: Option<InitiativeId>,
-    disposition: Option<PreemptionDisposition>,
+    pub(crate) kind: CausalKind,
+    pub(crate) faction: Faction,
+    pub(crate) command: CommandId,
+    pub(crate) sequence: u8,
+    pub(crate) initiative: Option<InitiativeId>,
+    pub(crate) disposition: Option<PreemptionDisposition>,
 }
-
 impl CausalEvent {
     pub(crate) const fn new(
         kind: CausalKind,
@@ -42,7 +41,6 @@ impl CausalEvent {
             disposition: None,
         }
     }
-
     pub(crate) const fn for_initiative(
         kind: CausalKind,
         faction: Faction,
@@ -59,7 +57,6 @@ impl CausalEvent {
             disposition: None,
         }
     }
-
     pub(crate) const fn preemption(
         faction: Faction,
         command: CommandId,
@@ -76,24 +73,32 @@ impl CausalEvent {
             disposition: Some(disposition),
         }
     }
-
     #[must_use]
-    pub const fn kind(self) -> CausalKind {
+    pub const fn kind(&self) -> CausalKind {
         self.kind
     }
-
     #[must_use]
-    pub const fn command(self) -> CommandId {
-        self.command
+    pub const fn command(&self) -> &CommandId {
+        &self.command
     }
-
     #[must_use]
-    pub const fn initiative(self) -> Option<InitiativeId> {
-        self.initiative
+    pub const fn initiative(&self) -> Option<&InitiativeId> {
+        self.initiative.as_ref()
     }
-
     #[must_use]
-    pub const fn disposition(self) -> Option<PreemptionDisposition> {
+    pub const fn disposition(&self) -> Option<PreemptionDisposition> {
         self.disposition
+    }
+
+    pub(crate) fn valid(&self) -> bool {
+        let shape = match self.kind {
+            CausalKind::MindUpdated => self.initiative.is_none() && self.disposition.is_none(),
+            CausalKind::Preempted => self.initiative.is_some() && self.disposition.is_some(),
+            _ => self.initiative.is_some() && self.disposition.is_none(),
+        };
+        shape
+            && self.command.valid()
+            && self.initiative.as_ref().is_none_or(InitiativeId::valid)
+            && self.sequence < 6
     }
 }

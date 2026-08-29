@@ -1,4 +1,7 @@
-use mind_domain::{CommandId, MindAggregate, MindCommand, transition};
+use mind_domain::{
+    Capability, CommandId, InitiativeCommand, InitiativeId, InitiativeSpec, MindAggregate,
+    MindCommand, transition,
+};
 use mind_persistence::{CheckpointDraft, CheckpointEnvelope, CheckpointError};
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Faction, PacketLimits, derive_packets};
@@ -17,9 +20,27 @@ fn committed_mind() -> Result<mind_domain::PendingMindCommit, String> {
     let packets =
         derive_packets(&snapshot, PacketLimits::tracer()).map_err(|error| format!("{error:?}"))?;
     let packet = packets.packet(Faction::Zya);
-    transition(
+    let initial = transition(
         &MindAggregate::empty(Faction::Zya),
         MindCommand::from_packet(packet, CommandId::new("mind-zya-1")),
+    )
+    .map_err(|error| format!("{error:?}"))?;
+    let initiative = initial
+        .aggregate()
+        .apply_initiative(InitiativeCommand::accept(
+            CommandId::new("initiative-command-zya-1"),
+            InitiativeSpec::new(
+                InitiativeId::new("initiative-zya-1"),
+                Capability::DefenseAndMilitaryStrategy,
+                "defend frontier",
+                "military-fact",
+                90,
+            ),
+        ))
+        .map_err(|error| format!("{error:?}"))?;
+    transition(
+        initiative.aggregate(),
+        MindCommand::from_packet(packet, CommandId::new("mind-zya-2")),
     )
     .map_err(|error| format!("{error:?}"))
 }
@@ -52,8 +73,14 @@ fn encodes_a_complete_deterministic_committed_transition() {
     assert_eq!(first.integrity_hash(), second.integrity_hash());
     assert_eq!(first.sequence(), 1);
     assert_eq!(first.strategic_tick_id(), "tick-zya-1");
+    assert_eq!(first.restored_mind(), Ok(commit.aggregate().clone()));
     let Ok(bytes) = first_bytes else { return };
-    assert_eq!(CheckpointEnvelope::decode(&bytes), Ok(first));
+    let decoded = CheckpointEnvelope::decode(&bytes);
+    assert_eq!(decoded, Ok(first.clone()));
+    assert_eq!(
+        decoded.and_then(|value| value.restored_mind()),
+        first.restored_mind()
+    );
 }
 
 #[test]

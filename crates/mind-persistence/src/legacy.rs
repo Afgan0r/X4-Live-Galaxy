@@ -1,5 +1,6 @@
 use crate::checkpoint::{CheckpointPayload, validate_payload};
 use crate::{CheckpointEnvelope, CheckpointError, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
+use mind_domain::MindCheckpointState;
 use serde::Deserialize;
 
 const MAX_LEGACY_BYTES: usize = 32_768;
@@ -10,7 +11,7 @@ struct LegacyV0 {
     sequence: u64,
     snapshot: String,
     tick: String,
-    mind: String,
+    mind: MindCheckpointState,
     replay: String,
     admission: String,
     report: String,

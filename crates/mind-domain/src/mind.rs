@@ -1,35 +1,36 @@
 use crate::{CausalEvent, CausalKind, Initiative, InitiativeCommand, PendingInitiativeCommit};
+use serde::{Deserialize, Serialize};
 use strategic_state::{BilateralPosture, Capability, Faction, StrategicPacket};
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CommandId(&'static str);
-
+const MAX_TEXT: usize = 256;
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CommandId(String);
 impl CommandId {
     #[must_use]
-    pub const fn new(value: &'static str) -> Self {
-        Self(value)
+    pub fn new(value: &str) -> Self {
+        Self(value.into())
+    }
+    pub(crate) const fn valid(&self) -> bool {
+        !self.0.is_empty() && self.0.len() <= MAX_TEXT
     }
 }
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MindError {
     FactionMismatch,
     UnsupportedProfile,
     Initiative(crate::InitiativeError),
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MindCommand {
-    faction: Faction,
-    doctrine_version: &'static str,
-    priorities: [Capability; 3],
-    posture: BilateralPosture,
-    id: CommandId,
+    pub(crate) faction: Faction,
+    pub(crate) doctrine_version: String,
+    pub(crate) priorities: [Capability; 3],
+    pub(crate) posture: BilateralPosture,
+    pub(crate) id: CommandId,
 }
-
 impl MindCommand {
     #[must_use]
-    pub const fn from_packet(packet: &StrategicPacket, id: CommandId) -> Self {
+    pub fn from_packet(packet: &StrategicPacket, id: CommandId) -> Self {
         let posture = match packet.profile().priorities()[0] {
             Capability::DefenseAndMilitaryStrategy => BilateralPosture::IncreasePressure,
             Capability::EconomyAndLogistics => BilateralPosture::SeekLimitedCoordination,
@@ -39,37 +40,36 @@ impl MindCommand {
         };
         Self {
             faction: packet.faction(),
-            doctrine_version: packet.profile_version(),
+            doctrine_version: packet.profile_version().into(),
             priorities: packet.profile().priorities(),
             posture,
             id,
         }
     }
 }
-
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MindAggregate {
     pub(crate) faction: Faction,
-    doctrine_version: &'static str,
-    motives: [&'static str; 2],
-    priorities: [Capability; 3],
-    goals: [Capability; 3],
-    short_term_plans: [Capability; 3],
-    long_term_plans: [Capability; 3],
-    posture: BilateralPosture,
+    pub(crate) doctrine_version: String,
+    pub(crate) motives: [String; 2],
+    pub(crate) priorities: [Capability; 3],
+    pub(crate) goals: [Capability; 3],
+    pub(crate) short_term_plans: [Capability; 3],
+    pub(crate) long_term_plans: [Capability; 3],
+    pub(crate) posture: BilateralPosture,
     pub(crate) slots: [Option<Initiative>; 3],
     pub(crate) history: Vec<Initiative>,
     pub(crate) ledger: Vec<CausalEvent>,
     pub(crate) commands: Vec<(InitiativeCommand, Vec<CausalEvent>)>,
 }
-
 impl MindAggregate {
     #[must_use]
     pub const fn empty(faction: Faction) -> Self {
         Self {
             faction,
-            doctrine_version: "",
-            motives: ["", ""],
+            doctrine_version: String::new(),
+            motives: [String::new(), String::new()],
             priorities: Capability::ALL,
             goals: Capability::ALL,
             short_term_plans: Capability::ALL,
@@ -82,11 +82,11 @@ impl MindAggregate {
         }
     }
     #[must_use]
-    pub const fn doctrine_version(&self) -> &'static str {
-        self.doctrine_version
+    pub fn doctrine_version(&self) -> &str {
+        &self.doctrine_version
     }
     #[must_use]
-    pub const fn motives(&self) -> &[&'static str; 2] {
+    pub const fn motives(&self) -> &[String; 2] {
         &self.motives
     }
     pub const fn priorities(&self) -> &[Capability; 3] {
@@ -124,13 +124,12 @@ impl MindAggregate {
         crate::ledger::apply(self, command).map_err(MindError::Initiative)
     }
 }
-
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PendingMindCommit {
-    aggregate: MindAggregate,
-    events: [CausalEvent; 1],
+    pub(crate) aggregate: MindAggregate,
+    pub(crate) events: [CausalEvent; 1],
 }
-
 impl PendingMindCommit {
     #[must_use]
     pub const fn aggregate(&self) -> &MindAggregate {
@@ -140,8 +139,11 @@ impl PendingMindCommit {
     pub const fn events(&self) -> &[CausalEvent; 1] {
         &self.events
     }
+    #[must_use]
+    pub fn checkpoint_state(&self) -> crate::MindCheckpointState {
+        crate::MindCheckpointState::from_pending_commit(self)
+    }
 }
-
 pub fn transition(
     prior: &MindAggregate,
     command: MindCommand,
@@ -153,28 +155,29 @@ pub fn transition(
         return Err(MindError::UnsupportedProfile);
     }
     let motives = match command.priorities[0] {
-        Capability::DefenseAndMilitaryStrategy => ["protect territory", "sustain pressure"],
-        Capability::EconomyAndLogistics => ["sustain economy", "coordinate defense"],
+        Capability::DefenseAndMilitaryStrategy => {
+            ["protect territory".into(), "sustain pressure".into()]
+        }
+        Capability::EconomyAndLogistics => ["sustain economy".into(), "coordinate defense".into()],
         Capability::TerritorialDevelopmentAndInfrastructure => {
-            ["expand infrastructure", "protect territory"]
+            ["expand infrastructure".into(), "protect territory".into()]
         }
     };
-    let aggregate = MindAggregate {
-        faction: command.faction,
-        doctrine_version: command.doctrine_version,
-        motives,
-        priorities: command.priorities,
-        goals: command.priorities,
-        short_term_plans: command.priorities,
-        long_term_plans: command.priorities,
-        posture: command.posture,
-        slots: prior.slots,
-        history: prior.history.clone(),
-        ledger: prior.ledger.clone(),
-        commands: prior.commands.clone(),
-    };
     Ok(PendingMindCommit {
-        aggregate,
+        aggregate: MindAggregate {
+            faction: command.faction,
+            doctrine_version: command.doctrine_version,
+            motives,
+            priorities: command.priorities,
+            goals: command.priorities,
+            short_term_plans: command.priorities,
+            long_term_plans: command.priorities,
+            posture: command.posture,
+            slots: prior.slots.clone(),
+            history: prior.history.clone(),
+            ledger: prior.ledger.clone(),
+            commands: prior.commands.clone(),
+        },
         events: [CausalEvent::new(
             CausalKind::MindUpdated,
             command.faction,

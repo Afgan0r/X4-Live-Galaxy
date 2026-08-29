@@ -1,17 +1,21 @@
-use crate::{CausalEvent, CausalKind, CommandId};
-use strategic_state::{Capability, Faction};
+use crate::{CausalEvent, CommandId};
+use serde::{Deserialize, Serialize};
+use strategic_state::Capability;
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct InitiativeId(&'static str);
-
+const MAX_TEXT: usize = 256;
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InitiativeId(String);
 impl InitiativeId {
     #[must_use]
-    pub const fn new(value: &'static str) -> Self {
-        Self(value)
+    pub fn new(value: &str) -> Self {
+        Self(value.into())
+    }
+    pub(crate) fn valid(&self) -> bool {
+        valid(&self.0)
     }
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum InitiativeLifecycle {
     Active,
     Completed,
@@ -19,13 +23,11 @@ pub enum InitiativeLifecycle {
     Rejected,
     Failed,
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PreemptionDisposition {
     Cancelled,
     Rejected,
 }
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InitiativeError {
     ActiveSlot,
@@ -34,54 +36,62 @@ pub enum InitiativeError {
     IllegalTerminal,
     CapacityExceeded,
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct InitiativeSpec {
     pub(crate) id: InitiativeId,
     pub(crate) capability: Capability,
-    pub(crate) objective: &'static str,
-    pub(crate) evidence: &'static str,
+    pub(crate) objective: String,
+    pub(crate) evidence: String,
     pub(crate) priority: u8,
 }
-
 impl InitiativeSpec {
     #[must_use]
-    pub const fn new(
+    pub fn new(
         id: InitiativeId,
         capability: Capability,
-        objective: &'static str,
-        evidence: &'static str,
+        objective: &str,
+        evidence: &str,
         priority: u8,
     ) -> Self {
         Self {
             id,
             capability,
-            objective,
-            evidence,
+            objective: objective.into(),
+            evidence: evidence.into(),
             priority,
         }
     }
+    pub(crate) fn valid(&self) -> bool {
+        self.id.valid() && valid(&self.objective) && valid(&self.evidence)
+    }
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Initiative {
     pub(crate) spec: InitiativeSpec,
     pub(crate) state: InitiativeLifecycle,
     pub(crate) validating_event: CausalEvent,
 }
-
 impl Initiative {
     #[must_use]
-    pub const fn id(&self) -> InitiativeId {
-        self.spec.id
+    pub const fn id(&self) -> &InitiativeId {
+        &self.spec.id
     }
     #[must_use]
     pub const fn state(&self) -> InitiativeLifecycle {
         self.state
     }
-}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub(crate) fn valid(&self) -> bool {
+        self.spec.valid()
+            && self.validating_event.valid()
+            && self.validating_event.kind == crate::CausalKind::Validated
+            && self.validating_event.initiative.as_ref() == Some(&self.spec.id)
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum InitiativeCommand {
     Accept {
         id: CommandId,
@@ -91,7 +101,7 @@ pub enum InitiativeCommand {
         id: CommandId,
         predecessor: InitiativeId,
         replacement: InitiativeSpec,
-        trigger: &'static str,
+        trigger: String,
         disposition: PreemptionDisposition,
     },
     Terminal {
@@ -100,25 +110,24 @@ pub enum InitiativeCommand {
         state: InitiativeLifecycle,
     },
 }
-
 impl InitiativeCommand {
     #[must_use]
     pub const fn accept(id: CommandId, initiative: InitiativeSpec) -> Self {
         Self::Accept { id, initiative }
     }
     #[must_use]
-    pub const fn preempt(
+    pub fn preempt(
         id: CommandId,
         predecessor: InitiativeId,
         replacement: InitiativeSpec,
-        trigger: &'static str,
+        trigger: &str,
         disposition: PreemptionDisposition,
     ) -> Self {
         Self::Preempt {
             id,
             predecessor,
             replacement,
-            trigger,
+            trigger: trigger.into(),
             disposition,
         }
     }
@@ -154,13 +163,25 @@ impl InitiativeCommand {
             state: InitiativeLifecycle::Failed,
         }
     }
-    pub(crate) const fn id(self) -> CommandId {
+    pub(crate) const fn id(&self) -> &CommandId {
         match self {
             Self::Accept { id, .. } | Self::Preempt { id, .. } | Self::Terminal { id, .. } => id,
         }
     }
+    pub(crate) fn valid(&self) -> bool {
+        match self {
+            Self::Accept { id, initiative } => id.valid() && initiative.valid(),
+            Self::Preempt {
+                id,
+                predecessor,
+                replacement,
+                trigger,
+                ..
+            } => id.valid() && predecessor.valid() && replacement.valid() && valid(trigger),
+            Self::Terminal { id, initiative, .. } => id.valid() && initiative.valid(),
+        }
+    }
 }
-
 pub const fn slot(capability: Capability) -> usize {
     match capability {
         Capability::DefenseAndMilitaryStrategy => 0,
@@ -168,30 +189,6 @@ pub const fn slot(capability: Capability) -> usize {
         Capability::TerritorialDevelopmentAndInfrastructure => 2,
     }
 }
-
-pub fn events(
-    faction: Faction,
-    command: CommandId,
-    initiative: InitiativeId,
-    kinds: &[CausalKind],
-) -> Vec<CausalEvent> {
-    kinds
-        .iter()
-        .zip(0u8..)
-        .map(|(kind, sequence)| {
-            CausalEvent::for_initiative(*kind, faction, command, sequence, initiative)
-        })
-        .collect()
-}
-
-pub fn update_history(
-    history: &mut [Initiative],
-    id: InitiativeId,
-    state: InitiativeLifecycle,
-) -> Result<(), InitiativeError> {
-    let Some(initiative) = history.iter_mut().find(|initiative| initiative.id() == id) else {
-        return Err(InitiativeError::StalePredecessor);
-    };
-    initiative.state = state;
-    Ok(())
+pub const fn valid(value: &str) -> bool {
+    !value.is_empty() && value.len() <= MAX_TEXT
 }

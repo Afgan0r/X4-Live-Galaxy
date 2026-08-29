@@ -44,6 +44,8 @@ name = "mind-domain"
 version = "0.1.0"
 dependencies = [
  "observation-ingest",
+ "serde",
+ "serde_json",
  "strategic-state",
 ]
 
@@ -148,6 +150,7 @@ version = "0.1.0"
 dependencies = [
  "observation-domain",
  "observation-ingest",
+ "serde",
 ]
 
 [[package]]

@@ -111,15 +111,34 @@ fn unsupported_migration_returns_only_the_last_valid_projection() {
 
 #[test]
 fn ordered_legacy_migration_exposes_only_a_valid_target_copy() {
+    let current = checkpoint("report-zya-1");
+    assert!(current.is_ok());
+    let Ok(current) = current else { return };
+    let value = serde_json::to_value(&current);
+    assert!(value.is_ok());
+    let Ok(value) = value else { return };
+    let legacy = serde_json::json!({
+        "sequence": 1,
+        "snapshot": "snapshot-zya-1",
+        "tick": "tick-zya-1",
+        "mind": value["payload"]["typed_mind_commit"].clone(),
+        "replay": "replay-zya-1",
+        "admission": "admission-zya-1",
+        "report": "report-zya-1"
+    });
+    let legacy = serde_json::to_vec(&legacy);
+    assert!(legacy.is_ok());
+    let Ok(legacy) = legacy else { return };
     let outcome = recover(RecoveryInput::migration(
         None,
         "mind-checkpoint-v0",
         "1",
-        br#"{"sequence":1,"snapshot":"snapshot-zya-1","tick":"tick-zya-1","mind":"legacy","replay":"replay-zya-1","admission":"admission-zya-1","report":"report-zya-1"}"#.to_vec(),
+        legacy,
     ));
-    assert!(outcome.projection().is_some());
     assert_eq!(outcome.diagnostic(), None);
     assert!(outcome.port_write_requested());
+    let restored = outcome.projection().map(CheckpointEnvelope::restored_mind);
+    assert_eq!(restored, Some(current.restored_mind()));
 }
 
 #[test]
@@ -128,10 +147,10 @@ fn invalid_legacy_payloads_retain_fallback_without_a_write() {
     assert!(fallback.is_ok());
     let Ok(fallback) = fallback else { return };
     let partial = br#"{"sequence":1,"snapshot":"snapshot-zya-1"}"#.to_vec();
+    let opaque = br#"{"sequence":1,"snapshot":"s","tick":"t","mind":"legacy","replay":"r","admission":"a","report":"p"}"#.to_vec();
     let unknown = br#"{"sequence":1,"snapshot":"s","tick":"t","mind":"m","replay":"r","admission":"a","report":"p","extra":true}"#.to_vec();
     let oversized = vec![b'x'; 32_769];
-
-    for legacy in [b"not-json".to_vec(), partial, unknown, oversized] {
+    for legacy in [b"not-json".to_vec(), partial, opaque, unknown, oversized] {
         let outcome = recover(RecoveryInput::migration(
             Some(fallback.clone()),
             "mind-checkpoint-v0",
@@ -139,12 +158,12 @@ fn invalid_legacy_payloads_retain_fallback_without_a_write() {
             legacy,
         ));
         assert_eq!(outcome.projection(), Some(&fallback));
-        assert!(matches!(
+        assert_eq!(
             outcome.diagnostic(),
             Some(RecoveryDiagnostic::Rejected {
                 code: "invalid-legacy"
             })
-        ));
+        );
         assert!(!outcome.port_write_requested());
     }
 }

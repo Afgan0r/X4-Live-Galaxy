@@ -1,5 +1,5 @@
 use crate::{CheckpointCursor, CheckpointDraft, CheckpointError};
-use mind_domain::PendingMindCommit;
+use mind_domain::{MindAggregate, MindCheckpointState, PendingMindCommit};
 use serde::{Deserialize, Serialize};
 
 pub const SCHEMA_VERSION: &str = "1";
@@ -26,7 +26,7 @@ pub struct CheckpointEnvelope {
 pub struct CheckpointPayload {
     pub(super) accepted_snapshot_identity: String,
     pub(super) strategic_tick_identity: String,
-    pub(super) typed_mind_commit: String,
+    pub(super) typed_mind_commit: MindCheckpointState,
     pub(super) replay_identity: String,
     pub(super) admission_identity: String,
     pub(super) reserved_report_identity: String,
@@ -48,7 +48,7 @@ impl CheckpointEnvelope {
         let payload = CheckpointPayload {
             accepted_snapshot_identity: draft.snapshot,
             strategic_tick_identity: draft.tick,
-            typed_mind_commit: format!("{commit:?}"),
+            typed_mind_commit: commit.checkpoint_state(),
             replay_identity: draft.replay,
             admission_identity: draft.admission,
             reserved_report_identity: draft.report,
@@ -105,6 +105,13 @@ impl CheckpointEnvelope {
     #[must_use]
     pub fn reserved_report_id(&self) -> &str {
         &self.payload.reserved_report_identity
+    }
+
+    pub fn restored_mind(&self) -> Result<MindAggregate, CheckpointError> {
+        self.payload
+            .typed_mind_commit
+            .restore()
+            .map_err(|_| CheckpointError::InvalidState)
     }
 
     pub(crate) fn predecessor_matches(&self, expected: Option<&CheckpointCursor>) -> bool {
@@ -174,11 +181,15 @@ pub fn validate_payload(payload: &CheckpointPayload) -> Result<(), CheckpointErr
             return Err(CheckpointError::InvalidIdentity);
         }
     }
-    if payload.typed_mind_commit.is_empty()
-        || payload.typed_mind_commit.len() > MAX_MIND_STATE_BYTES
-    {
+    let mind_bytes =
+        serde_json::to_vec(&payload.typed_mind_commit).map_err(|_| CheckpointError::Malformed)?;
+    if mind_bytes.len() > MAX_MIND_STATE_BYTES {
         return Err(CheckpointError::Oversized);
     }
+    payload
+        .typed_mind_commit
+        .restore()
+        .map_err(|_| CheckpointError::InvalidState)?;
     Ok(())
 }
 

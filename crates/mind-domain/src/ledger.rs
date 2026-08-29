@@ -6,7 +6,6 @@ use crate::{
 const MAX_HISTORY: usize = 16;
 const MAX_EVENTS: usize = 64;
 const MAX_COMMANDS: usize = 16;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PendingInitiativeCommit {
     aggregate: MindAggregate,
@@ -46,8 +45,8 @@ pub fn apply(
         return Err(InitiativeError::CapacityExceeded);
     }
     let mut aggregate = prior.clone();
-    let events = transition(&mut aggregate, command)?;
-    aggregate.ledger.extend(events.iter().copied());
+    let events = transition(&mut aggregate, command.clone())?;
+    aggregate.ledger.extend(events.iter().cloned());
     aggregate.commands.push((command, events.clone()));
     Ok(PendingInitiativeCommit { aggregate, events })
 }
@@ -64,7 +63,7 @@ fn transition(
             replacement,
             trigger: _,
             disposition,
-        } => preempt(aggregate, id, predecessor, replacement, disposition),
+        } => preempt(aggregate, id, &predecessor, replacement, disposition),
         InitiativeCommand::Terminal {
             id,
             initiative,
@@ -73,6 +72,10 @@ fn transition(
     }
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "command ownership is consumed by causal evidence"
+)]
 fn accept(
     aggregate: &mut MindAggregate,
     id: crate::CommandId,
@@ -85,10 +88,10 @@ fn accept(
     if aggregate.history.len() == MAX_HISTORY || aggregate.ledger.len() + 5 > MAX_EVENTS {
         return Err(InitiativeError::CapacityExceeded);
     }
-    let events = crate::initiative::events(
+    let events = crate::initiative_events::events(
         aggregate.faction,
-        id,
-        spec.id,
+        &id,
+        &spec.id,
         &[
             CausalKind::Proposal,
             CausalKind::Objection,
@@ -100,22 +103,26 @@ fn accept(
     let initiative = Initiative {
         spec,
         state: InitiativeLifecycle::Active,
-        validating_event: events[3],
+        validating_event: events[3].clone(),
     };
-    aggregate.slots[index] = Some(initiative);
+    aggregate.slots[index] = Some(initiative.clone());
     aggregate.history.push(initiative);
     Ok(events)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "command ownership is consumed by causal evidence"
+)]
 fn preempt(
     aggregate: &mut MindAggregate,
     id: crate::CommandId,
-    predecessor: InitiativeId,
+    predecessor: &InitiativeId,
     replacement: crate::InitiativeSpec,
     disposition: PreemptionDisposition,
 ) -> Result<Vec<CausalEvent>, InitiativeError> {
     let index = crate::initiative::slot(replacement.capability);
-    let Some(active) = aggregate.slots[index] else {
+    let Some(ref active) = aggregate.slots[index] else {
         return Err(InitiativeError::StalePredecessor);
     };
     if active.id() != predecessor {
@@ -128,18 +135,18 @@ fn preempt(
         PreemptionDisposition::Cancelled => InitiativeLifecycle::Cancelled,
         PreemptionDisposition::Rejected => InitiativeLifecycle::Rejected,
     };
-    crate::initiative::update_history(&mut aggregate.history, predecessor, state)?;
+    crate::initiative_events::update_history(&mut aggregate.history, predecessor, state)?;
     let mut events = vec![CausalEvent::preemption(
         aggregate.faction,
-        id,
+        id.clone(),
         0,
-        predecessor,
+        predecessor.clone(),
         disposition,
     )];
-    events.extend(crate::initiative::events(
+    events.extend(crate::initiative_events::events(
         aggregate.faction,
-        id,
-        replacement.id,
+        &id,
+        &replacement.id,
         &[
             CausalKind::Proposal,
             CausalKind::Objection,
@@ -151,24 +158,28 @@ fn preempt(
     let initiative = Initiative {
         spec: replacement,
         state: InitiativeLifecycle::Active,
-        validating_event: events[4],
+        validating_event: events[4].clone(),
     };
-    aggregate.slots[index] = Some(initiative);
+    aggregate.slots[index] = Some(initiative.clone());
     aggregate.history.push(initiative);
     Ok(events)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "command and target ownership are consumed by causal evidence"
+)]
 fn terminal(
     aggregate: &mut MindAggregate,
     id: crate::CommandId,
     target: InitiativeId,
     state: InitiativeLifecycle,
 ) -> Result<Vec<CausalEvent>, InitiativeError> {
-    let Some(index) = aggregate
-        .slots
-        .iter()
-        .position(|value| value.is_some_and(|initiative| initiative.id() == target))
-    else {
+    let Some(index) = aggregate.slots.iter().position(|value| {
+        value
+            .as_ref()
+            .is_some_and(|initiative| initiative.id() == &target)
+    }) else {
         return Err(InitiativeError::IllegalTerminal);
     };
     let kind = match state {
@@ -178,12 +189,12 @@ fn terminal(
         InitiativeLifecycle::Failed => CausalKind::Failed,
         InitiativeLifecycle::Active => return Err(InitiativeError::IllegalTerminal),
     };
-    crate::initiative::update_history(&mut aggregate.history, target, state)?;
+    crate::initiative_events::update_history(&mut aggregate.history, &target, state)?;
     aggregate.slots[index] = None;
-    Ok(crate::initiative::events(
+    Ok(crate::initiative_events::events(
         aggregate.faction,
-        id,
-        target,
+        &id,
+        &target,
         &[kind],
     ))
 }

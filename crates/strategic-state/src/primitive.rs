@@ -1,8 +1,6 @@
 use crate::fact::FactReference;
 use crate::packet::StrategicPacket;
-
 const MAX_SHADOW_PRIMITIVES: usize = 4;
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum ShadowPrimitiveKind {
     DefensiveReadiness,
@@ -10,7 +8,6 @@ pub enum ShadowPrimitiveKind {
     TerritorialDevelopmentPriority,
     BilateralPostureDisposition,
 }
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum PrimitiveOwner {
     Defense,
@@ -18,7 +15,6 @@ pub enum PrimitiveOwner {
     Territorial,
     Executive,
 }
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum PlanningHorizon {
     Immediate,
@@ -26,7 +22,9 @@ pub enum PlanningHorizon {
     Sustained,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
+)]
 pub enum BilateralPosture {
     PreserveRelations,
     Deescalate,

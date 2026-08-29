@@ -4,13 +4,23 @@ use mind_domain::{
 };
 use strategic_state::Faction;
 
-const fn defense(id: &'static str) -> InitiativeSpec {
+fn defense(id: &str) -> InitiativeSpec {
     InitiativeSpec::new(
         InitiativeId::new(id),
         Capability::DefenseAndMilitaryStrategy,
         "defend frontier",
         "military-fact",
         90,
+    )
+}
+
+fn initiative(id: &str, capability: Capability) -> InitiativeSpec {
+    InitiativeSpec::new(
+        InitiativeId::new(id),
+        capability,
+        "bounded objective",
+        "supporting fact",
+        50,
     )
 }
 
@@ -101,5 +111,57 @@ fn terminal_outcomes_are_replayable_without_mutation() {
                 .is_none()
         );
         assert_eq!(terminal.events().len(), 1);
+    }
+}
+
+#[test]
+fn exposes_exactly_three_independent_capability_slots_per_faction() {
+    let capabilities = [
+        Capability::DefenseAndMilitaryStrategy,
+        Capability::EconomyAndLogistics,
+        Capability::TerritorialDevelopmentAndInfrastructure,
+    ];
+    let ids = ["defense", "economy", "territorial"];
+    let command_ids = ["accept-defense", "accept-economy", "accept-territorial"];
+    let mut aggregate = MindAggregate::empty(Faction::Arg);
+
+    for ((capability, id), command_id) in capabilities.into_iter().zip(ids).zip(command_ids) {
+        let accepted = aggregate.apply_initiative(InitiativeCommand::accept(
+            CommandId::new(command_id),
+            initiative(id, capability),
+        ));
+        assert!(accepted.is_ok());
+        let Ok(commit) = accepted else { return };
+        aggregate = commit.aggregate().clone();
+    }
+
+    for capability in capabilities {
+        assert!(aggregate.active_initiative(capability).is_some());
+    }
+    for (capability, id, command_id) in [
+        (
+            Capability::DefenseAndMilitaryStrategy,
+            "defense-replacement",
+            "duplicate-defense",
+        ),
+        (
+            Capability::EconomyAndLogistics,
+            "economy-replacement",
+            "duplicate-economy",
+        ),
+        (
+            Capability::TerritorialDevelopmentAndInfrastructure,
+            "territorial-replacement",
+            "duplicate-territorial",
+        ),
+    ] {
+        assert!(
+            aggregate
+                .apply_initiative(InitiativeCommand::accept(
+                    CommandId::new(command_id),
+                    initiative(id, capability),
+                ))
+                .is_err()
+        );
     }
 }

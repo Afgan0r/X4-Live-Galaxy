@@ -10,3 +10,4 @@ workspace = true
 [dependencies]
 observation-domain = { path = "../observation-domain" }
 observation-ingest = { path = "../observation-ingest" }
+serde = { version = "=1.0.229", features = ["derive"] }

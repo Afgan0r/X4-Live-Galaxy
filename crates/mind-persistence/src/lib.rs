@@ -66,6 +66,7 @@ impl CheckpointDraft {
 pub enum CheckpointError {
     InvalidHash,
     InvalidIdentity,
+    InvalidState,
     Malformed,
     Oversized,
     SequenceMismatch,
