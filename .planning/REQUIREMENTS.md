@@ -42,9 +42,9 @@
 - [ ] **MODEL-01**: Real-model prototype deliberation is isolated behind a provider-neutral typed interface and uses a developer-controlled subscription harness before `1.0.0`; public runtime API integration is not required by milestone 0.1.
 - [x] **MODEL-02**: Provider output remains untrusted until schema, semantic, information, safety, budget, and current-state validation all succeed.
 - [x] **MODEL-03**: Rejected or timed-out provider work records a bounded reason and cannot partially admit a plan or alter authoritative X4 state.
-- [ ] **MODEL-04**: Cache entries use exact versioned keys covering faction, snapshot, policy, prompt package, schema, provider, model, and relevant generation settings.
+- [x] **MODEL-04**: Cache entries use exact versioned keys covering faction, snapshot, policy, prompt package, schema, provider, model, and relevant generation settings.
 - [x] **MODEL-05**: Context and history compaction uses model-relative token budgets and produces versioned typed-plus-narrative capsules whose typed facts remain authoritative.
-- [ ] **MODEL-06**: Provider calls, retries, time, payload size, context size, queue depth, and retained history have explicit enforceable bounds.
+- [x] **MODEL-06**: Provider calls, retries, time, payload size, context size, queue depth, and retained history have explicit enforceable bounds.
 - [ ] **MODEL-07**: Recorded fixtures and deterministic fakes allow normal tests and replay evaluation to run without a live model, but fake output cannot satisfy real-model strategic-quality acceptance.
 - [ ] **MODEL-08**: A scenario corpus scores factual grounding, continuity, information discipline, faction divergence, strategic consistency, schema reliability, latency, cache behavior, and model cost.
 - [ ] **MODEL-09**: Strategic-quality acceptance uses complete subscription-backed real-model trajectories, is gated by an independently measured reliability floor, and derives thresholds from recorded baselines rather than invented targets.
@@ -150,9 +150,9 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MODEL-01 | Phase 5 | Pending |
 | MODEL-02 | Phase 5 | Complete |
 | MODEL-03 | Phase 5 | Complete |
-| MODEL-04 | Phase 5 | Pending |
+| MODEL-04 | Phase 5 | Complete |
 | MODEL-05 | Phase 4 | Complete |
-| MODEL-06 | Phase 5 | Pending |
+| MODEL-06 | Phase 5 | Complete |
 | MODEL-07 | Phase 5 | Pending |
 | MODEL-08 | Phase 8 | Pending |
 | MODEL-09 | Phase 8 | Pending |
