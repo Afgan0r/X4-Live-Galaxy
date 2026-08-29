@@ -23,6 +23,10 @@ pub enum RequestError {
 }
 
 impl DeliberationRequest {
+    pub const fn faction(&self) -> Faction {
+        self.packet.faction()
+    }
+
     #[must_use]
     pub fn snapshot_identity(&self) -> &str {
         &self.snapshot_identity

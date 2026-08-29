@@ -41,6 +41,18 @@ impl DeliberationRunner {
     where
         P: ShadowProvider,
     {
+        if request.request().snapshot_identity() != context.current_snapshot_identity
+            || request.request().faction() != prior.faction()
+        {
+            let outcome = RunnerOutcome::Admitted {
+                admission: AdmissionDecision::Rejected(
+                    mind_domain::AdmissionRejection::CurrentState,
+                ),
+                evidence: provider.evidence(),
+            };
+            context.scheduler.complete(context.faction);
+            return outcome;
+        }
         let evidence = provider.evidence();
         let outcome = match provider.propose(request) {
             Ok(bytes) => RunnerOutcome::Admitted {
@@ -80,6 +92,17 @@ impl DeliberationRunner {
         evidence: EvidenceClass,
         context: RunContext<'_>,
     ) -> RunnerOutcome {
+        if request.request().snapshot_identity() != context.current_snapshot_identity
+            || request.request().faction() != prior.faction()
+        {
+            context.scheduler.complete(context.faction);
+            return RunnerOutcome::Admitted {
+                admission: AdmissionDecision::Rejected(
+                    mind_domain::AdmissionRejection::CurrentState,
+                ),
+                evidence,
+            };
+        }
         let outcome = RunnerOutcome::Admitted {
             admission: admit(
                 request.request(),

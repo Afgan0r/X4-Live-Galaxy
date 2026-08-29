@@ -1,3 +1,5 @@
+#[path = "shadow_deliberation_evals/admission_edges.rs"]
+mod admission_edges;
 #[path = "shadow_deliberation_evals/dialogue.rs"]
 mod dialogue;
 #[path = "shadow_deliberation_evals/exact_cache.rs"]
