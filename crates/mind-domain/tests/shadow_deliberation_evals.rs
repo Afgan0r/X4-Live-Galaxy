@@ -1,5 +1,6 @@
 use mind_domain::{
-    AdmissionDecision, CommandId, DeliberationRequest, MindAggregate, ShadowProposal, admit,
+    AdmissionDecision, CommandId, DeliberationRequest, ExactCacheKey, MindAggregate,
+    RequestBounds, ShadowProposal, admit, revalidate_cached,
 };
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Capability, Faction, PacketLimits, derive_packets};
@@ -107,4 +108,70 @@ fn stale_faction_is_rejected_before_any_pending_commit() {
             .pending_commit(&MindAggregate::empty(Faction::Arg))
             .is_none()
     );
+}
+
+#[test]
+fn sd_006_exact_key_changes_for_every_authority_component_and_is_order_stable() {
+    let request = request().expect("fixture request");
+    let bounds = RequestBounds::test_profile();
+    let baseline = ExactCacheKey::from_request(
+        &request,
+        &bounds,
+        "schema-v1",
+        "provider-a",
+        "model-a",
+        ["temperature=0", "top_p=1"],
+        ["defense", "economy"],
+        "compact-v1",
+    )
+    .expect("bounded key");
+    let reordered = ExactCacheKey::from_request(
+        &request,
+        &bounds,
+        "schema-v1",
+        "provider-a",
+        "model-a",
+        ["top_p=1", "temperature=0"],
+        ["economy", "defense"],
+        "compact-v1",
+    )
+    .expect("ordered key");
+    assert_eq!(baseline, reordered);
+    for changed in [
+        ExactCacheKey::for_test("ARG", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-v1", "provider-a", "model-a", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-2", "policy-v1", "prompt-v1", "schema-v1", "provider-a", "model-a", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-2", "prompt-v1", "schema-v1", "provider-a", "model-a", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-2", "schema-v1", "provider-a", "model-a", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-2", "provider-a", "model-a", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-v1", "provider-b", "model-a", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-v1", "provider-a", "model-b", "temperature=0", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-v1", "provider-a", "model-a", "temperature=1", "defense,economy", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-v1", "provider-a", "model-a", "temperature=0", "defense", "compact-v1"),
+        ExactCacheKey::for_test("ZYA", "snapshot-zya-1", "policy-v1", "prompt-v1", "schema-v1", "provider-a", "model-a", "temperature=0", "defense,economy", "compact-2"),
+    ] {
+        assert_ne!(baseline, changed.expect("changed key"));
+    }
+}
+
+#[test]
+fn sd_005_all_request_bounds_are_required_and_nonzero() {
+    assert!(RequestBounds::new(0, 1, 1, 1, 1, 1, 1, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 0, 1, 1, 1, 1, 1, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 0, 1, 1, 1, 1, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 1, 0, 1, 1, 1, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 1, 1, 0, 1, 1, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 1, 1, 1, 0, 1, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 1, 1, 1, 1, 0, 1, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 1, 1, 1, 1, 1, 0, 1).is_err());
+    assert!(RequestBounds::new(1, 1, 1, 1, 1, 1, 1, 1, 0).is_err());
+}
+
+#[test]
+fn sd_006_cached_bytes_revalidate_through_current_state_admission() {
+    let request = request().expect("fixture request");
+    let candidate = proposal().expect("fixture candidate");
+    let result = revalidate_cached(&request, &MindAggregate::empty(Faction::Arg), &candidate);
+    assert_eq!(result.decision, AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState));
+    assert!(result.cache_hit);
+    assert_eq!(result.validator_outcome, "current_state");
 }
