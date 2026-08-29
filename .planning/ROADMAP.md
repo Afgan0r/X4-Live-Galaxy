@@ -191,13 +191,15 @@ Plans:
 
 **Research**: Required — inspect installed vanilla X4 first, then the X4 Live reference call shapes and exact installed mod/version evidence; treat runtime semantics as unknown until the disposable probe.
 **Requirement mapping note**: This conditional evidence closure strengthens the existing OBS-06 / D-09 contract and introduces no new milestone requirement ID.
-**Plans:** 2/3 plans executed
+**Plans:** 3 completed, 1 superseded, 1 queued
 
 Plans:
 
 - [x] 05.1-01-PLAN.md
 - [x] 05.1-02-PLAN.md
-- [ ] 05.1-03-PLAN.md
+- [x] 05.1-03-PLAN.md
+- [ ] 05.1-04-PLAN.md — Superseded by 05.1-05; do not execute its 64-station cap.
+- [ ] 05.1-05-PLAN.md — Measure native/transport budgets and stream complete owner scopes incrementally.
 
 ### Phase 6: Correlated Reports and Diagnostics
 

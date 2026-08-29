@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-30T04:26:59.4930444+07:00",
+  "phase": "05.1",
+  "phase_name": "bounded-real-component-discovery-inserted",
+  "phase_dir": ".planning/phases/05.1-bounded-real-component-discovery-inserted",
+  "plan": 5,
+  "task": 0,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "bounded station-frame prototype", "status": "done", "commit": "2d1108b"},
+    {"id": 2, "name": "backpressure and reconnect atomicity fixes", "status": "done", "commit": "66adbe9"}
+  ],
+  "remaining_tasks": [
+    {"id": 1, "name": "replace prototype bounds with MCP-oriented bounded FIFO", "status": "not_started"},
+    {"id": 2, "name": "bridge and ingest stream-bound alignment", "status": "not_started"},
+    {"id": 3, "name": "disposable X4 normal-speed and SETA UAT", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "05.1-05 plan check found the implementation scope omits existing 64/128/2 KiB limits in batch, bridge server, and listener; it also lacks a precise framed-wire-byte accounting definition.", "type": "technical", "workaround": "Revise plan before execution; do not run 05.1-05."}
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Use X4 MCP as the clean-room architectural baseline for FIFO, drain, retry, cadence, and transport envelope.", "rationale": "Owner states MCP works well; do not copy its domain model or global reconciliation semantics.", "phase": "05.1"},
+    {"decision": "Do not use 16 or 64 as a global faction-station scope limit.", "rationale": "Native UAT observed Argon scope above 64; transport flow control and native enumeration safety are separate concerns.", "phase": "05.1"}
+  ],
+  "uncommitted_files": [
+    ".planning/ROADMAP.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-PATTERNS.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-REVIEW.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-VALIDATION.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-PLAN-CHECK.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-PLAN.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-RESEARCH.md"
+  ],
+  "next_action": "Revise 05.1-05 planning scope to include current bridge/ingest limits and define framed-wire byte accounting, then rerun GSD plan checker before any execution.",
+  "context_notes": "Trace is default-off; X4 and x4-bridge are stopped. No save was read or modified."
+}
