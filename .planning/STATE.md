@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
 current_phase: 05.1
-current_phase_name: bounded-real-component-discovery-inserted
+current_phase_name: Bounded Real Component Discovery (INSERTED)
 status: executing
-stopped_at: Phase 05 complete, ready to plan Phase 06
-last_updated: "2026-08-29T15:39:16.023Z"
+stopped_at: Completed 05.1-01-PLAN.md
+last_updated: "2026-08-29T15:51:51.228Z"
 last_activity: 2026-08-29
-last_activity_desc: Phase 05 complete, transitioned to Phase 06
-state_head: 8c0426f055674d28e0db98ae12c069d39f495782
+last_activity_desc: Phase 05.1 execution started
+state_head: b334d959d21ccc58639d08c7da5ccde8fc751864
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 26
-  completed_plans: 21
+  completed_plans: 22
   percent: 40
 ---
 
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-28)
 
 **Core value:** Factions pursue coherent, distinct, long-lived strategies while X4 remains authoritative and every proposed effect stays observable, recoverable, and bounded by deterministic validation.
-**Current focus:** Phase 06 — Correlated Reports and Diagnostics
+**Current focus:** Phase 05.1 — Bounded Real Component Discovery (INSERTED)
 
 ## Current Position
 
-Phase: 05.1 (bounded-real-component-discovery-inserted) — READY TO EXECUTE
-Plan: Not started
+Phase: 05.1 (Bounded Real Component Discovery (INSERTED)) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-08-29 — Phase 05 complete, transitioned to Phase 06
+Last activity: 2026-08-29 — Phase 05.1 execution started
 
-Progress: [█████░░░░░] 50%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [█████░░░░░] 50%
 | Phase 05 P03 | resumed execution | 3 tasks | 21 files |
 | Phase 05 P04 | 4m | 3 tasks | 8 files |
 | Phase 05 P05 | resumed execution | 3 tasks | 10 files |
+| Phase 05.1 P01 | 28m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Deterministic fixture evidence proves contracts and replay only; manual harness evidence is distinct from quality acceptance.
 - [Phase 05]: The subscription route is manual-only and returns unavailable instead of using an API fallback.
 - [Phase 05]: Benchmark evidence is bounded and redacted, never authoritative state or a quality threshold.
+- [Phase 05.1]: Phase 05.1 uses a fixed two-path telemetry-only package allowlist before production component discovery.
+- [Phase 05.1]: Station facts require a complete canonical envelope before accepted projection replacement.
 
 ### Pending Todos
 
@@ -149,6 +152,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-29T05:10:55.930Z
-Stopped at: Phase 05 complete, ready to plan Phase 06
-Resume file: None
+Last session: 2026-08-29T15:51:50.789Z
+Stopped at: Completed 05.1-01-PLAN.md
+Resume file: 05.1-02-PLAN.md
