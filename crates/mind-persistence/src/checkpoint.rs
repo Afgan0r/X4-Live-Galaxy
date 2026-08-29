@@ -5,8 +5,6 @@ use serde::{Deserialize, Serialize};
 pub const SCHEMA_VERSION: &str = "1";
 pub const GAME_PROTOCOL_IDENTITY: &str = "live_galaxy.persistence.v1";
 const MAX_ENVELOPE_BYTES: usize = 32_768;
-const MAX_ID_BYTES: usize = 128;
-const MAX_MIND_STATE_BYTES: usize = 16_384;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -45,6 +43,12 @@ impl CheckpointEnvelope {
         {
             return Err(CheckpointError::SequenceMismatch);
         }
+        if predecessor
+            .as_ref()
+            .is_some_and(|cursor| !crate::integrity::valid(&cursor.integrity_hash))
+        {
+            return Err(CheckpointError::InvalidHash);
+        }
         let payload = CheckpointPayload {
             accepted_snapshot_identity: draft.snapshot,
             strategic_tick_identity: draft.tick,
@@ -53,7 +57,7 @@ impl CheckpointEnvelope {
             admission_identity: draft.admission,
             reserved_report_identity: draft.report,
         };
-        validate_payload(&payload)?;
+        crate::checkpoint_validation::payload(&payload)?;
         let mut envelope = Self {
             schema_version: SCHEMA_VERSION.into(),
             game_protocol_identity: GAME_PROTOCOL_IDENTITY.into(),
@@ -131,12 +135,22 @@ impl CheckpointEnvelope {
         {
             return Err(CheckpointError::InvalidIdentity);
         }
-        if self.predecessor.as_ref().is_some_and(|cursor| {
-            cursor.sequence >= self.sequence || cursor.integrity_hash.is_empty()
-        }) {
+        if self
+            .predecessor
+            .as_ref()
+            .is_some_and(|cursor| cursor.sequence >= self.sequence)
+        {
             return Err(CheckpointError::SequenceMismatch);
         }
-        validate_payload(&self.payload)?;
+        if !crate::integrity::valid(&self.integrity_hash)
+            || self
+                .predecessor
+                .as_ref()
+                .is_some_and(|cursor| !crate::integrity::valid(&cursor.integrity_hash))
+        {
+            return Err(CheckpointError::InvalidHash);
+        }
+        crate::checkpoint_validation::payload(&self.payload)?;
         if self.integrity_hash != self.calculate_integrity_hash()? {
             return Err(CheckpointError::InvalidHash);
         }
@@ -154,7 +168,7 @@ impl CheckpointEnvelope {
             payload: &self.payload,
         };
         let bytes = serde_json::to_vec(&binding).map_err(|_| CheckpointError::Malformed)?;
-        Ok(format!("{:016x}", fnv1a(&bytes)))
+        Ok(crate::integrity::checksum(&bytes))
     }
 }
 
@@ -167,34 +181,4 @@ struct IntegrityBinding<'a> {
     compatibility_status: &'a str,
     x4_restart_required: bool,
     payload: &'a CheckpointPayload,
-}
-
-pub fn validate_payload(payload: &CheckpointPayload) -> Result<(), CheckpointError> {
-    for value in [
-        &payload.accepted_snapshot_identity,
-        &payload.strategic_tick_identity,
-        &payload.replay_identity,
-        &payload.admission_identity,
-        &payload.reserved_report_identity,
-    ] {
-        if value.is_empty() || value.len() > MAX_ID_BYTES {
-            return Err(CheckpointError::InvalidIdentity);
-        }
-    }
-    let mind_bytes =
-        serde_json::to_vec(&payload.typed_mind_commit).map_err(|_| CheckpointError::Malformed)?;
-    if mind_bytes.len() > MAX_MIND_STATE_BYTES {
-        return Err(CheckpointError::Oversized);
-    }
-    payload
-        .typed_mind_commit
-        .restore()
-        .map_err(|_| CheckpointError::InvalidState)?;
-    Ok(())
-}
-
-fn fnv1a(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
-        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
-    })
 }

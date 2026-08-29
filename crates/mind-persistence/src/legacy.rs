@@ -1,4 +1,4 @@
-use crate::checkpoint::{CheckpointPayload, validate_payload};
+use crate::checkpoint::CheckpointPayload;
 use crate::{CheckpointEnvelope, CheckpointError, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
 use mind_domain::MindCheckpointState;
 use serde::Deserialize;
@@ -30,7 +30,7 @@ pub fn decode_and_convert(bytes: &[u8]) -> Result<CheckpointEnvelope, Checkpoint
         admission_identity: legacy.admission,
         reserved_report_identity: legacy.report,
     };
-    validate_payload(&payload)?;
+    crate::checkpoint_validation::payload(&payload)?;
     let mut envelope = CheckpointEnvelope {
         schema_version: SCHEMA_VERSION.into(),
         game_protocol_identity: GAME_PROTOCOL_IDENTITY.into(),

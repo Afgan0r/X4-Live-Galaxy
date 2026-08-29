@@ -2,7 +2,7 @@ use mind_domain::{
     Capability, CommandId, InitiativeCommand, InitiativeId, InitiativeSpec, MindAggregate,
     MindCommand, transition,
 };
-use mind_persistence::{CheckpointDraft, CheckpointEnvelope, CheckpointError};
+use mind_persistence::{CheckpointCursor, CheckpointDraft, CheckpointEnvelope, CheckpointError};
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Faction, PacketLimits, derive_packets};
 
@@ -114,4 +114,29 @@ fn rejects_tampered_partial_and_oversized_checkpoint_records() {
         CheckpointEnvelope::decode(&vec![b'x'; 32_769]),
         Err(CheckpointError::Oversized)
     ));
+}
+
+#[test]
+fn rejects_noncanonical_predecessor_integrity_identifiers() {
+    let commit = committed_mind();
+    assert!(commit.is_ok());
+    let Ok(commit) = commit else { return };
+    for hash in ["not-hex", "a", "a234567890abcdef0"] {
+        assert_eq!(
+            CheckpointEnvelope::from_pending_commit(
+                2,
+                Some(CheckpointCursor::new(1, hash.into())),
+                &commit,
+                draft()
+            ),
+            Err(CheckpointError::InvalidHash)
+        );
+    }
+    let valid = CheckpointEnvelope::from_pending_commit(
+        2,
+        Some(CheckpointCursor::new(1, "a234567890abcdef".into())),
+        &commit,
+        draft(),
+    );
+    assert!(valid.is_ok());
 }

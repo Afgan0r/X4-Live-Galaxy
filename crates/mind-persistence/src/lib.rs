@@ -3,7 +3,9 @@
 mod capsule;
 mod capsule_identity;
 mod checkpoint;
+mod checkpoint_validation;
 mod fake_port;
+mod integrity;
 mod legacy;
 mod migration;
 mod port;
