@@ -1,4 +1,4 @@
-use crate::{CheckpointEnvelope, SCHEMA_VERSION};
+use crate::CheckpointEnvelope;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CrashPoint {
@@ -17,6 +17,7 @@ pub enum RecoveryDiagnostic {
 pub struct RecoveryOutcome {
     projection: Option<CheckpointEnvelope>,
     diagnostic: Option<RecoveryDiagnostic>,
+    port_write_requested: bool,
 }
 
 impl RecoveryOutcome {
@@ -25,6 +26,23 @@ impl RecoveryOutcome {
         Self {
             projection: Some(envelope),
             diagnostic: Some(diagnostic),
+            port_write_requested: false,
+        }
+    }
+
+    pub(super) const fn migrated(envelope: CheckpointEnvelope) -> Self {
+        Self {
+            projection: Some(envelope),
+            diagnostic: None,
+            port_write_requested: true,
+        }
+    }
+
+    pub(super) const fn failed(diagnostic: RecoveryDiagnostic) -> Self {
+        Self {
+            projection: None,
+            diagnostic: Some(diagnostic),
+            port_write_requested: false,
         }
     }
 
@@ -40,7 +58,7 @@ impl RecoveryOutcome {
 
     #[must_use]
     pub const fn port_write_requested(&self) -> bool {
-        false
+        self.port_write_requested
     }
 }
 
@@ -55,9 +73,10 @@ pub enum RecoveryInput {
         candidate: Vec<u8>,
     },
     Migration {
-        acknowledged: CheckpointEnvelope,
+        fallback: Option<CheckpointEnvelope>,
         source: String,
         target: String,
+        legacy: Vec<u8>,
     },
 }
 
@@ -83,11 +102,17 @@ impl RecoveryInput {
     }
 
     #[must_use]
-    pub fn migration(acknowledged: CheckpointEnvelope, source: &str, target: &str) -> Self {
+    pub fn migration(
+        fallback: Option<CheckpointEnvelope>,
+        source: &str,
+        target: &str,
+        legacy: Vec<u8>,
+    ) -> Self {
         Self::Migration {
-            acknowledged,
+            fallback,
             source: source.into(),
             target: target.into(),
+            legacy,
         }
     }
 }
@@ -104,10 +129,11 @@ pub fn recover(input: RecoveryInput) -> RecoveryOutcome {
             candidate,
         } => recover_candidate(acknowledged, &candidate),
         RecoveryInput::Migration {
-            acknowledged,
+            fallback,
             source,
             target,
-        } => migrate(acknowledged, &source, &target),
+            legacy,
+        } => crate::migration::recover_migration(fallback, &source, &target, &legacy),
     }
 }
 
@@ -129,15 +155,7 @@ fn recover_candidate(acknowledged: CheckpointEnvelope, candidate: &[u8]) -> Reco
     }
 }
 
-fn migrate(acknowledged: CheckpointEnvelope, source: &str, target: &str) -> RecoveryOutcome {
-    if target == SCHEMA_VERSION && matches!(source, SCHEMA_VERSION | "mind-checkpoint-v0") {
-        retained_valid(acknowledged, None)
-    } else {
-        RecoveryOutcome::retained(acknowledged, RecoveryDiagnostic::UnsupportedMigration)
-    }
-}
-
-fn retained_valid(
+pub fn retained_valid(
     acknowledged: CheckpointEnvelope,
     diagnostic: Option<RecoveryDiagnostic>,
 ) -> RecoveryOutcome {
@@ -145,12 +163,14 @@ fn retained_valid(
         Ok(_) => RecoveryOutcome {
             projection: Some(acknowledged),
             diagnostic,
+            port_write_requested: false,
         },
         Err(_) => RecoveryOutcome {
             projection: None,
             diagnostic: Some(RecoveryDiagnostic::Rejected {
                 code: "invalid-acknowledged",
             }),
+            port_write_requested: false,
         },
     }
 }

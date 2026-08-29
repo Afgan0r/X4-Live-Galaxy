@@ -11,25 +11,25 @@ const MAX_MIND_STATE_BYTES: usize = 16_384;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CheckpointEnvelope {
-    schema_version: String,
-    game_protocol_identity: String,
-    sequence: u64,
-    predecessor: Option<CheckpointCursor>,
-    integrity_hash: String,
-    compatibility_status: String,
-    x4_restart_required: bool,
-    payload: CheckpointPayload,
+    pub(super) schema_version: String,
+    pub(super) game_protocol_identity: String,
+    pub(super) sequence: u64,
+    pub(super) predecessor: Option<CheckpointCursor>,
+    pub(super) integrity_hash: String,
+    pub(super) compatibility_status: String,
+    pub(super) x4_restart_required: bool,
+    pub(super) payload: CheckpointPayload,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CheckpointPayload {
-    accepted_snapshot_identity: String,
-    strategic_tick_identity: String,
-    typed_mind_commit: String,
-    replay_identity: String,
-    admission_identity: String,
-    reserved_report_identity: String,
+pub struct CheckpointPayload {
+    pub(super) accepted_snapshot_identity: String,
+    pub(super) strategic_tick_identity: String,
+    pub(super) typed_mind_commit: String,
+    pub(super) replay_identity: String,
+    pub(super) admission_identity: String,
+    pub(super) reserved_report_identity: String,
 }
 
 impl CheckpointEnvelope {
@@ -136,7 +136,7 @@ impl CheckpointEnvelope {
         Ok(())
     }
 
-    fn calculate_integrity_hash(&self) -> Result<String, CheckpointError> {
+    pub(super) fn calculate_integrity_hash(&self) -> Result<String, CheckpointError> {
         let binding = IntegrityBinding {
             schema_version: &self.schema_version,
             game_protocol_identity: &self.game_protocol_identity,
@@ -162,7 +162,7 @@ struct IntegrityBinding<'a> {
     payload: &'a CheckpointPayload,
 }
 
-fn validate_payload(payload: &CheckpointPayload) -> Result<(), CheckpointError> {
+pub fn validate_payload(payload: &CheckpointPayload) -> Result<(), CheckpointError> {
     for value in [
         &payload.accepted_snapshot_identity,
         &payload.strategic_tick_identity,

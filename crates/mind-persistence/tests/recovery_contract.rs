@@ -98,9 +98,10 @@ fn unsupported_migration_returns_only_the_last_valid_projection() {
     assert!(result.is_ok());
     let Ok(acknowledged) = result else { return };
     let outcome = recover(RecoveryInput::migration(
-        acknowledged.clone(),
+        Some(acknowledged.clone()),
         "unsupported-source",
         "v2",
+        Vec::new(),
     ));
     assert_eq!(
         outcome,
@@ -110,17 +111,42 @@ fn unsupported_migration_returns_only_the_last_valid_projection() {
 
 #[test]
 fn ordered_legacy_migration_exposes_only_a_valid_target_copy() {
-    let result = checkpoint("report-zya-1");
-    assert!(result.is_ok());
-    let Ok(acknowledged) = result else { return };
     let outcome = recover(RecoveryInput::migration(
-        acknowledged.clone(),
+        None,
         "mind-checkpoint-v0",
         "1",
+        br#"{"sequence":1,"snapshot":"snapshot-zya-1","tick":"tick-zya-1","mind":"legacy","replay":"replay-zya-1","admission":"admission-zya-1","report":"report-zya-1"}"#.to_vec(),
     ));
-    assert_eq!(outcome.projection(), Some(&acknowledged));
+    assert!(outcome.projection().is_some());
     assert_eq!(outcome.diagnostic(), None);
-    assert!(!outcome.port_write_requested());
+    assert!(outcome.port_write_requested());
+}
+
+#[test]
+fn invalid_legacy_payloads_retain_fallback_without_a_write() {
+    let fallback = checkpoint("report-zya-1");
+    assert!(fallback.is_ok());
+    let Ok(fallback) = fallback else { return };
+    let partial = br#"{"sequence":1,"snapshot":"snapshot-zya-1"}"#.to_vec();
+    let unknown = br#"{"sequence":1,"snapshot":"s","tick":"t","mind":"m","replay":"r","admission":"a","report":"p","extra":true}"#.to_vec();
+    let oversized = vec![b'x'; 32_769];
+
+    for legacy in [b"not-json".to_vec(), partial, unknown, oversized] {
+        let outcome = recover(RecoveryInput::migration(
+            Some(fallback.clone()),
+            "mind-checkpoint-v0",
+            "1",
+            legacy,
+        ));
+        assert_eq!(outcome.projection(), Some(&fallback));
+        assert!(matches!(
+            outcome.diagnostic(),
+            Some(RecoveryDiagnostic::Rejected {
+                code: "invalid-legacy"
+            })
+        ));
+        assert!(!outcome.port_write_requested());
+    }
 }
 
 #[test]

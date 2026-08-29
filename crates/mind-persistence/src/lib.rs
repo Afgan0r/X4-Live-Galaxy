@@ -3,6 +3,8 @@
 mod capsule;
 mod checkpoint;
 mod fake_port;
+mod legacy;
+mod migration;
 mod port;
 mod recovery;
 
