@@ -9,6 +9,7 @@ local function fake_api(count)
     local stations = { "station:20", "station:10" }
     return {
         count_stations = function() return count or #stations end,
+        new_buffer = function(_, size) return {} end,
         fill_stations = function(_, buffer, size)
             for index = 1, size do buffer[index] = stations[index] end
             return size

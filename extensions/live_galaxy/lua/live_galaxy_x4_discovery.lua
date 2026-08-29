@@ -1,4 +1,5 @@
 local discovery = {}
+local component_discovery = require("live_galaxy_component_discovery")
 
 local MAX_SECTIONS_PER_CYCLE = 1
 local MAX_SECTOR_SCAN = 16
@@ -138,7 +139,7 @@ local function classify_ware_limit(cargo, call_ok, value)
     return "ok"
 end
 
-function discovery.new(api, capability_probe)
+local function legacy_new(api, capability_probe)
     local adapter = {}
     local probe = capability_probe or api.capability_probe
     local probe_consumed = false
@@ -249,8 +250,19 @@ function discovery.new(api, capability_probe)
     return adapter
 end
 
-function discovery.new_runtime_adapter()
+local function legacy_new_runtime_adapter()
     return discovery.new(runtime_api())
+end
+
+function discovery.new(api, capability_probe)
+    if callable(api, "count_stations") then
+        return component_discovery.new(api)
+    end
+    return legacy_new(api, capability_probe)
+end
+
+function discovery.new_runtime_adapter()
+    return component_discovery.new_runtime_adapter()
 end
 
 return discovery

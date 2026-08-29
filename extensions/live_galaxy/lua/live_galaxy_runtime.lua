@@ -99,6 +99,7 @@ function runtime.emit(payload)
 end
 
 local generation, sequence, observation_version, connected = 0, 0, 1, false
+local discovery_incomplete = false
 local MAX_COUNTER = 9007199254740991
 local discovery_adapter
 
@@ -121,9 +122,14 @@ function runtime.next_payload()
         local adapter = discovery_adapter or discovery.new_runtime_adapter()
         local body = runtime.produce_discovery_payload(adapter, observation_version)
         if body == nil then
+            discovery_incomplete = true
             return payload("runtime_health", ',"status":"unavailable"')
         end
         return payload("observation", "," .. body)
+    end
+    if discovery_incomplete then
+        discovery_incomplete = false
+        return payload("runtime_health", ',"status":"unavailable"')
     end
     local marker, kind, current_generation, current_sequence = payload("complete_marker", "")
     if marker ~= nil and observation_version < MAX_COUNTER then

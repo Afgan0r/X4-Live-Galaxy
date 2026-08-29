@@ -298,7 +298,7 @@ function cases.runtime_advances_past_a_failed_discovery_without_an_observation_f
     local heartbeat, heartbeat_kind, _, heartbeat_sequence = runtime.next_payload()
     local health, health_kind, _, health_sequence = runtime.next_payload()
     local unavailable, unavailable_kind, _, unavailable_sequence = runtime.next_payload()
-    local complete, complete_kind, _, complete_sequence = runtime.next_payload()
+    local no_marker, no_marker_kind, _, no_marker_sequence = runtime.next_payload()
     local next_heartbeat, next_heartbeat_kind, _, next_heartbeat_sequence = runtime.next_payload()
 
     assert(hello_kind == "hello")
@@ -310,9 +310,10 @@ function cases.runtime_advances_past_a_failed_discovery_without_an_observation_f
     assert(unavailable_kind == "runtime_health" and unavailable_sequence == 3)
     assert(unavailable:match('"status":"unavailable"'))
     assert(not unavailable:match('"type":"observation"'))
-    assert(complete_kind == "complete_marker" and complete_sequence == 4)
+    assert(no_marker_kind == "runtime_health" and no_marker_sequence == 4)
+    assert(no_marker:match('"status":"unavailable"'))
     assert(next_heartbeat_kind == "heartbeat" and next_heartbeat_sequence == 5)
-    assert(heartbeat ~= nil and health ~= nil and complete ~= nil and next_heartbeat ~= nil)
+    assert(heartbeat ~= nil and health ~= nil and no_marker ~= nil and next_heartbeat ~= nil)
 
     runtime.set_discovery_adapter(nil)
 end
