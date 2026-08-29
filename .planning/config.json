@@ -22,8 +22,8 @@
   "fast_mode": {
     "enabled": true,
     "routing_tier_defaults": {
-      "light": true,
-      "standard": true,
+      "light": false,
+      "standard": false,
       "heavy": false
     }
   },
