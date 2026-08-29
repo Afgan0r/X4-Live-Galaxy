@@ -92,6 +92,34 @@ function cases.suppresses_every_invalid_stage_without_partial_observation()
     assert(err == "enumeration_incomplete")
 end
 
+function cases.fails_closed_when_count_call_throws()
+    local api, calls = fake_api()
+    api.count_stations = function() error("native count unavailable") end
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "enumeration_unavailable")
+    assert(calls.allocations == 0)
+end
+
+function cases.fails_closed_when_component_metadata_call_throws()
+    local api = fake_api()
+    api.get_component_data = function() error("native metadata unavailable") end
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "facts_unsupported")
+end
+
+function cases.fails_closed_when_component_capacity_call_throws()
+    local api = fake_api()
+    api.get_people_capacity = function() error("native capacity unavailable") end
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "facts_unsupported")
+end
+
 function cases.fails_closed_when_a_raw_universe_id_cannot_be_converted()
     local api = fake_api()
     api.to_component = function() return nil end
