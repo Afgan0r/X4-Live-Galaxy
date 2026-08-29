@@ -1,5 +1,5 @@
 ---
-status: ready_for_runtime
+status: investigating
 trigger: "Phase 05.1 disposable X4 verification reaches facts_unsupported after native station enumeration."
 created: 2026-08-30
 updated: 2026-08-30
@@ -18,14 +18,14 @@ updated: 2026-08-30
 
 ## Current Focus
 
-- hypothesis: One of the post-enumeration owner, sector, or capacity contract
-  checks rejects a native value.
-- test: Add an opt-in, closed diagnostic class that identifies only the failed
-  validation category while preserving the public `facts_unsupported` result.
+- hypothesis: The native station call requires the X4 faction token while the
+  emitted observation uses a distinct canonical ownership identifier.
+- test: Pass the native faction token only to native enumeration, then
+  canonicalize the returned owner fact before its existing validation.
 - constraints: No raw IDs, native text, values, payloads, retries, or wider
   native seams may be added.
-- expecting: A disposable X4 run identifies one allowlisted category and keeps
-  the bridge protocol health-only on failure.
+- expecting: A disposable X4 run advances beyond native owner resolution; any
+  subsequent failure remains a closed class and the bridge stays health-only.
 
 ## Evidence
 
@@ -39,9 +39,14 @@ updated: 2026-08-30
   found: All checks pass with an allowlisted diagnostic class that preserves
     the external `facts_unsupported` result and is emitted only with trace
     enabled.
+- timestamp: 2026-08-30
+  checked: Disposable attempt `obs-x4-component-discovery-051-04`
+  found: The native station function rejects the configured ownership token
+    before candidate enumeration. The owner scope was not empty because of the
+    fresh save; the token has the wrong native representation.
 
 ## Next Action
 
-Deploy the bounded revision, enable trace for one disposable attempt, reload
-the already-authorized disposable test save, and record only the emitted closed
-diagnostic class.
+Deploy the corrected native-token revision after X4 closes, enable trace for
+one disposable attempt, reload the already-authorized disposable test save, and
+record only the emitted closed diagnostic class.

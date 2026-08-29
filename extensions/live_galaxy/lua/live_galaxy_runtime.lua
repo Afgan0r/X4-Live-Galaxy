@@ -11,6 +11,7 @@ local DISCOVERY_DIAGNOSTIC_CLASSES = {
     capacity_unavailable = true,
     metadata_unavailable = true,
     owner_invalid = true,
+    owner_scope_empty = true,
     owner_scope_mismatch = true,
     sector_invalid = true,
 }

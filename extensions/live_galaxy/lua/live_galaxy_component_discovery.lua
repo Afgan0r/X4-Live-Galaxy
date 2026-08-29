@@ -9,6 +9,7 @@ local FACT_DIAGNOSTIC_CLASSES = {
     capacity_unavailable = true,
     metadata_unavailable = true,
     owner_invalid = true,
+    owner_scope_empty = true,
     owner_scope_mismatch = true,
     sector_invalid = true,
 }
@@ -45,7 +46,13 @@ local function runtime_api()
         get_people_capacity = function(_, component64)
             return C.GetPeopleCapacity(component64, "", false)
         end,
+        canonical_owner_id = function(_, owner_id)
+            if type(owner_id) ~= "string" or owner_id == "" then return nil end
+            if owner_id:sub(1, 8) == "faction:" then return owner_id end
+            return "faction:" .. owner_id
+        end,
         faction_id = "faction:argon",
+        native_faction_id = "argon",
     }
 end
 
@@ -90,15 +97,16 @@ function discovery.new(api)
     function adapter.read_observation(_, version)
         last_diagnostic_class = nil
         if not api_available(api) then return nil, "enumeration_unavailable" end
-        local count_ok, raw_count = pcall(api.count_stations, api, api.faction_id)
+        local native_faction_id = api.native_faction_id or api.faction_id
+        local count_ok, raw_count = pcall(api.count_stations, api, native_faction_id)
         local count = tonumber(raw_count)
         if not count_ok or not valid_integer(count) then return nil, "enumeration_unavailable" end
         if count > MAX_OWNER_STATIONS then return nil, "enumeration_overflow" end
-        if count == 0 then return nil, "facts_unsupported" end
+        if count == 0 then return unsupported("owner_scope_empty") end
 
         local allocation_ok, buffer = pcall(api.new_buffer, api, count)
         if not allocation_ok or buffer == nil then return nil, "enumeration_unavailable" end
-        local fill_ok, raw_filled = pcall(api.fill_stations, api, buffer, count, api.faction_id)
+        local fill_ok, raw_filled = pcall(api.fill_stations, api, buffer, count, native_faction_id)
         local filled = tonumber(raw_filled)
         if not fill_ok or not valid_integer(filled) or filled ~= count then return nil, "enumeration_incomplete" end
 
@@ -122,10 +130,20 @@ function discovery.new(api)
         table.sort(candidates, function(left, right) return left.stable_id < right.stable_id end)
 
         for _, candidate in ipairs(candidates) do
-            local metadata_ok, owner_id, sector_id = pcall(api.get_component_data, api, candidate.component)
+            local metadata_ok, raw_owner_id, sector_id = pcall(
+                api.get_component_data, api, candidate.component
+            )
             local capacity_ok, people_capacity = pcall(
                 api.get_people_capacity, api, candidate.component64
             )
+            local owner_id = raw_owner_id
+            if metadata_ok and callable(api, "canonical_owner_id") then
+                local canonical_ok, canonical_owner_id = pcall(
+                    api.canonical_owner_id, api, raw_owner_id
+                )
+                if not canonical_ok then return unsupported("owner_invalid") end
+                owner_id = canonical_owner_id
+            end
             candidate.asset_id = "asset:station:" .. candidate.stable_id
             candidate.owner_id, candidate.sector_id, candidate.people_capacity = owner_id, sector_id, people_capacity
             if not metadata_ok then return unsupported("metadata_unavailable") end

@@ -27,9 +27,12 @@ foreach ($pattern in @(
     'GetComponentData\(component, "owner", "sector"\)',
     'get_people_capacity = function\(_, component64\)',
     'C\.GetPeopleCapacity\(component64, "", false\)',
+    'native_faction_id = "argon"',
+    'canonical_owner_id = function',
     'function adapter\.diagnostic_class\(\)',
     'metadata_unavailable',
     'owner_scope_mismatch',
+    'owner_scope_empty',
     'capacity_invalid',
     'pcall'
 )) {

@@ -74,6 +74,29 @@ function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
     assert(calls.order[5] == "metadata" and calls.order[6] == "capacity")
 end
 
+function cases.uses_a_native_faction_token_and_canonicalizes_owner_facts()
+    local api = fake_api(1)
+    local counted_faction, filled_faction
+    api.native_faction_id = "argon"
+    api.count_stations = function(_, faction_id)
+        counted_faction = faction_id
+        return 1
+    end
+    api.fill_stations = function(_, buffer, _, faction_id)
+        filled_faction = faction_id
+        buffer[0] = "station:10"
+        return 1
+    end
+    api.get_component_data = function() return "argon", "sector:argon_prime" end
+    api.canonical_owner_id = function(_, owner_id) return "faction:" .. owner_id end
+
+    local observation = assert(discovery.new(api).read_observation(1))
+
+    assert(counted_faction == "argon")
+    assert(filled_faction == "argon")
+    assert(observation.runtime_facts.ownership[1].owner_id == "faction:argon")
+end
+
 function cases.serializes_the_existing_compact_station_envelope()
     local api = fake_api()
     local payload = assert(telemetry.produce_observation(discovery.new(api), 3))
@@ -165,6 +188,17 @@ function cases.clears_the_closed_diagnostic_class_after_a_successful_retry()
     end
     assert(adapter.read_observation(1) ~= nil)
     assert(adapter.diagnostic_class() == nil)
+end
+
+function cases.classifies_an_actual_empty_owner_scope_without_changing_the_error()
+    local api = fake_api()
+    api.count_stations = function() return 0 end
+    local adapter = discovery.new(api)
+    local payload, err = telemetry.produce_observation(adapter)
+
+    assert(payload == nil)
+    assert(err == "facts_unsupported")
+    assert(adapter.diagnostic_class() == "owner_scope_empty")
 end
 
 function cases.suppresses_every_invalid_stage_without_partial_observation()
