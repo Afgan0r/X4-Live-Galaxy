@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "schema_version": "schema-v1",
+  "policy_version": "policy-v1",
+  "prompt_package_hash": "prompt-v1",
+  "cases": [
+    {"id":"SD-001","fixture_hash":"fixture-sd-001","expected":"reject-information","evidence_class":"ci"},
+    {"id":"SD-002","fixture_hash":"fixture-sd-002","expected":"accept","evidence_class":"ci"},
+    {"id":"SD-003","fixture_hash":"fixture-sd-003","expected":"reject-decode","evidence_class":"ci"},
+    {"id":"SD-004","fixture_hash":"fixture-sd-004","expected":"reject-semantic","evidence_class":"ci"},
+    {"id":"SD-005","fixture_hash":"fixture-sd-005","expected":"reject-budget","evidence_class":"ci"},
+    {"id":"SD-006","fixture_hash":"fixture-sd-006","expected":"degraded-timeout","evidence_class":"ci"},
+    {"id":"SD-007","fixture_hash":"fixture-sd-007","expected":"coalesced","evidence_class":"ci"},
+    {"id":"SD-008","fixture_hash":"fixture-sd-008","expected":"zero-cycle","evidence_class":"ci"},
+    {"id":"SD-009","fixture_hash":"fixture-sd-009","expected":"two-cycle-cap","evidence_class":"ci"},
+    {"id":"SD-010","fixture_hash":"fixture-sd-010","expected":"revalidate-cache","evidence_class":"ci"},
+    {"id":"SD-011","fixture_hash":"fixture-sd-011","expected":"recover-retained","evidence_class":"ci"},
+    {"id":"SD-012","fixture_hash":"fixture-sd-012","expected":"manual-benchmark","evidence_class":"benchmark"},
+    {"id":"SD-013","fixture_hash":"fixture-sd-013","expected":"reject-safety","evidence_class":"ci"}
+  ]
+}
