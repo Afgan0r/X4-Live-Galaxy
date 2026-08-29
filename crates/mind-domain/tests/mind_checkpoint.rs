@@ -157,3 +157,43 @@ fn malformed_oversized_and_unknown_checkpoint_is_rejected() {
     let Ok(decoded) = decoded else { return };
     assert!(decoded.restore().is_err());
 }
+
+#[test]
+fn rejects_each_corrupted_restore_validation_bucket() {
+    for field in ["core", "profile", "slot", "history", "ledger", "command"] {
+        let serialized = serde_json::to_value(state());
+        assert!(serialized.is_ok(), "serialize {field} fixture");
+        let Ok(mut value) = serialized else { return };
+        match field {
+            "core" => {
+                value["commit"]["aggregate"]["doctrine_version"] =
+                    Value::String("wrong-profile".into());
+            }
+            "profile" => {
+                value["commit"]["aggregate"]["priorities"][0] =
+                    Value::String("EconomyAndLogistics".into());
+            }
+            "slot" => {
+                let history_entry = value["commit"]["aggregate"]["history"][0].clone();
+                value["commit"]["aggregate"]["slots"][0] = history_entry;
+            }
+            "history" => {
+                value["commit"]["aggregate"]["history"] = Value::Array(Vec::new());
+            }
+            "ledger" => {
+                value["commit"]["aggregate"]["ledger"] = Value::Array(Vec::new());
+            }
+            "command" => {
+                value["commit"]["aggregate"]["commands"][0][0]["id"] = Value::String(String::new());
+            }
+            _ => return,
+        }
+        let decoded: Result<MindCheckpointState, _> = serde_json::from_value(value);
+        assert!(decoded.is_ok(), "decode {field} fixture");
+        let Ok(decoded) = decoded else { return };
+        assert!(
+            decoded.restore().is_err(),
+            "restore must reject {field} corruption"
+        );
+    }
+}
