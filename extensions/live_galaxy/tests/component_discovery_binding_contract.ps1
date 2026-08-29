@@ -16,10 +16,17 @@ foreach ($pattern in @(
     'to_component',
     'ConvertStringToLuaID',
     'buffer\[index\]',
-    'ConvertIDTo64Bit',
+    'to_component64 = function\(_, component\) return globals\.ConvertIDTo64Bit\(component\) end',
     'GetComponentData\(component, "owner", "sector"\)',
-    'C\.GetPeopleCapacity',
+    'get_people_capacity = function\(_, component64\)',
+    'C\.GetPeopleCapacity\(component64, "", false\)',
     'pcall'
 )) {
     if ($source -notmatch $pattern) { throw "Missing protected binding: $pattern" }
+}
+
+$conversionOffset = $source.IndexOf('local id_ok, component64 = pcall(api.to_component64')
+$capacityOffset = $source.IndexOf('api.get_people_capacity, api, candidate.component64')
+if ($conversionOffset -lt 0 -or $capacityOffset -lt 0 -or $conversionOffset -ge $capacityOffset) {
+    throw 'Component 64-bit conversion must precede the native capacity call.'
 }

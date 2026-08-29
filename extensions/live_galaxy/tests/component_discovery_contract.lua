@@ -5,7 +5,14 @@ local telemetry = require("live_galaxy_telemetry")
 local cases = {}
 
 local function fake_api(count)
-    local calls = { convert = 0, metadata = 0, capacity = 0, allocations = 0, order = {} }
+    local calls = {
+        convert = 0,
+        convert64 = 0,
+        metadata = 0,
+        capacity = 0,
+        allocations = 0,
+        order = {},
+    }
     local stations = { "station:20", "station:10" }
     return {
         count_stations = function() return count or #stations end,
@@ -22,7 +29,9 @@ local function fake_api(count)
             calls.order[#calls.order + 1] = "convert"
             return raw_station
         end,
-        stable_id = function(_, station)
+        to_component64 = function(_, station)
+            calls.convert64 = calls.convert64 + 1
+            calls.order[#calls.order + 1] = "convert64"
             return station:match("%d+")
         end,
         get_component_data = function(_, station)
@@ -31,10 +40,11 @@ local function fake_api(count)
             return station == "station:10" and "faction:argon" or "faction:antigone",
                 station == "station:10" and "sector:argon_prime" or "sector:second_contact"
         end,
-        get_people_capacity = function(_, station)
+        get_people_capacity = function(_, component64)
             calls.capacity = calls.capacity + 1
             calls.order[#calls.order + 1] = "capacity"
-            return station == "station:10" and 42 or 24
+            assert(component64 == "10" or component64 == "20")
+            return component64 == "10" and 42 or 24
         end,
     }, calls
 end
@@ -57,8 +67,9 @@ function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
     assert(observation.entity_id == "sector:argon_prime")
     assert(facts.assets[1].id == "asset:station:10")
     assert(facts.assets[2].id == "asset:station:20")
-    assert(calls.convert == 2 and calls.metadata == 2 and calls.capacity == 2)
+    assert(calls.convert == 2 and calls.convert64 == 2 and calls.metadata == 2 and calls.capacity == 2)
     assert(calls.order[1] == "convert" and calls.order[2] == "convert")
+    assert(calls.order[3] == "convert64" and calls.order[4] == "convert64")
 end
 
 function cases.serializes_the_existing_compact_station_envelope()
@@ -87,6 +98,20 @@ function cases.fails_closed_when_a_raw_universe_id_cannot_be_converted()
 
     assert(payload == nil)
     assert(err == "identity_invalid")
+end
+
+function cases.fails_closed_before_capacity_when_component64_conversion_fails()
+    local api, calls = fake_api()
+    api.to_component64 = function()
+        calls.convert64 = calls.convert64 + 1
+        error("native conversion unavailable")
+    end
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "identity_invalid")
+    assert(calls.convert64 == 1)
+    assert(calls.capacity == 0)
 end
 
 function cases.normalizes_native_count_and_fill_before_validation()

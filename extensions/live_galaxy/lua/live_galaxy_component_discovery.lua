@@ -27,18 +27,20 @@ local function runtime_api()
             return globals.C.GetAllFactionStations(buffer, count, faction_id)
         end,
         to_component = function(_, raw_id) return globals.ConvertStringToLuaID(tostring(raw_id)) end,
-        stable_id = function(_, component) return tostring(globals.ConvertIDTo64Bit(component)) end,
+        to_component64 = function(_, component) return globals.ConvertIDTo64Bit(component) end,
         get_component_data = function(_, component)
             return globals.GetComponentData(component, "owner", "sector")
         end,
-        get_people_capacity = function(_, component) return globals.C.GetPeopleCapacity(component, "", false) end,
+        get_people_capacity = function(_, component64)
+            return globals.C.GetPeopleCapacity(component64, "", false)
+        end,
         faction_id = "faction:argon",
     }
 end
 
 local function api_available(api)
     return callable(api, "count_stations") and callable(api, "new_buffer")
-        and callable(api, "fill_stations") and callable(api, "to_component") and callable(api, "stable_id")
+        and callable(api, "fill_stations") and callable(api, "to_component") and callable(api, "to_component64")
         and callable(api, "get_component_data") and callable(api, "get_people_capacity")
 end
 
@@ -82,16 +84,26 @@ function discovery.new(api)
         for index = 0, count - 1 do
             local component_ok, component = pcall(api.to_component, api, buffer[index])
             if not component_ok or component == nil or component == false then return nil, "identity_invalid" end
-            local id_ok, stable_id = pcall(api.stable_id, api, component)
-            if not id_ok or not valid_id(stable_id) or stable_ids[stable_id] then return nil, "identity_invalid" end
+            local id_ok, component64 = pcall(api.to_component64, api, component)
+            local stable_id = id_ok and tostring(component64) or nil
+            if not id_ok or component64 == nil or component64 == false
+                or not valid_id(stable_id) or stable_ids[stable_id] then
+                return nil, "identity_invalid"
+            end
             stable_ids[stable_id] = true
-            candidates[#candidates + 1] = { component = component, stable_id = stable_id }
+            candidates[#candidates + 1] = {
+                component = component,
+                component64 = component64,
+                stable_id = stable_id,
+            }
         end
         table.sort(candidates, function(left, right) return left.stable_id < right.stable_id end)
 
         for _, candidate in ipairs(candidates) do
             local metadata_ok, owner_id, sector_id = pcall(api.get_component_data, api, candidate.component)
-            local capacity_ok, people_capacity = pcall(api.get_people_capacity, api, candidate.component)
+            local capacity_ok, people_capacity = pcall(
+                api.get_people_capacity, api, candidate.component64
+            )
             candidate.asset_id = "asset:station:" .. candidate.stable_id
             candidate.owner_id, candidate.sector_id, candidate.people_capacity = owner_id, sector_id, people_capacity
             if not metadata_ok or not capacity_ok or not valid_id(candidate.asset_id)
