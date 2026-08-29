@@ -10,9 +10,11 @@ critical_gap_count: 1
 
 # EVAL-REVIEW — Phase 05: Bounded Shadow Deliberation
 
-**Audit Date:** 2026-08-29  
-**AI-SPEC Present:** Yes  
-**Overall Score:** 74.29/100  
+**Audit Date:** 2026-08-29
+
+**AI-SPEC Present:** Yes
+
+**Overall Score:** 74.29/100
 **Verdict:** NEEDS WORK
 
 The deterministic Phase 05 evaluation contract is now implemented and executable.
