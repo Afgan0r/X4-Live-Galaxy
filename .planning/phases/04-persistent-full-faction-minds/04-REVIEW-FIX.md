@@ -41,10 +41,33 @@ narrative remains deliberately outside the authoritative binding.
 Regression coverage changes each commitment field independently and verifies
 that a narrative-only replacement preserves identity.
 
+## Verifier Gap: Reconstructible Typed Mind State
+
+The checkpoint payload now stores a versioned `MindCheckpointState` instead of
+Debug text. Its bounded owned identifiers and strict serde shape preserve the
+complete aggregate, three initiative slots, history, causal ledger, recorded
+commands, per-command events, and the pending mind transition.
+
+Restore validates the locked faction profile and core state, reconstructs the
+base mind from the pending event, replays every initiative command, compares
+its exact events, and exposes only an exactly matching aggregate. Legacy
+migration accepts the same typed state and rejects the former opaque string.
+
+## Final Review: Canonical Chain Identifiers
+
+Current and predecessor checkpoint checksums must use the canonical fixed-width
+lowercase hexadecimal encoding before the state can enter recovery or CAS.
+Malformed, short, overlong, and valid predecessor cases are covered. The
+checksum remains corruption, identity, and chain evidence; hostile local
+checkpoint rewriting is outside the locked trust boundary and no
+authentication claim is made.
+
 ## Verification
 
 - `cargo test -p mind-persistence --test recovery_contract` — passed, 6 tests.
 - `cargo test -p mind-persistence --test capsule_contract` — passed, 4 tests.
+- `cargo test -p mind-persistence --test checkpoint_tracer` — passed, 3 tests.
+- `cargo test -p mind-domain --test mind_checkpoint` — passed, 3 tests.
 - `cargo test -p mind-persistence --test mutation_baseline` — passed, 2 tests.
 - `cargo run -p source-size-lint` — passed.
 - `cargo clippy --workspace --all-targets -- -D warnings` — passed.

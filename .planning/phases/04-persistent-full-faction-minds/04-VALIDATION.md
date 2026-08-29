@@ -1,7 +1,7 @@
 ---
 phase: 04
 slug: persistent-full-faction-minds
-status: planned
+status: verified
 nyquist_compliant: true
 wave_0_complete: true
 ---
@@ -34,12 +34,12 @@ wave_0_complete: true
 | Task ID | Plan | Wave | Requirements | Threat Ref | Behavior | Automated command | Evidence level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 04-01-01 | 01 | 1 | MIND-01, MIND-05 | T-04-01/T-04-03 | Paired packet fixture creates independent doctrine-divergent typed mind aggregates deterministically. | `cargo test -p mind-domain --test mind_tracer` | verified locally |
-| 04-01-02 | 01 | 1 | INST-03, INST-08 | T-04-01/T-04-02 | One active initiative per each of three faction slots; proposal, objection, disposition, validation, ownership, preemption, and terminal events preserve causal history and idempotency. | `cargo test -p mind-domain --test initiative_lifecycle` | verified locally |
+| 04-01-02 | 01 | 1 | INST-03, INST-08 | T-04-01/T-04-02 | Exactly three capability slots per faction; one active initiative per slot; proposal, objection, disposition, validation, ownership, preemption, and terminal events preserve causal history and idempotency. | `cargo test -p mind-domain --test initiative_lifecycle` | verified locally |
 | 04-02-01 | 02 | 1 | STATE-01, STATE-06 | T-04-04/T-04-05 | Static MD root cue and shared manifest contain equal checkpoint schema/protocol/cursor/hash fields and no broadened game-side behavior. | `pwsh -NoProfile -File extensions/live_galaxy/tests/persistence_schema_contract.ps1` | verified locally |
 | 04-02-02 | 02 | 1 | STATE-01, STATE-06 | T-04-06 | Phase 7 procedure distinguishes pending X4 observations from static contract evidence. | `pwsh -NoProfile -File extensions/live_galaxy/tests/persistence_schema_contract.ps1` | verified locally |
-| 04-03-01 | 03 | 2 | STATE-01, STATE-02 | T-04-07/T-04-09 | Canonical envelope binds typed mind, strategic-tick, replay/admission, and report-reservation state; it rejects malformed records and matches the shared MD schema manifest. | `cargo test -p mind-persistence --test checkpoint_tracer && cargo test -p mind-persistence --test schema_contract` | verified locally |
+| 04-03-01 | 03 | 2 | STATE-01, STATE-02 | T-04-07/T-04-09 | Canonical envelope binds typed mind, strategic-tick, replay/admission, and report-reservation state; typed full-mind serde round-trip/replay rejects malformed checkpoint fields; envelope rejects malformed records and matches the shared MD schema manifest. | `cargo test -p mind-domain --test mind_checkpoint && cargo test -p mind-persistence --test checkpoint_tracer && cargo test -p mind-persistence --test schema_contract` | verified locally |
 | 04-03-02 | 03 | 2 | STATE-03, STATE-06 | T-04-08/T-04-10 | Fake port proves acknowledged compare-and-set, retry-safe accepted strategic-tick identity, compatible reload without a duplicate tick, and restart-required disposition. | `cargo test -p mind-persistence --test fake_port_contract` | verified locally |
-| 04-04-01 | 04 | 3 | STATE-04, STATE-05 | T-04-11 | Last valid acknowledged checkpoint survives corrupt, partial, stale, duplicate, out-of-order, migration, and three deterministic crash-point fixtures without exposing speculative state. | `cargo test -p mind-persistence --test recovery_contract` | verified locally |
+| 04-04-01 | 04 | 3 | STATE-04, STATE-05 | T-04-11 | Last valid acknowledged checkpoint survives corrupt, partial, stale, duplicate, out-of-order, migration, and three deterministic crash-point fixtures without exposing speculative state; restore rejects corrupted core/profile/slot/history/ledger/command fields. | `cargo test -p mind-persistence --test recovery_contract` plus `cargo test -p mind-domain --test mind_checkpoint` | verified locally |
 | 04-04-02 | 04 | 3 | MODEL-05 | T-04-12/T-04-13/T-04-14 | Provider-relative capsule preserves typed authority; pure policy mutation baseline is measured and reviewed. | `cargo test -p mind-persistence --test capsule_contract && cargo test -p mind-persistence --test mutation_baseline && cargo mutants -p mind-persistence -- --test mutation_baseline` | verified locally or measured tool failure |
 
 ## Sampling Rate
@@ -84,11 +84,11 @@ Deferred public API settings/credentials, mutable institutional power, multiple 
 
 ## Validation Sign-Off
 
-- [ ] All focused Rust and static XML contracts pass.
-- [ ] Every Rust source stays at or below 200 physical lines and strict Clippy is clean.
-- [ ] Workspace suite and formatter pass after each wave.
-- [ ] Mutation baseline has measured counts and survivor dispositions, or a recorded reviewed-tool failure.
-- [ ] Phase documentation separates documented, verified locally, pending-X4, and observed-in-X4 facts.
-- [ ] Phase 7 owns all payload, interruption, save/load, and reconnect runtime observations.
+- [x] All focused Rust and static XML contracts pass.
+- [x] Every Rust source stays at or below 200 physical lines and strict Clippy is clean.
+- [x] Workspace suite and formatter pass after the phase wave.
+- [x] Mutation baseline records the measured reviewed-tool failure (`cargo-mutants` is unavailable); no score is inferred.
+- [x] Phase documentation separates documented, verified locally, pending-X4, and observed-in-X4 facts.
+- [x] Phase 7 owns all payload, interruption, save/load, and reconnect runtime observations.
 
-**Approval:** pending execution
+**Approval:** verified locally; mutation score pending reviewed runner availability
