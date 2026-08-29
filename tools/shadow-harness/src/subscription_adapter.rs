@@ -15,7 +15,6 @@ impl SubscriptionAdapter {
         Self { available: false }
     }
 
-    #[must_use]
     pub const fn preflight(&self) -> Result<(), ProviderFailure> {
         if self.available {
             Ok(())

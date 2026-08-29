@@ -30,6 +30,14 @@ impl EvidenceRecord {
             && self.provider_id.len() <= MAX_FIELD
             && self.model_id.len() <= MAX_FIELD
     }
+
+    #[must_use]
+    pub fn validates_manifest(manifest: &str) -> bool {
+        (1..=13).all(|number| {
+            let id = format!("SD-{number:03}");
+            manifest.contains(&id) && manifest.contains("fixture_hash")
+        }) && manifest.contains("\"evidence_class\":\"benchmark\"")
+    }
 }
 
 fn bounded(value: &str) -> String {

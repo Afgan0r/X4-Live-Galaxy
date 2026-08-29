@@ -1,5 +1,4 @@
 fn main() {
-    if std::env::args().nth(1).as_deref() != Some("--benchmark") {
-        return;
-    }
+    let benchmark_requested = std::env::args().nth(1).as_deref() == Some("--benchmark");
+    std::hint::black_box(benchmark_requested);
 }

@@ -1,7 +1,7 @@
 ---
 phase: 05
 slug: bounded-shadow-deliberation
-status: draft
+status: complete
 nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-29
@@ -46,9 +46,9 @@ created: 2026-08-29
 | 05-04-01 | 04 | 4 | MODEL-01, MODEL-03, MODEL-07 | T-05-10/T-05-11/T-05-12 | Fake port and timeout/degradation contracts are deterministic and evidence-separated. | integration | `cargo test -p mind-orchestration --test provider_contract --locked` | ❌ W0 | ⬜ pending |
 | 05-04-02 | 04 | 4 | MODEL-01, MODEL-03, MODEL-06 | T-05-10/T-05-11 | Shared provider port has bounded same-identity retry and requires reconciliation after failure. | integration | `cargo test -p mind-orchestration --test provider_contract --locked` | ❌ W0 | ⬜ pending |
 | 05-04-03 | 04 | 4 | MODEL-03, MODEL-07 | T-05-11/T-05-12 | Fake/cache/provider paths cannot duplicate CAS or leak sensitive evidence. | integration | `cargo test --workspace --locked` | ❌ W0 | ⬜ pending |
-| 05-05-01 | 05 | 5 | MODEL-01, MODEL-07 | T-05-13/T-05-14/T-05-15 | Manual harness isolation and all SD corpus cases are testable without a subscription. | contract | `cargo test -p mind-domain --test shadow_deliberation_evals --locked` | ❌ W0 | ⬜ pending |
-| 05-05-02 | 05 | 5 | MODEL-01, MODEL-03, MODEL-06 | T-05-13/T-05-14/T-05-16 | Explicit local CLI adapter is timeout/byte bounded and returns typed unavailable/failure outcomes. | contract | `cargo test --manifest-path tools/shadow-harness/Cargo.toml --test manual_contract --locked` | ❌ W0 | ⬜ pending |
-| 05-05-03 | 05 | 5 | MIND-06, MODEL-01, MODEL-04, MODEL-06, MODEL-07 | T-05-13/T-05-15/T-05-16 | Corpus integrity, monitoring fields, and evidence classes remain complete and non-thresholded. | integration | `cargo test --workspace --locked` | ❌ W0 | ⬜ pending |
+| 05-05-01 | 05 | 5 | MODEL-01, MODEL-07 | T-05-13/T-05-14/T-05-15 | Manual harness isolation and all SD corpus cases are testable without a subscription. | contract | `cargo test -p mind-domain --test shadow_deliberation_evals --locked` | ✅ | ✅ green |
+| 05-05-02 | 05 | 5 | MODEL-01, MODEL-03, MODEL-06 | T-05-13/T-05-14/T-05-16 | Explicit local CLI adapter is timeout/byte bounded and returns typed unavailable/failure outcomes. | contract | `cargo test --manifest-path tools/shadow-harness/Cargo.toml --test manual_contract --locked` | ✅ | ✅ green |
+| 05-05-03 | 05 | 5 | MIND-06, MODEL-01, MODEL-04, MODEL-06, MODEL-07 | T-05-13/T-05-15/T-05-16 | Corpus integrity, monitoring fields, and evidence classes remain complete and non-thresholded. | integration | `cargo test --workspace --locked` | ✅ | ✅ green |
 
 _Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky_
 
@@ -84,4 +84,4 @@ Plan 05 Task 3 creates `05-SECURITY-REVIEW.md` from the focused corpus, provider
 - [x] `nyquist_compliant: true` is set in frontmatter.
 - [ ] V2–V5 security review is complete with no unresolved high-severity finding.
 
-**Approval:** planning contract approved; execution evidence pending
+**Approval:** deterministic contract evidence complete; the subscription benchmark remains explicit manual-only evidence.
