@@ -12,6 +12,20 @@ local function fresh_runtime()
     return require("live_galaxy_runtime")
 end
 
+local function station(sector_id, stable_id, capacity)
+    local asset_id = "asset:station:" .. stable_id
+    return {
+        entity_id = asset_id, source = "x4_runtime", version = 1, quality = "fresh",
+        runtime_facts = {
+            source = "x4_runtime", quality = "fresh", availability = "available",
+            sectors = { { id = sector_id } },
+            assets = { { id = asset_id, sector_id = sector_id } },
+            capacity = { { id = "capacity:station:" .. stable_id, asset_id = asset_id, value = capacity } },
+            ownership = { { id = "ownership:station:" .. stable_id, asset_id = asset_id, owner_id = "faction:argon" } },
+        },
+    }
+end
+
 function cases.sanitizes_embedded_version_without_exposing_unavailable_values()
     assert(runtime.sanitize_embedded_version(nil) == "unavailable")
     assert(runtime.sanitize_embedded_version(42) == "unavailable")
@@ -292,19 +306,6 @@ end
 
 function cases.runtime_keeps_multiple_station_frames_atomic_before_the_marker()
     local isolated_runtime = fresh_runtime()
-    local function station(sector_id, stable_id, capacity)
-        local asset_id = "asset:station:" .. stable_id
-        return {
-            entity_id = asset_id, source = "x4_runtime", version = 1, quality = "fresh",
-            runtime_facts = {
-                source = "x4_runtime", quality = "fresh", availability = "available",
-                sectors = { { id = sector_id } },
-                assets = { { id = asset_id, sector_id = sector_id } },
-                capacity = { { id = "capacity:station:" .. stable_id, asset_id = asset_id, value = capacity } },
-                ownership = { { id = "ownership:station:" .. stable_id, asset_id = asset_id, owner_id = "faction:argon" } },
-            },
-        }
-    end
     isolated_runtime.set_discovery_adapter({
         read_observations = function()
             return { station("sector:argon_prime", "10", 42), station("sector:second_contact", "20", 24) }
@@ -403,6 +404,42 @@ function cases.runtime_fails_closed_when_backpressure_drops_a_station_frame()
     assert(accepted[4]:match('"entity_id":"asset:station:10"'))
     assert(accepted[5]:match('"type":"runtime_health"'))
     assert(accepted[5]:match('"status":"unavailable"'))
+    for _, frame in ipairs(accepted) do assert(not frame:match('"type":"complete_marker"')) end
+
+    isolated_runtime.set_pipe_adapter(nil)
+    isolated_runtime.set_discovery_adapter(nil)
+end
+
+function cases.runtime_fails_closed_when_backpressure_drops_a_station_completion_marker()
+    local isolated_runtime = fresh_runtime()
+    local reads = 0
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function()
+            reads = reads + 1
+            if reads > 1 then return nil, "facts_unsupported" end
+            return {
+                station("sector:argon_prime", "10", 42),
+                station("sector:second_contact", "20", 24),
+            }
+        end,
+    })
+    local writes, accepted = 0, {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, frame)
+            writes = writes + 1
+            if writes == 6 then return false end
+            accepted[#accepted + 1] = frame
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    for _ = 1, 5 do assert(select(2, isolated_runtime.handle_tick()) == "sent") end
+    assert(select(2, isolated_runtime.handle_tick()) == "pipe_backpressure")
+    for _ = 1, 6 do assert(select(2, isolated_runtime.handle_tick()) == "sent") end
+
+    assert(accepted[4]:match('"entity_id":"asset:station:10"'))
+    assert(accepted[5]:match('"entity_id":"asset:station:20"'))
     for _, frame in ipairs(accepted) do assert(not frame:match('"type":"complete_marker"')) end
 
     isolated_runtime.set_pipe_adapter(nil)

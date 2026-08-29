@@ -110,6 +110,7 @@ end
 
 local generation, sequence, observation_version, connected = 0, 0, 1, false
 local discovery_incomplete = false
+local discovery_marker_suppressed = false
 local discovery_frames, discovery_frame_index
 local MAX_COUNTER = 9007199254740991
 local discovery_adapter
@@ -121,6 +122,7 @@ end
 local function fail_discovery_batch()
     discard_discovery_frames()
     discovery_incomplete = true
+    discovery_marker_suppressed = true
 end
 
 local function payload(kind, extra)
@@ -141,7 +143,6 @@ function runtime.next_payload()
             discovery_frame_index = discovery_frame_index + 1
             return payload("observation", "," .. frame:sub(2, -2))
         end
-        discard_discovery_frames()
         local marker, kind, current_generation, current_sequence = payload("complete_marker", "")
         if marker ~= nil and observation_version < MAX_COUNTER then observation_version = observation_version + 1 end
         return marker, kind, current_generation, current_sequence
@@ -163,6 +164,9 @@ function runtime.next_payload()
         end
         discovery_frames, discovery_frame_index = frames, 2
         return payload("observation", "," .. frames[1]:sub(2, -2))
+    end
+    if discovery_marker_suppressed then
+        return payload("runtime_health", ',"status":"unavailable"')
     end
     local marker, kind, current_generation, current_sequence = payload("complete_marker", "")
     if marker ~= nil and observation_version < MAX_COUNTER then
@@ -206,10 +210,14 @@ function runtime.handle_tick()
     trace("frame_created", "type=" .. kind .. " generation=" .. current_generation
         .. " sequence=" .. current_sequence .. " bytes=" .. #value, true)
     local ok, status = runtime.emit(value)
-    if not ok and (status == "pipe_unavailable" or status == "pipe_reconnect") then
+    if ok and kind == "complete_marker" and discovery_frames then
+        discard_discovery_frames()
+        discovery_marker_suppressed = false
+    elseif not ok and (status == "pipe_unavailable" or status == "pipe_reconnect") then
         connected = false
         discard_discovery_frames()
-    elseif not ok and status == "pipe_backpressure" and kind == "observation" and discovery_frames then
+    elseif not ok and status == "pipe_backpressure" and discovery_frames
+        and (kind == "observation" or kind == "complete_marker") then
         fail_discovery_batch()
     end
     trace("telemetry_tick", "status=" .. status, true)

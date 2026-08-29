@@ -26,15 +26,20 @@ fn station_frames_replace_scope_only_with_the_completion_marker() {
 }
 
 #[test]
-fn partial_station_batch_without_marker_preserves_prior_membership() {
+fn marker_loss_after_full_station_batch_preserves_prior_membership() {
     let accepted = admit_batch(
         AcceptedProjection::empty(),
         &[STATION_ONE, STATION_TWO, MARKER],
     )
     .into_projection();
-    let backpressured_station_one = STATION_ONE.replace("\"version\":4", "\"version\":5");
+    let marker_lost_station_one = STATION_ONE.replace("\"version\":4", "\"version\":5");
+    let marker_lost_station_two = STATION_TWO.replace("\"version\":4", "\"version\":5");
 
-    let retained = admit_batch(accepted, &[&backpressured_station_one]).into_projection();
+    let retained = admit_batch(
+        accepted,
+        &[&marker_lost_station_one, &marker_lost_station_two],
+    )
+    .into_projection();
 
     assert_eq!(
         retained.snapshot().entity_ids(),
