@@ -1,18 +1,18 @@
 ---
 gsd_state_version: 1.0
-current_phase: 05.1
-current_phase_name: Bounded Real Component Discovery (INSERTED)
+current_phase: 05.2
+current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: executing
-stopped_at: Completed 05.1-02-PLAN.md
-last_updated: "2026-08-29T17:07:38.294Z"
-last_activity: 2026-08-29
-last_activity_desc: Phase 05.1 execution started
-state_head: f08d0e08876d2791390bfa461c07b187c9c83738
+stopped_at: Completed 05.2-01-PLAN.md
+last_updated: "2026-08-29T23:23:23.419Z"
+last_activity: 2026-08-30
+last_activity_desc: Completed Phase 05.2 Plan 01 admission foundation
+state_head: cacfd605eb1db461c19d8e402b45f5d36fea1649
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 27
-  completed_plans: 23
+  total_plans: 36
+  completed_plans: 25
   percent: 40
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-28)
 
 **Core value:** Factions pursue coherent, distinct, long-lived strategies while X4 remains authoritative and every proposed effect stays observable, recoverable, and bounded by deterministic validation.
-**Current focus:** Phase 05.1 — Bounded Real Component Discovery (INSERTED)
+**Current focus:** Phase 05.2 — Layered Lua and X4 Verification Foundation (INSERTED)
 
 ## Current Position
 
-Phase: 05.1 (Bounded Real Component Discovery (INSERTED)) — READY TO EXECUTE
-Plan: 2 of 3
-Status: Ready to execute
-Last activity: 2026-08-29 — Phase 05.1 execution started
+Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — EXECUTING
+Plan: 1 of 5
+Status: In progress
+Last activity: 2026-08-30 — Completed Phase 05.2 Plan 01 admission foundation
 
 Progress: [████░░░░░░] 40%
 
@@ -77,6 +77,7 @@ Progress: [████░░░░░░] 40%
 | Phase 05 P05 | resumed execution | 3 tasks | 10 files |
 | Phase 05.1 P01 | 28m | 3 tasks | 4 files |
 | Phase 05.1 P02 | 24m | 2 tasks | 8 files |
+| Phase 05.2 P01 | 19min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,9 @@ Recent decisions affecting current work:
 - [Phase 05.1]: Station facts require a complete canonical envelope before accepted projection replacement.
 - [Phase 05.1]: Failed component discovery emits health-only frames without a completion marker.
 - [Phase 05.1]: Complete owner-scoped station facts validate before telemetry serialization.
+- [Phase 05.2]: The complete dossier is a validation fixture and does not admit the runtime-pending Phase 05.1 seam.
+- [Phase 05.2]: Registry growth requires evidence and executable coverage for every current row before dossier evaluation.
+- [Phase 05.2]: Owner overrides bind one finding to the exact dossier digest, explicit decision, remaining risk, and a maximum 90-day expiry.
 
 ### Pending Todos
 
@@ -143,7 +147,7 @@ None yet.
 ### Roadmap Evolution
 
 - Phase 05.1 inserted after Phase 5: Bounded Real Component Discovery; conditional successor for actual component-level X4 telemetry, separated from the Phase 1 transport spine. (URGENT)
-- Phase 05.2 inserted after Phase 5.1: Layered Lua and X4 verification foundation, based on the approved handoff; executes after conditional component discovery and before Phase 6. (URGENT)
+- Phase 05.2 inserted after Phase 5 and reordered before further Phase 05.1 X4 execution: it must build the admission gate and read-only candidate harness first; Phase 05.1 then owns one prepared X4 run over the remaining candidate matrix. (URGENT)
 
 ## Deferred Items
 
@@ -155,6 +159,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-29T16:02:19.922Z
-Stopped at: Completed 05.1-02-PLAN.md
+Last session: 2026-08-29T23:22:41.923Z
+Stopped at: Completed 05.2-01-PLAN.md
 Resume file: None

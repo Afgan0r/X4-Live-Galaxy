@@ -168,14 +168,43 @@ Plans:
 
 ### Phase 05.2: Layered Lua and X4 Verification Foundation (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Require source-saturated dossiers, an executable known-failure gate,
+production-faithful conformance, and bounded read-only candidate experiments
+before any future X4 seam is planned, implemented, packaged, or tested in game.
+**Requirements**: Phase-local specification (05.2-SPEC.md); verification
+foundation for inherited OBS-X4 evidence and future X4 seams
 **Depends on:** Phase 5
-**Plans:** 0 plans
+**Success Criteria** (what must be TRUE):
+
+1. A versioned dossier contract rejects any X4 seam missing primary-source and
+   independent production-precedent evidence for loader, binding, call shape,
+   identity, lifecycle, failure/completeness, or volume behavior.
+
+2. A project-owned Known X4 Failure Registry and exhaustive coverage matrix gate
+   every seam, with negative fixtures for all seven initial demonstrated classes
+   and no automatic small-change exception.
+
+3. Packaged conformance proves production module resolution, registration,
+   native-binding acquisition, and the full import graph without relying on a
+   permissive local-only package path.
+
+4. A bounded developer-only read-only candidate harness isolates failures,
+   records structured JSONL, and judges execution, contract, and effect
+   independently while keeping full evidence private and digest-linked.
+
+5. Remaining Phase 05.1 native unknowns are prepared as the first complete
+   candidate matrix for one later human X4 run; Phase 05.2 itself performs no
+   game mutation and requires no X4 execution.
+
+**Plans:** 5 plans
 
 Plans:
 
-- [ ] TBD (run $gsd-plan-phase 05.2 to break down)
+- [x] 05.2-01-PLAN.md
+- [ ] 05.2-02-PLAN.md
+- [ ] 05.2-03-PLAN.md
+- [ ] 05.2-04-PLAN.md
+- [ ] 05.2-05-PLAN.md
 
 ### Phase 05.1: Bounded Real Component Discovery (INSERTED)
 
