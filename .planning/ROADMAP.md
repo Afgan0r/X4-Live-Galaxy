@@ -180,7 +180,6 @@ Plans:
 ### Phase 05.1: Bounded Real Component Discovery (INSERTED)
 
 **Goal:** Replace the unsupported sector-as-capacity-target probe with deterministic, bounded discovery of real X4 components so runtime asset, capacity, and ownership facts can be admitted without synthetic fallback or unbounded game-thread work.
-**Requirements**: None — conditional evidence closure for the existing OBS-06 / D-09 contract; do not duplicate the completed milestone requirement mapping.
 **Depends on:** Phase 5
 **Success Criteria** (what must be TRUE):
 
@@ -191,6 +190,7 @@ Plans:
 5. A disposable X4 probe separately records whether real component facts are observed, partial, or unsupported with bounded correlated diagnostics; static and fake evidence are not reported as observed-in-X4 proof.
 
 **Research**: Required — inspect installed vanilla X4 first, then the X4 Live reference call shapes and exact installed mod/version evidence; treat runtime semantics as unknown until the disposable probe.
+**Requirement mapping note**: This conditional evidence closure strengthens the existing OBS-06 / D-09 contract and introduces no new milestone requirement ID.
 **Plans:** 0 plans
 
 Plans:
