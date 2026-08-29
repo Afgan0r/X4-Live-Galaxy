@@ -106,20 +106,25 @@ function Test-PackagedPath {
     )
     Assert-True ((@($bundle.fixtures.id | Sort-Object) -join '|') -eq (($expectedIds | Sort-Object) -join '|')) 'Negative fixture set is incomplete.'
 
-    $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ("live-galaxy-conformance-" + [guid]::NewGuid().ToString('N'))
+    $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
+    $scratch = Join-Path $tempRoot ("live-galaxy-conformance-" + [guid]::NewGuid().ToString('N'))
     try {
         foreach ($fixture in $bundle.fixtures) {
             $candidate = Join-Path $scratch $fixture.id
             New-FixturePackage $fixture $candidate
             $negative = Invoke-Conformance $candidate 1
             Assert-True ($negative.verdict -eq 'non-conformant') "Fixture '$($fixture.id)' did not fail closed."
-            Assert-True (@($negative.reason_codes) -contains $fixture.expected_reason_code) "Fixture '$($fixture.id)' returned the wrong reason code."
+            Assert-True (@($negative.reason_codes) -contains $fixture.expected_reason_code) "Fixture '$($fixture.id)' returned '$(@($negative.reason_codes) -join ',')', expected '$($fixture.expected_reason_code)'."
             Assert-True ($negative.classification -eq $fixture.expected_classification) "Fixture '$($fixture.id)' returned the wrong classification."
             Assert-NoAbsolutePath $negative
         }
     }
     finally {
         if (Test-Path -LiteralPath $scratch) {
+            $resolvedScratch = [System.IO.Path]::GetFullPath($scratch)
+            if (-not $resolvedScratch.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "Refusing to remove fixture root outside the system temporary directory."
+            }
             Remove-Item -LiteralPath $scratch -Recurse -Force
         }
     }
