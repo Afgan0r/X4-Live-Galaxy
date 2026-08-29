@@ -1,5 +1,5 @@
 local discovery = {}
-local component_discovery = require("live_galaxy_component_discovery")
+local component_discovery = require("live_galaxy/lua/live_galaxy_component_discovery")
 
 local MAX_SECTIONS_PER_CYCLE = 1
 local MAX_SECTOR_SCAN = 16

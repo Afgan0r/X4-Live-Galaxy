@@ -20,11 +20,13 @@ end
 
 local function runtime_api()
     local globals = _G
+    local ffi = require("ffi")
+    local C = ffi.C
     return {
-        count_stations = function(_, faction_id) return globals.C.GetNumAllFactionStations(faction_id) end,
-        new_buffer = function(_, count) return require("ffi").new("UniverseID[?]", count) end,
+        count_stations = function(_, faction_id) return C.GetNumAllFactionStations(faction_id) end,
+        new_buffer = function(_, count) return ffi.new("UniverseID[?]", count) end,
         fill_stations = function(_, buffer, count, faction_id)
-            return globals.C.GetAllFactionStations(buffer, count, faction_id)
+            return C.GetAllFactionStations(buffer, count, faction_id)
         end,
         to_component = function(_, raw_id) return globals.ConvertStringToLuaID(tostring(raw_id)) end,
         to_component64 = function(_, component) return globals.ConvertIDTo64Bit(component) end,
@@ -32,7 +34,7 @@ local function runtime_api()
             return globals.GetComponentData(component, "owner", "sector")
         end,
         get_people_capacity = function(_, component64)
-            return globals.C.GetPeopleCapacity(component64, "", false)
+            return C.GetPeopleCapacity(component64, "", false)
         end,
         faction_id = "faction:argon",
     }
