@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod admission;
+mod arbitration;
 mod cache_identity;
 mod causal;
 mod checkpoint;
@@ -17,6 +18,7 @@ pub use admission::{
     AcceptedProposal, AdmissionDecision, AdmissionRejection, CacheRevalidation, admit,
     revalidate_cached,
 };
+pub use arbitration::{ArbitrationError, DialogueState, ExecutiveDecision, PreemptionRequest};
 pub use cache_identity::ExactCacheKey;
 pub use causal::{CausalEvent, CausalKind};
 pub use checkpoint::{MIND_CHECKPOINT_SCHEMA_VERSION, MindCheckpointError, MindCheckpointState};
