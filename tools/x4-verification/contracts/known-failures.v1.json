@@ -1,0 +1,29 @@
+{
+  "schema_version": "x4-known-failures.v1",
+  "registry_id": "live-galaxy-known-x4-failures",
+  "evidence_sources": [
+    { "id": "primary-loader-failure", "class": "primary-source", "kind": "runtime-evidence", "reference": "phase-051-loader-failure", "verification_scope": "loader mismatch", "verified": true, "production": true },
+    { "id": "precedent-loader-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-loader", "verification_scope": "loader mismatch", "verified": true, "production": true },
+    { "id": "primary-binding-failure", "class": "primary-source", "kind": "runtime-evidence", "reference": "phase-051-binding-failure", "verification_scope": "native binding", "verified": true, "production": true },
+    { "id": "precedent-binding-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-ffi-binding", "verification_scope": "native binding", "verified": true, "production": true },
+    { "id": "primary-identity-failure", "class": "primary-source", "kind": "repository-contract", "reference": "phase-051-identity-contract", "verification_scope": "identity mismatch", "verified": true, "production": true },
+    { "id": "precedent-identity-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-conversion", "verification_scope": "identity mismatch", "verified": true, "production": true },
+    { "id": "primary-bounds-failure", "class": "primary-source", "kind": "runtime-evidence", "reference": "phase-051-enumeration-overflow", "verification_scope": "unmeasured bounds", "verified": true, "production": true },
+    { "id": "precedent-bounds-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-measured-scan", "verification_scope": "unmeasured bounds", "verified": true, "production": true },
+    { "id": "primary-partial-failure", "class": "primary-source", "kind": "repository-contract", "reference": "phase-051-no-marker", "verification_scope": "partial completeness", "verified": true, "production": true },
+    { "id": "precedent-partial-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-protected-results", "verification_scope": "partial completeness", "verified": true, "production": true },
+    { "id": "primary-harness-failure", "class": "primary-source", "kind": "runtime-evidence", "reference": "phase-051-package-resolution", "verification_scope": "permissive harness", "verified": true, "production": true },
+    { "id": "precedent-harness-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-packaged-import", "verification_scope": "permissive harness", "verified": true, "production": true },
+    { "id": "primary-call-shape-failure", "class": "primary-source", "kind": "research-evidence", "reference": "phase-051-isolated-call-shape", "verification_scope": "isolated research", "verified": true, "production": true },
+    { "id": "precedent-call-shape-failure", "class": "working-production-precedent", "kind": "verified-precedent", "reference": "x4-live-mcp-integrated-call-context", "verification_scope": "isolated research", "verified": true, "production": true }
+  ],
+  "failure_classes": [
+    { "id": "loader-mismatch", "title": "Loader or registration differs from packaged X4 behavior", "primary_evidence_id": "primary-loader-failure", "precedent_evidence_id": "precedent-loader-failure" },
+    { "id": "native-binding-assumptions", "title": "Native binding is assumed from source shape", "primary_evidence_id": "primary-binding-failure", "precedent_evidence_id": "precedent-binding-failure" },
+    { "id": "native-canonical-identity-mismatch", "title": "Native and canonical identities do not close", "primary_evidence_id": "primary-identity-failure", "precedent_evidence_id": "precedent-identity-failure" },
+    { "id": "invented-unmeasured-bounds", "title": "Bounds lack source or measurement evidence", "primary_evidence_id": "primary-bounds-failure", "precedent_evidence_id": "precedent-bounds-failure" },
+    { "id": "partial-results-represented-complete", "title": "Partial results are represented as complete", "primary_evidence_id": "primary-partial-failure", "precedent_evidence_id": "precedent-partial-failure" },
+    { "id": "permissive-local-harness", "title": "Local loading is more permissive than X4", "primary_evidence_id": "primary-harness-failure", "precedent_evidence_id": "precedent-harness-failure" },
+    { "id": "isolated-call-shape-research", "title": "Isolated call shape lacks integration context", "primary_evidence_id": "primary-call-shape-failure", "precedent_evidence_id": "precedent-call-shape-failure" }
+  ]
+}
