@@ -23,7 +23,7 @@
 - [x] **MIND-03**: The deterministic kernel derives bounded strategic facts, priorities, and allowed shadow primitives from a frozen normalized snapshot.
 - [x] **MIND-04**: Equivalent replay inputs produce canonically ordered, reproducible deterministic inputs and admission results.
 - [x] **MIND-05**: ZYA and ARG exhibit measurably distinct strategic responses to shared scenarios rather than differing only by faction labels.
-- [ ] **MIND-06**: Accepted shadow plans and Executive diplomatic postures carry typed goals or dispositions, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations without opening inter-faction negotiation.
+- [x] **MIND-06**: Accepted shadow plans and Executive diplomatic postures carry typed goals or dispositions, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations without opening inter-faction negotiation.
 - [ ] **MIND-07**: A strategic tick, relevant event trigger, or cooldown can request deliberation while per-faction scheduling remains bounded and deduplicated.
 
 ### Primitive Institutions
@@ -40,8 +40,8 @@
 ### Model Orchestration and Evaluation
 
 - [ ] **MODEL-01**: Real-model prototype deliberation is isolated behind a provider-neutral typed interface and uses a developer-controlled subscription harness before `1.0.0`; public runtime API integration is not required by milestone 0.1.
-- [ ] **MODEL-02**: Provider output remains untrusted until schema, semantic, information, safety, budget, and current-state validation all succeed.
-- [ ] **MODEL-03**: Rejected or timed-out provider work records a bounded reason and cannot partially admit a plan or alter authoritative X4 state.
+- [x] **MODEL-02**: Provider output remains untrusted until schema, semantic, information, safety, budget, and current-state validation all succeed.
+- [x] **MODEL-03**: Rejected or timed-out provider work records a bounded reason and cannot partially admit a plan or alter authoritative X4 state.
 - [ ] **MODEL-04**: Cache entries use exact versioned keys covering faction, snapshot, policy, prompt package, schema, provider, model, and relevant generation settings.
 - [x] **MODEL-05**: Context and history compaction uses model-relative token budgets and produces versioned typed-plus-narrative capsules whose typed facts remain authoritative.
 - [ ] **MODEL-06**: Provider calls, retries, time, payload size, context size, queue depth, and retained history have explicit enforceable bounds.
@@ -137,7 +137,7 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MIND-03 | Phase 3 | Complete |
 | MIND-04 | Phase 3 | Complete |
 | MIND-05 | Phase 4 | Complete |
-| MIND-06 | Phase 5 | Pending |
+| MIND-06 | Phase 5 | Complete |
 | MIND-07 | Phase 5 | Pending |
 | INST-01 | Phase 3 | Complete |
 | INST-02 | Phase 3 | Complete |
@@ -148,8 +148,8 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | INST-07 | Phase 5 | Pending |
 | INST-08 | Phase 4 | Complete |
 | MODEL-01 | Phase 5 | Pending |
-| MODEL-02 | Phase 5 | Pending |
-| MODEL-03 | Phase 5 | Pending |
+| MODEL-02 | Phase 5 | Complete |
+| MODEL-03 | Phase 5 | Complete |
 | MODEL-04 | Phase 5 | Pending |
 | MODEL-05 | Phase 4 | Complete |
 | MODEL-06 | Phase 5 | Pending |
