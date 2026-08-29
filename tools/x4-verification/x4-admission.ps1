@@ -43,6 +43,7 @@ $script:failureCode = 'INTERNAL_VALIDATION_ERROR'
 $script:dossierId = 'unparsed'
 $script:dossierDigest = $null
 $script:validationContext = 'startup'
+$script:overriddenFindingIds = @()
 
 function Fail([string]$Code) {
     $script:failureCode = $Code
@@ -297,6 +298,7 @@ function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
     $dimensions = Require-Array (Require-Property $Dossier 'dimensions') $maxDimensions
     Assert-UniqueIds $dimensions
     $dimensionIds = @()
+    $dimensionFindingRefs = @{}
     foreach ($dimension in $dimensions) {
         $id = Require-Property $dimension 'id'
         Require-Id $id
@@ -308,6 +310,23 @@ function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
         if ($status -ne 'EVIDENCED') {
             Fail 'UNRESOLVED_EVIDENCE'
         }
+        $findingIds = @()
+        if ($dimension.PSObject.Properties.Name -contains 'finding_ids') {
+            if ($dimension.finding_ids -is [string]) {
+                Fail 'INVALID_FIELD_VALUE'
+            }
+            $findingIds = @($dimension.finding_ids)
+            if ($findingIds.Count -gt 8) {
+                Fail 'BOUND_EXCEEDED'
+            }
+            foreach ($findingId in $findingIds) {
+                Require-Id $findingId
+            }
+            if (@($findingIds | Sort-Object -Unique).Count -ne $findingIds.Count) {
+                Fail 'DUPLICATE_ID'
+            }
+        }
+        $dimensionFindingRefs[$id] = $findingIds
         $dimensionIds += $id
     }
     if ((@($dimensionIds | Sort-Object) -join '|') -ne (@($requiredDimensions | Sort-Object) -join '|')) {
@@ -320,10 +339,17 @@ function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
         Fail 'BOUND_EXCEEDED'
     }
     Assert-UniqueIds $findings
+    $findingMap = @{}
+    $knownFindings = @()
     foreach ($finding in $findings) {
-        Require-Id (Require-Property $finding 'id')
+        $findingId = Require-Property $finding 'id'
+        Require-Id $findingId
         $failureClassId = Require-Property $finding 'failure_class_id'
         if ($FailureClassIds -notcontains $failureClassId) {
+            Fail 'INVALID_EVIDENCE_REFERENCE'
+        }
+        $dimensionId = Require-Property $finding 'dimension_id'
+        if ($requiredDimensions -notcontains $dimensionId) {
             Fail 'INVALID_EVIDENCE_REFERENCE'
         }
         $disposition = Require-Property $finding 'disposition'
@@ -331,9 +357,79 @@ function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
             Fail 'INVALID_FIELD_VALUE'
         }
         if ($disposition -eq 'known-failure') {
-            Fail 'KNOWN_FAILURE_BLOCKED'
+            $knownFindings += $finding
+        }
+        $findingMap[$findingId] = $finding
+    }
+    foreach ($dimensionId in $dimensionFindingRefs.Keys) {
+        foreach ($findingId in $dimensionFindingRefs[$dimensionId]) {
+            if (-not $findingMap.ContainsKey($findingId) -or $findingMap[$findingId].dimension_id -ne $dimensionId) {
+                Fail 'INVALID_EVIDENCE_REFERENCE'
+            }
         }
     }
+    foreach ($finding in $findings) {
+        $references = @($dimensionFindingRefs.Values | ForEach-Object { @($_) } | Where-Object { $_ -eq $finding.id })
+        if ($references.Count -ne 1) {
+            Fail 'INVALID_EVIDENCE_REFERENCE'
+        }
+    }
+    return @($knownFindings)
+}
+
+function Test-OwnerOverride($Override, $KnownFindings) {
+    $script:validationContext = 'override-required-fields'
+    foreach ($field in @('override_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'expires_at')) {
+        $null = Require-Property $Override $field
+    }
+    $script:validationContext = 'override-identifiers'
+    Require-Id $Override.override_id
+    Require-Id $Override.owner_decision_id
+    $script:validationContext = 'override-rationale'
+    Require-Text $Override.rationale
+    Require-Text $Override.remaining_risk
+    $script:validationContext = 'override-scope'
+    if ($Override.dossier_id -ne $script:dossierId) {
+        Fail 'OVERRIDE_SCOPE_MISMATCH'
+    }
+    if ($Override.dossier_digest -notmatch '^[a-f0-9]{64}$' -or $Override.dossier_digest -ne $script:dossierDigest) {
+        Fail 'OVERRIDE_DIGEST_MISMATCH'
+    }
+    $matching = @($KnownFindings | Where-Object { $_.id -eq $Override.finding_id })
+    if ($matching.Count -ne 1) {
+        Fail 'OVERRIDE_SCOPE_MISMATCH'
+    }
+    if ($Override.decision -ne 'accept-risk') {
+        Fail 'INVALID_OWNER_DECISION'
+    }
+    $script:validationContext = 'override-expiry'
+    try {
+        if ($Override.expires_at -is [DateTime]) {
+            $expiry = [DateTimeOffset]::new($Override.expires_at.ToUniversalTime())
+        }
+        elseif ($Override.expires_at -is [DateTimeOffset]) {
+            $expiry = $Override.expires_at.ToUniversalTime()
+        }
+        else {
+            $expiry = [DateTimeOffset]::ParseExact(
+                $Override.expires_at,
+                'yyyy-MM-ddTHH:mm:ssZ',
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.DateTimeStyles]::AssumeUniversal
+            )
+        }
+    }
+    catch {
+        Fail 'INVALID_FIELD_VALUE'
+    }
+    $now = [DateTimeOffset]::UtcNow
+    if ($expiry -le $now) {
+        Fail 'OVERRIDE_EXPIRED'
+    }
+    if ($expiry -gt $now.AddDays(90)) {
+        Fail 'OVERRIDE_EXPIRY_OUT_OF_RANGE'
+    }
+    return @($Override.finding_id)
 }
 
 function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
@@ -344,6 +440,7 @@ function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
         reason_codes = @($ReasonCodes | Select-Object -First 32)
         dossier_digest = $script:dossierDigest
         diagnostic_id = $script:validationContext
+        overridden_finding_ids = @($script:overriddenFindingIds)
     }
     Write-Output ($result | ConvertTo-Json -Compress -Depth 8)
 }
@@ -370,7 +467,24 @@ try {
         Test-Coverage $coverageRead.Value $registryInfo $fixtureMap
     }
     $script:validationContext = 'dossier-validation'
-    Test-Dossier $dossierRead.Value $registryInfo.Ids
+    $knownFindings = @(Test-Dossier $dossierRead.Value $registryInfo.Ids)
+    if ($knownFindings.Count -gt 0) {
+        if ([string]::IsNullOrWhiteSpace($OverridePath)) {
+            Fail 'KNOWN_FAILURE_BLOCKED'
+        }
+        $script:validationContext = 'override-read'
+        $overrideRead = Read-BoundedJson $OverridePath 'x4-owner-override.v1' 'UNSUPPORTED_OVERRIDE_SCHEMA'
+        $script:validationContext = 'override-validation'
+        $script:overriddenFindingIds = @(Test-OwnerOverride $overrideRead.Value $knownFindings)
+        if ($script:overriddenFindingIds.Count -ne $knownFindings.Count) {
+            Fail 'KNOWN_FAILURE_BLOCKED'
+        }
+        Write-Result 'admissible-with-owner-override' @('OWNER_OVERRIDE_APPLIED')
+        exit 0
+    }
+    if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
+        Fail 'OVERRIDE_SCOPE_MISMATCH'
+    }
     Write-Result 'admissible' @('ADMISSIBLE')
     exit 0
 }

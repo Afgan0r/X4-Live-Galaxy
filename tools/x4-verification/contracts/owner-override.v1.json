@@ -1,0 +1,12 @@
+{
+  "schema_version": "x4-owner-override.v1",
+  "override_id": "owner-override-template",
+  "dossier_id": "replace-with-exact-dossier-id",
+  "dossier_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "finding_id": "replace-with-exact-finding-id",
+  "owner_decision_id": "replace-with-owner-decision-id",
+  "decision": "accept-risk",
+  "rationale": "Replace with the bounded reason for accepting this exact finding.",
+  "remaining_risk": "Replace with the risk that remains after this exact override.",
+  "expires_at": "1970-01-01T00:00:00Z"
+}

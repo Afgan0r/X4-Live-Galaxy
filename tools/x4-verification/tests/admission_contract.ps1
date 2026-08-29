@@ -61,7 +61,8 @@ function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $n
         if ($null -ne $Override) {
             $tempOverride = Join-Path $tempRoot 'override.json'
             $resolvedOverride = Copy-Json $Override
-            if ($resolvedOverride.dossier_digest -eq '__DOSSIER_DIGEST__') {
+            if ($resolvedOverride.PSObject.Properties.Name -contains 'dossier_digest' -and
+                $resolvedOverride.dossier_digest -eq '__DOSSIER_DIGEST__') {
                 $resolvedOverride.dossier_digest = $inputDigestBefore
             }
             $resolvedOverride | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempOverride -Encoding utf8NoBOM
