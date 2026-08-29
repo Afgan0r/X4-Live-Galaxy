@@ -46,6 +46,21 @@ only the smallest necessary excerpts. Do not copy code into Live Galaxy, edit
 the repository, modify the X4 installation or installed mods, touch saves, start
 the game, or write to runtime state.
 
+## Completeness Contract
+
+For every assigned integration seam, fill every dossier dimension required by
+the X4 integration skill. The evidence table must enumerate all material
+production precedents and call sites needed to establish loader, binding, call
+shape, identity, lifecycle, failure, completeness, and volume behavior. Do not
+return one representative example in place of the complete integration context.
+
+Give every dossier field one status: `EVIDENCED`, `CONFLICTING`, or `UNKNOWN`,
+with exact source paths and symbols. Include the sources searched, the remaining
+load-bearing questions, and the evidence-saturation reason for stopping. If any
+question answerable from available sources remains open, label the dossier
+`INCOMPLETE_FOR_REVIEW`; do not replace the missing research with a proposed
+in-game probe.
+
 Write findings only to the current GSD-owned artifact explicitly assigned by
 the caller. If no output artifact is assigned, return structured Markdown
 without writing files. Recommend a provenance ledger entry only when a specific
