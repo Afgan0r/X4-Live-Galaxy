@@ -50,5 +50,12 @@ fn accepted_candidate_uses_one_checkpoint_compare_and_set() {
     let mut port = FakeCheckpointPort::new();
     let result = persist_deliberation(&mut port, &accepted, &pending);
     assert!(result.is_ok());
+    let Ok(result) = result else { return };
+    assert!(result.compare_and_set_performed);
     assert!(port.load().is_some());
+    let retry = persist_deliberation(&mut port, &accepted, &pending);
+    assert!(retry.is_ok());
+    let Ok(retry) = retry else { return };
+    assert!(!retry.compare_and_set_performed);
+    assert_eq!(retry.acknowledged.cursor, result.acknowledged.cursor);
 }

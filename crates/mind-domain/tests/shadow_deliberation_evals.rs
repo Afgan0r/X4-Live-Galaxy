@@ -88,3 +88,23 @@ fn sd_001_hidden_and_sd_013_forbidden_candidates_have_no_pending_projection() {
         assert!(decision.pending_commit(&prior).is_none());
     }
 }
+
+#[test]
+fn stale_faction_is_rejected_before_any_pending_commit() {
+    let request = request();
+    assert!(request.is_ok());
+    let Ok(request) = request else { return };
+    let proposal = proposal();
+    assert!(proposal.is_ok());
+    let Ok(proposal) = proposal else { return };
+    let decision = admit(&request, &MindAggregate::empty(Faction::Arg), &proposal);
+    assert_eq!(
+        decision,
+        AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState)
+    );
+    assert!(
+        decision
+            .pending_commit(&MindAggregate::empty(Faction::Arg))
+            .is_none()
+    );
+}
