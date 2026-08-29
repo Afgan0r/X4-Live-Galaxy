@@ -9,6 +9,13 @@ $source = Get-Content -LiteralPath $module -Raw
 foreach ($pattern in @(
     'C\.GetNumAllFactionStations',
     'C\.GetAllFactionStations',
+    'UniverseID\[\?\]',
+    'tonumber\(raw_count\)',
+    'tonumber\(raw_filled\)',
+    'for index = 0, count - 1 do',
+    'to_component',
+    'ConvertStringToLuaID',
+    'buffer\[index\]',
     'ConvertIDTo64Bit',
     'GetComponentData\(component, "owner", "sector"\)',
     'C\.GetPeopleCapacity',

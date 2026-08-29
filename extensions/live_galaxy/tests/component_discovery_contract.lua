@@ -80,6 +80,15 @@ function cases.suppresses_every_invalid_stage_without_partial_observation()
     assert(err == "enumeration_incomplete")
 end
 
+function cases.fails_closed_when_a_raw_universe_id_cannot_be_converted()
+    local api = fake_api()
+    api.to_component = function() return nil end
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "identity_invalid")
+end
+
 function cases.normalizes_native_count_and_fill_before_validation()
     local api = fake_api()
     api.count_stations = function() return "2" end

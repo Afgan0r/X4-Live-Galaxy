@@ -81,7 +81,7 @@ function discovery.new(api)
         local candidates, stable_ids = {}, {}
         for index = 0, count - 1 do
             local component_ok, component = pcall(api.to_component, api, buffer[index])
-            if not component_ok or component == nil then return nil, "identity_invalid" end
+            if not component_ok or component == nil or component == false then return nil, "identity_invalid" end
             local id_ok, stable_id = pcall(api.stable_id, api, component)
             if not id_ok or not valid_id(stable_id) or stable_ids[stable_id] then return nil, "identity_invalid" end
             stable_ids[stable_id] = true
