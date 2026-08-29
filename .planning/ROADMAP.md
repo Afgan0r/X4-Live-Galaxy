@@ -23,9 +23,9 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 ## Phases
 
 - [ ] **Phase 1: Read-Only Observation Spine** - Produce trustworthy, bounded, replayable X4 observations without mutation or game-thread stalls.
-- [ ] **Phase 2: Hostile-Faction Research Track** - Establish versioned XEN/KHK evidence independently of the ZYA/ARG critical path.
-- [ ] **Phase 3: Faction-Scoped Strategic State** - Turn frozen observations into deterministic faction and fixed-priority institution inputs for ZYA and ARG.
-- [ ] **Phase 4: Persistent Full Faction Minds** - Preserve distinct ZYA/ARG goals, institution initiatives, causal history, and recovery state across interruption boundaries.
+- [x] **Phase 2: Hostile-Faction Research Track** - Establish versioned XEN/KHK evidence independently of the ZYA/ARG critical path.
+- [x] **Phase 3: Faction-Scoped Strategic State** - Turn frozen observations into deterministic faction and fixed-priority institution inputs for ZYA and ARG.
+- [x] **Phase 4: Persistent Full Faction Minds** - Preserve distinct ZYA/ARG goals, institution initiatives, causal history, and recovery state across interruption boundaries.
 - [ ] **Phase 5: Bounded Shadow Deliberation** - Arbitrate and admit provider proposals and institution initiatives only through deterministic validation, budgets, and exact replay contracts.
 - [ ] **Phase 6: Correlated Reports and Diagnostics** - Emit safe concise X4 reports while retaining complete external decision evidence.
 - [ ] **Phase 7: X4 Operational Proof** - Demonstrate bounded normal-speed, SETA, reconnect, recovery, and unattended behavior in disposable X4 runs.
@@ -205,7 +205,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 1. Read-Only Observation Spine | 8/9 | In Progress |  |
 | 2. Hostile-Faction Research Track | 1/1 | Complete | 2026-08-29 |
 | 3. Faction-Scoped Strategic State | 3/3 | Complete | 2026-08-29 |
-| 4. Persistent Full Faction Minds | 4/4 | In Progress |  |
+| 4. Persistent Full Faction Minds | 4/4 | Complete | 2026-08-29 |
 | 5. Bounded Shadow Deliberation | 0/TBD | Not started | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |
