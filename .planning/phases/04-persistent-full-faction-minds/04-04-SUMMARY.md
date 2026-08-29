@@ -51,7 +51,7 @@ status: complete
 ## Accomplishments
 
 - Added last-acknowledged recovery policy for corrupt, partial, duplicate-content, stale, out-of-order, unsupported-migration, and three crash-point inputs without a port write.
-- Added copied legacy-to-current migration acceptance and unsupported-version rejection with bounded typed diagnostics.
+- Added bounded raw legacy-to-current conversion that validates and rehashes a complete target envelope before requesting its durable write; unsupported or invalid input retains the fallback without a write.
 - Added provider/model budget-profile capsules with source range/hash identity, measured headroom, bounded narrative, and typed commitment authority.
 
 ## Task Commits
@@ -69,7 +69,7 @@ status: complete
 
 ## Decisions Made
 
-- The acknowledged X4 checkpoint remains the sole recovery candidate; speculative work is invisible after every modeled crash point.
+- The acknowledged X4 checkpoint remains the sole crash-recovery candidate; speculative work is invisible after every modeled crash point. A valid acknowledged v0 record may be copied into a fully validated v1 target.
 - Capsule compaction has no event-count or elapsed-time trigger: it depends exclusively on its recorded provider/model budget profile.
 
 ## Deviations from Plan
