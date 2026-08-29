@@ -2,7 +2,8 @@
 mod exact_cache;
 
 use mind_domain::{
-    AdmissionDecision, CommandId, DeliberationRequest, MindAggregate, ShadowProposal, admit,
+    AdmissionDecision, CommandId, DeliberationRequest, DeliberationScheduler, FactionTrigger,
+    MindAggregate, RequestEligibility, SchedulerBounds, ShadowProposal, admit,
 };
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Capability, Faction, PacketLimits, derive_packets};
@@ -110,4 +111,43 @@ fn stale_faction_is_rejected_before_any_pending_commit() {
             .pending_commit(&MindAggregate::empty(Faction::Arg))
             .is_none()
     );
+}
+
+#[test]
+fn sd_007_duplicate_and_interrupted_triggers_keep_one_faction_owner() {
+    let mut scheduler = DeliberationScheduler::new(SchedulerBounds::ci());
+    let first = scheduler.eligibility(Faction::Zya, FactionTrigger::StrategicTick(1));
+    assert!(matches!(first, RequestEligibility::Eligible(_)));
+    for trigger in [
+        FactionTrigger::StrategicTick(1),
+        FactionTrigger::RelevantEvent("XEN:threat:XEN".into()),
+        FactionTrigger::Interrupted,
+    ] {
+        assert_eq!(
+            scheduler.eligibility(Faction::Zya, trigger),
+            RequestEligibility::Coalesced
+        );
+    }
+    assert_eq!(scheduler.outstanding_count(Faction::Zya), 1);
+}
+
+#[test]
+fn sd_011_timeout_pauses_until_a_newer_reconciled_observation() {
+    let mut scheduler = DeliberationScheduler::new(SchedulerBounds::ci());
+    assert!(matches!(
+        scheduler.eligibility(Faction::Arg, FactionTrigger::StrategicTick(4)),
+        RequestEligibility::Eligible(_)
+    ));
+    assert_eq!(
+        scheduler.timeout(Faction::Arg, 4),
+        RequestEligibility::PausedAwaitingReconciliation
+    );
+    assert_eq!(
+        scheduler.reconcile(Faction::Arg, 4),
+        RequestEligibility::PausedAwaitingReconciliation
+    );
+    assert!(matches!(
+        scheduler.reconcile(Faction::Arg, 5),
+        RequestEligibility::Reconciled
+    ));
 }
