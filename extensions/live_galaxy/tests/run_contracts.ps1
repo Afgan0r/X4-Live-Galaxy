@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-verification')]
+    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-verification')]
     [string]$Suite = 'all',
     [string]$LuaPath
 )
@@ -7,12 +7,21 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $admissionContract = Join-Path $root 'tools/x4-verification/tests/admission_contract.ps1'
+$packageConformanceContract = Join-Path $root 'tools/x4-verification/tests/package_conformance_contract.ps1'
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission')) {
         & pwsh -NoProfile -File $admissionContract -Case $admissionCase
         if ($LASTEXITCODE -ne 0) { throw "X4 admission contract failed: $admissionCase" }
     }
+    if ($Suite -eq 'x4-admission') {
+        exit 0
+    }
+}
+
+if ($Suite -in @('all', 'x4-package-conformance', 'x4-verification')) {
+    & pwsh -NoProfile -File $packageConformanceContract -Case packaged-path
+    if ($LASTEXITCODE -ne 0) { throw 'X4 package conformance contract failed.' }
     if ($Suite -ne 'all') {
         exit 0
     }
