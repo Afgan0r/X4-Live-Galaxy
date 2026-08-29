@@ -107,7 +107,8 @@ function discovery.new(api)
             candidate.asset_id = "asset:station:" .. candidate.stable_id
             candidate.owner_id, candidate.sector_id, candidate.people_capacity = owner_id, sector_id, people_capacity
             if not metadata_ok or not capacity_ok or not valid_id(candidate.asset_id)
-                or not valid_id(owner_id) or not valid_id(sector_id) or not valid_integer(people_capacity) then
+                or not valid_id(owner_id) or owner_id ~= api.faction_id or not valid_id(sector_id)
+                or not valid_integer(people_capacity) then
                 return nil, "facts_unsupported"
             end
         end

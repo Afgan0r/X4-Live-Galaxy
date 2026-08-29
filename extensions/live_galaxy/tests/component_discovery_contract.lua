@@ -15,6 +15,7 @@ local function fake_api(count)
     }
     local stations = { "station:20", "station:10" }
     return {
+        faction_id = "faction:argon",
         count_stations = function() return count or #stations end,
         new_buffer = function(_, size)
             calls.allocations = calls.allocations + 1
