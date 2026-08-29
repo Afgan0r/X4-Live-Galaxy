@@ -1,0 +1,14 @@
+{
+  "schema_version": "x4-negative-fixtures.v1",
+  "fixture_bundle_id": "live-galaxy-known-x4-failure-negatives",
+  "max_execution_ms": 5000,
+  "fixtures": [
+    { "id": "negative-01-loader-mismatch", "failure_class_id": "loader-mismatch", "dimension_id": "loader-registration", "finding_id": "finding-loader-mismatch", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true },
+    { "id": "negative-02-native-binding-assumptions", "failure_class_id": "native-binding-assumptions", "dimension_id": "lua-native-binding", "finding_id": "finding-native-binding-assumption", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true },
+    { "id": "negative-03-native-canonical-identity-mismatch", "failure_class_id": "native-canonical-identity-mismatch", "dimension_id": "native-canonical-identity", "finding_id": "finding-native-canonical-identity", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true },
+    { "id": "negative-04-invented-unmeasured-bounds", "failure_class_id": "invented-unmeasured-bounds", "dimension_id": "volume-performance", "finding_id": "finding-invented-unmeasured-bound", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true },
+    { "id": "negative-05-partial-results-represented-complete", "failure_class_id": "partial-results-represented-complete", "dimension_id": "failure-partial-completeness", "finding_id": "finding-partial-result-complete", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true },
+    { "id": "negative-06-permissive-local-harness", "failure_class_id": "permissive-local-harness", "dimension_id": "module-resolution", "finding_id": "finding-permissive-local-harness", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true },
+    { "id": "negative-07-isolated-call-shape-research", "failure_class_id": "isolated-call-shape-research", "dimension_id": "arguments-returns", "finding_id": "finding-isolated-call-shape", "expected_reason_code": "KNOWN_FAILURE_BLOCKED", "enabled": true }
+  ]
+}

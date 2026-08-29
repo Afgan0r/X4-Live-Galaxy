@@ -7,6 +7,7 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$RegistryPath,
     [string]$CoveragePath,
+    [string]$FixturePath,
     [string]$OverridePath
 )
 
@@ -41,6 +42,7 @@ $requiredFailureClasses = @(
 $script:failureCode = 'INTERNAL_VALIDATION_ERROR'
 $script:dossierId = 'unparsed'
 $script:dossierDigest = $null
+$script:validationContext = 'startup'
 
 function Fail([string]$Code) {
     $script:failureCode = $Code
@@ -170,10 +172,121 @@ function Test-Registry($Registry) {
         Assert-Provenance $failureClass $evidenceMap
         $ids += $id
     }
-    if ((@($ids | Sort-Object) -join '|') -ne (@($requiredFailureClasses | Sort-Object) -join '|')) {
+    foreach ($requiredClass in $requiredFailureClasses) {
+        if ($ids -notcontains $requiredClass) {
+            Fail 'INVALID_FAILURE_REGISTRY'
+        }
+    }
+    if ($ids.Count -lt $requiredFailureClasses.Count) {
         Fail 'INVALID_FAILURE_REGISTRY'
     }
-    return @($ids)
+    return [pscustomobject]@{ Ids = @($ids); EvidenceMap = $evidenceMap; Classes = @($classes) }
+}
+
+function Test-FixtureBundle($Bundle, [string[]]$FailureClassIds) {
+    Require-Id (Require-Property $Bundle 'fixture_bundle_id')
+    $maxExecutionMs = Require-Property $Bundle 'max_execution_ms'
+    if ($maxExecutionMs -isnot [long] -and $maxExecutionMs -isnot [int]) {
+        Fail 'INVALID_FIELD_VALUE'
+    }
+    if ($maxExecutionMs -lt 1 -or $maxExecutionMs -gt 10000) {
+        Fail 'BOUND_EXCEEDED'
+    }
+    $fixtures = Require-Array (Require-Property $Bundle 'fixtures') 32
+    Assert-UniqueIds $fixtures
+    $fixtureIds = @($fixtures | ForEach-Object { [string]$_.id })
+    if (($fixtureIds -join '|') -ne (@($fixtureIds | Sort-Object) -join '|')) {
+        Fail 'NON_DETERMINISTIC_ORDER'
+    }
+    $map = @{}
+    foreach ($fixture in $fixtures) {
+        $id = Require-Property $fixture 'id'
+        Require-Id $id
+        $failureClassId = Require-Property $fixture 'failure_class_id'
+        if ($FailureClassIds -notcontains $failureClassId) {
+            Fail 'INVALID_EVIDENCE_REFERENCE'
+        }
+        $dimensionId = Require-Property $fixture 'dimension_id'
+        if ($requiredDimensions -notcontains $dimensionId) {
+            Fail 'INVALID_EVIDENCE_REFERENCE'
+        }
+        Require-Id (Require-Property $fixture 'finding_id')
+        Require-Bool (Require-Property $fixture 'enabled')
+        if (-not $fixture.enabled) {
+            Fail 'SKIPPED_NEGATIVE_FIXTURE'
+        }
+        if ((Require-Property $fixture 'expected_reason_code') -ne 'KNOWN_FAILURE_BLOCKED') {
+            Fail 'PASSING_NEGATIVE_FIXTURE'
+        }
+        $map[$id] = $fixture
+    }
+    return $map
+}
+
+function Test-Coverage($Coverage, $RegistryInfo, $FixtureMap) {
+    Require-Id (Require-Property $Coverage 'coverage_id')
+    if ((Require-Property $Coverage 'registry_id') -ne 'live-galaxy-known-x4-failures') {
+        Fail 'INVALID_EVIDENCE_REFERENCE'
+    }
+    $rows = Require-Array (Require-Property $Coverage 'rows') 32
+    Assert-UniqueIds $rows
+    $rowMap = @{}
+    foreach ($row in $rows) {
+        $id = Require-Property $row 'id'
+        Require-Id $id
+        $failureClassId = Require-Property $row 'failure_class_id'
+        if ($id -ne $failureClassId) {
+            Fail 'MISMATCHED_COVERAGE_ROW'
+        }
+        $registryClass = @($RegistryInfo.Classes | Where-Object { $_.id -eq $failureClassId })
+        if ($registryClass.Count -ne 1) {
+            Fail 'INVALID_EVIDENCE_REFERENCE'
+        }
+        if ((Require-Property $row 'primary_evidence_id') -ne $registryClass[0].primary_evidence_id -or
+            (Require-Property $row 'precedent_evidence_id') -ne $registryClass[0].precedent_evidence_id) {
+            Fail 'MISMATCHED_COVERAGE_ROW'
+        }
+        $status = Require-Property $row 'status'
+        if ($status -notin @('covered', 'not-applicable')) {
+            Fail 'INVALID_FIELD_VALUE'
+        }
+        Require-Text (Require-Property $row 'executable_check')
+        $null = Require-Property $row 'fixture_ids'
+        if ($row.fixture_ids -is [string]) {
+            Fail 'INVALID_FIELD_VALUE'
+        }
+        $fixtureIds = @($row.fixture_ids)
+        if ($fixtureIds.Count -gt 8) {
+            Fail 'BOUND_EXCEEDED'
+        }
+        if ($status -eq 'covered' -and $fixtureIds.Count -eq 0) {
+            Fail 'INVALID_FIXTURE_REFERENCE'
+        }
+        if ($status -eq 'not-applicable') {
+            Require-Text (Require-Property $row 'justification')
+            if ($fixtureIds.Count -ne 0) {
+                Fail 'MISMATCHED_COVERAGE_ROW'
+            }
+        }
+        foreach ($fixtureId in $fixtureIds) {
+            Require-Id $fixtureId
+            if (-not $FixtureMap.ContainsKey($fixtureId)) {
+                Fail 'INVALID_FIXTURE_REFERENCE'
+            }
+            if ($FixtureMap[$fixtureId].failure_class_id -ne $failureClassId) {
+                Fail 'MISMATCHED_FIXTURE'
+            }
+        }
+        $rowMap[$failureClassId] = $row
+    }
+    foreach ($failureClassId in $RegistryInfo.Ids) {
+        if (-not $rowMap.ContainsKey($failureClassId)) {
+            Fail 'UNCOVERED_FAILURE_CLASS'
+        }
+    }
+    if ($rowMap.Count -ne $RegistryInfo.Ids.Count) {
+        Fail 'UNCOVERED_FAILURE_CLASS'
+    }
 }
 
 function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
@@ -230,16 +343,34 @@ function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
         verdict = $Verdict
         reason_codes = @($ReasonCodes | Select-Object -First 32)
         dossier_digest = $script:dossierDigest
+        diagnostic_id = $script:validationContext
     }
     Write-Output ($result | ConvertTo-Json -Compress -Depth 8)
 }
 
 try {
+    $script:validationContext = 'dossier-read'
     $dossierRead = Read-BoundedJson $DossierPath 'x4-integration-dossier.v1' 'UNSUPPORTED_DOSSIER_SCHEMA'
     $script:dossierDigest = Get-Sha256Hex $dossierRead.Bytes
+    $script:validationContext = 'registry-read'
     $registryRead = Read-BoundedJson $RegistryPath 'x4-known-failures.v1' 'UNSUPPORTED_REGISTRY_SCHEMA'
-    $failureClasses = Test-Registry $registryRead.Value
-    Test-Dossier $dossierRead.Value $failureClasses
+    $script:validationContext = 'registry-validation'
+    $registryInfo = Test-Registry $registryRead.Value
+    if (-not [string]::IsNullOrWhiteSpace($CoveragePath) -or -not [string]::IsNullOrWhiteSpace($FixturePath)) {
+        if ([string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
+            Fail 'MISSING_INPUT'
+        }
+        $script:validationContext = 'fixture-read'
+        $fixtureRead = Read-BoundedJson $FixturePath 'x4-negative-fixtures.v1' 'UNSUPPORTED_FIXTURE_SCHEMA'
+        $script:validationContext = 'fixture-validation'
+        $fixtureMap = Test-FixtureBundle $fixtureRead.Value $registryInfo.Ids
+        $script:validationContext = 'coverage-read'
+        $coverageRead = Read-BoundedJson $CoveragePath 'x4-known-failure-coverage.v1' 'UNSUPPORTED_COVERAGE_SCHEMA'
+        $script:validationContext = 'coverage-validation'
+        Test-Coverage $coverageRead.Value $registryInfo $fixtureMap
+    }
+    $script:validationContext = 'dossier-validation'
+    Test-Dossier $dossierRead.Value $registryInfo.Ids
     Write-Result 'admissible' @('ADMISSIBLE')
     exit 0
 }

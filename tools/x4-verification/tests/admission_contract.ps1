@@ -74,7 +74,7 @@ function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $n
 function Assert-Rejected($Run, [string]$ReasonCode, [string]$Label) {
     Assert-True ($Run.ExitCode -ne 0) "$Label unexpectedly succeeded."
     Assert-True ($Run.Result.verdict -eq 'non-admissible') "$Label returned an unstable verdict."
-    Assert-True (@($Run.Result.reason_codes) -contains $ReasonCode) "$Label did not report $ReasonCode."
+    Assert-True (@($Run.Result.reason_codes) -contains $ReasonCode) "$Label did not report $ReasonCode; got $(@($Run.Result.reason_codes) -join ',') at $($Run.Result.diagnostic_id)."
     $joined = $Run.Output -join "`n"
     Assert-True ($joined -notmatch '(?i)[A-Z]:\\|/Users/|\\Users\\|private|secret') "$Label leaked a private path or value."
 }
