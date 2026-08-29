@@ -69,4 +69,17 @@ function cases.suppresses_every_invalid_stage_without_partial_observation()
     assert(err == "enumeration_incomplete")
 end
 
+function cases.normalizes_native_count_and_fill_before_validation()
+    local api = fake_api()
+    api.count_stations = function() return "2" end
+    api.fill_stations = function(_, buffer, size)
+        buffer[1], buffer[2] = "station:20", "station:10"
+        return "2"
+    end
+
+    local observation = assert(discovery.new(api).read_observation(1))
+
+    assert(observation.runtime_facts.assets[1].id == "asset:station:10")
+end
+
 return cases

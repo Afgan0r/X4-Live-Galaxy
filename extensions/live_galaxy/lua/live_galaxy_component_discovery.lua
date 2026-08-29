@@ -65,14 +65,16 @@ function discovery.new(api)
 
     function adapter.read_observation(_, version)
         if not api_available(api) then return nil, "enumeration_unavailable" end
-        local count_ok, count = pcall(api.count_stations, api, api.faction_id)
+        local count_ok, raw_count = pcall(api.count_stations, api, api.faction_id)
+        local count = tonumber(raw_count)
         if not count_ok or not valid_integer(count) then return nil, "enumeration_unavailable" end
         if count > MAX_OWNER_STATIONS then return nil, "enumeration_overflow" end
         if count == 0 then return nil, "facts_unsupported" end
 
         local allocation_ok, buffer = pcall(api.new_buffer, api, count)
         if not allocation_ok or buffer == nil then return nil, "enumeration_unavailable" end
-        local fill_ok, filled = pcall(api.fill_stations, api, buffer, count, api.faction_id)
+        local fill_ok, raw_filled = pcall(api.fill_stations, api, buffer, count, api.faction_id)
+        local filled = tonumber(raw_filled)
         if not fill_ok or not valid_integer(filled) or filled ~= count then return nil, "enumeration_incomplete" end
 
         local candidates, stable_ids = {}, {}
