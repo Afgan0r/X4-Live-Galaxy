@@ -1,11 +1,18 @@
 param(
-    [ValidateSet('all', 'x4_discovery')]
+    [ValidateSet('all', 'x4_discovery', 'component_discovery_guard')]
     [string]$Suite = 'all',
     [string]$LuaPath
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+
+if ($Suite -eq 'component_discovery_guard') {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -SelfTest
+    if ($LASTEXITCODE -ne 0) { throw 'Component discovery package guard failed.' }
+    exit 0
+}
+
 $lockPath = Join-Path $root 'tools/lua-runner.lock.json'
 if (-not (Test-Path -LiteralPath $lockPath -PathType Leaf)) {
     throw "Lua runner lock is missing: $lockPath"
