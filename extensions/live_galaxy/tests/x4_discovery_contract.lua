@@ -1,6 +1,7 @@
 package.path = package.path .. ";extensions/live_galaxy/lua/?.lua"
 
 local discovery = require("live_galaxy_x4_discovery")
+local component_discovery = require("live_galaxy_component_discovery")
 local telemetry = require("live_galaxy_telemetry")
 local runtime = require("live_galaxy_runtime")
 
@@ -314,6 +315,37 @@ function cases.runtime_advances_past_a_failed_discovery_without_an_observation_f
     assert(no_marker:match('"status":"unavailable"'))
     assert(next_heartbeat_kind == "heartbeat" and next_heartbeat_sequence == 5)
     assert(heartbeat ~= nil and health ~= nil and no_marker ~= nil and next_heartbeat ~= nil)
+
+    runtime.set_discovery_adapter(nil)
+end
+
+function cases.runtime_emits_health_only_for_a_component_owner_scope_mismatch()
+    local adapter = component_discovery.new({
+        faction_id = "faction:argon",
+        count_stations = function() return 1 end,
+        new_buffer = function() return {} end,
+        fill_stations = function(_, buffer)
+            buffer[0] = "station:20"
+            return 1
+        end,
+        to_component = function(_, station) return station end,
+        to_component64 = function() return "20" end,
+        get_component_data = function() return "faction:antigone", "sector:second_contact" end,
+        get_people_capacity = function() return 24 end,
+    })
+    runtime.set_discovery_adapter(adapter)
+
+    runtime.next_payload()
+    runtime.next_payload()
+    runtime.next_payload()
+    local unavailable, unavailable_kind, _, unavailable_sequence = runtime.next_payload()
+    local no_marker, no_marker_kind, _, no_marker_sequence = runtime.next_payload()
+
+    assert(unavailable_kind == "runtime_health" and unavailable_sequence == 3)
+    assert(unavailable:match('"status":"unavailable"'))
+    assert(not unavailable:match('"type":"observation"'))
+    assert(no_marker_kind == "runtime_health" and no_marker_sequence == 4)
+    assert(not no_marker:match('complete_marker'))
 
     runtime.set_discovery_adapter(nil)
 end

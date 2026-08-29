@@ -37,7 +37,7 @@ local function fake_api(count)
         get_component_data = function(_, station)
             calls.metadata = calls.metadata + 1
             calls.order[#calls.order + 1] = "metadata"
-            return station == "station:10" and "faction:argon" or "faction:antigone",
+            return "faction:argon",
                 station == "station:10" and "sector:argon_prime" or "sector:second_contact"
         end,
         get_people_capacity = function(_, component64)
@@ -80,7 +80,21 @@ function cases.serializes_the_existing_compact_station_envelope()
     assert(payload:match('"entity_id":"sector:argon_prime"'))
     assert(payload:match('"x":%[{"i":"asset:station:10","p":"sector:argon_prime"},{"i":"asset:station:20","p":"sector:second_contact"}%]'))
     assert(payload:match('"c":%[{"i":"capacity:station:10","p":"asset:station:10","v":42},{"i":"capacity:station:20","p":"asset:station:20","v":24}%]'))
-    assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"},{"i":"ownership:station:20","p":"asset:station:20","n":"faction:antigone"}%]'))
+    assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"},{"i":"ownership:station:20","p":"asset:station:20","n":"faction:argon"}%]'))
+end
+
+function cases.rejects_a_syntactically_valid_owner_outside_the_declared_scope()
+    local api = fake_api()
+    local original_get_component_data = api.get_component_data
+    api.get_component_data = function(_, station)
+        local _, sector_id = original_get_component_data(api, station)
+        return station == "station:20" and "faction:antigone" or "faction:argon", sector_id
+    end
+
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "facts_unsupported")
 end
 
 function cases.suppresses_every_invalid_stage_without_partial_observation()
