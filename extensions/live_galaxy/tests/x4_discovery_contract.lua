@@ -7,6 +7,11 @@ local runtime = require("live_galaxy_runtime")
 
 local cases = {}
 
+local function fresh_runtime()
+    package.loaded["live_galaxy_runtime"] = nil
+    return require("live_galaxy_runtime")
+end
+
 function cases.sanitizes_embedded_version_without_exposing_unavailable_values()
     assert(runtime.sanitize_embedded_version(nil) == "unavailable")
     assert(runtime.sanitize_embedded_version(42) == "unavailable")
@@ -293,14 +298,15 @@ function cases.runtime_suppresses_observation_when_discovery_fails()
 end
 
 function cases.runtime_advances_past_a_failed_discovery_without_an_observation_frame()
-    runtime.set_discovery_adapter(discovery.new({}))
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter(discovery.new({}))
 
-    local hello, hello_kind = runtime.next_payload()
-    local heartbeat, heartbeat_kind, _, heartbeat_sequence = runtime.next_payload()
-    local health, health_kind, _, health_sequence = runtime.next_payload()
-    local unavailable, unavailable_kind, _, unavailable_sequence = runtime.next_payload()
-    local no_marker, no_marker_kind, _, no_marker_sequence = runtime.next_payload()
-    local next_heartbeat, next_heartbeat_kind, _, next_heartbeat_sequence = runtime.next_payload()
+    local hello, hello_kind = isolated_runtime.next_payload()
+    local heartbeat, heartbeat_kind, _, heartbeat_sequence = isolated_runtime.next_payload()
+    local health, health_kind, _, health_sequence = isolated_runtime.next_payload()
+    local unavailable, unavailable_kind, _, unavailable_sequence = isolated_runtime.next_payload()
+    local no_marker, no_marker_kind, _, no_marker_sequence = isolated_runtime.next_payload()
+    local next_heartbeat, next_heartbeat_kind, _, next_heartbeat_sequence = isolated_runtime.next_payload()
 
     assert(hello_kind == "hello")
     assert(hello:match('"type":"hello"'))
@@ -316,10 +322,11 @@ function cases.runtime_advances_past_a_failed_discovery_without_an_observation_f
     assert(next_heartbeat_kind == "heartbeat" and next_heartbeat_sequence == 5)
     assert(heartbeat ~= nil and health ~= nil and no_marker ~= nil and next_heartbeat ~= nil)
 
-    runtime.set_discovery_adapter(nil)
+    isolated_runtime.set_discovery_adapter(nil)
 end
 
 function cases.runtime_emits_health_only_for_a_component_owner_scope_mismatch()
+    local isolated_runtime = fresh_runtime()
     local adapter = component_discovery.new({
         faction_id = "faction:argon",
         count_stations = function() return 1 end,
@@ -333,13 +340,13 @@ function cases.runtime_emits_health_only_for_a_component_owner_scope_mismatch()
         get_component_data = function() return "faction:antigone", "sector:second_contact" end,
         get_people_capacity = function() return 24 end,
     })
-    runtime.set_discovery_adapter(adapter)
+    isolated_runtime.set_discovery_adapter(adapter)
 
-    runtime.next_payload()
-    runtime.next_payload()
-    runtime.next_payload()
-    local unavailable, unavailable_kind, _, unavailable_sequence = runtime.next_payload()
-    local no_marker, no_marker_kind, _, no_marker_sequence = runtime.next_payload()
+    isolated_runtime.next_payload()
+    isolated_runtime.next_payload()
+    isolated_runtime.next_payload()
+    local unavailable, unavailable_kind, _, unavailable_sequence = isolated_runtime.next_payload()
+    local no_marker, no_marker_kind, _, no_marker_sequence = isolated_runtime.next_payload()
 
     assert(unavailable_kind == "runtime_health" and unavailable_sequence == 3)
     assert(unavailable:match('"status":"unavailable"'))
@@ -347,7 +354,7 @@ function cases.runtime_emits_health_only_for_a_component_owner_scope_mismatch()
     assert(no_marker_kind == "runtime_health" and no_marker_sequence == 4)
     assert(not no_marker:match('complete_marker'))
 
-    runtime.set_discovery_adapter(nil)
+    isolated_runtime.set_discovery_adapter(nil)
 end
 
 function cases.runtime_discards_a_frame_that_crosses_a_restarted_pipe_connection()
