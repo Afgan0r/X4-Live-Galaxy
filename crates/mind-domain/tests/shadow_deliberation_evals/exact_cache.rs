@@ -120,11 +120,30 @@ fn sd_006_cached_bytes_revalidate_through_current_state_admission() {
     let (Ok(request), Ok(candidate)) = (request, candidate) else {
         return;
     };
-    let result = revalidate_cached(&request, &MindAggregate::empty(Faction::Arg), &candidate);
+    let result = revalidate_cached(
+        &request,
+        &MindAggregate::empty(Faction::Arg),
+        request.snapshot_identity(),
+        &candidate,
+    );
     assert_eq!(
         result.decision,
         AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState)
     );
     assert!(result.cache_hit);
     assert_eq!(result.validator_outcome, "current_state");
+}
+
+#[test]
+fn same_faction_changed_snapshot_is_rejected_without_a_pending_commit() {
+    let (Ok(request), Ok(candidate)) = (request(), proposal()) else {
+        return;
+    };
+    let prior = MindAggregate::empty(Faction::Zya);
+    let result = revalidate_cached(&request, &prior, "snapshot-zya-2", &candidate);
+    assert_eq!(
+        result.decision,
+        AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState)
+    );
+    assert!(result.decision.pending_commit(&prior).is_none());
 }

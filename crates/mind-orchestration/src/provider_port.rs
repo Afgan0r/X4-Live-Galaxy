@@ -11,7 +11,10 @@ pub enum EvidenceClass {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProviderFailure {
     Timeout,
+    Oversized,
     Transport,
+    Stream,
+    DrainIncomplete,
     Unavailable,
 }
 

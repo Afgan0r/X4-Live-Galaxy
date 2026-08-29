@@ -45,7 +45,7 @@ fn accepted_candidate_uses_one_checkpoint_compare_and_set() {
     assert!(bytes.is_ok());
     let Ok(bytes) = bytes else { return };
     let prior = MindAggregate::empty(Faction::Zya);
-    let decision = admit(&request, &prior, &bytes);
+    let decision = admit(&request, &prior, request.snapshot_identity(), &bytes);
     assert!(matches!(decision, AdmissionDecision::Accepted(_)));
     let AdmissionDecision::Accepted(accepted) = decision else {
         return;
@@ -91,7 +91,13 @@ fn accepted_preemption_persists_full_causal_record_and_replays_exactly() {
     );
     assert!(preemption.is_ok());
     let Ok(preemption) = preemption else { return };
-    let accepted = admit_preemption(&request, &prior, &bytes, preemption.clone());
+    let accepted = admit_preemption(
+        &request,
+        &prior,
+        request.snapshot_identity(),
+        &bytes,
+        preemption.clone(),
+    );
     assert!(accepted.is_ok());
     let Ok(accepted) = accepted else { return };
 
@@ -118,6 +124,9 @@ fn accepted_preemption_persists_full_causal_record_and_replays_exactly() {
     assert!(retry.is_ok());
     assert!(matches!(retry, Ok(record) if !record.compare_and_set_performed));
 }
+
+#[path = "deliberation_checkpoint/stale_preemption.rs"]
+mod stale_preemption;
 
 fn request() -> Result<DeliberationRequest, mind_domain::RequestError> {
     let snapshot = admit_batch(

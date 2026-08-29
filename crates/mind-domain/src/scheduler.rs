@@ -5,8 +5,8 @@ const MAX_EVENT_ID: usize = 128;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FactionTrigger {
     StrategicTick(u64),
-    RelevantEvent(String),
-    Interrupted,
+    RelevantEvent { id: String, observation: u64 },
+    Interrupted(u64),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -102,6 +102,10 @@ impl DeliberationScheduler {
         RequestEligibility::PausedAwaitingReconciliation
     }
 
+    pub const fn complete(&mut self, faction: Faction) {
+        self.factions[index(faction)].outstanding = false;
+    }
+
     pub fn reconcile(&mut self, faction: Faction, observation: u64) -> RequestEligibility {
         let state = &mut self.factions[index(faction)];
         if state.paused_at.is_none_or(|paused| observation <= paused) {
@@ -127,14 +131,16 @@ const fn index(faction: Faction) -> usize {
 
 const fn valid_trigger(trigger: &FactionTrigger) -> bool {
     match trigger {
-        FactionTrigger::StrategicTick(_) | FactionTrigger::Interrupted => true,
-        FactionTrigger::RelevantEvent(id) => !id.is_empty() && id.len() <= MAX_EVENT_ID,
+        FactionTrigger::StrategicTick(value) | FactionTrigger::Interrupted(value) => *value > 0,
+        FactionTrigger::RelevantEvent { id, observation } => {
+            !id.is_empty() && id.len() <= MAX_EVENT_ID && *observation > 0
+        }
     }
 }
 
 const fn tick(trigger: &FactionTrigger) -> u64 {
     match trigger {
-        FactionTrigger::StrategicTick(value) => *value,
-        FactionTrigger::RelevantEvent(_) | FactionTrigger::Interrupted => 0,
+        FactionTrigger::StrategicTick(value) | FactionTrigger::Interrupted(value) => *value,
+        FactionTrigger::RelevantEvent { observation, .. } => *observation,
     }
 }

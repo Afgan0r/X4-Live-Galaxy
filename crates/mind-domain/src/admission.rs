@@ -99,6 +99,7 @@ impl AcceptedProposal {
 pub fn admit(
     request: &DeliberationRequest,
     prior: &MindAggregate,
+    current_snapshot_identity: &str,
     bytes: &[u8],
 ) -> AdmissionDecision {
     if bytes.len() > request.max_candidate_bytes {
@@ -127,7 +128,9 @@ pub fn admit(
     if proposal.trade_offs.len() > request.max_trade_offs {
         return AdmissionDecision::Rejected(AdmissionRejection::Budget);
     }
-    if prior_faction_mismatch(request, prior) {
+    if prior_faction_mismatch(request, prior)
+        || request.snapshot_identity != current_snapshot_identity
+    {
         return AdmissionDecision::Rejected(AdmissionRejection::CurrentState);
     }
     AdmissionDecision::Accepted(Box::new(AcceptedProposal {
@@ -144,9 +147,10 @@ pub fn admit(
 pub fn revalidate_cached(
     request: &DeliberationRequest,
     prior: &MindAggregate,
+    current_snapshot_identity: &str,
     bytes: &[u8],
 ) -> CacheRevalidation {
-    let decision = admit(request, prior, bytes);
+    let decision = admit(request, prior, current_snapshot_identity, bytes);
     let validator_outcome = match &decision {
         AdmissionDecision::Accepted(_) => "accepted",
         AdmissionDecision::Rejected(AdmissionRejection::Oversized) => "oversized",

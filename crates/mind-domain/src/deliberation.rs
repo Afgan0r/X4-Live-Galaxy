@@ -23,6 +23,10 @@ pub enum RequestError {
 }
 
 impl DeliberationRequest {
+    #[must_use]
+    pub fn snapshot_identity(&self) -> &str {
+        &self.snapshot_identity
+    }
     #[expect(
         clippy::too_many_arguments,
         reason = "the frozen request constructor mirrors the versioned boundary"

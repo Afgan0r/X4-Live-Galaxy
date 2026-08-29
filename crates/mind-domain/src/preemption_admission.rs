@@ -30,11 +30,13 @@ impl AcceptedPreemption {
 pub fn admit_preemption(
     request: &DeliberationRequest,
     prior: &MindAggregate,
+    current_snapshot_identity: &str,
     bytes: &[u8],
     preemption: PreemptionRequest,
 ) -> Result<AcceptedPreemption, AdmissionRejection> {
-    let AdmissionDecision::Accepted(accepted) = admit(request, prior, bytes) else {
-        return Err(AdmissionRejection::Semantic);
+    let accepted = match admit(request, prior, current_snapshot_identity, bytes) {
+        AdmissionDecision::Accepted(accepted) => accepted,
+        AdmissionDecision::Rejected(rejection) => return Err(rejection),
     };
     if accepted.command_id() != *preemption.command_id() || !preemption.valid() {
         return Err(AdmissionRejection::Semantic);

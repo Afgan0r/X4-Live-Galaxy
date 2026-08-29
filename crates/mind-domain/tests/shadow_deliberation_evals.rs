@@ -59,7 +59,7 @@ fn sd_002_valid_candidate_creates_pending_commit() {
     assert!(proposal.is_ok());
     let Ok(proposal) = proposal else { return };
     let prior = MindAggregate::empty(Faction::Zya);
-    let decision = admit(&request, &prior, &proposal);
+    let decision = admit(&request, &prior, request.snapshot_identity(), &proposal);
     assert!(matches!(decision, AdmissionDecision::Accepted(_)));
     let AdmissionDecision::Accepted(accepted) = decision else {
         return;
@@ -76,7 +76,12 @@ fn sd_003_malformed_missing_and_unknown_candidates_are_rejected() {
         assert!(request.is_ok());
         let Ok(request) = request else { return };
         assert!(matches!(
-            admit(&request, &MindAggregate::empty(Faction::Zya), candidate),
+            admit(
+                &request,
+                &MindAggregate::empty(Faction::Zya),
+                request.snapshot_identity(),
+                candidate
+            ),
             AdmissionDecision::Rejected(_)
         ));
     }
@@ -91,7 +96,7 @@ fn sd_001_hidden_and_sd_013_forbidden_candidates_have_no_pending_projection() {
         assert!(request.is_ok());
         let Ok(request) = request else { return };
         let prior = MindAggregate::empty(Faction::Zya);
-        let decision = admit(&request, &prior, candidate);
+        let decision = admit(&request, &prior, request.snapshot_identity(), candidate);
         assert!(matches!(decision, AdmissionDecision::Rejected(_)));
         assert!(decision.pending_commit(&prior).is_none());
     }
@@ -105,7 +110,12 @@ fn stale_faction_is_rejected_before_any_pending_commit() {
     let proposal = proposal();
     assert!(proposal.is_ok());
     let Ok(proposal) = proposal else { return };
-    let decision = admit(&request, &MindAggregate::empty(Faction::Arg), &proposal);
+    let decision = admit(
+        &request,
+        &MindAggregate::empty(Faction::Arg),
+        request.snapshot_identity(),
+        &proposal,
+    );
     assert_eq!(
         decision,
         AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState)
@@ -124,8 +134,11 @@ fn sd_007_duplicate_and_interrupted_triggers_keep_one_faction_owner() {
     assert!(matches!(first, RequestEligibility::Eligible(_)));
     for trigger in [
         FactionTrigger::StrategicTick(1),
-        FactionTrigger::RelevantEvent("XEN:threat:XEN".into()),
-        FactionTrigger::Interrupted,
+        FactionTrigger::RelevantEvent {
+            id: "XEN:threat:XEN".into(),
+            observation: 2,
+        },
+        FactionTrigger::Interrupted(2),
     ] {
         assert_eq!(
             scheduler.eligibility(Faction::Zya, trigger),
@@ -153,5 +166,25 @@ fn sd_011_timeout_pauses_until_a_newer_reconciled_observation() {
     assert!(matches!(
         scheduler.reconcile(Faction::Arg, 5),
         RequestEligibility::Reconciled
+    ));
+}
+
+#[test]
+fn completed_tick_allows_a_later_relevant_event() {
+    let mut scheduler = DeliberationScheduler::new(SchedulerBounds::ci());
+    assert!(matches!(
+        scheduler.eligibility(Faction::Zya, FactionTrigger::StrategicTick(4)),
+        RequestEligibility::Eligible(_)
+    ));
+    scheduler.complete(Faction::Zya);
+    assert!(matches!(
+        scheduler.eligibility(
+            Faction::Zya,
+            FactionTrigger::RelevantEvent {
+                id: "XEN:threat:XEN".into(),
+                observation: 6
+            }
+        ),
+        RequestEligibility::Eligible(_)
     ));
 }
