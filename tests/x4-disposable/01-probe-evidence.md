@@ -347,3 +347,25 @@ procedure against `live-galaxy-x4-integration` and `live-galaxy-x4-tests`.
 They already require bounded correlated diagnostics, explicit unsupported
 results, and separately authorized scope expansion; this evidence applies those
 rules without establishing a missing reusable rule.
+
+## Final Transport Reconnect Smoke — 2026-08-29
+
+Attempt `obs-x4-phase1-reconnect-20260829-04` earned
+`observed-in-X4` evidence for the repaired bridge-restart recovery path. It
+does not qualify component-fact discovery, which is deferred to Phase 5.1.
+
+<!-- markdownlint-disable MD013 -->
+
+| Field | Recorded value |
+| --- | --- |
+| Isolated hypothesis | A bridge outage causes the Lua runtime to discard the unsent frame, reset its session, and emit a new generation hello after the replacement bridge becomes available. |
+| Initial bridge admission | Generation `1` hello was accepted by the bridge. |
+| Forced outage | The bridge was stopped while the disposable X4 session remained running. |
+| Lua recovery | The next runtime-health send reported bounded `pipe_reconnect`; Lua reset its session and emitted generation `2` hello while the bridge remained absent. |
+| Replacement bridge admission | After bridge restart, generation `3` hello and heartbeat sequence `1` were accepted. |
+| X4 restart | None during the bridge outage and recovery. |
+| Discovery facts | Out of scope for this smoke; no fact enumeration is claimed. |
+| Save access or modification | `none` |
+| Game-state effect, report, acknowledgement, command, persistence, or model path | `none` |
+
+<!-- markdownlint-enable MD013 -->
