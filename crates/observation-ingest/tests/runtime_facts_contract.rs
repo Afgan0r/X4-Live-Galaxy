@@ -195,10 +195,22 @@ fn complete_canonical_station_scope_reconciles_only_after_strict_admission() {
 #[test]
 fn complete_owner_station_scope_requires_canonical_order_and_all_relationships() {
     let prior = admit_batch(AcceptedProjection::empty(), &[V2_FACTS, MARKER]).into_projection();
-    let accepted = admit_batch(prior.clone(), &[COMPLETE_STATION_SCOPE, COMPLETE_STATION_MARKER])
-        .into_projection();
-    let facts = accepted.runtime_facts("sector:argon_prime").expect("complete scope is accepted");
-    assert_eq!(facts.assets.iter().map(|asset| asset.id.as_str()).collect::<Vec<_>>(), ["asset:station:10", "asset:station:20"]);
+    let accepted = admit_batch(
+        prior.clone(),
+        &[COMPLETE_STATION_SCOPE, COMPLETE_STATION_MARKER],
+    )
+    .into_projection();
+    let facts = accepted
+        .runtime_facts("sector:argon_prime")
+        .expect("complete scope is accepted");
+    assert_eq!(
+        facts
+            .assets
+            .iter()
+            .map(|asset| asset.id.as_str())
+            .collect::<Vec<_>>(),
+        ["asset:station:10", "asset:station:20"]
+    );
 
     let reordered = COMPLETE_STATION_SCOPE.replace(
         r#""x":[{"i":"asset:station:10","p":"sector:argon_prime"},{"i":"asset:station:20","p":"sector:second_contact"}]"#,
