@@ -176,9 +176,12 @@ local function validate_jsonl(jsonl)
     local lines = split_lines(jsonl)
     assert(#lines <= contract.bounds.max_output_rows)
     assert(#jsonl <= contract.bounds.max_total_bytes)
+    local rows = {}
+    local previous_candidate
     for index, line in ipairs(lines) do
         assert(#line <= contract.bounds.max_row_bytes)
         local row = decode_json(line)
+        rows[index] = row
         for _, field in ipairs(contract.required_fields) do assert(row[field] ~= nil, field) end
         assert(row.schema_version == contract.schema_version)
         assert(row.evidence_classification == contract.evidence_classification)
@@ -186,6 +189,18 @@ local function validate_jsonl(jsonl)
         assert(row.digest_algorithm == contract.digest_algorithm)
         assert(#row.record_digest == contract.digest_hex_length)
         assert(row.record_digest == digest_value(row.canonical_digest_payload))
+        local stage_index = ((index - 1) % #contract.stage_order) + 1
+        if stage_index == 1 then
+            assert(row.contract_verdict == "not_run" and row.effect_verdict == "not_run")
+            if previous_candidate ~= nil then assert(previous_candidate < row.candidate_id) end
+            previous_candidate = row.candidate_id
+        elseif stage_index == 2 then
+            assert(row.effect_verdict == "not_run")
+            assert(row.candidate_id == previous_candidate)
+        else
+            assert(row.candidate_id == previous_candidate)
+            if row.effect_verdict == "pass" then assert(row.actual_result == row.expected_result) end
+        end
         local payload = {}
         for key, value in pairs(row) do
             if key ~= "digest_algorithm" and key ~= "canonical_digest_payload" and key ~= "record_digest" then
@@ -194,7 +209,28 @@ local function validate_jsonl(jsonl)
         end
         assert(independent_encode(payload) == row.canonical_digest_payload)
     end
-    return lines
+    return lines, rows
+end
+
+local function successful_candidate(id, actual_result)
+    return {
+        id = id,
+        source = "05.2-RESEARCH.md#phase-05.1-candidate-matrix",
+        expected_result = "expected-result",
+        execute = function()
+            return { actual_result = actual_result or "expected-result", completeness = "complete",
+                work_units = 2, observations = { "observation" } }
+        end,
+        validate = function(result) return type(result) == "table" and result.completeness == "complete" end,
+    }
+end
+
+local function multi_manifest(first)
+    local manifest = phase_051.single_success()
+    manifest.bounds.max_output_rows = 6
+    manifest.bounds.max_total_bytes = 65536
+    manifest.candidates = { successful_candidate("candidate-z-later"), first }
+    return manifest
 end
 
 function cases.emits_one_candidate_as_three_digest_bound_jsonl_stages()
@@ -214,6 +250,100 @@ function cases.emits_one_candidate_as_three_digest_bound_jsonl_stages()
     assert(result.candidate_count == 1)
     assert(result.output_rows == 3)
     assert(result.total_bytes == #jsonl)
+end
+
+function cases.isolates_exceptions_malformed_results_and_work_unit_exhaustion()
+    local failures = {
+        { expected = "execution_exception", execute = function() error("private native text") end },
+        { expected = "malformed_result", execute = function() return "invalid" end },
+        { expected = "work_units_exceeded", execute = function()
+            return { actual_result = "expected-result", completeness = "complete", work_units = 9 }
+        end },
+    }
+    for _, failure in ipairs(failures) do
+        local first = successful_candidate("candidate-a-first")
+        first.execute = failure.execute
+        local jsonl, result = runner.run(multi_manifest(first), execution_context())
+        assert(type(jsonl) == "string", tostring(result))
+        local _, rows = validate_jsonl(jsonl)
+        assert(rows[1].candidate_id == "candidate-a-first")
+        assert(rows[1].execution_verdict == "fail")
+        assert(rows[1].actual_result == failure.expected)
+        assert(rows[1].failure_point == "execution")
+        assert(rows[4].candidate_id == "candidate-z-later")
+        assert(rows[6].effect_verdict == "pass")
+    end
+end
+
+function cases.uses_an_external_timeout_marker_without_invoking_the_stage()
+    local calls = 0
+    local first = successful_candidate("candidate-a-timeout")
+    first.execute = function() calls = calls + 1; return {} end
+    local context = execution_context()
+    context.timeout_markers = { [first.id] = { execution = true } }
+    local jsonl, result = runner.run(multi_manifest(first), context)
+    assert(type(jsonl) == "string", tostring(result))
+    local _, rows = validate_jsonl(jsonl)
+    assert(calls == 0)
+    assert(rows[1].actual_result == "timeout_marker")
+    assert(rows[1].failure_point == "execution")
+    assert(rows[4].candidate_id == "candidate-z-later")
+    assert(rows[6].effect_verdict == "pass")
+end
+
+function cases.never_passes_a_valid_but_unexpected_effect()
+    local manifest = phase_051.single_success()
+    manifest.candidates = { successful_candidate("candidate-unexpected", "valid-unexpected-result") }
+    local jsonl, result = runner.run(manifest, execution_context())
+    assert(type(jsonl) == "string", tostring(result))
+    local _, rows = validate_jsonl(jsonl)
+    assert(rows[3].execution_verdict == "pass")
+    assert(rows[3].contract_verdict == "pass")
+    assert(rows[3].effect_verdict == "mismatch")
+    assert(rows[3].failure_point == "effect")
+end
+
+function cases.rejects_missing_identity_bounds_and_digest_failures_with_exact_codes()
+    local manifest = phase_051.single_success()
+    manifest.run_id = nil
+    assert(select(2, runner.run(manifest, execution_context())) == "run_id_invalid")
+
+    local bound_cases = {
+        { field = "max_steps", value = 2, reason = "stage_row_bound_invalid" },
+        { field = "max_candidate_rows", value = 2, reason = "stage_row_bound_invalid" },
+        { field = "max_output_rows", value = 2, reason = "output_rows_exceeded" },
+        { field = "max_row_bytes", value = 1, reason = "row_bytes_exceeded" },
+        { field = "max_total_bytes", value = 1, reason = "total_bytes_exceeded" },
+    }
+    for _, case in ipairs(bound_cases) do
+        manifest = phase_051.single_success()
+        manifest.bounds[case.field] = case.value
+        assert(select(2, runner.run(manifest, execution_context())) == case.reason)
+    end
+
+    local context = execution_context()
+    context.digest.verify = function() return false end
+    assert(select(2, runner.run(phase_051.single_success(), context)) == "digest_mismatch")
+end
+
+function cases.independent_contract_rejects_collapsed_verdicts_and_noncanonical_order()
+    local jsonl = assert(runner.run(phase_051.single_success(), execution_context()))
+    local lines, rows = validate_jsonl(jsonl)
+    rows[1].contract_verdict = "pass"
+    local payload = {}
+    for key, value in pairs(rows[1]) do
+        if key ~= "digest_algorithm" and key ~= "canonical_digest_payload" and key ~= "record_digest" then
+            payload[key] = value
+        end
+    end
+    rows[1].canonical_digest_payload = independent_encode(payload)
+    rows[1].record_digest = digest_value(rows[1].canonical_digest_payload)
+    lines[1] = independent_encode(rows[1])
+    assert(not pcall(validate_jsonl, table.concat(lines, "\n")))
+
+    lines = split_lines(jsonl)
+    lines[1], lines[2] = lines[2], lines[1]
+    assert(not pcall(validate_jsonl, table.concat(lines, "\n")))
 end
 
 return cases
