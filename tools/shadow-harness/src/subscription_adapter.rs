@@ -1,45 +1,46 @@
+use crate::process::BenchmarkProcess;
 use mind_orchestration::{EvidenceClass, ProviderFailure, ProviderRequest, ShadowProvider};
-use std::process::Command;
-
-const MAX_OUTPUT_BYTES: usize = 65_536;
-const TIMEOUT_MILLIS: u64 = 30_000;
 
 #[derive(Debug)]
-pub struct SubscriptionAdapter {
-    available: bool,
+pub struct SubscriptionAdapter<P> {
+    process: Option<P>,
 }
 
-impl SubscriptionAdapter {
+impl<P> SubscriptionAdapter<P> {
     #[must_use]
     pub const fn unavailable() -> Self {
-        Self { available: false }
+        Self { process: None }
+    }
+
+    #[must_use]
+    pub const fn for_explicit_benchmark(process: P) -> Self {
+        Self {
+            process: Some(process),
+        }
     }
 
     pub const fn preflight(&self) -> Result<(), ProviderFailure> {
-        if self.available {
+        if self.process.is_some() {
             Ok(())
         } else {
             Err(ProviderFailure::Unavailable)
         }
     }
+}
 
-    pub fn explicit_benchmark(&mut self, request: &ProviderRequest) -> Result<Vec<u8>, ProviderFailure> {
-        self.preflight()?;
-        let output = Command::new("codex")
-            .args(["exec", "--json", "--output-schema", "schema.json", request.identity()])
-            .output()
-            .map_err(|_| ProviderFailure::Unavailable)?;
-        if !output.status.success() {
-            return Err(ProviderFailure::Transport);
-        }
-        if output.stdout.len() > MAX_OUTPUT_BYTES || TIMEOUT_MILLIS == 0 {
-            return Err(ProviderFailure::Timeout);
-        }
-        Ok(output.stdout)
+impl<P: BenchmarkProcess> SubscriptionAdapter<P> {
+    pub fn explicit_benchmark(
+        &mut self,
+        request: &ProviderRequest,
+    ) -> Result<Vec<u8>, ProviderFailure> {
+        let Some(process) = self.process.as_mut() else {
+            return Err(ProviderFailure::Unavailable);
+        };
+        process.invoke(request.identity())
     }
 }
 
-impl ShadowProvider for SubscriptionAdapter {
+impl<P: BenchmarkProcess> ShadowProvider for SubscriptionAdapter<P> {
     fn propose(&mut self, request: &ProviderRequest) -> Result<Vec<u8>, ProviderFailure> {
         self.explicit_benchmark(request)
     }

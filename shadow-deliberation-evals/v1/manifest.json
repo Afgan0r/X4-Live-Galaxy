@@ -1,25 +1,18 @@
-{
-  "version": "v1",
-  "schema_version": "schema-v1",
-  "policy_version": "policy-v1",
-  "prompt_package_hash": "prompt-v1",
-  "cases": [
-    {"id":"SD-001","fixture_hash":"fixture-sd-001","expected":"reject-information","evidence_class":"ci"},
-    {"id":"SD-002","fixture_hash":"fixture-sd-002","expected":"accept","evidence_class":"ci"},
-    {"id":"SD-003","fixture_hash":"fixture-sd-003","expected":"reject-decode","evidence_class":"ci"},
-    {"id":"SD-004","fixture_hash":"fixture-sd-004","expected":"reject-semantic","evidence_class":"ci"},
-    {"id":"SD-005","fixture_hash":"fixture-sd-005","expected":"reject-unbounded-request","evidence_class":"ci"},
-    {"id":"SD-006","fixture_hash":"fixture-sd-006","expected":"exact-cache-revalidate","evidence_class":"ci"},
-    {"id":"SD-007","fixture_hash":"fixture-sd-007","expected":"one-outstanding-coalesced","evidence_class":"ci"},
-    {"id":"SD-008","fixture_hash":"fixture-sd-008","expected":"zero-cycle","evidence_class":"ci"},
-    {"id":"SD-009","fixture_hash":"fixture-sd-009","expected":"two-cycle-cap","evidence_class":"ci"},
-    {"id":"SD-010-maintain","fixture_hash":"fixture-sd-010-maintain","expected":"accept-shadow-posture","evidence_class":"ci"},
-    {"id":"SD-010-de-escalate","fixture_hash":"fixture-sd-010-de-escalate","expected":"accept-shadow-posture","evidence_class":"ci"},
-    {"id":"SD-010-intensify","fixture_hash":"fixture-sd-010-intensify","expected":"accept-shadow-posture","evidence_class":"ci"},
-    {"id":"SD-010-coordinate","fixture_hash":"fixture-sd-010-coordinate","expected":"accept-visible-threat-posture","evidence_class":"ci"},
-    {"id":"SD-010-reject","fixture_hash":"fixture-sd-010-reject","expected":"reject-external-shadow-posture","evidence_class":"ci"},
-    {"id":"SD-011","fixture_hash":"fixture-sd-011","expected":"pause-reconcile-retained","evidence_class":"ci"},
-    {"id":"SD-012","fixture_hash":"fixture-sd-012","expected":"manual-benchmark","evidence_class":"benchmark"},
-    {"id":"SD-013","fixture_hash":"fixture-sd-013","expected":"reject-safety","evidence_class":"ci"}
-  ]
-}
+{"version":"v1","schema_version":"schema-v1","schema_path":"schema.json","schema_digest":"bytes-v1:76e1bf8fb238f6ff","cases":[
+{"id":"SD-001","fixture_path":"fixtures/SD-001.json","fixture_digest":"bytes-v1:ec3adb244da05b54","expected":"reject-information","evidence_class":"ci"},
+{"id":"SD-002","fixture_path":"fixtures/SD-002.json","fixture_digest":"bytes-v1:15ea694999fa9d55","expected":"accept","evidence_class":"ci"},
+{"id":"SD-003","fixture_path":"fixtures/SD-003.json","fixture_digest":"bytes-v1:bc5abc990ba36f96","expected":"reject-decode","evidence_class":"ci"},
+{"id":"SD-004","fixture_path":"fixtures/SD-004.json","fixture_digest":"bytes-v1:2a726a79cd657f17","expected":"reject-semantic","evidence_class":"ci"},
+{"id":"SD-005","fixture_path":"fixtures/SD-005.json","fixture_digest":"bytes-v1:9e7729e61d24b7c0","expected":"reject-unbounded-request","evidence_class":"ci"},
+{"id":"SD-006","fixture_path":"fixtures/SD-006.json","fixture_digest":"bytes-v1:90f75429d12f0fd1","expected":"exact-cache-revalidate","evidence_class":"ci"},
+{"id":"SD-007","fixture_path":"fixtures/SD-007.json","fixture_digest":"bytes-v1:3a69fa63a96d92f2","expected":"one-outstanding-coalesced","evidence_class":"ci"},
+{"id":"SD-008","fixture_path":"fixtures/SD-008.json","fixture_digest":"bytes-v1:e58b0828678da2a3","expected":"zero-cycle","evidence_class":"ci"},
+{"id":"SD-009","fixture_path":"fixtures/SD-009.json","fixture_digest":"bytes-v1:5af37fd6172eba9c","expected":"two-cycle-cap","evidence_class":"ci"},
+{"id":"SD-010-maintain","fixture_path":"fixtures/SD-010-maintain.json","fixture_digest":"bytes-v1:9247a27581cccae0","expected":"accept-shadow-posture","evidence_class":"ci"},
+{"id":"SD-010-de-escalate","fixture_path":"fixtures/SD-010-de-escalate.json","fixture_digest":"bytes-v1:250e1159aa807d3d","expected":"accept-shadow-posture","evidence_class":"ci"},
+{"id":"SD-010-intensify","fixture_path":"fixtures/SD-010-intensify.json","fixture_digest":"bytes-v1:6031bf267cfcf628","expected":"accept-shadow-posture","evidence_class":"ci"},
+{"id":"SD-010-coordinate","fixture_path":"fixtures/SD-010-coordinate.json","fixture_digest":"bytes-v1:293770c511241c33","expected":"accept-visible-threat-posture","evidence_class":"ci"},
+{"id":"SD-010-reject","fixture_path":"fixtures/SD-010-reject.json","fixture_digest":"bytes-v1:0692e86e72f9fd1e","expected":"reject-external-shadow-posture","evidence_class":"ci"},
+{"id":"SD-011","fixture_path":"fixtures/SD-011.json","fixture_digest":"bytes-v1:9a70a8638b3e7321","expected":"pause-reconcile-retained","evidence_class":"ci"},
+{"id":"SD-012","fixture_path":"fixtures/SD-012.json","fixture_digest":"bytes-v1:89f33eb68c8776cd","expected":"manual-benchmark","evidence_class":"benchmark"},
+{"id":"SD-013","fixture_path":"fixtures/SD-013.json","fixture_digest":"bytes-v1:1828891be7639627","expected":"reject-safety","evidence_class":"ci"}]}

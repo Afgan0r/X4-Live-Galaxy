@@ -1,4 +1,6 @@
 fn main() {
-    let benchmark_requested = std::env::args().nth(1).as_deref() == Some("--benchmark");
-    std::hint::black_box(benchmark_requested);
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    if shadow_harness::run_cli(&args, shadow_harness::CodexProcess).is_err() {
+        std::process::exit(2);
+    }
 }

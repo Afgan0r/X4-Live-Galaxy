@@ -109,7 +109,12 @@ dependencies = [
 name = "shadow-harness"
 version = "0.1.0"
 dependencies = [
+ "mind-domain",
  "mind-orchestration",
+ "observation-ingest",
+ "serde",
+ "serde_json",
+ "strategic-state",
 ]
 
 [[package]]
