@@ -272,8 +272,14 @@ owner approval.
   user authorization; remove or locally ignore disposable artifacts instead.
   Preserve pre-existing user changes and never stage or absorb them into an
   agent commit.
-- Do not commit or push unless explicitly requested. The initial empty-repository
-  bootstrap is explicitly authorized for direct commit and push to `master`.
+- A clear user authorization to carry out a durable repository change includes
+  staging and committing the agent-created files after required verification,
+  unless the user excludes committing, the work is incomplete, or the active
+  workflow defines another commit lifecycle. Push still requires explicit
+  authorization.
+- Do not commit or push unless explicitly requested or covered by the durable
+  change authorization above. The initial empty-repository bootstrap is
+  explicitly authorized for direct commit and push to `master`.
 - Never commit runtime state, saves, databases, logs, credentials, generated
   agent routing, build output, or local settings.
 - Use the global `git-commit` skill for every commit.
