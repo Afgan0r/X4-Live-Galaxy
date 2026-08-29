@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod admission;
+mod cache_identity;
 mod causal;
 mod checkpoint;
 mod deliberation;
@@ -10,7 +11,11 @@ mod ledger;
 mod mind;
 mod restore;
 
-pub use admission::{AcceptedProposal, AdmissionDecision, AdmissionRejection, admit};
+pub use admission::{
+    AcceptedProposal, AdmissionDecision, AdmissionRejection, CacheRevalidation, admit,
+    revalidate_cached,
+};
+pub use cache_identity::{BoundsError, ExactCacheKey, RequestBounds};
 pub use causal::{CausalEvent, CausalKind};
 pub use checkpoint::{MIND_CHECKPOINT_SCHEMA_VERSION, MindCheckpointError, MindCheckpointState};
 pub use deliberation::{DeliberationRequest, RequestError, ShadowProposal};

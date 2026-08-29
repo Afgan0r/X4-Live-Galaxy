@@ -33,6 +33,13 @@ pub enum AdmissionRejection {
     CurrentState,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CacheRevalidation {
+    pub cache_hit: bool,
+    pub decision: AdmissionDecision,
+    pub validator_outcome: &'static str,
+}
+
 impl AdmissionDecision {
     #[must_use]
     pub fn pending_commit(
@@ -131,6 +138,31 @@ pub fn admit(
         prompt_package_hash: request.prompt_package_hash.clone(),
         candidate_bytes: bytes.len(),
     }))
+}
+
+#[must_use]
+pub fn revalidate_cached(
+    request: &DeliberationRequest,
+    prior: &MindAggregate,
+    bytes: &[u8],
+) -> CacheRevalidation {
+    let decision = admit(request, prior, bytes);
+    let validator_outcome = match &decision {
+        AdmissionDecision::Accepted(_) => "accepted",
+        AdmissionDecision::Rejected(AdmissionRejection::Oversized) => "oversized",
+        AdmissionDecision::Rejected(AdmissionRejection::Decode) => "decode",
+        AdmissionDecision::Rejected(AdmissionRejection::Schema) => "schema",
+        AdmissionDecision::Rejected(AdmissionRejection::Semantic) => "semantic",
+        AdmissionDecision::Rejected(AdmissionRejection::Information) => "information",
+        AdmissionDecision::Rejected(AdmissionRejection::Safety) => "safety",
+        AdmissionDecision::Rejected(AdmissionRejection::Budget) => "budget",
+        AdmissionDecision::Rejected(AdmissionRejection::CurrentState) => "current_state",
+    };
+    CacheRevalidation {
+        cache_hit: true,
+        decision,
+        validator_outcome,
+    }
 }
 
 fn semantic_valid(proposal: &ShadowProposal) -> bool {
