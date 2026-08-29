@@ -154,17 +154,21 @@ local function normalize_outcome(value, bounds)
         and completeness ~= "not_applicable" then return nil, "completeness_invalid" end
     local observations = copy_sorted_strings(value.observations or {}, bounds.max_observations_per_step)
     if observations == nil then return nil, "observations_invalid" end
+    local seta_state = value.seta_state or "not_applicable"
+    if seta_state ~= "active" and seta_state ~= "inactive" and seta_state ~= "unknown"
+        and seta_state ~= "not_applicable" then return nil, "seta_state_invalid" end
     local work_units = value.work_units or 0
     if type(work_units) ~= "number" or work_units % 1 ~= 0 or work_units < 0
         or work_units > bounds.max_work_units_per_step then return nil, "work_units_exceeded" end
     for _, field in ipairs({ "elapsed_real_ms", "elapsed_game_ms" }) do
         local number = value[field] or 0
-        if type(number) ~= "number" or number % 1 ~= 0 or number < 0 then return nil, field .. "_invalid" end
+        if type(number) ~= "number" or number % 1 ~= 0 or number < 0
+            or number > 9007199254740991 then return nil, field .. "_invalid" end
     end
     return {
         actual_result = value.actual_result, completeness = completeness,
         elapsed_real_ms = value.elapsed_real_ms or 0, elapsed_game_ms = value.elapsed_game_ms or 0,
-        seta_state = value.seta_state or "not_applicable", work_units = work_units,
+        seta_state = seta_state, work_units = work_units,
         observation_count = #observations,
     }
 end
@@ -174,7 +178,8 @@ local function ordered_candidates(candidates)
     for _, candidate in ipairs(candidates) do
         if type(candidate) ~= "table" or not valid_string(candidate.id) or seen[candidate.id]
             or not valid_string(candidate.source) or not valid_string(candidate.expected_result)
-            or type(candidate.execute) ~= "function" or type(candidate.validate) ~= "function" then
+            or type(candidate.execute) ~= "function" or type(candidate.validate) ~= "function"
+            or (candidate.assess ~= nil and type(candidate.assess) ~= "function") then
             return nil, "candidate_invalid"
         end
         seen[candidate.id] = true
@@ -188,6 +193,13 @@ local function execute_candidate(candidate, context, bounds)
     local state = { actual_result = "not_run", completeness = "unknown", failure_point = "none",
         execution_verdict = "not_run", contract_verdict = "not_run", effect_verdict = "not_run" }
     local outcomes = {}
+    local timeout_markers = type(context.timeout_markers) == "table" and context.timeout_markers or {}
+    local candidate_timeouts = type(timeout_markers[candidate.id]) == "table" and timeout_markers[candidate.id] or {}
+    if candidate_timeouts.execution == true then
+        state.execution_verdict, state.failure_point, state.actual_result = "fail", "execution", "timeout_marker"
+        outcomes.execution = {}
+        return state, outcomes
+    end
     local ok, raw = pcall(candidate.execute, context)
     if not ok then
         state.execution_verdict, state.failure_point, state.actual_result = "fail", "execution", "execution_exception"
@@ -203,15 +215,33 @@ local function execute_candidate(candidate, context, bounds)
     state.execution_verdict = "pass"
     state.actual_result, state.completeness = outcome.actual_result, outcome.completeness
     outcomes.execution = outcome
-    local contract_ok, valid = pcall(candidate.validate, raw)
     outcomes.contract = { work_units = 1 }
+    if candidate_timeouts.contract == true then
+        state.contract_verdict, state.failure_point, state.actual_result = "fail", "contract", "timeout_marker"
+        return state, outcomes
+    end
+    local contract_ok, valid = pcall(candidate.validate, raw)
     if not contract_ok or valid ~= true then
         state.contract_verdict, state.failure_point = "fail", "contract"
         return state, outcomes
     end
     state.contract_verdict = "pass"
     outcomes.effect = { work_units = 1 }
-    state.effect_verdict = state.actual_result == candidate.expected_result and "pass" or "mismatch"
+    if candidate_timeouts.effect == true then
+        state.effect_verdict, state.failure_point, state.actual_result = "fail", "effect", "timeout_marker"
+        return state, outcomes
+    end
+    local effect_ok, matches
+    if candidate.assess ~= nil then
+        effect_ok, matches = pcall(candidate.assess, raw, candidate.expected_result)
+    else
+        effect_ok, matches = true, state.actual_result == candidate.expected_result
+    end
+    if not effect_ok then
+        state.effect_verdict, state.failure_point, state.actual_result = "fail", "effect", "effect_exception"
+        return state, outcomes
+    end
+    state.effect_verdict = matches == true and "pass" or "mismatch"
     if state.effect_verdict ~= "pass" then state.failure_point = "effect" end
     return state, outcomes
 end

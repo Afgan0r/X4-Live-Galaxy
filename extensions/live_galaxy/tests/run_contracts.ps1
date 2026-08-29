@@ -22,7 +22,7 @@ if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
 if ($Suite -in @('all', 'x4-package-conformance', 'x4-verification')) {
     & pwsh -NoProfile -File $packageConformanceContract -Case packaged-path
     if ($LASTEXITCODE -ne 0) { throw 'X4 package conformance contract failed.' }
-    if ($Suite -ne 'all') {
+    if ($Suite -eq 'x4-package-conformance') {
         exit 0
     }
 }
@@ -107,7 +107,7 @@ $tests = if ($Suite -eq 'x4_discovery') {
     @('x4_discovery_contract.lua')
 } elseif ($Suite -eq 'component_discovery') {
     @('component_discovery_contract.lua')
-} elseif ($Suite -eq 'x4-candidate-runner') {
+} elseif ($Suite -in @('x4-candidate-runner', 'x4-verification')) {
     @('x4_candidate_runner_contract.lua')
 } else {
     Get-ChildItem $PSScriptRoot -Filter '*_contract.lua' | ForEach-Object Name
