@@ -8,6 +8,23 @@ description: Convert verified Live Galaxy implementation lessons into minimal du
 Use this skill after completed implementation, verification, debugging, or
 review reveals a reusable project rule or a defect in a project-local skill.
 
+## Mandatory Completion Gate
+
+Before declaring an implementation, debugging, verification, or review task
+complete, inspect its deviations, failed probes, review findings, and changed
+rules. Record one of these outcomes in the task's existing summary, review, or
+verification output; do not create a separate learning artifact:
+
+- `Skill learning: none` — name the evidence considered and why it does not
+  establish a reusable lesson.
+- `Skill learning candidate` — name the evidence, single owning project skill,
+  existing-rule check, minimal proposed rule, and whether owner approval is
+  required or obtained.
+
+Repeated violations of an existing rule are a workflow-enforcement candidate,
+not a reason to duplicate that rule. A candidate remains open until the owner
+approves it or explicitly defers it; never silently discard it.
+
 ## Gate
 
 A lesson is durable only when it is supported by repository evidence, a
@@ -35,5 +52,6 @@ Before editing a skill:
 
 ## Verify
 
-Run the shared skill validator, format Markdown, re-read the changed rule, and
-confirm that a future agent can determine when it applies and how to verify it.
+Format the changed Markdown, run `git diff --check`, re-read the changed rule,
+and confirm that a future agent can determine when it applies and how to verify
+it.

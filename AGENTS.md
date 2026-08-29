@@ -44,8 +44,13 @@ acting:
 - `.agents/skills/live-galaxy-code-review/SKILL.md` for code review.
 - `.agents/skills/live-galaxy-x4-integration/SKILL.md` for X4 XML, Mission
   Director, Lua, game-data, installed-mod, or compatibility work.
-- `.agents/skills/live-galaxy-skill-evolution/SKILL.md` when completed work
-  reveals a reusable project rule or a skill defect.
+- `.agents/skills/live-galaxy-skill-evolution/SKILL.md` at the end of every
+  completed implementation, debugging, verification, or review task. The task
+  output must state `Skill learning: none` with the evidence considered, or a
+  candidate naming the evidence, single owning project skill, minimal proposed
+  rule, and approval status. Do not declare the task complete without this
+  gate. New behavioral rules require explicit owner approval; objective
+  corrections remain evidence-gated.
 
 Use the global `lua` skill for Lua changes, `mcp-builder` for MCP contract work,
 and `openai-docs` for current OpenAI API or model behavior. Current official
