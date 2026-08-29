@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'x4_discovery', 'component_discovery_guard')]
+    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard')]
     [string]$Suite = 'all',
     [string]$LuaPath
 )
@@ -11,6 +11,11 @@ if ($Suite -eq 'component_discovery_guard') {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -SelfTest
     if ($LASTEXITCODE -ne 0) { throw 'Component discovery package guard failed.' }
     exit 0
+}
+
+if ($Suite -eq 'component_discovery') {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_binding_contract.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Component discovery binding contract failed.' }
 }
 
 $lockPath = Join-Path $root 'tools/lua-runner.lock.json'
@@ -70,6 +75,8 @@ if ($null -eq $lua) {
 
 $tests = if ($Suite -eq 'x4_discovery') {
     @('x4_discovery_contract.lua')
+} elseif ($Suite -eq 'component_discovery') {
+    @('component_discovery_contract.lua')
 } else {
     Get-ChildItem $PSScriptRoot -Filter '*_contract.lua' | ForEach-Object Name
 }

@@ -1,0 +1,61 @@
+package.path = package.path .. ";extensions/live_galaxy/lua/?.lua"
+
+local discovery = require("live_galaxy_component_discovery")
+local telemetry = require("live_galaxy_telemetry")
+local cases = {}
+
+local function fake_api(count)
+    local calls = { convert = 0, metadata = 0, capacity = 0 }
+    local stations = { "station:20", "station:10" }
+    return {
+        count_stations = function() return count or #stations end,
+        fill_stations = function(_, buffer, size)
+            for index = 1, size do buffer[index] = stations[index] end
+            return size
+        end,
+        stable_id = function(_, station)
+            calls.convert = calls.convert + 1
+            return station:match("%d+")
+        end,
+        get_component_data = function(_, station)
+            calls.metadata = calls.metadata + 1
+            return station == "station:10" and "faction:argon" or "faction:antigone",
+                station == "station:10" and "sector:argon_prime" or "sector:second_contact"
+        end,
+        get_people_capacity = function(_, station)
+            calls.capacity = calls.capacity + 1
+            return station == "station:10" and 42 or 24
+        end,
+    }, calls
+end
+
+function cases.validates_the_complete_owner_scope_before_component_reads()
+    local api, calls = fake_api(17)
+    local observation, err = discovery.new(api).read_observation(1)
+
+    assert(observation == nil)
+    assert(err == "enumeration_overflow")
+    assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
+end
+
+function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
+    local api, calls = fake_api()
+    local observation = assert(discovery.new(api).read_observation(1))
+    local facts = observation.runtime_facts
+
+    assert(observation.entity_id == "sector:argon_prime")
+    assert(facts.assets[1].id == "asset:station:10")
+    assert(facts.assets[2].id == "asset:station:20")
+    assert(calls.convert == 2 and calls.metadata == 2 and calls.capacity == 2)
+end
+
+function cases.suppresses_every_invalid_stage_without_partial_observation()
+    local api = fake_api()
+    api.fill_stations = function() return 1 end
+    local payload, err = telemetry.produce_observation(discovery.new(api))
+
+    assert(payload == nil)
+    assert(err == "enumeration_incomplete")
+end
+
+return cases
