@@ -11,6 +11,7 @@ mod ledger;
 mod mind;
 mod request_bounds;
 mod restore;
+mod scheduler;
 
 pub use admission::{
     AcceptedProposal, AdmissionDecision, AdmissionRejection, CacheRevalidation, admit,
@@ -27,4 +28,5 @@ pub use initiative::{
 pub use ledger::PendingInitiativeCommit;
 pub use mind::{CommandId, MindAggregate, MindCommand, MindError, PendingMindCommit, transition};
 pub use request_bounds::{BoundsError, RequestBounds};
+pub use scheduler::{DeliberationScheduler, FactionTrigger, RequestEligibility, SchedulerBounds};
 pub use strategic_state::Capability;
