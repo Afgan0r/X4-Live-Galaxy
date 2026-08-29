@@ -51,7 +51,7 @@ local function fake_api(count)
 end
 
 function cases.validates_the_complete_owner_scope_before_component_reads()
-    local api, calls = fake_api(17)
+    local api, calls = fake_api(65)
     local observation, err = discovery.new(api).read_observation(1)
 
     assert(observation == nil)
@@ -60,14 +60,15 @@ function cases.validates_the_complete_owner_scope_before_component_reads()
     assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
 end
 
-function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
+function cases.emits_sorted_real_station_frames_only_after_all_members_validate()
     local api, calls = fake_api()
-    local observation = assert(discovery.new(api).read_observation(1))
-    local facts = observation.runtime_facts
+    local observations = assert(discovery.new(api).read_observations(1))
+    local first, second = observations[1].runtime_facts, observations[2].runtime_facts
 
-    assert(observation.entity_id == "sector:argon_prime")
-    assert(facts.assets[1].id == "asset:station:10")
-    assert(facts.assets[2].id == "asset:station:20")
+    assert(observations[1].entity_id == "asset:station:10")
+    assert(observations[2].entity_id == "asset:station:20")
+    assert(first.assets[1].id == "asset:station:10")
+    assert(second.assets[1].id == "asset:station:20")
     assert(calls.convert == 2 and calls.convert64 == 2 and calls.metadata == 2 and calls.capacity == 2)
     assert(calls.order[1] == "convert" and calls.order[2] == "convert64")
     assert(calls.order[3] == "convert" and calls.order[4] == "convert64")
@@ -90,21 +91,57 @@ function cases.uses_a_native_faction_token_and_canonicalizes_owner_facts()
     api.get_component_data = function() return "argon", "sector:argon_prime" end
     api.canonical_owner_id = function(_, owner_id) return "faction:" .. owner_id end
 
-    local observation = assert(discovery.new(api).read_observation(1))
+    local observation = assert(discovery.new(api).read_observations(1))[1]
 
     assert(counted_faction == "argon")
     assert(filled_faction == "argon")
     assert(observation.runtime_facts.ownership[1].owner_id == "faction:argon")
 end
 
-function cases.serializes_the_existing_compact_station_envelope()
+function cases.serializes_each_station_in_its_own_compact_envelope()
     local api = fake_api()
-    local payload = assert(telemetry.produce_observation(discovery.new(api), 3))
+    local payloads = assert(telemetry.produce_observations(discovery.new(api), 3))
+    local payload = payloads[1]
 
-    assert(payload:match('"entity_id":"sector:argon_prime"'))
-    assert(payload:match('"x":%[{"i":"asset:station:10","p":"sector:argon_prime"},{"i":"asset:station:20","p":"sector:second_contact"}%]'))
-    assert(payload:match('"c":%[{"i":"capacity:station:10","p":"asset:station:10","v":42},{"i":"capacity:station:20","p":"asset:station:20","v":24}%]'))
-    assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"},{"i":"ownership:station:20","p":"asset:station:20","n":"faction:argon"}%]'))
+    assert(#payloads == 2)
+    assert(payload:match('"entity_id":"asset:station:10"'))
+    assert(#payload <= 1800)
+    assert(payload:match('"x":%[{"i":"asset:station:10","p":"sector:argon_prime"}%]'))
+    assert(payload:match('"c":%[{"i":"capacity:station:10","p":"asset:station:10","v":42}%]'))
+    assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"}%]'))
+end
+
+function cases.accepts_the_new_64_station_bound_without_aggregate_frames()
+    local stations = {}
+    for index = 1, 64 do stations[index] = string.format("station:%02d", index) end
+    local api = {
+        faction_id = "faction:argon",
+        count_stations = function() return #stations end,
+        new_buffer = function() return {} end,
+        fill_stations = function(_, buffer)
+            for index, station in ipairs(stations) do buffer[index - 1] = station end
+            return #stations
+        end,
+        to_component = function(_, station) return station end,
+        to_component64 = function(_, station) return station:match("%d+") end,
+        get_component_data = function(_, station)
+            return "faction:argon", "sector:station_" .. station:match("%d+")
+        end,
+        get_people_capacity = function() return 1 end,
+    }
+
+    local observations = assert(discovery.new(api).read_observations(4))
+
+    assert(#observations == 64)
+    assert(observations[1].entity_id == "asset:station:01")
+    assert(observations[64].entity_id == "asset:station:64")
+    for _, observation in ipairs(observations) do
+        assert(#observation.runtime_facts.assets == 1)
+        assert(#observation.runtime_facts.capacity == 1)
+        assert(#observation.runtime_facts.ownership == 1)
+    end
+    local payloads = assert(telemetry.produce_observations(discovery.new(api), 4))
+    for _, payload in ipairs(payloads) do assert(#payload <= 1800) end
 end
 
 function cases.rejects_a_syntactically_valid_owner_outside_the_declared_scope()
@@ -186,7 +223,7 @@ function cases.clears_the_closed_diagnostic_class_after_a_successful_retry()
     api.get_people_capacity = function(_, component64)
         return component64 == "10" and 42 or 24
     end
-    assert(adapter.read_observation(1) ~= nil)
+    assert(adapter.read_observations(1) ~= nil)
     assert(adapter.diagnostic_class() == nil)
 end
 
@@ -269,7 +306,7 @@ function cases.normalizes_native_count_and_fill_before_validation()
         return "2"
     end
 
-    local observation = assert(discovery.new(api).read_observation(1))
+    local observation = assert(discovery.new(api).read_observations(1))[1]
 
     assert(observation.runtime_facts.assets[1].id == "asset:station:10")
 end

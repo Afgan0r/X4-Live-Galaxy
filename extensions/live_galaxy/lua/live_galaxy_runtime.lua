@@ -110,8 +110,13 @@ end
 
 local generation, sequence, observation_version, connected = 0, 0, 1, false
 local discovery_incomplete = false
+local discovery_frames, discovery_frame_index
 local MAX_COUNTER = 9007199254740991
 local discovery_adapter
+
+local function discard_discovery_frames()
+    discovery_frames, discovery_frame_index = nil, nil
+end
 
 local function payload(kind, extra)
     if sequence == MAX_COUNTER then return nil end
@@ -125,17 +130,30 @@ function runtime.next_payload()
         generation, sequence, connected = generation + 1, 0, true
         return '{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":' .. generation .. '}', "hello", generation, 0
     end
+    if discovery_frames then
+        if discovery_frame_index <= #discovery_frames then
+            local frame = discovery_frames[discovery_frame_index]
+            discovery_frame_index = discovery_frame_index + 1
+            return payload("observation", "," .. frame:sub(2, -2))
+        end
+        discard_discovery_frames()
+        local marker, kind, current_generation, current_sequence = payload("complete_marker", "")
+        if marker ~= nil and observation_version < MAX_COUNTER then observation_version = observation_version + 1 end
+        return marker, kind, current_generation, current_sequence
+    end
     local step = (sequence % 4) + 1
     if step == 1 then return payload("heartbeat", "") end
     if step == 2 then return payload("runtime_health", ',"status":"available"') end
     if step == 3 then
         local adapter = discovery_adapter or discovery.new_runtime_adapter()
-        local body = runtime.produce_discovery_payload(adapter, observation_version)
-        if body == nil then
+        local frames, err = telemetry.produce_observations(adapter, observation_version)
+        if frames == nil then
+            trace("discovery_unavailable", tostring(err))
             discovery_incomplete = true
             return payload("runtime_health", ',"status":"unavailable"')
         end
-        return payload("observation", "," .. body)
+        discovery_frames, discovery_frame_index = frames, 2
+        return payload("observation", "," .. frames[1]:sub(2, -2))
     end
     if discovery_incomplete then
         discovery_incomplete = false
@@ -185,6 +203,7 @@ function runtime.handle_tick()
     local ok, status = runtime.emit(value)
     if not ok and (status == "pipe_unavailable" or status == "pipe_reconnect") then
         connected = false
+        discard_discovery_frames()
     end
     trace("telemetry_tick", "status=" .. status, true)
     return ok, status

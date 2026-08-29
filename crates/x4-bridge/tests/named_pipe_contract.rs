@@ -16,6 +16,12 @@ fn observation(version: u64, sequence: u64) -> String {
     )
 }
 
+fn station_observation(station: u64, sector: &str, sequence: u64) -> String {
+    format!(
+        r#"{{"type":"observation","scope":"runtime:sectors","entity_id":"asset:station:{station}","version":2,"quality":"fresh","runtime_facts":{{"r":"x4_runtime","q":"fresh","a":"available","s":[{{"i":"{sector}"}}],"x":[{{"i":"asset:station:{station}","p":"{sector}"}}],"c":[{{"i":"capacity:station:{station}","p":"asset:station:{station}","v":42}}],"o":[{{"i":"ownership:station:{station}","p":"asset:station:{station}","n":"faction:argon"}}]}},"generation":1,"sequence":{sequence}}}"#
+    )
+}
+
 #[test]
 fn project_pipe_identity_and_typed_batch_admission_are_aligned() {
     let mut server = PipeServer::new();
@@ -59,6 +65,24 @@ fn disconnect_or_conflicting_marker_discards_only_the_pending_snapshot() {
         PipeDisposition::Rejected
     );
     assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
+}
+
+#[test]
+fn station_frames_remain_pending_until_one_matching_marker() {
+    let mut server = PipeServer::new();
+    let first = station_observation(10, "sector:argon_prime", 1);
+    let second = station_observation(20, "sector:second_contact", 2);
+    let marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":3}"#;
+
+    assert_eq!(server.admit_message(HELLO), PipeDisposition::Accepted);
+    assert_eq!(server.admit_message(&first), PipeDisposition::Accepted);
+    assert_eq!(server.admit_message(&second), PipeDisposition::Accepted);
+    assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
+    assert_eq!(server.admit_message(marker), PipeDisposition::Accepted);
+    assert_eq!(
+        server.snapshot().entity_ids(),
+        vec!["asset:station:10", "asset:station:20"]
+    );
 }
 
 #[test]

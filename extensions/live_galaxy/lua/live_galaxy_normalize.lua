@@ -57,7 +57,8 @@ local function normalize_runtime_facts(raw, entity_id)
         or not sorted_unique(raw.assets, "id")
         or not sorted_unique(raw.capacity, "id")
         or not sorted_unique(raw.ownership, "id")
-        or not has_item(raw.sectors, "id", entity_id) then
+        or (not has_item(raw.sectors, "id", entity_id)
+            and not has_item(raw.assets, "id", entity_id)) then
         return nil, "runtime_facts_invalid"
     end
     for _, item in ipairs(raw.assets) do

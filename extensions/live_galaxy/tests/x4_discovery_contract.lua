@@ -290,6 +290,78 @@ function cases.runtime_wraps_discovery_without_the_retired_probe_payload()
     assert(not body:match("sector:live_galaxy"))
 end
 
+function cases.runtime_keeps_multiple_station_frames_atomic_before_the_marker()
+    local isolated_runtime = fresh_runtime()
+    local function station(sector_id, stable_id, capacity)
+        local asset_id = "asset:station:" .. stable_id
+        return {
+            entity_id = asset_id, source = "x4_runtime", version = 1, quality = "fresh",
+            runtime_facts = {
+                source = "x4_runtime", quality = "fresh", availability = "available",
+                sectors = { { id = sector_id } },
+                assets = { { id = asset_id, sector_id = sector_id } },
+                capacity = { { id = "capacity:station:" .. stable_id, asset_id = asset_id, value = capacity } },
+                ownership = { { id = "ownership:station:" .. stable_id, asset_id = asset_id, owner_id = "faction:argon" } },
+            },
+        }
+    end
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function()
+            return { station("sector:argon_prime", "10", 42), station("sector:second_contact", "20", 24) }
+        end,
+    })
+    isolated_runtime.next_payload(); isolated_runtime.next_payload(); isolated_runtime.next_payload()
+    local first, first_kind = isolated_runtime.next_payload()
+    local second, second_kind = isolated_runtime.next_payload()
+    local marker, marker_kind = isolated_runtime.next_payload()
+    assert(first_kind == "observation" and first:match("asset:station:10"))
+    assert(second_kind == "observation" and second:match("asset:station:20"))
+    assert(marker_kind == "complete_marker")
+    isolated_runtime.set_discovery_adapter(nil)
+end
+
+function cases.runtime_discards_pending_station_frames_after_a_lost_connection()
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function()
+            return {
+                { entity_id = "asset:station:10", source = "x4_runtime", version = 1, quality = "fresh",
+                    runtime_facts = { source = "x4_runtime", quality = "fresh", availability = "available",
+                        sectors = { { id = "sector:argon_prime" } },
+                        assets = { { id = "asset:station:10", sector_id = "sector:argon_prime" } },
+                        capacity = { { id = "capacity:station:10", asset_id = "asset:station:10", value = 42 } },
+                        ownership = { { id = "ownership:station:10", asset_id = "asset:station:10", owner_id = "faction:argon" } } } },
+                { entity_id = "asset:station:20", source = "x4_runtime", version = 1, quality = "fresh",
+                    runtime_facts = { source = "x4_runtime", quality = "fresh", availability = "available",
+                        sectors = { { id = "sector:second_contact" } },
+                        assets = { { id = "asset:station:20", sector_id = "sector:second_contact" } },
+                        capacity = { { id = "capacity:station:20", asset_id = "asset:station:20", value = 24 } },
+                        ownership = { { id = "ownership:station:20", asset_id = "asset:station:20", owner_id = "faction:argon" } } } },
+            }
+        end,
+    })
+    local writes, payloads = 0, {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, payload)
+            writes = writes + 1
+            payloads[#payloads + 1] = payload
+            if writes == 4 then error("connection lost") end
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+    assert(select(2, isolated_runtime.handle_tick()) == "pipe_reconnect")
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+    assert(payloads[5]:match('"type":"hello"'))
+
+    isolated_runtime.set_pipe_adapter(nil)
+    isolated_runtime.set_discovery_adapter(nil)
+end
+
 function cases.runtime_suppresses_observation_when_discovery_fails()
     local observation, err = runtime.produce_discovery_payload(discovery.new({}))
 

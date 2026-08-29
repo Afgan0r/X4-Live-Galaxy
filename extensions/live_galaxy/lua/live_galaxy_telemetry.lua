@@ -3,6 +3,8 @@ local telemetry = {}
 local normalize = require("live_galaxy/lua/live_galaxy_normalize")
 
 local MAX_SECTIONS_PER_CYCLE = 1
+local MAX_DISCOVERY_OBSERVATION_FRAMES = 64
+local MAX_DISCOVERY_OBSERVATION_BYTES = 1800
 
 local function bounded_limit(limit)
     if type(limit) ~= "number" or limit < 1 then
@@ -52,6 +54,28 @@ function telemetry.produce_observation(adapter, version)
     end
 
     return normalize.serialize_telemetry(observation)
+end
+
+function telemetry.produce_observations(adapter, version)
+    if type(adapter) == "table" and type(adapter.read_observations) == "function" then
+        local observations, err = adapter.read_observations(adapter, version)
+        if type(observations) ~= "table" or #observations == 0
+            or #observations > MAX_DISCOVERY_OBSERVATION_FRAMES then
+            return nil, err or "observation_unavailable"
+        end
+        local serialized = {}
+        for _, observation in ipairs(observations) do
+            local frame, normalize_err = normalize.serialize_telemetry(observation)
+            if frame == nil or #frame > MAX_DISCOVERY_OBSERVATION_BYTES then
+                return nil, normalize_err or "observation_oversized"
+            end
+            serialized[#serialized + 1] = frame
+        end
+        return serialized
+    end
+    local observation, err = telemetry.produce_observation(adapter, version)
+    if observation == nil then return nil, err end
+    return { observation }
 end
 
 return telemetry

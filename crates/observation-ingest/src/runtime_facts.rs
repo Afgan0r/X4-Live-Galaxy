@@ -90,10 +90,14 @@ impl RuntimeFacts {
         if !within_bounds(self) {
             return Err(AdmissionError::CollectionLimitExceeded);
         }
-        let valid = self
+        let valid = (self
             .sectors
             .iter()
             .any(|sector| sector.id == sector_id.as_str())
+            || self
+                .assets
+                .iter()
+                .any(|asset| asset.id == sector_id.as_str()))
             && self.assets.iter().all(|asset| {
                 self.sectors
                     .iter()

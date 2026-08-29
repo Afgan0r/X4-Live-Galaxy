@@ -1,6 +1,6 @@
 local discovery = {}
 
-local MAX_OWNER_STATIONS = 16
+local MAX_OWNER_STATIONS = 64
 local MAX_FACT_STRING_BYTES = 96
 local MAX_SAFE_INTEGER = 9007199254740991
 local FACT_DIAGNOSTIC_CLASSES = {
@@ -62,23 +62,15 @@ local function api_available(api)
         and callable(api, "get_component_data") and callable(api, "get_people_capacity")
 end
 
-local function section_from_candidates(candidates)
-    local sectors, assets, capacity, ownership, known_sectors = {}, {}, {}, {}, {}
-    for _, candidate in ipairs(candidates) do
-        if not known_sectors[candidate.sector_id] then
-            known_sectors[candidate.sector_id] = true
-            sectors[#sectors + 1] = { id = candidate.sector_id }
-        end
-        assets[#assets + 1] = { id = candidate.asset_id, sector_id = candidate.sector_id }
-        capacity[#capacity + 1] = { id = "capacity:station:" .. candidate.stable_id,
-            asset_id = candidate.asset_id, value = candidate.people_capacity }
-        ownership[#ownership + 1] = { id = "ownership:station:" .. candidate.stable_id,
-            asset_id = candidate.asset_id, owner_id = candidate.owner_id }
-    end
-    table.sort(sectors, function(left, right) return left.id < right.id end)
-    return { entity_id = sectors[1].id, source = "x4_runtime", version = 1, quality = "fresh",
+local function section_from_candidate(candidate)
+    return { entity_id = candidate.asset_id, source = "x4_runtime", version = 1, quality = "fresh",
         runtime_facts = { source = "x4_runtime", quality = "fresh", availability = "available",
-            sectors = sectors, assets = assets, capacity = capacity, ownership = ownership } }
+            sectors = { { id = candidate.sector_id } },
+            assets = { { id = candidate.asset_id, sector_id = candidate.sector_id } },
+            capacity = { { id = "capacity:station:" .. candidate.stable_id,
+                asset_id = candidate.asset_id, value = candidate.people_capacity } },
+            ownership = { { id = "ownership:station:" .. candidate.stable_id,
+                asset_id = candidate.asset_id, owner_id = candidate.owner_id } } } }
 end
 
 function discovery.new(api)
@@ -94,7 +86,7 @@ function discovery.new(api)
         return last_diagnostic_class
     end
 
-    function adapter.read_observation(_, version)
+    function adapter.read_observations(_, version)
         last_diagnostic_class = nil
         if not api_available(api) then return nil, "enumeration_unavailable" end
         local native_faction_id = api.native_faction_id or api.faction_id
@@ -155,9 +147,20 @@ function discovery.new(api)
             if not valid_integer(people_capacity) then return unsupported("capacity_invalid") end
         end
 
-        local observation = section_from_candidates(candidates)
-        if valid_integer(version) and version >= 1 then observation.version = version end
-        return observation
+        local observations = {}
+        for _, candidate in ipairs(candidates) do
+            local observation = section_from_candidate(candidate)
+            if valid_integer(version) and version >= 1 then observation.version = version end
+            observations[#observations + 1] = observation
+        end
+        return observations
+    end
+
+    function adapter.read_observation(_, version)
+        local observations, err = adapter.read_observations(adapter, version)
+        if observations == nil then return nil, err end
+        if #observations ~= 1 then return nil, "observation_batch_required" end
+        return observations[1]
     end
 
     return adapter
