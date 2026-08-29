@@ -81,6 +81,9 @@ impl MindAggregate {
             commands: Vec::new(),
         }
     }
+    pub const fn faction(&self) -> Faction {
+        self.faction
+    }
     #[must_use]
     pub fn doctrine_version(&self) -> &str {
         &self.doctrine_version

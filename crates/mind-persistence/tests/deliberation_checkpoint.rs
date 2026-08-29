@@ -1,5 +1,5 @@
-use mind_domain::{admit, AdmissionDecision, DeliberationRequest, MindAggregate, ShadowProposal};
-use mind_persistence::{persist_deliberation, FakeCheckpointPort};
+use mind_domain::{AdmissionDecision, DeliberationRequest, MindAggregate, ShadowProposal, admit};
+use mind_persistence::{CheckpointPort, FakeCheckpointPort, persist_deliberation};
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Capability, Faction, PacketLimits, derive_packets};
 
@@ -11,7 +11,9 @@ fn accepted_candidate_uses_one_checkpoint_compare_and_set() {
     )
     .into_projection()
     .snapshot;
-    let packets = derive_packets(&snapshot, PacketLimits::tracer()).expect("packet fixture");
+    let packets = derive_packets(&snapshot, PacketLimits::tracer());
+    assert!(packets.is_ok());
+    let Ok(packets) = packets else { return };
     let request = DeliberationRequest::from_packet(
         packets.packet(Faction::Zya).clone(),
         "snapshot-zya-1",
@@ -21,8 +23,9 @@ fn accepted_candidate_uses_one_checkpoint_compare_and_set() {
         "prompt-v1",
         2048,
         4,
-    )
-    .expect("request fixture");
+    );
+    assert!(request.is_ok());
+    let Ok(request) = request else { return };
     let bytes = serde_json::to_vec(&ShadowProposal::new(
         "schema-v1",
         Capability::DefenseAndMilitaryStrategy,
@@ -32,14 +35,18 @@ fn accepted_candidate_uses_one_checkpoint_compare_and_set() {
         ["preserve logistics"],
         "hold the visible frontier",
         "mind-zya-shadow-1",
-    ))
-    .expect("proposal fixture");
-    let AdmissionDecision::Accepted(accepted) = admit(&request, &bytes) else {
-        panic!("candidate must be admitted");
+    ));
+    assert!(bytes.is_ok());
+    let Ok(bytes) = bytes else { return };
+    let prior = MindAggregate::empty(Faction::Zya);
+    let decision = admit(&request, &prior, &bytes);
+    assert!(matches!(decision, AdmissionDecision::Accepted(_)));
+    let AdmissionDecision::Accepted(accepted) = decision else {
+        return;
     };
-    let pending = accepted
-        .pending_commit(&MindAggregate::empty(Faction::Zya))
-        .expect("pending commit");
+    let pending = accepted.pending_commit(&prior);
+    assert!(pending.is_ok());
+    let Ok(pending) = pending else { return };
     let mut port = FakeCheckpointPort::new();
     let result = persist_deliberation(&mut port, &accepted, &pending);
     assert!(result.is_ok());

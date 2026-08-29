@@ -4,6 +4,7 @@ mod capsule;
 mod capsule_identity;
 mod checkpoint;
 mod checkpoint_validation;
+mod deliberation_checkpoint;
 mod fake_port;
 mod integrity;
 mod legacy;
@@ -13,6 +14,9 @@ mod recovery;
 
 pub use capsule::{BudgetProfile, Capsule, CapsuleError, CommitmentProjection, LedgerRange};
 pub use checkpoint::{CheckpointEnvelope, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
+pub use deliberation_checkpoint::{
+    DeliberationCheckpointError, DeliberationCheckpointRecord, persist_deliberation,
+};
 pub use fake_port::FakeCheckpointPort;
 pub use port::{CheckpointAck, CheckpointPort, CompatibilityStatus, PortError};
 pub use recovery::{CrashPoint, RecoveryDiagnostic, RecoveryInput, RecoveryOutcome, recover};

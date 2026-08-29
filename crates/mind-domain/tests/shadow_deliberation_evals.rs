@@ -1,5 +1,5 @@
 use mind_domain::{
-    admit, AdmissionDecision, CommandId, DeliberationRequest, MindAggregate, ShadowProposal,
+    AdmissionDecision, CommandId, DeliberationRequest, MindAggregate, ShadowProposal, admit,
 };
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Capability, Faction, PacketLimits, derive_packets};
@@ -9,11 +9,12 @@ const FRAMES: [&str; 2] = [
     r#"{"type":"observation","scope":"XEN","entity_id":"XEN:threat:XEN","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"shared"}"#,
 ];
 
-fn request() -> DeliberationRequest {
+fn request() -> Result<DeliberationRequest, String> {
     let snapshot = admit_batch(AcceptedProjection::empty(), &FRAMES)
         .into_projection()
         .snapshot;
-    let packets = derive_packets(&snapshot, PacketLimits::tracer()).expect("packet fixture");
+    let packets = derive_packets(&snapshot, PacketLimits::tracer())
+        .map_err(|error| format!("packet fixture: {error:?}"))?;
     DeliberationRequest::from_packet(
         packets.packet(Faction::Zya).clone(),
         "snapshot-zya-1",
@@ -24,10 +25,10 @@ fn request() -> DeliberationRequest {
         2048,
         4,
     )
-    .expect("frozen request")
+    .map_err(|error| format!("frozen request: {error:?}"))
 }
 
-fn proposal() -> Vec<u8> {
+fn proposal() -> Result<Vec<u8>, String> {
     serde_json::to_vec(&ShadowProposal::new(
         "schema-v1",
         Capability::DefenseAndMilitaryStrategy,
@@ -38,16 +39,24 @@ fn proposal() -> Vec<u8> {
         "hold the visible frontier",
         "mind-zya-shadow-1",
     ))
-    .expect("proposal fixture")
+    .map_err(|error| format!("proposal fixture: {error}"))
 }
 
 #[test]
 fn sd_002_valid_candidate_creates_pending_commit() {
-    let decision = admit(&request(), &proposal());
+    let request = request();
+    assert!(request.is_ok());
+    let Ok(request) = request else { return };
+    let proposal = proposal();
+    assert!(proposal.is_ok());
+    let Ok(proposal) = proposal else { return };
+    let prior = MindAggregate::empty(Faction::Zya);
+    let decision = admit(&request, &prior, &proposal);
+    assert!(matches!(decision, AdmissionDecision::Accepted(_)));
     let AdmissionDecision::Accepted(accepted) = decision else {
-        panic!("valid proposal must be accepted");
+        return;
     };
-    let pending = accepted.pending_commit(&MindAggregate::empty(Faction::Zya));
+    let pending = accepted.pending_commit(&prior);
     assert!(pending.is_ok());
     assert_eq!(accepted.command_id(), CommandId::new("mind-zya-shadow-1"));
 }
@@ -55,7 +64,13 @@ fn sd_002_valid_candidate_creates_pending_commit() {
 #[test]
 fn sd_003_malformed_missing_and_unknown_candidates_are_rejected() {
     for candidate in [b"{".as_slice(), b"{}", b"{\"unknown\":true}"] {
-        assert!(matches!(admit(&request(), candidate), AdmissionDecision::Rejected(_)));
+        let request = request();
+        assert!(request.is_ok());
+        let Ok(request) = request else { return };
+        assert!(matches!(
+            admit(&request, &MindAggregate::empty(Faction::Zya), candidate),
+            AdmissionDecision::Rejected(_)
+        ));
     }
 }
 
@@ -64,8 +79,12 @@ fn sd_001_hidden_and_sd_013_forbidden_candidates_have_no_pending_projection() {
     let hidden = br#"{"schema_version":"schema-v1","capability":"DefenseAndMilitaryStrategy","priority":1,"horizon":"short","supporting_fact_ids":["ARG:secret"],"trade_offs":["preserve logistics"],"explanation":"hold frontier","command_id":"mind-zya-shadow-1"}"#;
     let forbidden = br#"{"schema_version":"schema-v1","capability":"EconomyAndLogistics","priority":1,"horizon":"short","supporting_fact_ids":["ZYA:military:fleet"],"trade_offs":["preserve logistics"],"explanation":"hold frontier","command_id":"mind-zya-shadow-1"}"#;
     for candidate in [hidden.as_slice(), forbidden.as_slice()] {
-        let decision = admit(&request(), candidate);
+        let request = request();
+        assert!(request.is_ok());
+        let Ok(request) = request else { return };
+        let prior = MindAggregate::empty(Faction::Zya);
+        let decision = admit(&request, &prior, candidate);
         assert!(matches!(decision, AdmissionDecision::Rejected(_)));
-        assert!(decision.pending_commit(&MindAggregate::empty(Faction::Zya)).is_none());
+        assert!(decision.pending_commit(&prior).is_none());
     }
 }
