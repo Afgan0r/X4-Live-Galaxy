@@ -118,6 +118,11 @@ local function discard_discovery_frames()
     discovery_frames, discovery_frame_index = nil, nil
 end
 
+local function fail_discovery_batch()
+    discard_discovery_frames()
+    discovery_incomplete = true
+end
+
 local function payload(kind, extra)
     if sequence == MAX_COUNTER then return nil end
     sequence = sequence + 1
@@ -141,6 +146,10 @@ function runtime.next_payload()
         if marker ~= nil and observation_version < MAX_COUNTER then observation_version = observation_version + 1 end
         return marker, kind, current_generation, current_sequence
     end
+    if discovery_incomplete then
+        discovery_incomplete = false
+        return payload("runtime_health", ',"status":"unavailable"')
+    end
     local step = (sequence % 4) + 1
     if step == 1 then return payload("heartbeat", "") end
     if step == 2 then return payload("runtime_health", ',"status":"available"') end
@@ -154,10 +163,6 @@ function runtime.next_payload()
         end
         discovery_frames, discovery_frame_index = frames, 2
         return payload("observation", "," .. frames[1]:sub(2, -2))
-    end
-    if discovery_incomplete then
-        discovery_incomplete = false
-        return payload("runtime_health", ',"status":"unavailable"')
     end
     local marker, kind, current_generation, current_sequence = payload("complete_marker", "")
     if marker ~= nil and observation_version < MAX_COUNTER then
@@ -204,6 +209,8 @@ function runtime.handle_tick()
     if not ok and (status == "pipe_unavailable" or status == "pipe_reconnect") then
         connected = false
         discard_discovery_frames()
+    elseif not ok and status == "pipe_backpressure" and kind == "observation" and discovery_frames then
+        fail_discovery_batch()
     end
     trace("telemetry_tick", "status=" .. status, true)
     return ok, status

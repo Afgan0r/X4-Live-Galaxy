@@ -362,6 +362,53 @@ function cases.runtime_discards_pending_station_frames_after_a_lost_connection()
     isolated_runtime.set_discovery_adapter(nil)
 end
 
+function cases.runtime_fails_closed_when_backpressure_drops_a_station_frame()
+    local isolated_runtime = fresh_runtime()
+    local reads = 0
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function()
+            reads = reads + 1
+            if reads > 1 then return nil, "facts_unsupported" end
+            return {
+                { entity_id = "asset:station:10", source = "x4_runtime", version = 1, quality = "fresh",
+                    runtime_facts = { source = "x4_runtime", quality = "fresh", availability = "available",
+                        sectors = { { id = "sector:argon_prime" } },
+                        assets = { { id = "asset:station:10", sector_id = "sector:argon_prime" } },
+                        capacity = { { id = "capacity:station:10", asset_id = "asset:station:10", value = 42 } },
+                        ownership = { { id = "ownership:station:10", asset_id = "asset:station:10", owner_id = "faction:argon" } } } },
+                { entity_id = "asset:station:20", source = "x4_runtime", version = 1, quality = "fresh",
+                    runtime_facts = { source = "x4_runtime", quality = "fresh", availability = "available",
+                        sectors = { { id = "sector:second_contact" } },
+                        assets = { { id = "asset:station:20", sector_id = "sector:second_contact" } },
+                        capacity = { { id = "capacity:station:20", asset_id = "asset:station:20", value = 24 } },
+                        ownership = { { id = "ownership:station:20", asset_id = "asset:station:20", owner_id = "faction:argon" } } } },
+            }
+        end,
+    })
+    local writes, accepted = 0, {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, frame)
+            writes = writes + 1
+            if writes == 5 then return false end
+            accepted[#accepted + 1] = frame
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    for _ = 1, 4 do assert(select(2, isolated_runtime.handle_tick()) == "sent") end
+    assert(select(2, isolated_runtime.handle_tick()) == "pipe_backpressure")
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+
+    assert(accepted[4]:match('"entity_id":"asset:station:10"'))
+    assert(accepted[5]:match('"type":"runtime_health"'))
+    assert(accepted[5]:match('"status":"unavailable"'))
+    for _, frame in ipairs(accepted) do assert(not frame:match('"type":"complete_marker"')) end
+
+    isolated_runtime.set_pipe_adapter(nil)
+    isolated_runtime.set_discovery_adapter(nil)
+end
+
 function cases.runtime_suppresses_observation_when_discovery_fails()
     local observation, err = runtime.produce_discovery_payload(discovery.new({}))
 

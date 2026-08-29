@@ -24,3 +24,26 @@ fn station_frames_replace_scope_only_with_the_completion_marker() {
         Some(24)
     );
 }
+
+#[test]
+fn partial_station_batch_without_marker_preserves_prior_membership() {
+    let accepted = admit_batch(
+        AcceptedProjection::empty(),
+        &[STATION_ONE, STATION_TWO, MARKER],
+    )
+    .into_projection();
+    let backpressured_station_one = STATION_ONE.replace("\"version\":4", "\"version\":5");
+
+    let retained = admit_batch(accepted, &[&backpressured_station_one]).into_projection();
+
+    assert_eq!(
+        retained.snapshot().entity_ids(),
+        ["asset:station:10", "asset:station:20"]
+    );
+    assert_eq!(
+        retained
+            .runtime_facts("asset:station:20")
+            .map(|facts| facts.capacity[0].value),
+        Some(24)
+    );
+}
