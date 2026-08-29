@@ -191,14 +191,13 @@ Plans:
 
 **Research**: Required — inspect installed vanilla X4 first, then the X4 Live reference call shapes and exact installed mod/version evidence; treat runtime semantics as unknown until the disposable probe.
 **Requirement mapping note**: This conditional evidence closure strengthens the existing OBS-06 / D-09 contract and introduces no new milestone requirement ID.
-**Plans:** 2/2 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 
 - [x] 05.1-01-PLAN.md
 - [x] 05.1-02-PLAN.md
-
-- [ ] TBD (run $gsd-plan-phase 05.1 to break down)
+- [ ] 05.1-03-PLAN.md
 
 ### Phase 6: Correlated Reports and Diagnostics
 
