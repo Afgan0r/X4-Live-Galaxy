@@ -11,25 +11,39 @@ fn commitments() -> CommitmentProjection {
 #[test]
 fn provider_relative_budget_controls_capsule_eligibility_and_identity() {
     let range = LedgerRange::new(4, 8, "ledger-hash");
-    let compact = Capsule::new(
+    let exact = Capsule::new(
         range.clone(),
         profile("provider-a", "model-a", 80),
         commitments(),
         None,
     );
-    let retain = Capsule::new(
-        range,
-        profile("provider-b", "model-b", 79),
+    let below = Capsule::new(
+        range.clone(),
+        profile("provider-a", "model-a", 79),
         commitments(),
         None,
     );
-    assert!(compact.is_ok() && retain.is_ok());
-    let (Ok(compact), Ok(retain)) = (compact, retain) else {
+    let above = Capsule::new(
+        range.clone(),
+        profile("provider-a", "model-a", 81),
+        commitments(),
+        None,
+    );
+    let overflow = Capsule::new(
+        range,
+        BudgetProfile::new("provider-a", "model-a", u32::MAX, u32::MAX, 1),
+        commitments(),
+        None,
+    );
+    assert!(exact.is_ok() && below.is_ok() && above.is_ok() && overflow.is_ok());
+    let (Ok(exact), Ok(below), Ok(above), Ok(overflow)) = (exact, below, above, overflow) else {
         return;
     };
-    assert!(compact.eligible());
-    assert!(!retain.eligible());
-    assert_ne!(compact.identity(), retain.identity());
+    assert!(below.eligible());
+    assert!(exact.eligible());
+    assert!(!above.eligible());
+    assert!(!overflow.eligible());
+    assert_ne!(exact.identity(), below.identity());
 }
 
 #[test]

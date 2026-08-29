@@ -47,8 +47,10 @@ impl BudgetProfile {
         }
     }
 
-    const fn eligible(&self) -> bool {
-        self.measured_tokens.saturating_add(self.headroom_tokens) >= self.context_limit
+    fn eligible(&self) -> bool {
+        self.measured_tokens
+            .checked_add(self.headroom_tokens)
+            .is_some_and(|required| required <= self.context_limit)
     }
 }
 
@@ -108,19 +110,22 @@ impl Capsule {
     }
 
     #[must_use]
-    pub const fn eligible(&self) -> bool {
+    pub fn eligible(&self) -> bool {
         self.profile.eligible()
     }
 
     #[must_use]
     pub fn identity(&self) -> String {
         format!(
-            "{CAPSULE_SCHEMA}:{}:{}:{}:{}:{}",
+            "{CAPSULE_SCHEMA}:{}:{}:{}:{}:{}:{}:{}:{}",
             self.range.first_sequence,
             self.range.last_sequence,
             self.range.integrity_hash,
             self.profile.provider,
-            self.profile.model
+            self.profile.model,
+            self.profile.context_limit,
+            self.profile.measured_tokens,
+            self.profile.headroom_tokens
         )
     }
 
