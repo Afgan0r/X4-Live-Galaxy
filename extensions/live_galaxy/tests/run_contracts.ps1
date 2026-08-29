@@ -9,7 +9,7 @@ $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot
 $admissionContract = Join-Path $root 'tools/x4-verification/tests/admission_contract.ps1'
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
-    foreach ($admissionCase in @('dossier', 'negative-fixtures')) {
+    foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission')) {
         & pwsh -NoProfile -File $admissionContract -Case $admissionCase
         if ($LASTEXITCODE -ne 0) { throw "X4 admission contract failed: $admissionCase" }
     }

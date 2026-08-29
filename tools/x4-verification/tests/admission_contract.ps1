@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('dossier', 'negative-fixtures')]
+    [ValidateSet('dossier', 'negative-fixtures', 'admission')]
     [string]$Case = 'dossier'
 )
 
@@ -14,6 +14,7 @@ $dossierPath = Join-Path $contractsRoot 'dossier.v1.json'
 $registryPath = Join-Path $contractsRoot 'known-failures.v1.json'
 $coveragePath = Join-Path $contractsRoot 'coverage.v1.json'
 $fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
+$overrideContractPath = Join-Path $contractsRoot 'owner-override.v1.json'
 
 $requiredDimensions = @(
     'loader-registration',
@@ -37,13 +38,14 @@ function Copy-Json($Value) {
     return ($Value | ConvertTo-Json -Depth 32 | ConvertFrom-Json)
 }
 
-function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null) {
+function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null, $Override = $null) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("live-galaxy-admission-{0}" -f [guid]::NewGuid().ToString('N'))
     [void](New-Item -ItemType Directory -Path $tempRoot)
     try {
         $tempDossier = Join-Path $tempRoot 'dossier.json'
         $tempRegistry = Join-Path $tempRoot 'registry.json'
         $Dossier | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempDossier -Encoding utf8NoBOM
+        $inputDigestBefore = (Get-FileHash -LiteralPath $tempDossier -Algorithm SHA256).Hash.ToLowerInvariant()
         $Registry | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempRegistry -Encoding utf8NoBOM
         $arguments = @('-NoProfile', '-File', $admissionPath, '-DossierPath', $tempDossier, '-RegistryPath', $tempRegistry)
         if ($null -ne $Coverage) {
@@ -56,14 +58,26 @@ function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $n
             $Fixtures | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempFixtures -Encoding utf8NoBOM
             $arguments += @('-FixturePath', $tempFixtures)
         }
+        if ($null -ne $Override) {
+            $tempOverride = Join-Path $tempRoot 'override.json'
+            $resolvedOverride = Copy-Json $Override
+            if ($resolvedOverride.dossier_digest -eq '__DOSSIER_DIGEST__') {
+                $resolvedOverride.dossier_digest = $inputDigestBefore
+            }
+            $resolvedOverride | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempOverride -Encoding utf8NoBOM
+            $arguments += @('-OverridePath', $tempOverride)
+        }
         $output = & pwsh @arguments 2>&1
         $exitCode = $LASTEXITCODE
+        $inputDigestAfter = (Get-FileHash -LiteralPath $tempDossier -Algorithm SHA256).Hash.ToLowerInvariant()
         $jsonLine = @($output | ForEach-Object { $_.ToString() } | Where-Object { $_.TrimStart().StartsWith('{') }) | Select-Object -Last 1
         Assert-True ($null -ne $jsonLine) "Admission emitted no JSON result: $($output -join ' | ')"
         return [pscustomobject]@{
             ExitCode = $exitCode
             Result = $jsonLine | ConvertFrom-Json
             Output = @($output | ForEach-Object { $_.ToString() })
+            InputDigestBefore = $inputDigestBefore
+            InputDigestAfter = $inputDigestAfter
         }
     }
     finally {
@@ -83,12 +97,77 @@ $requiredPaths = @($admissionPath, $dossierPath, $registryPath)
 if ($Case -eq 'negative-fixtures') {
     $requiredPaths += @($coveragePath, $fixturePath)
 }
+if ($Case -eq 'admission') {
+    $requiredPaths += @($coveragePath, $fixturePath, $overrideContractPath)
+}
 foreach ($path in $requiredPaths) {
     Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required admission artifact is missing: $path"
 }
 
 $baseDossier = Get-Content -LiteralPath $dossierPath -Raw -Encoding utf8 | ConvertFrom-Json
 $baseRegistry = Get-Content -LiteralPath $registryPath -Raw -Encoding utf8 | ConvertFrom-Json
+
+if ($Case -eq 'admission') {
+    $coverage = Get-Content -LiteralPath $coveragePath -Raw -Encoding utf8 | ConvertFrom-Json
+    $fixtures = Get-Content -LiteralPath $fixturePath -Raw -Encoding utf8 | ConvertFrom-Json
+    $override = Get-Content -LiteralPath $overrideContractPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $knownFailure = Copy-Json $baseDossier
+    $knownFailure.dimensions[0] | Add-Member -NotePropertyName finding_ids -NotePropertyValue @('finding-small-loader-exception')
+    $knownFailure.findings = @([pscustomobject]@{
+        id = 'finding-small-loader-exception'
+        failure_class_id = 'loader-mismatch'
+        dimension_id = 'loader-registration'
+        disposition = 'known-failure'
+    })
+
+    $blocked = Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures
+    Assert-Rejected $blocked 'KNOWN_FAILURE_BLOCKED' 'known failure without override'
+    Assert-True ($blocked.InputDigestBefore -eq $blocked.InputDigestAfter) 'Admission mutated the source dossier.'
+
+    $override.dossier_id = $knownFailure.dossier_id
+    $override.dossier_digest = '__DOSSIER_DIGEST__'
+    $override.finding_id = 'finding-small-loader-exception'
+    $override.expires_at = [DateTimeOffset]::UtcNow.AddDays(30).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    $accepted = Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $override
+    Assert-True ($accepted.ExitCode -eq 0) "Exact override failed: $($accepted.Output -join ' | ')"
+    Assert-True ($accepted.Result.verdict -eq 'admissible-with-owner-override') 'Exact override returned the wrong verdict.'
+    Assert-True (@($accepted.Result.reason_codes) -contains 'OWNER_OVERRIDE_APPLIED') 'Exact override returned the wrong reason.'
+    Assert-True (@($accepted.Result.overridden_finding_ids) -join '|' -eq 'finding-small-loader-exception') 'Override did not report the exact finding.'
+    Assert-True ($accepted.InputDigestBefore -eq $accepted.InputDigestAfter) 'Exact override mutated the source dossier.'
+
+    foreach ($field in @('schema_version', 'override_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'expires_at')) {
+        $missing = Copy-Json $override
+        $missing.PSObject.Properties.Remove($field)
+        Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $missing) 'MISSING_REQUIRED_FIELD' "missing override.$field"
+    }
+
+    $broad = Copy-Json $override
+    $broad.finding_id = '*'
+    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $broad) 'OVERRIDE_SCOPE_MISMATCH' 'broad override'
+
+    $stale = Copy-Json $override
+    $stale.finding_id = 'finding-stale'
+    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $stale) 'OVERRIDE_SCOPE_MISMATCH' 'stale override'
+
+    $expired = Copy-Json $override
+    $expired.expires_at = '2000-01-01T00:00:00Z'
+    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $expired) 'OVERRIDE_EXPIRED' 'expired override'
+
+    $digestMismatch = Copy-Json $override
+    $digestMismatch.dossier_digest = '0' * 64
+    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $digestMismatch) 'OVERRIDE_DIGEST_MISMATCH' 'digest-mismatched override'
+
+    $dossierMismatch = Copy-Json $override
+    $dossierMismatch.dossier_id = 'different-dossier'
+    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $dossierMismatch) 'OVERRIDE_SCOPE_MISMATCH' 'dossier-mismatched override'
+
+    $invalidDecision = Copy-Json $override
+    $invalidDecision.decision = 'auto-admit-small-change'
+    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $invalidDecision) 'INVALID_OWNER_DECISION' 'severity-based override'
+
+    Write-Output 'PASS: owner override admission contract'
+    exit 0
+}
 
 if ($Case -eq 'negative-fixtures') {
     $coverage = Get-Content -LiteralPath $coveragePath -Raw -Encoding utf8 | ConvertFrom-Json
