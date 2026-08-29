@@ -50,6 +50,16 @@ function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
     assert(calls.convert == 2 and calls.metadata == 2 and calls.capacity == 2)
 end
 
+function cases.serializes_the_existing_compact_station_envelope()
+    local api = fake_api()
+    local payload = assert(telemetry.produce_observation(discovery.new(api), 3))
+
+    assert(payload:match('"entity_id":"sector:argon_prime"'))
+    assert(payload:match('"x":%[{"i":"asset:station:10","p":"sector:argon_prime"},{"i":"asset:station:20","p":"sector:second_contact"}%]'))
+    assert(payload:match('"c":%[{"i":"capacity:station:10","p":"asset:station:10","v":42},{"i":"capacity:station:20","p":"asset:station:20","v":24}%]'))
+    assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"},{"i":"ownership:station:20","p":"asset:station:20","n":"faction:antigone"}%]'))
+end
+
 function cases.suppresses_every_invalid_stage_without_partial_observation()
     local api = fake_api()
     api.fill_stations = function() return 1 end

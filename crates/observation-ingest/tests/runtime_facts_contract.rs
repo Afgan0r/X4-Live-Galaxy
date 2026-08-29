@@ -28,6 +28,19 @@ const STATION_FACTS: &str = r#"{
 
 const STATION_MARKER: &str = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":4}"#;
 
+const COMPLETE_STATION_SCOPE: &str = r#"{
+  "type":"observation","scope":"runtime:sectors","entity_id":"sector:argon_prime",
+  "version":3,"quality":"fresh",
+  "runtime_facts":{"r":"x4_runtime","q":"fresh","a":"available",
+  "s":[{"i":"sector:argon_prime"},{"i":"sector:second_contact"}],
+  "x":[{"i":"asset:station:10","p":"sector:argon_prime"},{"i":"asset:station:20","p":"sector:second_contact"}],
+  "c":[{"i":"capacity:station:10","p":"asset:station:10","v":42},{"i":"capacity:station:20","p":"asset:station:20","v":24}],
+  "o":[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"},{"i":"ownership:station:20","p":"asset:station:20","n":"faction:antigone"}]},
+  "generation":1,"sequence":5
+}"#;
+
+const COMPLETE_STATION_MARKER: &str = r#"{"type":"complete_marker","scope":"runtime:sectors","version":3,"generation":1,"sequence":6}"#;
+
 struct FixedClock(u64);
 
 impl ReceiptClock for FixedClock {
@@ -177,4 +190,21 @@ fn complete_canonical_station_scope_reconciles_only_after_strict_admission() {
     assert_eq!(facts.assets[0].id, "asset:station:1");
     assert_eq!(facts.capacity[0].asset_id, "asset:station:1");
     assert_eq!(facts.ownership[0].owner_id, "faction:argon");
+}
+
+#[test]
+fn complete_owner_station_scope_requires_canonical_order_and_all_relationships() {
+    let prior = admit_batch(AcceptedProjection::empty(), &[V2_FACTS, MARKER]).into_projection();
+    let accepted = admit_batch(prior.clone(), &[COMPLETE_STATION_SCOPE, COMPLETE_STATION_MARKER])
+        .into_projection();
+    let facts = accepted.runtime_facts("sector:argon_prime").expect("complete scope is accepted");
+    assert_eq!(facts.assets.iter().map(|asset| asset.id.as_str()).collect::<Vec<_>>(), ["asset:station:10", "asset:station:20"]);
+
+    let reordered = COMPLETE_STATION_SCOPE.replace(
+        r#""x":[{"i":"asset:station:10","p":"sector:argon_prime"},{"i":"asset:station:20","p":"sector:second_contact"}]"#,
+        r#""x":[{"i":"asset:station:20","p":"sector:second_contact"},{"i":"asset:station:10","p":"sector:argon_prime"}]"#,
+    );
+    let rejected = admit_batch(prior.clone(), &[&reordered]);
+    assert_eq!(rejected.snapshot(), prior.snapshot());
+    assert!(rejected.rejection_reason().is_some());
 }
