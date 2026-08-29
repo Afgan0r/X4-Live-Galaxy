@@ -50,6 +50,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mind-orchestration"
+version = "0.1.0"
+dependencies = [
+ "mind-domain",
+ "observation-ingest",
+ "serde_json",
+ "strategic-state",
+]
+
+[[package]]
 name = "mind-persistence"
 version = "0.1.0"
 dependencies = [
