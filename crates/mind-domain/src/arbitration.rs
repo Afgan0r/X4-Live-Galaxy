@@ -33,6 +33,13 @@ impl DialogueState {
         }
     }
 
+    pub const fn finalize(self) -> Result<Self, ArbitrationError> {
+        match self {
+            Self::DirectAgreement | Self::MaterialObjection { .. } => Ok(Self::FinalDisposition),
+            Self::FinalDisposition => Err(ArbitrationError::CycleCap),
+        }
+    }
+
     #[must_use]
     pub const fn cycles(self) -> u8 {
         cycles(self)

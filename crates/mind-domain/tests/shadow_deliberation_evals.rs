@@ -1,3 +1,5 @@
+#[path = "shadow_deliberation_evals/dialogue.rs"]
+mod dialogue;
 #[path = "shadow_deliberation_evals/exact_cache.rs"]
 mod exact_cache;
 #[path = "shadow_deliberation_evals/posture.rs"]
