@@ -68,8 +68,9 @@ function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
     assert(facts.assets[1].id == "asset:station:10")
     assert(facts.assets[2].id == "asset:station:20")
     assert(calls.convert == 2 and calls.convert64 == 2 and calls.metadata == 2 and calls.capacity == 2)
-    assert(calls.order[1] == "convert" and calls.order[2] == "convert")
-    assert(calls.order[3] == "convert64" and calls.order[4] == "convert64")
+    assert(calls.order[1] == "convert" and calls.order[2] == "convert64")
+    assert(calls.order[3] == "convert" and calls.order[4] == "convert64")
+    assert(calls.order[5] == "metadata" and calls.order[6] == "capacity")
 end
 
 function cases.serializes_the_existing_compact_station_envelope()
