@@ -1,0 +1,22 @@
+name: Phase 05 deterministic gates
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test -p mind-domain --test shadow_deliberation_evals --locked
+      - run: cargo test -p mind-orchestration --test provider_contract --locked
+      - run: cargo test --workspace --locked
+      - run: cargo test --manifest-path tools/shadow-harness/Cargo.toml --locked
+      - run: cargo clippy --manifest-path tools/shadow-harness/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo run -p source-size-lint --locked -- crates tools

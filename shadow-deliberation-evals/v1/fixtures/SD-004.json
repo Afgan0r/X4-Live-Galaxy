@@ -1,1 +1,1 @@
-{"id":"SD-004","track":"ci"}
+{"id":"SD-004","track":"ci","scenario":"unsupported-primitive-or-transition","expected_disposition":"reject-semantic"}

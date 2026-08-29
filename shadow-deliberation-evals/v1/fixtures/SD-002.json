@@ -1,1 +1,1 @@
-{"id":"SD-002","track":"ci"}
+{"id":"SD-002","track":"ci","scenario":"stale-or-unknown-after-transition","expected_disposition":"reject-current-state-or-information"}

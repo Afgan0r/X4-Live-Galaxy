@@ -1,1 +1,1 @@
-{"id":"SD-013","track":"ci"}
+{"id":"SD-013","track":"ci","scenario":"forbidden-game-mutation","expected_disposition":"reject-safety-no-effect"}

@@ -1,1 +1,1 @@
-{"id":"SD-010-de-escalate","track":"ci"}
+{"id":"SD-010-de-escalate","track":"ci","scenario":"shared-xen-pressure-de-escalate","expected_disposition":"valid-shadow-posture"}

@@ -1,1 +1,1 @@
-{"id":"SD-010-maintain","track":"ci"}
+{"id":"SD-010-maintain","track":"ci","scenario":"shared-xen-pressure-maintain","expected_disposition":"valid-shadow-posture"}

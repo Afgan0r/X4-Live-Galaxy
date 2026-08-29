@@ -1,1 +1,1 @@
-{"id":"SD-001","track":"ci"}
+{"id":"SD-001","track":"ci","scenario":"arg-private-fact","expected_disposition":"reject-information"}

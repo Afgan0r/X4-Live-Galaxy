@@ -8,6 +8,10 @@ use strategic_state::{Capability, Faction, PacketLimits, derive_packets};
 pub(crate) struct BenchmarkFixture {
     pub(crate) id: String,
     track: String,
+    #[serde(default)]
+    scenario: String,
+    #[serde(default)]
+    corpus_expected_disposition: String,
     faction: String,
     frozen_snapshot_identity: String,
     current_snapshot_identity: String,
@@ -75,6 +79,7 @@ impl BenchmarkFixture {
     pub(crate) fn canonical_payload(&self) -> String {
         serde_json::json!({
             "allowed_capabilities": self.allowed_capabilities,
+            "corpus_expected_disposition": self.corpus_expected_disposition,
             "current_snapshot_identity": self.current_snapshot_identity,
             "expected_disposition": self.expected_disposition,
             "expected_trajectory": self.expected_trajectory,
@@ -87,6 +92,7 @@ impl BenchmarkFixture {
             "policy_version": self.policy_version,
             "prompt_package_hash": self.prompt_package_hash,
             "prompt_payload": self.prompt_payload,
+            "scenario": self.scenario,
             "provider_id": self.provider_id,
             "visible_fact_ids": self.visible_fact_ids,
         })

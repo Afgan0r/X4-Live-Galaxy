@@ -1,1 +1,1 @@
-{"id":"SD-005","track":"ci"}
+{"id":"SD-005","track":"ci","scenario":"exhausted-resource-budget","expected_disposition":"reject-budget"}

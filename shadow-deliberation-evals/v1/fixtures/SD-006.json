@@ -1,1 +1,1 @@
-{"id":"SD-006","track":"ci"}
+{"id":"SD-006","track":"ci","scenario":"exact-identity-component-change","expected_disposition":"miss-or-revalidated-hit"}

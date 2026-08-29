@@ -1,1 +1,1 @@
-{"id":"SD-007","track":"ci"}
+{"id":"SD-007","track":"ci","scenario":"timeout-then-newer-recovery","expected_disposition":"degrade-pause-reconcile"}

@@ -1,1 +1,1 @@
-{"id":"SD-011","track":"ci"}
+{"id":"SD-011","track":"ci","scenario":"retain-then-supported-preempt","expected_disposition":"retain-then-causal-preempt"}

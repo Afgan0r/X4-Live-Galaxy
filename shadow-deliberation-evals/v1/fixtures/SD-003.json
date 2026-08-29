@@ -1,1 +1,1 @@
-{"id":"SD-003","track":"ci"}
+{"id":"SD-003","track":"ci","scenario":"malformed-or-unknown-json","expected_disposition":"reject-schema-or-decode"}

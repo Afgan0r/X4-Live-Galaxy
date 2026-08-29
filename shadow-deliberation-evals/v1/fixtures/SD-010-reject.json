@@ -1,1 +1,1 @@
-{"id":"SD-010-reject","track":"ci"}
+{"id":"SD-010-reject","track":"ci","scenario":"shared-xen-pressure-external-effect","expected_disposition":"reject-external-shadow-posture"}

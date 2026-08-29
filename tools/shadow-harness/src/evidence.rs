@@ -1,26 +1,25 @@
 use std::path::{Path, PathBuf};
-
 const MAX_FIELD: usize = 64;
-const CASES: [(&str, &str, &str); 17] = [
-    ("SD-001", "reject-information", "ci"),
-    ("SD-002", "accept", "ci"),
-    ("SD-003", "reject-decode", "ci"),
-    ("SD-004", "reject-semantic", "ci"),
-    ("SD-005", "reject-unbounded-request", "ci"),
-    ("SD-006", "exact-cache-revalidate", "ci"),
-    ("SD-007", "one-outstanding-coalesced", "ci"),
-    ("SD-008", "zero-cycle", "ci"),
-    ("SD-009", "two-cycle-cap", "ci"),
-    ("SD-010-maintain", "accept-shadow-posture", "ci"),
-    ("SD-010-de-escalate", "accept-shadow-posture", "ci"),
-    ("SD-010-intensify", "accept-shadow-posture", "ci"),
-    ("SD-010-coordinate", "accept-visible-threat-posture", "ci"),
-    ("SD-010-reject", "reject-external-shadow-posture", "ci"),
-    ("SD-011", "pause-reconcile-retained", "ci"),
-    ("SD-012", "manual-benchmark", "benchmark"),
-    ("SD-013", "reject-safety", "ci"),
+const CASES: [(&str, &str, &str, &str); 18] = [
+    ("SD-001", "arg-private-fact", "reject-information", "ci"),
+    ("SD-002", "stale-or-unknown-after-transition", "reject-current-state-or-information", "ci"),
+    ("SD-003", "malformed-or-unknown-json", "reject-schema-or-decode", "ci"),
+    ("SD-004", "unsupported-primitive-or-transition", "reject-semantic", "ci"),
+    ("SD-005", "exhausted-resource-budget", "reject-budget", "ci"),
+    ("SD-006", "exact-identity-component-change", "miss-or-revalidated-hit", "ci"),
+    ("SD-007", "timeout-then-newer-recovery", "degrade-pause-reconcile", "ci"),
+    ("SD-008", "material-objection", "two-cycles-final-admission", "ci"),
+    ("SD-009", "same-frozen-tuple-replay", "identical-no-duplicate", "ci"),
+    ("SD-010-maintain", "shared-xen-pressure-maintain", "valid-shadow-posture", "ci"),
+    ("SD-010-de-escalate", "shared-xen-pressure-de-escalate", "valid-shadow-posture", "ci"),
+    ("SD-010-intensify", "shared-xen-pressure-intensify", "valid-shadow-posture", "ci"),
+    ("SD-010-coordinate", "shared-xen-pressure-coordinate", "valid-visible-threat-posture", "ci"),
+    ("SD-010-reject", "shared-xen-pressure-external-effect", "reject-external-shadow-posture", "ci"),
+    ("SD-011", "retain-then-supported-preempt", "retain-then-causal-preempt", "ci"),
+    ("SD-012", "direct-executive-institution-agreement", "zero-cycle-terminal-admission", "ci"),
+    ("SD-013", "forbidden-game-mutation", "reject-safety-no-effect", "ci"),
+    ("SD-010-benchmark", "shared-xen-pressure-benchmark", "typed-divergence-labels", "benchmark"),
 ];
-
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Manifest {
@@ -43,8 +42,10 @@ struct ManifestCase {
 struct Fixture {
     id: String,
     track: String,
+    scenario: String,
+    expected_disposition: String,
+    corpus_expected_disposition: Option<String>,
 }
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceRecord {
     request_identity: String,
@@ -77,7 +78,6 @@ impl EvidenceRecord {
         parse_manifest(manifest).is_some()
     }
 }
-
 #[must_use]
 pub fn validate_corpus(root: &Path) -> bool {
     let Ok(bytes) = std::fs::read(root.join("manifest.json")) else {
@@ -137,7 +137,7 @@ fn parse_manifest(value: &str) -> Option<Manifest> {
         })
         .collect();
     actual.sort_unstable();
-    let mut expected = CASES.to_vec();
+    let mut expected: Vec<_> = CASES.iter().map(|(id, _, expected, track)| (*id, *expected, *track)).collect();
     expected.sort_unstable();
     (actual == expected).then_some(manifest)
 }
@@ -152,7 +152,17 @@ fn fixture(root: &Path, case: &ManifestCase) -> bool {
     let Ok(fixture) = serde_json::from_slice::<Fixture>(&bytes) else {
         return false;
     };
-    fixture.id == case.id && fixture.track == case.evidence_class
+    let Some((_, scenario, expected, track)) = CASES.iter().find(|(id, _, _, _)| *id == case.id) else {
+        return false;
+    };
+    fixture.id == case.id
+        && fixture.track == *track
+        && fixture.scenario == *scenario
+        && fixture
+            .corpus_expected_disposition
+            .as_deref()
+            .unwrap_or(&fixture.expected_disposition)
+            == *expected
 }
 
 fn artifact(root: &Path, relative: &str, digest: &str) -> bool {

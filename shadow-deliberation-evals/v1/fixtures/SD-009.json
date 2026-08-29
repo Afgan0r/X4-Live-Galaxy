@@ -1,1 +1,1 @@
-{"id":"SD-009","track":"ci"}
+{"id":"SD-009","track":"ci","scenario":"same-frozen-tuple-replay","expected_disposition":"identical-no-duplicate"}

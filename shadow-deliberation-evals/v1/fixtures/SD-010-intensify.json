@@ -1,1 +1,1 @@
-{"id":"SD-010-intensify","track":"ci"}
+{"id":"SD-010-intensify","track":"ci","scenario":"shared-xen-pressure-intensify","expected_disposition":"valid-shadow-posture"}

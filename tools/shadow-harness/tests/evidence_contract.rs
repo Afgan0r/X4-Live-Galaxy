@@ -65,7 +65,7 @@ fn rejects_wrong_closed_case_track_and_disposition() {
     let Some(root) = corpus_copy("disposition") else {
         return;
     };
-    assert!(replace(&root, "manual-benchmark", "unexpected"));
+    assert!(replace(&root, "zero-cycle-terminal-admission", "unexpected"));
     assert!(!validate_corpus(&root));
     let duplicate = include_str!("../../../shadow-deliberation-evals/v1/manifest.json").replacen(
         "\"id\":\"SD-013\"",
