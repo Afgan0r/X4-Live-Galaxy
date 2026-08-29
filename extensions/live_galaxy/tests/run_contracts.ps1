@@ -16,6 +16,16 @@ if ($Suite -eq 'component_discovery_guard') {
 if ($Suite -eq 'component_discovery') {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_binding_contract.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Component discovery binding contract failed.' }
+    $componentDiscoveryProductionPaths = @(
+        'extensions/live_galaxy/lua/live_galaxy_component_discovery.lua',
+        'extensions/live_galaxy/lua/live_galaxy_x4_discovery.lua'
+    )
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -SelfTest
+    if ($LASTEXITCODE -ne 0) { throw 'Component discovery package guard self-test failed.' }
+    foreach ($productionPath in $componentDiscoveryProductionPaths) {
+        & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -ProductionPath $productionPath
+        if ($LASTEXITCODE -ne 0) { throw "Component discovery package guard failed: $productionPath" }
+    }
 }
 
 $lockPath = Join-Path $root 'tools/lua-runner.lock.json'

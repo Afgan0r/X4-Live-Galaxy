@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [switch]$SelfTest
+    [switch]$SelfTest,
+    [string[]]$ProductionPath = @()
 )
 
 Set-StrictMode -Version Latest
@@ -78,6 +79,31 @@ function Invoke-ComponentDiscoveryPackageGuardSelfTest {
     }
 }
 
-if ($SelfTest -or $MyInvocation.InvocationName -ne '.') {
+function Invoke-ComponentDiscoveryPackageGuard {
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$ProductionPaths
+    )
+
+    foreach ($path in $ProductionPaths) {
+        $normalizedPath = $path.Replace('\', '/')
+        if ($normalizedPath -notin $FixedProductionAllowlist) {
+            throw "Changed production path is outside the fixed allowlist: $normalizedPath"
+        }
+        $fullPath = Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) $path
+        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+            throw "Allowlisted production file is missing: $normalizedPath"
+        }
+        if (-not (Test-ComponentDiscoveryPackage -ProductionPath $normalizedPath -Source (Get-Content -Raw -LiteralPath $fullPath))) {
+            throw "Production package guard rejected: $normalizedPath"
+        }
+    }
+}
+
+if ($SelfTest) {
     Invoke-ComponentDiscoveryPackageGuardSelfTest
+}
+
+if ($ProductionPath.Count -gt 0) {
+    Invoke-ComponentDiscoveryPackageGuard -ProductionPaths $ProductionPath
 }
