@@ -24,17 +24,17 @@
 - [x] **MIND-04**: Equivalent replay inputs produce canonically ordered, reproducible deterministic inputs and admission results.
 - [x] **MIND-05**: ZYA and ARG exhibit measurably distinct strategic responses to shared scenarios rather than differing only by faction labels.
 - [x] **MIND-06**: Accepted shadow plans and Executive diplomatic postures carry typed goals or dispositions, priorities, horizon, supporting facts, expected trade-offs, and safe player-facing explanations without opening inter-faction negotiation.
-- [ ] **MIND-07**: A strategic tick, relevant event trigger, or cooldown can request deliberation while per-faction scheduling remains bounded and deduplicated.
+- [x] **MIND-07**: A strategic tick, relevant event trigger, or cooldown can request deliberation while per-faction scheduling remains bounded and deduplicated.
 
 ### Primitive Institutions
 
 - [x] **INST-01**: ZYA and ARG each have exactly three primitive institutions mapped to defense and military strategy, economy and logistics, and territorial development and infrastructure; their canon-grounded identities and fixed priorities are versioned and conditioned by faction doctrine.
 - [x] **INST-02**: Every 0.1 institution reasons from the same authoritative faction-visible snapshot and cannot introduce private institutional knowledge or unsupported facts.
 - [x] **INST-03**: Each institution owns at most one active typed Shadow initiative with stable identity, objective, supporting evidence, priority, lifecycle state, and owner.
-- [ ] **INST-04**: The Executive Brain may originate, assign, approve, revise, preempt, reject, or terminate an institution initiative but cannot execute it directly or bypass deterministic admission.
-- [ ] **INST-05**: Replacing active work requires an explicit preemption request containing the trigger, previous initiative state, suspend-or-cancel disposition, replacement, Executive decision, and preserved reason.
-- [ ] **INST-06**: Direct Executive–institution agreement proceeds without dialogue; only a material objection, forced mandate, preemption, or revision can open negotiation.
-- [ ] **INST-07**: Exceptional Executive–institution negotiation is capped at two full dialogue cycles and ends in one final kernel-valid Executive disposition without political refusal or sabotage.
+- [x] **INST-04**: The Executive Brain may originate, assign, approve, revise, preempt, reject, or terminate an institution initiative but cannot execute it directly or bypass deterministic admission.
+- [x] **INST-05**: Replacing active work requires an explicit preemption request containing the trigger, previous initiative state, suspend-or-cancel disposition, replacement, Executive decision, and preserved reason.
+- [x] **INST-06**: Direct Executive–institution agreement proceeds without dialogue; only a material objection, forced mandate, preemption, or revision can open negotiation.
+- [x] **INST-07**: Exceptional Executive–institution negotiation is capped at two full dialogue cycles and ends in one final kernel-valid Executive disposition without political refusal or sabotage.
 - [x] **INST-08**: Proposal, objection, disposition, validation, ownership, preemption, and terminal outcome records persist as replayable causal evidence without mutating X4.
 
 ### Model Orchestration and Evaluation
@@ -138,14 +138,14 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | MIND-04 | Phase 3 | Complete |
 | MIND-05 | Phase 4 | Complete |
 | MIND-06 | Phase 5 | Complete |
-| MIND-07 | Phase 5 | Pending |
+| MIND-07 | Phase 5 | Complete |
 | INST-01 | Phase 3 | Complete |
 | INST-02 | Phase 3 | Complete |
 | INST-03 | Phase 4 | Complete |
-| INST-04 | Phase 5 | Pending |
-| INST-05 | Phase 5 | Pending |
-| INST-06 | Phase 5 | Pending |
-| INST-07 | Phase 5 | Pending |
+| INST-04 | Phase 5 | Complete |
+| INST-05 | Phase 5 | Complete |
+| INST-06 | Phase 5 | Complete |
+| INST-07 | Phase 5 | Complete |
 | INST-08 | Phase 4 | Complete |
 | MODEL-01 | Phase 5 | Pending |
 | MODEL-02 | Phase 5 | Complete |

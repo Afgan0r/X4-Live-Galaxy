@@ -143,7 +143,7 @@ Plans:
 9. Exact versioned cache keys and recorded fixtures make cache behavior and normal replay evaluation reproducible without a live provider.
 
 **Research**: Required — benchmark available subscription-backed models and harness behavior, then derive operating bounds from evidence rather than selecting a public runtime API or local provider in advance.
-**Plans**: 1/5 plans executed
+**Plans**: 3/5 plans executed
 
 Plans:
 **Wave 1**
@@ -152,11 +152,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-02-PLAN.md — Add exact cache identity, revalidation, and resource bounds.
+- [x] 05-02-PLAN.md — Add exact cache identity, revalidation, and resource bounds.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05-03-PLAN.md — Add bounded scheduling and Executive–institution arbitration.
+- [x] 05-03-PLAN.md — Add bounded scheduling and Executive–institution arbitration.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -227,7 +227,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 2. Hostile-Faction Research Track | 1/1 | Complete | 2026-08-29 |
 | 3. Faction-Scoped Strategic State | 3/3 | Complete | 2026-08-29 |
 | 4. Persistent Full Faction Minds | 4/4 | Complete | 2026-08-29 |
-| 5. Bounded Shadow Deliberation | 1/5 | In Progress|  |
+| 5. Bounded Shadow Deliberation | 3/5 | In Progress|  |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |
 | 8. Evaluation and Internal Prototype Gate | 0/TBD | Not started | - |
