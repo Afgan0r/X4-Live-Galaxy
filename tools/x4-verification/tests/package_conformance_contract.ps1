@@ -17,6 +17,7 @@ $coveragePath = Join-Path $root 'tools/x4-verification/contracts/coverage.v1.jso
 $admissionFixturePath = Join-Path $root 'tools/x4-verification/fixtures/negative-fixtures.v1.json'
 $admissionPath = Join-Path $root 'tools/x4-verification/x4-admission.ps1'
 $packageRoot = Join-Path $root 'extensions/live_galaxy'
+$aggregateRunner = Join-Path $root 'extensions/live_galaxy/tests/run_contracts.ps1'
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -130,9 +131,20 @@ function Test-PackagedPath {
     }
 }
 
+function Test-AggregateRegistration {
+    $output = & pwsh -NoProfile -File $aggregateRunner -Suite x4-package-conformance 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Aggregate package conformance failed: $($output -join [Environment]::NewLine)"
+    }
+    Assert-True (@($output) -contains 'package conformance contract passed: packaged-path') 'Aggregate runner did not execute the production package contract.'
+}
+
 switch ($Case) {
     'packaged-path' { Test-PackagedPath }
-    'all' { Test-PackagedPath }
+    'all' {
+        Test-PackagedPath
+        Test-AggregateRegistration
+    }
 }
 
 Write-Output "package conformance contract passed: $Case"
