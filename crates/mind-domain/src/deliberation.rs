@@ -31,6 +31,16 @@ impl DeliberationRequest {
     pub fn snapshot_identity(&self) -> &str {
         &self.snapshot_identity
     }
+
+    #[must_use]
+    pub fn policy_version(&self) -> &str {
+        &self.policy_version
+    }
+
+    #[must_use]
+    pub fn prompt_package_hash(&self) -> &str {
+        &self.prompt_package_hash
+    }
     #[expect(
         clippy::too_many_arguments,
         reason = "the frozen request constructor mirrors the versioned boundary"

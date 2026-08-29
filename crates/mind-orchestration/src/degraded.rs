@@ -1,4 +1,4 @@
-use crate::{EvidenceClass, ProviderFailure, ProviderRequest};
+use crate::{EvidenceClass, ProviderFailure, ProviderRequest, RedactedEvidence};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DegradedDeliberation {
@@ -9,6 +9,7 @@ pub struct DegradedDeliberation {
     failure: ProviderFailure,
     attempts: u8,
     paused_observation: u64,
+    trace: RedactedEvidence,
 }
 
 impl DegradedDeliberation {
@@ -25,6 +26,7 @@ impl DegradedDeliberation {
             failure,
             attempts: 1,
             paused_observation: request.observation_identity(),
+            trace: RedactedEvidence::degraded(request, evidence),
         }
     }
 
@@ -41,6 +43,11 @@ impl DegradedDeliberation {
     #[must_use]
     pub const fn attempts(&self) -> u8 {
         self.attempts
+    }
+
+    #[must_use]
+    pub const fn trace(&self) -> &RedactedEvidence {
+        &self.trace
     }
 
     #[must_use]

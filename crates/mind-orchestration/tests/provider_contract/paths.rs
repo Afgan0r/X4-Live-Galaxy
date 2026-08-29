@@ -49,3 +49,43 @@ fn scheduler_terminal_paths_clear_or_pause_then_reconcile() {
         RequestEligibility::Eligible(_)
     ));
 }
+
+#[test]
+fn accepted_and_degraded_traces_are_redacted_and_non_authoritative() {
+    let (Ok(request), Ok(candidate)) = (request(), candidate()) else {
+        return;
+    };
+    let Ok(canonical) = canonical("request-zya", request) else {
+        return;
+    };
+    let prior = MindAggregate::empty(Faction::Zya);
+    let mut runner = DeliberationRunner::new();
+    let mut scheduler = scheduled();
+    let mut provider = FakeProvider {
+        outcome: Ok(candidate),
+    };
+    let accepted = runner.run(&mut provider, &canonical, &prior, context(&mut scheduler));
+    let RunnerOutcome::Admitted { trace, .. } = accepted else {
+        panic!("fixture candidate must be admitted");
+    };
+    assert!(trace.is_redacted_and_bounded());
+    assert_eq!(
+        trace.recovery(),
+        mind_orchestration::RecoveryTransition::NotApplicable
+    );
+    assert!(!format!("{trace:?}").contains("hold the visible frontier"));
+    let _ = scheduler.eligibility(Faction::Zya, FactionTrigger::StrategicTick(3));
+    let mut failed = FakeProvider {
+        outcome: Err(ProviderFailure::Timeout),
+    };
+    let degraded = runner.run(&mut failed, &canonical, &prior, context(&mut scheduler));
+    let RunnerOutcome::Degraded(degraded) = degraded else {
+        panic!("timeout must degrade");
+    };
+    assert!(degraded.trace().is_redacted_and_bounded());
+    assert_eq!(
+        degraded.trace().recovery(),
+        mind_orchestration::RecoveryTransition::PausedAwaitingReconciliation
+    );
+    assert_eq!(prior, MindAggregate::empty(Faction::Zya));
+}

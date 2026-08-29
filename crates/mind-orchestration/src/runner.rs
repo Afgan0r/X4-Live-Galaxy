@@ -1,4 +1,6 @@
-use crate::{DegradedDeliberation, EvidenceClass, ProviderRequest, ShadowProvider};
+use crate::{
+    DegradedDeliberation, EvidenceClass, ProviderRequest, RedactedEvidence, ShadowProvider,
+};
 use mind_domain::{AdmissionDecision, DeliberationScheduler, MindAggregate, admit};
 use strategic_state::Faction;
 
@@ -7,6 +9,7 @@ pub enum RunnerOutcome {
     Admitted {
         admission: AdmissionDecision,
         evidence: EvidenceClass,
+        trace: RedactedEvidence,
     },
     Degraded(DegradedDeliberation),
 }
@@ -44,10 +47,11 @@ impl DeliberationRunner {
         if request.request().snapshot_identity() != context.current_snapshot_identity
             || request.request().faction() != prior.faction()
         {
+            let admission =
+                AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState);
             let outcome = RunnerOutcome::Admitted {
-                admission: AdmissionDecision::Rejected(
-                    mind_domain::AdmissionRejection::CurrentState,
-                ),
+                trace: RedactedEvidence::admission(request, &[], &admission, provider.evidence()),
+                admission,
                 evidence: provider.evidence(),
             };
             context.scheduler.complete(context.faction);
@@ -55,15 +59,19 @@ impl DeliberationRunner {
         }
         let evidence = provider.evidence();
         let outcome = match provider.propose(request) {
-            Ok(bytes) => RunnerOutcome::Admitted {
-                admission: admit(
+            Ok(bytes) => {
+                let admission = admit(
                     request.request(),
                     prior,
                     context.current_snapshot_identity,
                     &bytes,
-                ),
-                evidence,
-            },
+                );
+                RunnerOutcome::Admitted {
+                    trace: RedactedEvidence::admission(request, &bytes, &admission, evidence),
+                    admission,
+                    evidence,
+                }
+            }
             Err(failure) => RunnerOutcome::Degraded(DegradedDeliberation::from_failure(
                 request, evidence, failure,
             )),
@@ -96,20 +104,23 @@ impl DeliberationRunner {
             || request.request().faction() != prior.faction()
         {
             context.scheduler.complete(context.faction);
+            let admission =
+                AdmissionDecision::Rejected(mind_domain::AdmissionRejection::CurrentState);
             return RunnerOutcome::Admitted {
-                admission: AdmissionDecision::Rejected(
-                    mind_domain::AdmissionRejection::CurrentState,
-                ),
+                trace: RedactedEvidence::admission(request, &[], &admission, evidence),
+                admission,
                 evidence,
             };
         }
+        let admission = admit(
+            request.request(),
+            prior,
+            context.current_snapshot_identity,
+            candidate,
+        );
         let outcome = RunnerOutcome::Admitted {
-            admission: admit(
-                request.request(),
-                prior,
-                context.current_snapshot_identity,
-                candidate,
-            ),
+            trace: RedactedEvidence::admission(request, candidate, &admission, evidence),
+            admission,
             evidence,
         };
         context.scheduler.complete(context.faction);
