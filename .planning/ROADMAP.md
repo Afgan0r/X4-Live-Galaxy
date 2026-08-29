@@ -166,6 +166,28 @@ Plans:
 
 - [x] 05-05-PLAN.md — Add the manual subscription harness and complete corpus gate.
 
+### Phase 05.2: Layered Lua and X4 Verification Foundation (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run $gsd-plan-phase 05.2 to break down)
+
+### Phase 05.1: Bounded Real Component Discovery (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run $gsd-plan-phase 05.1 to break down)
+
 ### Phase 6: Correlated Reports and Diagnostics
 
 **Goal**: Operators receive safe concise X4 reports and complete, bounded external evidence for every shadow decision and degraded path.

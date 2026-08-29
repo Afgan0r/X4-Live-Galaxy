@@ -4,16 +4,16 @@ current_phase: 06
 current_phase_name: Correlated Reports and Diagnostics
 status: planning
 stopped_at: Phase 05 complete, ready to plan Phase 06
-last_updated: "2026-08-29T05:10:55.930Z"
+last_updated: "2026-08-29T14:30:28.138Z"
 last_activity: 2026-08-29
 last_activity_desc: Phase 05 complete, transitioned to Phase 06
-state_head: 0445f35fca71110d821339e8cc456a49fa1eda64
+state_head: 7528b5fb2d3a028627753fcb7fc3cbb8300a4141
 progress:
-  total_phases: 8
+  total_phases: 10
   completed_phases: 4
-  total_plans: 22
+  total_plans: 24
   completed_plans: 21
-  percent: 50
+  percent: 40
 ---
 
 # Project State
@@ -133,6 +133,11 @@ None yet.
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
 - [Phase 6]: The bounded Rust-to-X4 Mail/Logbook return channel and acknowledgement semantics require disposable evidence; topology and framing remain technical decisions.
+
+### Roadmap Evolution
+
+- Phase 05.1 inserted after Phase 5: Bounded Real Component Discovery; conditional successor for actual component-level X4 telemetry, separated from the Phase 1 transport spine. (URGENT)
+- Phase 05.2 inserted after Phase 5.1: Layered Lua and X4 verification foundation, based on the approved handoff; executes after conditional component discovery and before Phase 6. (URGENT)
 
 ## Deferred Items
 
