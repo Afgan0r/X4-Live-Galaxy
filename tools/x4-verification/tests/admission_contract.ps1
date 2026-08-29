@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('dossier')]
+    [ValidateSet('dossier', 'negative-fixtures')]
     [string]$Case = 'dossier'
 )
 
@@ -12,6 +12,8 @@ $contractsRoot = Join-Path $toolRoot 'contracts'
 $admissionPath = Join-Path $toolRoot 'x4-admission.ps1'
 $dossierPath = Join-Path $contractsRoot 'dossier.v1.json'
 $registryPath = Join-Path $contractsRoot 'known-failures.v1.json'
+$coveragePath = Join-Path $contractsRoot 'coverage.v1.json'
+$fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
 
 $requiredDimensions = @(
     'loader-registration',
@@ -35,7 +37,7 @@ function Copy-Json($Value) {
     return ($Value | ConvertTo-Json -Depth 32 | ConvertFrom-Json)
 }
 
-function Invoke-Admission($Dossier, $Registry) {
+function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("live-galaxy-admission-{0}" -f [guid]::NewGuid().ToString('N'))
     [void](New-Item -ItemType Directory -Path $tempRoot)
     try {
@@ -43,7 +45,18 @@ function Invoke-Admission($Dossier, $Registry) {
         $tempRegistry = Join-Path $tempRoot 'registry.json'
         $Dossier | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempDossier -Encoding utf8NoBOM
         $Registry | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempRegistry -Encoding utf8NoBOM
-        $output = & pwsh -NoProfile -File $admissionPath -DossierPath $tempDossier -RegistryPath $tempRegistry 2>&1
+        $arguments = @('-NoProfile', '-File', $admissionPath, '-DossierPath', $tempDossier, '-RegistryPath', $tempRegistry)
+        if ($null -ne $Coverage) {
+            $tempCoverage = Join-Path $tempRoot 'coverage.json'
+            $Coverage | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempCoverage -Encoding utf8NoBOM
+            $arguments += @('-CoveragePath', $tempCoverage)
+        }
+        if ($null -ne $Fixtures) {
+            $tempFixtures = Join-Path $tempRoot 'fixtures.json'
+            $Fixtures | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempFixtures -Encoding utf8NoBOM
+            $arguments += @('-FixturePath', $tempFixtures)
+        }
+        $output = & pwsh @arguments 2>&1
         $exitCode = $LASTEXITCODE
         $jsonLine = @($output | ForEach-Object { $_.ToString() } | Where-Object { $_.TrimStart().StartsWith('{') }) | Select-Object -Last 1
         Assert-True ($null -ne $jsonLine) "Admission emitted no JSON result: $($output -join ' | ')"
@@ -66,12 +79,74 @@ function Assert-Rejected($Run, [string]$ReasonCode, [string]$Label) {
     Assert-True ($joined -notmatch '(?i)[A-Z]:\\|/Users/|\\Users\\|private|secret') "$Label leaked a private path or value."
 }
 
-foreach ($path in @($admissionPath, $dossierPath, $registryPath)) {
+$requiredPaths = @($admissionPath, $dossierPath, $registryPath)
+if ($Case -eq 'negative-fixtures') {
+    $requiredPaths += @($coveragePath, $fixturePath)
+}
+foreach ($path in $requiredPaths) {
     Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required admission artifact is missing: $path"
 }
 
 $baseDossier = Get-Content -LiteralPath $dossierPath -Raw -Encoding utf8 | ConvertFrom-Json
 $baseRegistry = Get-Content -LiteralPath $registryPath -Raw -Encoding utf8 | ConvertFrom-Json
+
+if ($Case -eq 'negative-fixtures') {
+    $coverage = Get-Content -LiteralPath $coveragePath -Raw -Encoding utf8 | ConvertFrom-Json
+    $fixtures = Get-Content -LiteralPath $fixturePath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($fixtures.schema_version -eq 'x4-negative-fixtures.v1') 'Negative fixture schema is not versioned.'
+    Assert-True (@($fixtures.fixtures).Count -eq 7) 'Exactly seven initial negative fixtures are required.'
+    $orderedIds = @($fixtures.fixtures | Sort-Object id | ForEach-Object id)
+    Assert-True (($orderedIds -join '|') -eq (@($fixtures.fixtures | ForEach-Object id) -join '|')) 'Negative fixtures must use deterministic ID order.'
+
+    foreach ($fixture in @($fixtures.fixtures)) {
+        Assert-True ($fixture.enabled -is [bool] -and $fixture.enabled) "Fixture $($fixture.id) is skipped."
+        $dossier = Copy-Json $baseDossier
+        $dimension = @($dossier.dimensions | Where-Object { $_.id -eq $fixture.dimension_id })
+        Assert-True ($dimension.Count -eq 1) "Fixture $($fixture.id) names an unknown dimension."
+        $dimension[0] | Add-Member -NotePropertyName finding_ids -NotePropertyValue @($fixture.finding_id)
+        $dossier.findings = @([pscustomobject]@{
+            id = $fixture.finding_id
+            failure_class_id = $fixture.failure_class_id
+            dimension_id = $fixture.dimension_id
+            disposition = 'known-failure'
+        })
+        Assert-Rejected (Invoke-Admission $dossier $baseRegistry $coverage $fixtures) $fixture.expected_reason_code "fixture $($fixture.id)"
+    }
+
+    $missingRow = Copy-Json $coverage
+    $missingRow.rows = @($missingRow.rows | Select-Object -Skip 1)
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $missingRow $fixtures) 'UNCOVERED_FAILURE_CLASS' 'missing coverage row'
+
+    $missingFixture = Copy-Json $fixtures
+    $missingFixture.fixtures = @($missingFixture.fixtures | Select-Object -Skip 1)
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $missingFixture) 'INVALID_FIXTURE_REFERENCE' 'missing fixture'
+
+    $skippedFixture = Copy-Json $fixtures
+    $skippedFixture.fixtures[0].enabled = $false
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $skippedFixture) 'SKIPPED_NEGATIVE_FIXTURE' 'skipped fixture'
+
+    $mismatchedFixture = Copy-Json $fixtures
+    $mismatchedFixture.fixtures[0].failure_class_id = 'native-binding-assumptions'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $mismatchedFixture) 'MISMATCHED_FIXTURE' 'mismatched fixture'
+
+    $duplicateFixture = Copy-Json $fixtures
+    $duplicateFixture.fixtures = @($duplicateFixture.fixtures) + @(Copy-Json $duplicateFixture.fixtures[0])
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $duplicateFixture) 'DUPLICATE_ID' 'duplicate fixture'
+
+    $passingFixture = Copy-Json $fixtures
+    $passingFixture.fixtures[0].expected_reason_code = 'ADMISSIBLE'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $passingFixture) 'PASSING_NEGATIVE_FIXTURE' 'passing negative fixture'
+
+    $newRegistry = Copy-Json $baseRegistry
+    $newClass = Copy-Json $newRegistry.failure_classes[0]
+    $newClass.id = 'new-runtime-failure'
+    $newClass.title = 'New runtime failure awaiting coverage'
+    $newRegistry.failure_classes = @($newRegistry.failure_classes) + @($newClass)
+    Assert-Rejected (Invoke-Admission $baseDossier $newRegistry $coverage $fixtures) 'UNCOVERED_FAILURE_CLASS' 'new registry row without coverage'
+
+    Write-Output 'PASS: negative fixture coverage contract'
+    exit 0
+}
 
 $complete = Invoke-Admission $baseDossier $baseRegistry
 Assert-True ($complete.ExitCode -eq 0) "Complete dossier failed: $($complete.Output -join ' | ')"
