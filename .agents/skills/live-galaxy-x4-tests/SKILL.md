@@ -70,6 +70,21 @@ Read `.agents/skills/live-galaxy-x4-integration/SKILL.md` first. Use the global
 - A test is `observed in X4` only when the game produced the expected behavior
   and the success/failure health surface remained valid.
 
+### Correlated Developer Diagnostics
+
+- A multi-hop X4 runtime probe must use an opt-in developer trace, separate
+  from player-facing UI: every retained event identifies the probe attempt,
+  hop, result, and bounded timing or size metadata.
+- Correlate the X4 debuglog and bridge trace with the same attempt identity;
+  include safe envelope metadata such as generation, sequence, and type when
+  available, then diagnose the first missing or rejected hop.
+- Keep normal operation to lifecycle and error diagnostics. Enable per-frame
+  trace only for a bounded disposable probe, with rate and size limits.
+- Never write raw payload content, saves, prompts, credentials, or hidden model
+  reasoning into either trace. Record a sanitized, bounded failure reason.
+- A runtime ledger entry must cite the correlated artifacts and distinguish
+  their observations from static or fake-adapter evidence.
+
 ## Lua Mutation Testing
 
 - Mutate only executable pure Lua modules initially. The native X4 adapter and

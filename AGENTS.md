@@ -60,6 +60,9 @@ documentation and repository evidence outrank memory.
 
 - GSD owns project discovery, requirements, roadmap, phase discussion, planning,
   execution, verification, review, and milestone closure.
+- Route every code-affecting task through the applicable GSD workflow, including
+  runtime diagnostics, tests, and refactors. Do not hand-implement phase work
+  outside GSD; use `gsd-progress` to route in-flight or new work first.
 - During an autonomous goal, keep chat output to brief status updates and real
   blockers. Do not spend output tokens on narration the user does not need.
 - Run one deep product brainstorm before each new milestone. It must lock the

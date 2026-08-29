@@ -3,6 +3,7 @@
 .codex/.gsd-routing-state.json
 .codex/.gsd-routing-restart-required
 .tmp/
+tools/.cache/
 PENDING-MEMORY.md
 
 # Secrets and local configuration
