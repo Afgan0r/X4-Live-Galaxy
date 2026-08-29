@@ -85,3 +85,23 @@ Plan 05 Task 3 creates `05-SECURITY-REVIEW.md` from the focused corpus, provider
 - [ ] V2–V5 security review is complete with no unresolved high-severity finding.
 
 **Approval:** deterministic contract evidence complete; the subscription benchmark remains explicit manual-only evidence.
+
+## Nyquist Adversarial Audit — 2026-08-29
+
+The audit added executable behavioral coverage for previously weak or missing
+cases. Existing implementation files remain read-only. The stale-provider
+regression was re-run after the implementation fix and now proves zero provider
+calls for a detectable current-state mismatch.
+
+| Gap | Test added or tightened | Command | Result |
+| --- | --- | --- | --- |
+| SD-004 unsupported primitive lacked a direct admission assertion | `sd_004_unsupported_capability_is_rejected_without_a_pending_commit` | `cargo test -p mind-domain --test shadow_deliberation_evals --locked` | green |
+| SD-005 lacked oversized candidate and trade-off budget behavior | `sd_005_oversized_candidate_and_tradeoffs_are_rejected_atomically` | `cargo test -p mind-domain --test shadow_deliberation_evals --locked` | green |
+| Stale provider path could pass without proving provider isolation | Tightened `stale_provider_and_cache_reject_before_pending_commit`; added `stale_provider_request_is_rejected_before_provider_invocation` | `cargo test -p mind-orchestration --test provider_contract --locked` | green; zero provider calls and no pending commit |
+
+No implementation defects remain escalated from this audit. The stale-provider
+preflight fix is verified by the focused orchestration test and the full
+workspace suite.
+
+The real subscription benchmark and human X4 evidence remain manual-only and
+are not claimed as automated coverage.
