@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: executing
-stopped_at: Completed 05.2-01-PLAN.md
-last_updated: "2026-08-29T23:23:23.419Z"
+stopped_at: Completed 05.2-02-PLAN.md
+last_updated: "2026-08-29T23:43:15.342Z"
 last_activity: 2026-08-30
-last_activity_desc: Completed Phase 05.2 Plan 01 admission foundation
-state_head: cacfd605eb1db461c19d8e402b45f5d36fea1649
+last_activity_desc: Completed Phase 05.2 Plan 02 package conformance
+state_head: 2388be9d08fdd272b1c376f6937058c41af0f615
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 36
-  completed_plans: 25
+  completed_plans: 26
   percent: 40
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — EXECUTING
-Plan: 1 of 5
-Status: In progress
-Last activity: 2026-08-30 — Completed Phase 05.2 Plan 01 admission foundation
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-08-30 — Completed Phase 05.2 Plan 02 package conformance
 
 Progress: [████░░░░░░] 40%
 
@@ -78,6 +78,7 @@ Progress: [████░░░░░░] 40%
 | Phase 05.1 P01 | 28m | 3 tasks | 4 files |
 | Phase 05.1 P02 | 24m | 2 tasks | 8 files |
 | Phase 05.2 P01 | 19min | 3 tasks | 8 files |
+| Phase 05.2 P02 | 14min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,9 @@ Recent decisions affecting current work:
 - [Phase 05.2]: The complete dossier is a validation fixture and does not admit the runtime-pending Phase 05.1 seam.
 - [Phase 05.2]: Registry growth requires evidence and executable coverage for every current row before dossier evaluation.
 - [Phase 05.2]: Owner overrides bind one finding to the exact dossier digest, explicit decision, remaining risk, and a maximum 90-day expiry.
+- [Phase 05.2]: Production-faithful package evidence requires the registered entrypoint, contained complete import graph, and one direct ffi.C acquisition site.
+- [Phase 05.2]: Package conformance remains packaged-static and digest-bound; Plan 01 remains the independent admission authority.
+- [Phase 05.2]: Bare, test-only, and alternate-binding-only loading is local-only and cannot satisfy AC-04.
 
 ### Pending Todos
 
@@ -159,6 +163,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-29T23:22:41.923Z
-Stopped at: Completed 05.2-01-PLAN.md
+Last session: 2026-08-29T23:43:14.815Z
+Stopped at: Completed 05.2-02-PLAN.md
 Resume file: None
