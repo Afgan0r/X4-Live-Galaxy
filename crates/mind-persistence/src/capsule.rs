@@ -1,12 +1,12 @@
-const CAPSULE_SCHEMA: &str = "mind-capsule-v1";
+pub const CAPSULE_SCHEMA: &str = "mind-capsule-v1";
 const MAX_FIELD_BYTES: usize = 128;
 const MAX_NARRATIVE_BYTES: usize = 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LedgerRange {
-    first_sequence: u64,
-    last_sequence: u64,
-    integrity_hash: String,
+    pub(super) first_sequence: u64,
+    pub(super) last_sequence: u64,
+    pub(super) integrity_hash: String,
 }
 
 impl LedgerRange {
@@ -22,11 +22,11 @@ impl LedgerRange {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BudgetProfile {
-    provider: String,
-    model: String,
-    context_limit: u32,
-    measured_tokens: u32,
-    headroom_tokens: u32,
+    pub(super) provider: String,
+    pub(super) model: String,
+    pub(super) context_limit: u32,
+    pub(super) measured_tokens: u32,
+    pub(super) headroom_tokens: u32,
 }
 
 impl BudgetProfile {
@@ -56,10 +56,10 @@ impl BudgetProfile {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitmentProjection {
-    goal: String,
-    plan: String,
-    posture: String,
-    initiative_owner: String,
+    pub(super) goal: String,
+    pub(super) plan: String,
+    pub(super) posture: String,
+    pub(super) initiative_owner: String,
 }
 
 impl CommitmentProjection {
@@ -116,17 +116,7 @@ impl Capsule {
 
     #[must_use]
     pub fn identity(&self) -> String {
-        format!(
-            "{CAPSULE_SCHEMA}:{}:{}:{}:{}:{}:{}:{}:{}",
-            self.range.first_sequence,
-            self.range.last_sequence,
-            self.range.integrity_hash,
-            self.profile.provider,
-            self.profile.model,
-            self.profile.context_limit,
-            self.profile.measured_tokens,
-            self.profile.headroom_tokens
-        )
+        crate::capsule_identity::build(&self.range, &self.profile, &self.commitments)
     }
 
     #[must_use]

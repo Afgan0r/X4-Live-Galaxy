@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod capsule;
+mod capsule_identity;
 mod checkpoint;
 mod fake_port;
 mod legacy;

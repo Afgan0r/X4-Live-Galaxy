@@ -62,6 +62,60 @@ fn typed_commitments_survive_corrupt_narrative_without_authority_inversion() {
 }
 
 #[test]
+fn typed_commitments_bind_identity_while_narrative_does_not() {
+    let range = LedgerRange::new(4, 8, "ledger-hash");
+    let profile = profile("provider-a", "model-a", 80);
+    let base = Capsule::new(
+        range.clone(),
+        profile.clone(),
+        commitments(),
+        Some("summary"),
+    );
+    let changed_goal = Capsule::new(
+        range.clone(),
+        profile.clone(),
+        CommitmentProjection::new("other-goal", "plan", "posture", "initiative-owner"),
+        None,
+    );
+    let changed_plan = Capsule::new(
+        range.clone(),
+        profile.clone(),
+        CommitmentProjection::new("goal", "other-plan", "posture", "initiative-owner"),
+        None,
+    );
+    let changed_posture = Capsule::new(
+        range.clone(),
+        profile.clone(),
+        CommitmentProjection::new("goal", "plan", "other-posture", "initiative-owner"),
+        None,
+    );
+    let changed_owner = Capsule::new(
+        range,
+        profile,
+        CommitmentProjection::new("goal", "plan", "posture", "other-owner"),
+        None,
+    );
+    let (Ok(base), Ok(goal), Ok(plan), Ok(posture), Ok(owner)) = (
+        base,
+        changed_goal,
+        changed_plan,
+        changed_posture,
+        changed_owner,
+    ) else {
+        return;
+    };
+    let identity = base.identity();
+    assert_ne!(identity, goal.identity());
+    assert_ne!(identity, plan.identity());
+    assert_ne!(identity, posture.identity());
+    assert_ne!(identity, owner.identity());
+    assert_eq!(
+        identity,
+        base.with_narrative(Some("replacement")).identity()
+    );
+}
+
+#[test]
 fn rejects_inconsistent_ranges_profiles_and_oversized_narrative() {
     assert_eq!(
         Capsule::new(

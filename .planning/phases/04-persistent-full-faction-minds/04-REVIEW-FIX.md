@@ -3,7 +3,7 @@ phase: 04-persistent-full-faction-minds
 review: 04-REVIEW.md
 fixed: 2026-08-29
 status: resolved
-findings_resolved: [CR-01, CR-02]
+findings_resolved: [CR-01, CR-02, CR-03]
 ---
 
 # Phase 04 Code Review Fixes
@@ -31,10 +31,20 @@ projection.
 Migration conversion lives separately from current-envelope recovery so the
 strict source-file limit remains enforced.
 
+## CR-03: Authoritative capsule identity
+
+Capsule identity now length-frames the schema, ledger range, provider-relative
+budget, and every typed commitment field. Goal, plan, posture, and initiative
+owner changes therefore produce distinct identities, while the optional
+narrative remains deliberately outside the authoritative binding.
+
+Regression coverage changes each commitment field independently and verifies
+that a narrative-only replacement preserves identity.
+
 ## Verification
 
 - `cargo test -p mind-persistence --test recovery_contract` — passed, 6 tests.
-- `cargo test -p mind-persistence --test capsule_contract` — passed, 3 tests.
+- `cargo test -p mind-persistence --test capsule_contract` — passed, 4 tests.
 - `cargo test -p mind-persistence --test mutation_baseline` — passed, 2 tests.
 - `cargo run -p source-size-lint` — passed.
 - `cargo clippy --workspace --all-targets -- -D warnings` — passed.
