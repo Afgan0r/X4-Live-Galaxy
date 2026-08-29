@@ -92,10 +92,79 @@ function cases.rejects_a_syntactically_valid_owner_outside_the_declared_scope()
         return station == "station:20" and "faction:antigone" or "faction:argon", sector_id
     end
 
-    local payload, err = telemetry.produce_observation(discovery.new(api))
+    local adapter = discovery.new(api)
+    local payload, err = telemetry.produce_observation(adapter)
 
     assert(payload == nil)
     assert(err == "facts_unsupported")
+    assert(adapter.diagnostic_class() == "owner_scope_mismatch")
+end
+
+function cases.classifies_closed_post_enumeration_failures_without_changing_the_error()
+    local failures = {
+        {
+            class = "metadata_unavailable",
+            apply = function(api)
+                api.get_component_data = function() error("private native text") end
+            end,
+        },
+        {
+            class = "owner_invalid",
+            apply = function(api)
+                api.get_component_data = function() return "invalid owner!", "sector:argon_prime" end
+            end,
+        },
+        {
+            class = "owner_scope_mismatch",
+            apply = function(api)
+                api.get_component_data = function() return "faction:antigone", "sector:argon_prime" end
+            end,
+        },
+        {
+            class = "sector_invalid",
+            apply = function(api)
+                api.get_component_data = function() return "faction:argon", "invalid sector!" end
+            end,
+        },
+        {
+            class = "capacity_unavailable",
+            apply = function(api)
+                api.get_people_capacity = function() error("private native text") end
+            end,
+        },
+        {
+            class = "capacity_invalid",
+            apply = function(api)
+                api.get_people_capacity = function() return "private value" end
+            end,
+        },
+    }
+
+    for _, failure in ipairs(failures) do
+        local api = fake_api()
+        failure.apply(api)
+        local adapter = discovery.new(api)
+        local payload, err = telemetry.produce_observation(adapter)
+
+        assert(payload == nil)
+        assert(err == "facts_unsupported")
+        assert(adapter.diagnostic_class() == failure.class)
+    end
+end
+
+function cases.clears_the_closed_diagnostic_class_after_a_successful_retry()
+    local api = fake_api()
+    api.get_people_capacity = function() return "private value" end
+    local adapter = discovery.new(api)
+
+    assert(select(2, adapter.read_observation(1)) == "facts_unsupported")
+    assert(adapter.diagnostic_class() == "capacity_invalid")
+
+    api.get_people_capacity = function(_, component64)
+        return component64 == "10" and 42 or 24
+    end
+    assert(adapter.read_observation(1) ~= nil)
+    assert(adapter.diagnostic_class() == nil)
 end
 
 function cases.suppresses_every_invalid_stage_without_partial_observation()

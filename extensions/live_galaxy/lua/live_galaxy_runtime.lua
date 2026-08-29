@@ -5,6 +5,15 @@ package.path = package.path .. ";extensions/?.lua"
 local LOCAL_MODULE_PREFIX = "live_galaxy/lua/"
 local DEFAULT_TRACE_MAX_EVENTS = 64
 local VERSION_DIAGNOSTIC_MAX_BYTES = 64
+local DISCOVERY_DIAGNOSTIC_CLASSES = {
+    asset_identity_invalid = true,
+    capacity_invalid = true,
+    capacity_unavailable = true,
+    metadata_unavailable = true,
+    owner_invalid = true,
+    owner_scope_mismatch = true,
+    sector_invalid = true,
+}
 
 local function require_live_galaxy_module(name)
     return require(LOCAL_MODULE_PREFIX .. name)
@@ -149,6 +158,13 @@ end
 function runtime.produce_discovery_payload(adapter, version)
     local observation, err = telemetry.produce_observation(adapter, version)
     if observation == nil then
+        if trace_enabled and err == "facts_unsupported" and type(adapter) == "table"
+            and type(adapter.diagnostic_class) == "function" then
+            local diagnostic_ok, diagnostic_class = pcall(adapter.diagnostic_class, adapter)
+            if diagnostic_ok and DISCOVERY_DIAGNOSTIC_CLASSES[diagnostic_class] then
+                trace("component_discovery_class", diagnostic_class)
+            end
+        end
         trace("discovery_unavailable", tostring(err))
         return nil, "discovery_" .. tostring(err)
     end

@@ -3,6 +3,15 @@ local discovery = {}
 local MAX_OWNER_STATIONS = 16
 local MAX_FACT_STRING_BYTES = 96
 local MAX_SAFE_INTEGER = 9007199254740991
+local FACT_DIAGNOSTIC_CLASSES = {
+    asset_identity_invalid = true,
+    capacity_invalid = true,
+    capacity_unavailable = true,
+    metadata_unavailable = true,
+    owner_invalid = true,
+    owner_scope_mismatch = true,
+    sector_invalid = true,
+}
 
 local function callable(api, name)
     return type(api) == "table" and type(api[name]) == "function"
@@ -67,8 +76,19 @@ end
 
 function discovery.new(api)
     local adapter = {}
+    local last_diagnostic_class
+
+    local function unsupported(class)
+        last_diagnostic_class = FACT_DIAGNOSTIC_CLASSES[class] and class or nil
+        return nil, "facts_unsupported"
+    end
+
+    function adapter.diagnostic_class()
+        return last_diagnostic_class
+    end
 
     function adapter.read_observation(_, version)
+        last_diagnostic_class = nil
         if not api_available(api) then return nil, "enumeration_unavailable" end
         local count_ok, raw_count = pcall(api.count_stations, api, api.faction_id)
         local count = tonumber(raw_count)
@@ -108,11 +128,13 @@ function discovery.new(api)
             )
             candidate.asset_id = "asset:station:" .. candidate.stable_id
             candidate.owner_id, candidate.sector_id, candidate.people_capacity = owner_id, sector_id, people_capacity
-            if not metadata_ok or not capacity_ok or not valid_id(candidate.asset_id)
-                or not valid_id(owner_id) or owner_id ~= api.faction_id or not valid_id(sector_id)
-                or not valid_integer(people_capacity) then
-                return nil, "facts_unsupported"
-            end
+            if not metadata_ok then return unsupported("metadata_unavailable") end
+            if not capacity_ok then return unsupported("capacity_unavailable") end
+            if not valid_id(candidate.asset_id) then return unsupported("asset_identity_invalid") end
+            if not valid_id(owner_id) then return unsupported("owner_invalid") end
+            if owner_id ~= api.faction_id then return unsupported("owner_scope_mismatch") end
+            if not valid_id(sector_id) then return unsupported("sector_invalid") end
+            if not valid_integer(people_capacity) then return unsupported("capacity_invalid") end
         end
 
         local observation = section_from_candidates(candidates)

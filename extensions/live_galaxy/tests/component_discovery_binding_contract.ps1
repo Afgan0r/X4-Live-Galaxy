@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $module = Join-Path (Split-Path -Parent $PSScriptRoot) 'lua/live_galaxy_component_discovery.lua'
 $runtimeModule = Join-Path (Split-Path -Parent $PSScriptRoot) 'lua/live_galaxy_x4_discovery.lua'
+$entryModule = Join-Path (Split-Path -Parent $PSScriptRoot) 'lua/live_galaxy_runtime.lua'
 if (-not (Test-Path -LiteralPath $module -PathType Leaf)) {
     throw "Missing component discovery adapter: $module"
 }
@@ -26,6 +27,10 @@ foreach ($pattern in @(
     'GetComponentData\(component, "owner", "sector"\)',
     'get_people_capacity = function\(_, component64\)',
     'C\.GetPeopleCapacity\(component64, "", false\)',
+    'function adapter\.diagnostic_class\(\)',
+    'metadata_unavailable',
+    'owner_scope_mismatch',
+    'capacity_invalid',
     'pcall'
 )) {
     if ($source -notmatch $pattern) { throw "Missing protected binding: $pattern" }
@@ -44,4 +49,13 @@ $runtimeSource = Get-Content -LiteralPath $runtimeModule -Raw
 if ($runtimeSource -notmatch 'require\("live_galaxy/lua/live_galaxy_component_discovery"\)' -or
     $runtimeSource -match 'require\("live_galaxy_component_discovery"\)') {
     throw 'Component discovery must use the extension-relative X4 module path.'
+}
+if (-not (Test-Path -LiteralPath $entryModule -PathType Leaf)) {
+    throw "Missing runtime entrypoint: $entryModule"
+}
+$entrySource = Get-Content -LiteralPath $entryModule -Raw
+if ($entrySource -notmatch 'if trace_enabled and err == "facts_unsupported"' -or
+    $entrySource -notmatch 'component_discovery_class' -or
+    $entrySource -notmatch 'DISCOVERY_DIAGNOSTIC_CLASSES\[diagnostic_class\]') {
+    throw 'The component diagnostic must remain opt-in and allowlisted.'
 }

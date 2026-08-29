@@ -297,6 +297,69 @@ function cases.runtime_suppresses_observation_when_discovery_fails()
     assert(err == "discovery_adapter_unavailable")
 end
 
+function cases.runtime_emits_only_a_closed_component_class_when_trace_is_enabled()
+    local previous_debug_error = DebugError
+    local trace_events = {}
+    package.loaded["live_galaxy/lua/live_galaxy_trace_config"] = {
+        enabled = true,
+        attempt_id = "d051-facts-class",
+        max_frame_events = 64,
+        version_diagnostic_enabled = false,
+    }
+    DebugError = function(message) trace_events[#trace_events + 1] = message end
+
+    local isolated_runtime = fresh_runtime()
+    local adapter = {
+        read_observation = function() return nil, "facts_unsupported" end,
+        diagnostic_class = function() return "owner_scope_mismatch" end,
+    }
+    local body, err = isolated_runtime.produce_discovery_payload(adapter, 1)
+
+    assert(body == nil)
+    assert(err == "discovery_facts_unsupported")
+    local class_events = 0
+    for _, message in ipairs(trace_events) do
+        if message:match("event=component_discovery_class detail=owner_scope_mismatch") then
+            class_events = class_events + 1
+        end
+        assert(not message:match("private native text"))
+        assert(not message:match("private value"))
+    end
+    assert(class_events == 1)
+
+    DebugError = previous_debug_error
+    package.loaded["live_galaxy/lua/live_galaxy_trace_config"] = nil
+    package.loaded["live_galaxy_runtime"] = nil
+    require("live_galaxy_runtime")
+end
+
+function cases.runtime_does_not_emit_the_component_class_when_trace_is_disabled()
+    local previous_debug_error = DebugError
+    local trace_events = {}
+    package.loaded["live_galaxy/lua/live_galaxy_trace_config"] = {
+        enabled = false,
+        attempt_id = "d051-facts-class-disabled",
+        max_frame_events = 64,
+        version_diagnostic_enabled = false,
+    }
+    DebugError = function(message) trace_events[#trace_events + 1] = message end
+
+    local isolated_runtime = fresh_runtime()
+    local adapter = {
+        read_observation = function() return nil, "facts_unsupported" end,
+        diagnostic_class = function() return "owner_scope_mismatch" end,
+    }
+    assert(select(2, isolated_runtime.produce_discovery_payload(adapter, 1)) == "discovery_facts_unsupported")
+    for _, message in ipairs(trace_events) do
+        assert(not message:match("event=component_discovery_class"))
+    end
+
+    DebugError = previous_debug_error
+    package.loaded["live_galaxy/lua/live_galaxy_trace_config"] = nil
+    package.loaded["live_galaxy_runtime"] = nil
+    require("live_galaxy_runtime")
+end
+
 function cases.runtime_advances_past_a_failed_discovery_without_an_observation_frame()
     local isolated_runtime = fresh_runtime()
     isolated_runtime.set_discovery_adapter(discovery.new({}))
