@@ -54,6 +54,11 @@ implementation and review.
 
 ## Verification
 
+Use extension-relative module paths for every production Lua `require`,
+including dependencies loaded by other modules. Before deployment, statically
+verify the complete production import graph rather than only the registered
+entry point.
+
 Validate static schemas and contracts first, then run focused adapter tests, and
 only then use a disposable in-game probe. Capture exact game version, mod list,
 scenario, elapsed game time, logs, and expected versus observed results.
