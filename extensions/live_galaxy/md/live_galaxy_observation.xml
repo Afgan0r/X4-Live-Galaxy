@@ -6,12 +6,15 @@
     actions, reports, acknowledgements, or game-state effect path.
   -->
   <cues>
-    <cue name="live_galaxy_root" instantiate="true">
+    <cue name="live_galaxy_root">
       <conditions>
-        <event_game_started />
+        <check_any>
+          <event_cue_signalled cue="md.Setup.GameStart" />
+          <event_game_loaded />
+        </check_any>
       </conditions>
       <cues>
-        <cue name="live_galaxy_observation" checkinterval="30s">
+        <cue name="live_galaxy_observation" instantiate="true" checkinterval="30s">
           <actions>
             <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_tick'" />
           </actions>

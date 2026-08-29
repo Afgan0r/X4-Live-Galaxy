@@ -1,5 +1,5 @@
-const PROTOCOL_CAPABILITY: &str = "live-galaxy-observation-v1";
-const GAME_FACING_BUILD: &str = "live-galaxy-x4-build-1";
+const PROTOCOL_CAPABILITY: &str = "live-galaxy-observation-v2";
+const GAME_FACING_BUILD: &str = "live-galaxy-x4-build-2";
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

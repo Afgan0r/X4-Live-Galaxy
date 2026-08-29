@@ -4,7 +4,7 @@ use x4_bridge::{BridgeError, CapabilityDecision, TelemetryFrame, admit_tracer_fr
 #[test]
 fn protocol_contract_admits_compatible_telemetry_only_frame() {
     let fixture = include_str!("../../../tests/fixtures/tracer-observation.json");
-    let decision = CapabilityDecision::negotiate("live-galaxy-observation-v1");
+    let decision = CapabilityDecision::negotiate("live-galaxy-observation-v2");
     let frame = TelemetryFrame::observation(fixture);
 
     let accepted = match admit_tracer_frame(decision, frame) {

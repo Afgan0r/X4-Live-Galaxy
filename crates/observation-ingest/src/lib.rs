@@ -4,6 +4,7 @@ mod batch;
 mod batch_budget;
 mod completion;
 mod model;
+mod runtime_facts;
 mod snapshot;
 mod wire;
 
@@ -14,11 +15,15 @@ use observation_domain::{
 
 pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
-    admit_batch, validate_batch,
+    ReceiptClock, SystemReceiptClock, admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
 pub use model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, MAX_REJECTION_EVIDENCE,
     RejectionEvidence, RejectionReason,
+};
+pub use runtime_facts::{
+    RuntimeAsset, RuntimeCapacity, RuntimeFactAvailability, RuntimeFactQuality, RuntimeFacts,
+    RuntimeOwnership, RuntimeSector,
 };
 pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;

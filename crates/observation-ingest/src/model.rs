@@ -1,9 +1,10 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 
+use crate::runtime_facts::RuntimeFacts;
 use crate::snapshot::ProjectionSnapshot;
+use observation_domain::EntityId;
 
 pub const MAX_REJECTION_EVIDENCE: usize = 8;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AdmissionError {
     InvalidFixture,
@@ -13,6 +14,7 @@ pub enum AdmissionError {
     InvalidQuality,
     InvalidScope,
     InvalidContent,
+    ReceiptClockUnavailable,
     OutOfOrderVersion,
     EqualVersionConflict,
     CollectionLimitExceeded,
@@ -41,7 +43,8 @@ impl From<&AdmissionError> for RejectionReason {
             AdmissionError::CollectionLimitExceeded => Self::CollectionLimitExceeded,
             AdmissionError::InvalidFixture
             | AdmissionError::InvalidQuality
-            | AdmissionError::InvalidContent => Self::MalformedFrame,
+            | AdmissionError::InvalidContent
+            | AdmissionError::ReceiptClockUnavailable => Self::MalformedFrame,
         }
     }
 }
@@ -66,6 +69,7 @@ impl RejectionEvidence {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AcceptedProjection {
     pub snapshot: ProjectionSnapshot,
+    pub(crate) runtime_facts: BTreeMap<EntityId, RuntimeFacts>,
     rejection_evidence: VecDeque<RejectionEvidence>,
 }
 
@@ -79,6 +83,11 @@ impl AcceptedProjection {
     }
 
     #[must_use]
+    pub fn runtime_facts(&self, sector_id: &str) -> Option<&RuntimeFacts> {
+        EntityId::new(sector_id.to_owned()).and_then(|id| self.runtime_facts.get(&id))
+    }
+
+    #[must_use]
     pub const fn rejection_evidence(&self) -> &VecDeque<RejectionEvidence> {
         &self.rejection_evidence
     }
@@ -86,6 +95,18 @@ impl AcceptedProjection {
     pub const fn with_snapshot(snapshot: ProjectionSnapshot) -> Self {
         Self {
             snapshot,
+            runtime_facts: BTreeMap::new(),
+            rejection_evidence: VecDeque::new(),
+        }
+    }
+
+    pub(crate) const fn with_runtime_facts(
+        snapshot: ProjectionSnapshot,
+        runtime_facts: BTreeMap<EntityId, RuntimeFacts>,
+    ) -> Self {
+        Self {
+            snapshot,
+            runtime_facts,
             rejection_evidence: VecDeque::new(),
         }
     }

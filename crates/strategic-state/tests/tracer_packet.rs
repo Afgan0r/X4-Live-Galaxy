@@ -1,5 +1,6 @@
-use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Faction, PacketLimits, ThreatSubject, derive_packets};
+
+mod support;
 
 const FRAMES: [&str; 17] = [
     r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
@@ -22,9 +23,7 @@ const FRAMES: [&str; 17] = [
 ];
 
 fn projection() -> observation_ingest::ProjectionSnapshot {
-    admit_batch(AcceptedProjection::empty(), &FRAMES)
-        .into_projection()
-        .snapshot
+    support::admit_runtime_fact_frames(&FRAMES).snapshot
 }
 
 #[test]

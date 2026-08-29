@@ -1,7 +1,8 @@
-use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{
     FactAvailability, FactFamily, FactOwner, Faction, PacketLimits, StrategicFact, derive_packets,
 };
+
+mod support;
 
 const FRAMES: [&str; 4] = [
     r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:military:fleet","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
@@ -12,9 +13,7 @@ const FRAMES: [&str; 4] = [
 
 #[test]
 fn visibility_availability_capacity_and_canonical_order_remain_observable() {
-    let snapshot = admit_batch(AcceptedProjection::empty(), &FRAMES)
-        .into_projection()
-        .snapshot;
+    let snapshot = support::admit_runtime_fact_frames(&FRAMES).snapshot;
     let result = derive_packets(&snapshot, PacketLimits::tracer());
     assert!(result.is_ok());
     let Ok(packets) = result else { return };

@@ -1,8 +1,9 @@
-use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{
     BilateralPosture, Faction, PacketLimits, PlanningHorizon, PrimitiveOwner, ShadowPrimitive,
     ShadowPrimitiveError, ShadowPrimitiveKind, derive_packets,
 };
+
+mod support;
 
 const FRAMES: [&str; 4] = [
     r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:military:fleet","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
@@ -13,9 +14,7 @@ const FRAMES: [&str; 4] = [
 
 #[test]
 fn finite_allowlist_is_bounded_and_executive_posture_is_not_an_institution_view() {
-    let snapshot = admit_batch(AcceptedProjection::empty(), &FRAMES)
-        .into_projection()
-        .snapshot;
+    let snapshot = support::admit_runtime_fact_frames(&FRAMES).snapshot;
     let packets = derive_packets(&snapshot, PacketLimits::tracer()).expect("accepted fixture");
     let packet = packets.packet(Faction::Zya);
     let primitives = ShadowPrimitive::derive(packet).expect("available visible facts");
@@ -69,9 +68,7 @@ fn rejects_required_primitive_evidence_when_quality_is_unavailable() {
             r#"{"type":"observation","scope":"XEN","entity_id":"XEN:threat:XEN","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"shared"}"#.to_owned(),
         ];
         let input = frames.iter().map(String::as_str).collect::<Vec<_>>();
-        let snapshot = admit_batch(AcceptedProjection::empty(), &input)
-            .into_projection()
-            .snapshot;
+        let snapshot = support::admit_runtime_fact_frames(&input).snapshot;
         let packets = derive_packets(&snapshot, PacketLimits::tracer()).expect("packet input");
 
         assert_eq!(

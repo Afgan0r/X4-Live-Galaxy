@@ -1,5 +1,6 @@
-use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Faction, PacketLimits, ShadowPrimitive, derive_packets};
+
+mod support;
 
 const ORDERED: [&str; 4] = [
     r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:military:fleet","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
@@ -11,9 +12,7 @@ const ORDERED: [&str; 4] = [
 fn packet(
     frames: &[&str],
 ) -> Result<strategic_state::StrategicPacket, strategic_state::DerivationError> {
-    let snapshot = admit_batch(AcceptedProjection::empty(), frames)
-        .into_projection()
-        .snapshot;
+    let snapshot = support::admit_runtime_fact_frames(frames).snapshot;
     derive_packets(&snapshot, PacketLimits::tracer())
         .map(|packets| packets.packet(Faction::Zya).clone())
 }
@@ -52,9 +51,7 @@ fn permutations_have_one_canonical_packet_and_replay_identity() {
 
 #[test]
 fn configured_primitive_budget_rejects_below_four() {
-    let snapshot = admit_batch(AcceptedProjection::empty(), &ORDERED)
-        .into_projection()
-        .snapshot;
+    let snapshot = support::admit_runtime_fact_frames(&ORDERED).snapshot;
     for limit in [1, 2, 3] {
         assert_eq!(
             derive_packets(&snapshot, PacketLimits::new(32, limit)),
@@ -66,13 +63,12 @@ fn configured_primitive_budget_rejects_below_four() {
 }
 
 #[test]
-fn replay_fingerprint_changes_for_identity_content_and_version() {
+fn replay_fingerprint_changes_for_retained_identity_and_version() {
     let baseline = packet(&ORDERED).expect("baseline packet");
     let primitives = ShadowPrimitive::derive(&baseline).expect("baseline primitives");
     let fingerprint = baseline.replay_fingerprint(&primitives);
     for changed in [
         r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:energy","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"own"}"#,
-        r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":1,"quality":"fresh","content":"changed"}"#,
         r#"{"type":"observation","scope":"ZYA","entity_id":"ZYA:economy:ore","observed_at_unix_millis":1,"version":2,"quality":"fresh","content":"own"}"#,
     ] {
         let candidate =

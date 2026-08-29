@@ -33,6 +33,7 @@ pub const MAX_ACCEPT_DELAY_MILLIS: u64 = 1_000;
 const INITIAL_ACCEPT_DELAY_MILLIS: u64 = 100;
 const MAX_PENDING_OBSERVATIONS: usize = 64;
 const EXPECTED_PROTOCOL_MAJOR: u16 = 1;
+const MAX_PIPE_FRAME_BYTES: usize = 2_048;
 
 mod session_gate;
 
@@ -128,7 +129,7 @@ impl PipeServer {
         if pending.scope != scope
             || pending.version != version
             || pending.observations.len() == MAX_PENDING_OBSERVATIONS
-            || pending.bytes + payload.len() > MAX_BATCH_BYTES - 512
+            || pending.bytes + payload.len() > MAX_BATCH_BYTES - MAX_PIPE_FRAME_BYTES
         {
             self.discard_pending();
             return PipeDisposition::Rejected;
@@ -163,7 +164,10 @@ impl Default for PipeServer {
             accept_delay_millis: 0,
             pending: None,
             session: SessionState::new(EXPECTED_PROTOCOL_MAJOR),
-            ingress: BoundedIngress::new(FrameLimits::new(512, MAX_PENDING_OBSERVATIONS)),
+            ingress: BoundedIngress::new(FrameLimits::new(
+                MAX_PIPE_FRAME_BYTES,
+                MAX_PENDING_OBSERVATIONS,
+            )),
             client_generation: None,
         }
     }

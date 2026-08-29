@@ -1,6 +1,8 @@
 use observation_domain::SectionQuality;
 use serde::Deserialize;
 
+use crate::runtime_facts::RuntimeFacts;
+
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WireFrame {
@@ -30,7 +32,7 @@ pub enum FrameHeader {
 }
 
 pub fn inspect_frame(payload: &str) -> Result<FrameHeader, crate::AdmissionError> {
-    if payload.len() > 512 {
+    if payload.len() > 2_048 {
         return Err(crate::AdmissionError::FrameTooLarge);
     }
     match serde_json::from_str(payload).map_err(|_| crate::AdmissionError::InvalidFixture)? {
@@ -131,10 +133,9 @@ pub struct WireRuntimeHealth {
 pub struct WireObservation {
     pub scope: String,
     pub entity_id: String,
-    pub observed_at_unix_millis: u64,
     pub version: u64,
     pub quality: TracerQuality,
-    pub content: String,
+    pub runtime_facts: RuntimeFacts,
     pub generation: Option<u64>,
     pub sequence: Option<u64>,
 }

@@ -10,10 +10,28 @@ use crate::batch_budget::BatchBudget;
 use crate::model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, RejectionEvidence, RejectionReason,
 };
+use crate::runtime_facts::RuntimeFacts;
 use crate::snapshot::{ProjectionSnapshot, ScopedObservation};
 use crate::wire::{WireCompleteMarker, WireFrame, WireObservation};
 
-const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
+pub trait ReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError>;
+}
+
+pub struct SystemReceiptClock;
+
+impl ReceiptClock for SystemReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+            .filter(|value| *value > 0)
+            .ok_or(AdmissionError::ReceiptClockUnavailable)
+    }
+}
+
+const MAX_TRACER_PAYLOAD_BYTES: usize = 2_048;
 const MAX_SCOPE_MEMBERS: usize = 64;
 pub const MAX_BATCH_FRAMES: usize = 128;
 pub const MAX_BATCH_BYTES: usize = MAX_BATCH_FRAMES * MAX_TRACER_PAYLOAD_BYTES;
@@ -25,7 +43,16 @@ pub fn validate_batch(
     accepted: &AcceptedProjection,
     frames: &[&str],
 ) -> Result<ProjectionSnapshot, AdmissionError> {
+    Ok(validate_runtime_batch(accepted, frames, 1)?.0)
+}
+
+fn validate_runtime_batch(
+    accepted: &AcceptedProjection,
+    frames: &[&str],
+    receipt_unix_millis: u64,
+) -> Result<(ProjectionSnapshot, BTreeMap<EntityId, RuntimeFacts>), AdmissionError> {
     let mut candidate = accepted.snapshot.clone();
+    let mut runtime_facts = accepted.runtime_facts.clone();
     let mut markers = Vec::new();
     let mut observed_members = BTreeMap::<EntityId, Vec<CanonicalObservationKey>>::new();
     let mut budget = BatchBudget::new(frames.len())?;
@@ -40,9 +67,11 @@ pub fn validate_batch(
             WireFrame::RuntimeHealth(frame) => validate_health(frame)?,
             WireFrame::Observation(frame) => {
                 budget.record_observation()?;
-                let (scope, key) = apply_observation(&mut candidate, frame)?;
+                let (scope, key, entity_id, facts) =
+                    apply_observation(&mut candidate, frame, receipt_unix_millis)?;
                 budget.register_scope(&scope)?;
                 observed_members.entry(scope).or_default().push(key);
+                runtime_facts.insert(entity_id, facts);
             }
             WireFrame::CompleteMarker(frame) => {
                 budget.record_marker()?;
@@ -59,7 +88,8 @@ pub fn validate_batch(
             .unwrap_or_default();
         apply_reconciliation(&accepted.snapshot, &mut candidate, marker, observed)?;
     }
-    Ok(candidate)
+    runtime_facts.retain(|entity_id, _| candidate.observations.contains_key(entity_id));
+    Ok((candidate, runtime_facts))
 }
 
 fn validate_telemetry(scope: String, version: u64) -> Result<(), AdmissionError> {
@@ -76,8 +106,25 @@ fn validate_health(frame: crate::wire::WireRuntimeHealth) -> Result<(), Admissio
 }
 
 pub fn admit_batch(accepted: AcceptedProjection, frames: &[&str]) -> AdmissionOutcome {
-    match validate_batch(&accepted, frames) {
-        Ok(snapshot) => AdmissionOutcome::Accepted(AcceptedProjection::with_snapshot(snapshot)),
+    admit_batch_with_receipt_clock(accepted, frames, &SystemReceiptClock)
+}
+
+pub fn admit_batch_with_receipt_clock(
+    accepted: AcceptedProjection,
+    frames: &[&str],
+    clock: &dyn ReceiptClock,
+) -> AdmissionOutcome {
+    let outcome = validate_runtime_batch(&accepted, frames, 1).and_then(|_| {
+        let receipt = clock.receipt_unix_millis()?;
+        (receipt > 0)
+            .then_some(receipt)
+            .ok_or(AdmissionError::ReceiptClockUnavailable)
+            .and_then(|receipt| validate_runtime_batch(&accepted, frames, receipt))
+    });
+    match outcome {
+        Ok((snapshot, runtime_facts)) => AdmissionOutcome::Accepted(
+            AcceptedProjection::with_runtime_facts(snapshot, runtime_facts),
+        ),
         Err(error) => {
             let evidence = RejectionEvidence::new(RejectionReason::from(&error));
             AdmissionOutcome::Rejected {
@@ -91,7 +138,8 @@ pub fn admit_batch(accepted: AcceptedProjection, frames: &[&str]) -> AdmissionOu
 fn apply_observation(
     candidate: &mut ProjectionSnapshot,
     frame: WireObservation,
-) -> Result<(EntityId, CanonicalObservationKey), AdmissionError> {
+    receipt_unix_millis: u64,
+) -> Result<(EntityId, CanonicalObservationKey, EntityId, RuntimeFacts), AdmissionError> {
     let entity_id = EntityId::new(frame.entity_id).ok_or(AdmissionError::InvalidEntityId)?;
     let scope = EntityId::new(frame.scope).ok_or(AdmissionError::InvalidScope)?;
     let version = ObservationVersion::new(frame.version).ok_or(AdmissionError::InvalidVersion)?;
@@ -99,15 +147,20 @@ fn apply_observation(
     let record = ObservationRecord::new(
         entity_id.clone(),
         ObservationSource::x4_runtime(),
-        ObservationTime::from_unix_millis(frame.observed_at_unix_millis),
+        ObservationTime::from_unix_millis(receipt_unix_millis),
         version,
-        frame.content,
+        "runtime_facts_v2".to_owned(),
     )
     .map_err(|_| AdmissionError::InvalidContent)?;
+    let mut facts = frame.runtime_facts;
+    facts.validate(&entity_id)?;
+    facts.receipt_unix_millis = receipt_unix_millis;
     let key = CanonicalObservationKey::new(entity_id.clone(), version);
     if let Some(previous) = candidate.observations.get(&entity_id) {
         match classify_duplicate(&previous.record, &record) {
-            DuplicateDecision::Idempotent => return Ok((scope, key)),
+            DuplicateDecision::Idempotent => {
+                return Ok((scope, key, entity_id, facts));
+            }
             DuplicateDecision::Conflict if version == previous.record.version() => {
                 return Err(AdmissionError::EqualVersionConflict);
             }
@@ -119,14 +172,14 @@ fn apply_observation(
         }
     }
     candidate.observations.insert(
-        entity_id,
+        entity_id.clone(),
         ScopedObservation {
             scope: scope.clone(),
             record,
             quality,
         },
     );
-    Ok((scope, key))
+    Ok((scope, key, entity_id, facts))
 }
 
 fn complete_marker(frame: WireCompleteMarker) -> Result<CompleteMarker, AdmissionError> {

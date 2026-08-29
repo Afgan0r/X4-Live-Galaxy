@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "compatibilityTarget": "Lua 5.1",
+  "archiveVersion": "5.1.5",
+  "executableVersion": "Lua 5.1.5",
+  "platform": "windows-x86_64",
+  "archive": {
+    "url": "https://www.lua.org/ftp/lua-5.1.5.tar.gz",
+    "sha256": "2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333"
+  },
+  "materialization": {
+    "kind": "source-build",
+    "compiler": "clang.exe",
+    "linker": "lld-link.exe",
+    "executableRelativePath": "tools/.cache/lua/5.1.5/bin/lua.exe",
+    "binaryProvenance": "Built locally with the approved LLVM clang.exe source route from the checksum-verified official Lua 5.1.5 archive; no prebuilt binary is accepted."
+  },
+  "provenance": {
+    "source": "Official Lua.org FTP archive",
+    "license": "MIT; Lua 5.1.5 COPYRIGHT is retained in the verified source archive.",
+    "selectionEvidence": "Observed X4 embedded runtime diagnostic: Lua 5.1 (2026-08-29)."
+  }
+}

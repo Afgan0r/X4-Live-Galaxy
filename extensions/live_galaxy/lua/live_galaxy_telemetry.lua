@@ -1,6 +1,6 @@
 local telemetry = {}
 
-local normalize = require("live_galaxy_normalize")
+local normalize = require("live_galaxy/lua/live_galaxy_normalize")
 
 local MAX_SECTIONS_PER_CYCLE = 1
 
@@ -41,12 +41,12 @@ function telemetry.observe_runtime_scope(adapter, scope, limit)
     return sections
 end
 
-function telemetry.produce_observation(adapter)
+function telemetry.produce_observation(adapter, version)
     if type(adapter) ~= "table" or type(adapter.read_observation) ~= "function" then
         return nil, "adapter_unavailable"
     end
 
-    local observation, err = adapter.read_observation(MAX_SECTIONS_PER_CYCLE)
+    local observation, err = adapter.read_observation(MAX_SECTIONS_PER_CYCLE, version)
     if observation == nil then
         return nil, err or "observation_unavailable"
     end

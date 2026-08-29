@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<addon name="live_galaxy">
+<addon name="live_galaxy" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../ui/core/addon.xsd">
   <environment type="menus">
     <file name="lua/live_galaxy_runtime.lua" />
+    <dependency name="sn_mod_support_apis" />
   </environment>
 </addon>

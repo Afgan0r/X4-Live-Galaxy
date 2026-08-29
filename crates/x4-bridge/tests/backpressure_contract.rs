@@ -5,8 +5,8 @@ use x4_bridge::{
 fn compatible_session() -> SessionState {
     SessionState::new(1).admit_hello(SessionHello::new(
         1,
-        "live-galaxy-x4-build-1",
-        ["live-galaxy-observation-v1"],
+        "live-galaxy-x4-build-2",
+        ["live-galaxy-observation-v2"],
     ))
 }
 
@@ -55,8 +55,8 @@ fn unsupported_kind_is_rejected_without_consuming_queue_capacity() {
 fn terminal_or_stale_sessions_are_nonblocking_non_admissions() {
     let terminal = SessionState::new(1).admit_hello(SessionHello::new(
         2,
-        "live-galaxy-x4-build-1",
-        ["live-galaxy-observation-v1"],
+        "live-galaxy-x4-build-2",
+        ["live-galaxy-observation-v2"],
     ));
     let ingress = BoundedIngress::new(FrameLimits::new(3, 1));
 

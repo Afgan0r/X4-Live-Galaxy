@@ -1,7 +1,7 @@
 use x4_bridge::{CapabilityDecision, SessionHello, SessionState};
 
 fn hello() -> SessionHello {
-    SessionHello::new(1, "live-galaxy-x4-build-1", ["live-galaxy-observation-v1"])
+    SessionHello::new(1, "live-galaxy-x4-build-2", ["live-galaxy-observation-v2"])
 }
 
 #[test]
@@ -18,8 +18,8 @@ fn compatible_reconnect_advances_generation_without_mutating_acceptance() {
 fn incompatible_reconnect_stays_terminal() {
     let rejected = SessionState::new(1).admit_hello(SessionHello::new(
         2,
-        "live-galaxy-x4-build-1",
-        ["live-galaxy-observation-v1"],
+        "live-galaxy-x4-build-2",
+        ["live-galaxy-observation-v2"],
     ));
     assert_eq!(rejected.reconnect(), rejected);
 }

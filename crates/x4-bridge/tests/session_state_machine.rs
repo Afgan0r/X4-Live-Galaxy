@@ -4,7 +4,7 @@ use x4_bridge::{
 };
 
 fn compatible_hello() -> SessionHello {
-    SessionHello::new(1, "live-galaxy-x4-build-1", ["live-galaxy-observation-v1"])
+    SessionHello::new(1, "live-galaxy-x4-build-2", ["live-galaxy-observation-v2"])
 }
 
 #[test]
@@ -24,8 +24,8 @@ fn compatible_reconnect_advances_only_bridge_generation() {
 fn incompatible_hello_is_terminal_until_x4_restarts() {
     let incompatible = SessionState::new(1).admit_hello(SessionHello::new(
         2,
-        "live-galaxy-x4-build-1",
-        ["live-galaxy-observation-v1"],
+        "live-galaxy-x4-build-2",
+        ["live-galaxy-observation-v2"],
     ));
 
     assert_eq!(
@@ -40,13 +40,13 @@ fn incompatible_hello_is_terminal_until_x4_restarts() {
 fn missing_capability_and_game_build_mismatch_name_exact_restart_owner() {
     let missing_capability = SessionState::new(1).admit_hello(SessionHello::new(
         1,
-        "live-galaxy-x4-build-1",
+        "live-galaxy-x4-build-2",
         ["other-capability"],
     ));
     let build_mismatch = SessionState::new(1).admit_hello(SessionHello::new(
         1,
-        "live-galaxy-x4-build-2",
-        ["live-galaxy-observation-v1"],
+        "live-galaxy-x4-build-1",
+        ["live-galaxy-observation-v2"],
     ));
 
     assert_eq!(
