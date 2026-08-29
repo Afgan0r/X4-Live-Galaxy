@@ -19,6 +19,10 @@ impl ShadowProvider for FakeProvider {
     fn propose(&mut self, _: &ProviderRequest) -> Result<Vec<u8>, ProviderFailure> {
         self.outcome.clone()
     }
+
+    fn evidence(&self) -> EvidenceClass {
+        EvidenceClass::DeterministicFixture
+    }
 }
 
 fn request() -> Result<DeliberationRequest, String> {
@@ -62,20 +66,27 @@ fn deterministic_fake_replays_candidate_through_shared_admission() {
     let (Ok(request), Ok(candidate)) = (request, candidate) else {
         return;
     };
-    let canonical = ProviderRequest::new(
-        "request-zya-1",
-        request,
-        ProviderMetadata::new("fixture", "fake-v1").unwrap(),
-    )
-    .unwrap();
-    let mut first = FakeProvider { outcome: Ok(candidate.clone()) };
-    let mut replay = FakeProvider { outcome: Ok(candidate) };
+    let canonical = canonical("request-zya-1", request);
+    assert!(canonical.is_ok());
+    let Ok(canonical) = canonical else { return };
+    let mut first = FakeProvider {
+        outcome: Ok(candidate.clone()),
+    };
+    let mut replay = FakeProvider {
+        outcome: Ok(candidate),
+    };
     let mut runner = DeliberationRunner::new();
     let prior = MindAggregate::empty(Faction::Zya);
     let first = runner.run(&mut first, &canonical, &prior);
     let replay = runner.run(&mut replay, &canonical, &prior);
     assert_eq!(first, replay);
-    assert!(matches!(first, RunnerOutcome::Admitted { evidence: EvidenceClass::DeterministicFixture, .. }));
+    assert!(matches!(
+        first,
+        RunnerOutcome::Admitted {
+            evidence: EvidenceClass::DeterministicFixture,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -83,18 +94,28 @@ fn provider_timeout_pauses_until_newer_reconciled_observation() {
     let request = request();
     assert!(request.is_ok());
     let Ok(request) = request else { return };
-    let canonical = ProviderRequest::new(
-        "request-zya-timeout",
-        request,
-        ProviderMetadata::new("fixture", "fake-v1").unwrap(),
-    )
-    .unwrap();
-    let mut provider = FakeProvider { outcome: Err(ProviderFailure::Timeout) };
+    let canonical = canonical("request-zya-timeout", request);
+    assert!(canonical.is_ok());
+    let Ok(canonical) = canonical else { return };
+    let mut provider = FakeProvider {
+        outcome: Err(ProviderFailure::Timeout),
+    };
     let mut runner = DeliberationRunner::new();
     let prior = MindAggregate::empty(Faction::Zya);
     let outcome = runner.run(&mut provider, &canonical, &prior);
-    let RunnerOutcome::Degraded(record) = outcome else { return };
+    let RunnerOutcome::Degraded(record) = outcome else {
+        return;
+    };
     assert_eq!(record.evidence(), EvidenceClass::DeterministicFixture);
     assert!(record.reconcile(1).is_err());
     assert!(record.reconcile(2).is_ok());
+}
+
+fn metadata() -> Result<ProviderMetadata, String> {
+    ProviderMetadata::new("fixture", "fake-v1").map_err(|error| format!("metadata: {error:?}"))
+}
+
+fn canonical(identity: &str, request: DeliberationRequest) -> Result<ProviderRequest, String> {
+    ProviderRequest::new(identity, 1, request, metadata()?)
+        .map_err(|error| format!("canonical request: {error:?}"))
 }
