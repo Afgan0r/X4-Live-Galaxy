@@ -48,6 +48,10 @@ impl PipeServer {
             self.discard_pending();
             return PipeDisposition::Rejected;
         };
+        if self.confirm_pending_completion() == PipeDisposition::Rejected {
+            self.discard_pending();
+            return PipeDisposition::Rejected;
+        }
         if kind != "observation" {
             return self.admit_control(payload, kind, scope, version, session);
         }
@@ -76,10 +80,33 @@ impl PipeServer {
     ) -> PipeDisposition {
         self.session = session;
         match kind {
-            "complete_marker" => self.complete_snapshot(payload, scope, version),
+            "complete_marker" => self.defer_completion(payload, scope, version),
             "heartbeat" | "runtime_health" => self.admit_messages(&[payload]),
             _ => PipeDisposition::Rejected,
         }
+    }
+
+    fn defer_completion(&mut self, marker: &str, scope: &str, version: u64) -> PipeDisposition {
+        let Some(pending) = &self.pending else {
+            return PipeDisposition::Rejected;
+        };
+        if pending.scope != scope || pending.version != version {
+            self.discard_pending();
+            return PipeDisposition::Rejected;
+        }
+        self.pending_marker = Some(marker.to_owned());
+        PipeDisposition::Accepted
+    }
+
+    fn confirm_pending_completion(&mut self) -> PipeDisposition {
+        let Some(marker) = self.pending_marker.take() else {
+            return PipeDisposition::Accepted;
+        };
+        let Some(pending) = &self.pending else {
+            return PipeDisposition::Rejected;
+        };
+        let scope = pending.scope.clone();
+        self.complete_snapshot(&marker, &scope, pending.version)
     }
 }
 

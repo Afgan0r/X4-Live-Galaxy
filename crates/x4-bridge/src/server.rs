@@ -51,6 +51,7 @@ pub struct PipeServer {
     consecutive_accept_failures: usize,
     accept_delay_millis: u64,
     pending: Option<PendingSnapshot>,
+    pending_marker: Option<String>,
     session: SessionState,
     ingress: BoundedIngress,
     client_generation: Option<u64>,
@@ -99,6 +100,7 @@ impl PipeServer {
 
     pub fn discard_pending(&mut self) {
         self.pending = None;
+        self.pending_marker = None;
     }
 
     pub fn record_accept(&mut self, attempt: AcceptAttempt) -> AcceptDisposition {
@@ -163,6 +165,7 @@ impl Default for PipeServer {
             consecutive_accept_failures: 0,
             accept_delay_millis: 0,
             pending: None,
+            pending_marker: None,
             session: SessionState::new(EXPECTED_PROTOCOL_MAJOR),
             ingress: BoundedIngress::new(FrameLimits::new(
                 MAX_PIPE_FRAME_BYTES,

@@ -363,6 +363,34 @@ function cases.runtime_discards_pending_station_frames_after_a_lost_connection()
     isolated_runtime.set_discovery_adapter(nil)
 end
 
+function cases.runtime_discards_a_marker_recorded_before_the_pipe_write_throws()
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function()
+            return { station("sector:argon_prime", "10", 42), station("sector:second_contact", "20", 24) }
+        end,
+    })
+    local writes, payloads = 0, {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, payload)
+            writes = writes + 1
+            payloads[#payloads + 1] = payload
+            if writes == 6 then error("connection lost after marker delivery") end
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    for _ = 1, 5 do assert(select(2, isolated_runtime.handle_tick()) == "sent") end
+    assert(select(2, isolated_runtime.handle_tick()) == "pipe_reconnect")
+    assert(payloads[6]:match('"type":"complete_marker"'))
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+    assert(payloads[7]:match('"type":"hello"'))
+
+    isolated_runtime.set_pipe_adapter(nil)
+    isolated_runtime.set_discovery_adapter(nil)
+end
+
 function cases.runtime_fails_closed_when_backpressure_drops_a_station_frame()
     local isolated_runtime = fresh_runtime()
     local reads = 0

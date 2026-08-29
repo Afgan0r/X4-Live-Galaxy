@@ -9,6 +9,8 @@ const MARKER: &str = r#"{"type":"complete_marker","scope":"runtime:sectors","ver
 const HEARTBEAT: &str =
     r#"{"type":"heartbeat","scope":"runtime:sectors","version":1,"generation":1,"sequence":1}"#;
 const HEALTH: &str = r#"{"type":"runtime_health","scope":"runtime:sectors","version":1,"status":"available","generation":1,"sequence":2}"#;
+const MARKER_CONFIRMATION: &str =
+    r#"{"type":"heartbeat","scope":"runtime:sectors","version":1,"generation":1,"sequence":5}"#;
 
 fn observation(version: u64, sequence: u64) -> String {
     format!(
@@ -27,7 +29,14 @@ fn project_pipe_identity_and_typed_batch_admission_are_aligned() {
     let mut server = PipeServer::new();
 
     assert_eq!(PIPE_ENDPOINT, r"\\.\pipe\live_galaxy");
-    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
+    for frame in [
+        HELLO,
+        HEARTBEAT,
+        HEALTH,
+        OBSERVATION,
+        MARKER,
+        MARKER_CONFIRMATION,
+    ] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
@@ -79,6 +88,11 @@ fn station_frames_remain_pending_until_one_matching_marker() {
     assert_eq!(server.admit_message(&second), PipeDisposition::Accepted);
     assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
     assert_eq!(server.admit_message(marker), PipeDisposition::Accepted);
+    assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
+    assert_eq!(
+        server.admit_message(MARKER_CONFIRMATION),
+        PipeDisposition::Accepted
+    );
     assert_eq!(
         server.snapshot().entity_ids(),
         vec!["asset:station:10", "asset:station:20"]
@@ -101,12 +115,58 @@ fn session_rejects_stale_generation_replay_and_terminal_hello() {
 #[test]
 fn higher_generation_reconnect_preserves_completed_projection() {
     let mut server = PipeServer::new();
-    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
+    for frame in [
+        HELLO,
+        HEARTBEAT,
+        HEALTH,
+        OBSERVATION,
+        MARKER,
+        MARKER_CONFIRMATION,
+    ] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.admit_message(r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":2}"#), PipeDisposition::Accepted);
     assert_eq!(server.admit_message(r#"{"type":"heartbeat","scope":"runtime:sectors","version":1,"generation":2,"sequence":1}"#), PipeDisposition::Accepted);
     assert_eq!(server.admit_message(HEALTH), PipeDisposition::Rejected);
+    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
+}
+
+#[test]
+fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
+    let mut server = PipeServer::new();
+    let next_observation = station_observation(10, "sector:argon_prime", 6);
+    let ambiguous_marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":7}"#;
+    let reconnect = r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":2}"#;
+    let post_reconnect_heartbeat =
+        r#"{"type":"heartbeat","scope":"runtime:sectors","version":2,"generation":2,"sequence":1}"#;
+
+    for frame in [
+        HELLO,
+        HEARTBEAT,
+        HEALTH,
+        OBSERVATION,
+        MARKER,
+        MARKER_CONFIRMATION,
+    ] {
+        assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
+    }
+    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
+    assert_eq!(
+        server.admit_message(&next_observation),
+        PipeDisposition::Accepted
+    );
+    assert_eq!(
+        server.admit_message(ambiguous_marker),
+        PipeDisposition::Accepted
+    );
+    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
+
+    server.discard_pending();
+    assert_eq!(server.admit_message(reconnect), PipeDisposition::Accepted);
+    assert_eq!(
+        server.admit_message(post_reconnect_heartbeat),
+        PipeDisposition::Accepted
+    );
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
 }
 
