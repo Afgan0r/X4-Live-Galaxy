@@ -54,6 +54,7 @@ name = "mind-orchestration"
 version = "0.1.0"
 dependencies = [
  "mind-domain",
+ "mind-persistence",
  "observation-ingest",
  "serde_json",
  "strategic-state",

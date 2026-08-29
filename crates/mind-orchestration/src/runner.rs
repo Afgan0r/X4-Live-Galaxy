@@ -40,4 +40,18 @@ impl DeliberationRunner {
             )),
         }
     }
+
+    #[must_use]
+    pub fn run_cached(
+        &mut self,
+        request: &ProviderRequest,
+        prior: &MindAggregate,
+        candidate: &[u8],
+        evidence: EvidenceClass,
+    ) -> RunnerOutcome {
+        RunnerOutcome::Admitted {
+            admission: admit(request.request(), prior, candidate),
+            evidence,
+        }
+    }
 }

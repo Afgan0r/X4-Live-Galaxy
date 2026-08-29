@@ -48,6 +48,16 @@ impl DegradedDeliberation {
         &self.request_identity
     }
 
+    #[must_use]
+    pub fn provider_id(&self) -> &str {
+        &self.provider_id
+    }
+
+    #[must_use]
+    pub fn model_id(&self) -> &str {
+        &self.model_id
+    }
+
     pub const fn reconcile(&self, observation_identity: u64) -> Result<(), ProviderFailure> {
         if observation_identity > self.paused_observation {
             Ok(())

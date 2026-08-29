@@ -3,6 +3,7 @@ use mind_orchestration::{
     DeliberationRunner, EvidenceClass, ProviderFailure, ProviderMetadata, ProviderRequest,
     RunnerOutcome, ShadowProvider,
 };
+use mind_persistence::{FakeCheckpointPort, persist_deliberation};
 use observation_ingest::{AcceptedProjection, admit_batch};
 use strategic_state::{Capability, Faction, PacketLimits, derive_packets};
 
@@ -13,6 +14,20 @@ const FRAMES: [&str; 2] = [
 
 struct FakeProvider {
     outcome: Result<Vec<u8>, ProviderFailure>,
+}
+
+struct ManualProvider {
+    candidate: Vec<u8>,
+}
+
+impl ShadowProvider for ManualProvider {
+    fn propose(&mut self, _: &ProviderRequest) -> Result<Vec<u8>, ProviderFailure> {
+        Ok(self.candidate.clone())
+    }
+
+    fn evidence(&self) -> EvidenceClass {
+        EvidenceClass::ManualHarness
+    }
 }
 
 impl ShadowProvider for FakeProvider {
@@ -107,8 +122,72 @@ fn provider_timeout_pauses_until_newer_reconciled_observation() {
         return;
     };
     assert_eq!(record.evidence(), EvidenceClass::DeterministicFixture);
+    assert_eq!(record.request_identity(), "request-zya-timeout");
+    assert_eq!(record.attempts(), 1);
     assert!(record.reconcile(1).is_err());
     assert!(record.reconcile(2).is_ok());
+}
+
+#[test]
+fn fake_cache_and_manual_paths_share_admission_but_only_persistence_owns_one_cas() {
+    let request = request();
+    let candidate = candidate();
+    assert!(request.is_ok() && candidate.is_ok());
+    let (Ok(request), Ok(candidate)) = (request, candidate) else {
+        return;
+    };
+    let canonical = canonical("request-zya-cas", request);
+    assert!(canonical.is_ok());
+    let Ok(canonical) = canonical else { return };
+    let prior = MindAggregate::empty(Faction::Zya);
+    let mut runner = DeliberationRunner::new();
+    let mut fake = FakeProvider {
+        outcome: Ok(candidate.clone()),
+    };
+    let fake = runner.run(&mut fake, &canonical, &prior);
+    let cached = runner.run_cached(
+        &canonical,
+        &prior,
+        &candidate,
+        EvidenceClass::DeterministicFixture,
+    );
+    let mut manual = ManualProvider { candidate };
+    let manual = runner.run(&mut manual, &canonical, &prior);
+    assert_eq!(fake, cached);
+    let RunnerOutcome::Admitted { admission, .. } = fake else {
+        return;
+    };
+    let mind_domain::AdmissionDecision::Accepted(accepted) = admission else {
+        return;
+    };
+    let pending = accepted.pending_commit(&prior);
+    assert!(pending.is_ok());
+    let Ok(pending) = pending else { return };
+    let mut checkpoint = FakeCheckpointPort::new();
+    let first = persist_deliberation(&mut checkpoint, &accepted, &pending);
+    let second = persist_deliberation(&mut checkpoint, &accepted, &pending);
+    assert!(first.is_ok() && second.is_ok());
+    let (Ok(first), Ok(second)) = (first, second) else {
+        return;
+    };
+    assert!(first.compare_and_set_performed);
+    assert!(!second.compare_and_set_performed);
+    assert!(matches!(
+        manual,
+        RunnerOutcome::Admitted {
+            evidence: EvidenceClass::ManualHarness,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn metadata_rejects_oversized_identifiers_without_retaining_sensitive_provider_input() {
+    let oversized = "x".repeat(65);
+    assert_eq!(
+        ProviderMetadata::new(&oversized, "fake-v1"),
+        Err(ProviderFailure::Unavailable)
+    );
 }
 
 fn metadata() -> Result<ProviderMetadata, String> {

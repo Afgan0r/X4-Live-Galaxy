@@ -12,5 +12,6 @@ mind-domain = { path = "../mind-domain" }
 strategic-state = { path = "../strategic-state" }
 
 [dev-dependencies]
+mind-persistence = { path = "../mind-persistence" }
 observation-ingest = { path = "../observation-ingest" }
 serde_json = "=1.0.151"
