@@ -10,6 +10,9 @@ mod initiative;
 mod initiative_events;
 mod ledger;
 mod mind;
+mod mind_commands;
+mod posture;
+mod preemption_admission;
 mod request_bounds;
 mod restore;
 mod scheduler;
@@ -29,6 +32,10 @@ pub use initiative::{
 };
 pub use ledger::PendingInitiativeCommit;
 pub use mind::{CommandId, MindAggregate, MindCommand, MindError, PendingMindCommit, transition};
+pub use posture::{
+    PostureCandidate, PostureEffect, PostureRejection, ShadowPosture, admit_posture,
+};
+pub use preemption_admission::{AcceptedPreemption, admit_preemption};
 pub use request_bounds::{BoundsError, RequestBounds};
 pub use scheduler::{DeliberationScheduler, FactionTrigger, RequestEligibility, SchedulerBounds};
 pub use strategic_state::Capability;

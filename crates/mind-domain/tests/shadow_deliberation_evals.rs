@@ -1,5 +1,7 @@
 #[path = "shadow_deliberation_evals/exact_cache.rs"]
 mod exact_cache;
+#[path = "shadow_deliberation_evals/posture.rs"]
+mod posture;
 
 use mind_domain::{
     AdmissionDecision, CommandId, DeliberationRequest, DeliberationScheduler, FactionTrigger,

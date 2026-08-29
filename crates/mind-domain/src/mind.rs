@@ -146,6 +146,14 @@ impl PendingMindCommit {
     pub fn checkpoint_state(&self) -> crate::MindCheckpointState {
         crate::MindCheckpointState::from_pending_commit(self)
     }
+
+    #[must_use]
+    pub fn with_initiative_commit(&self, commit: &PendingInitiativeCommit) -> Self {
+        Self {
+            aggregate: commit.aggregate().clone(),
+            events: self.events.clone(),
+        }
+    }
 }
 pub fn transition(
     prior: &MindAggregate,

@@ -3,6 +3,7 @@
 mod capsule;
 mod capsule_identity;
 mod checkpoint;
+mod checkpoint_preemption;
 mod checkpoint_validation;
 mod deliberation_checkpoint;
 mod fake_port;
@@ -16,6 +17,7 @@ pub use capsule::{BudgetProfile, Capsule, CapsuleError, CommitmentProjection, Le
 pub use checkpoint::{CheckpointEnvelope, GAME_PROTOCOL_IDENTITY, SCHEMA_VERSION};
 pub use deliberation_checkpoint::{
     DeliberationCheckpointError, DeliberationCheckpointRecord, persist_deliberation,
+    persist_preemption,
 };
 pub use fake_port::FakeCheckpointPort;
 pub use port::{CheckpointAck, CheckpointPort, CompatibilityStatus, PortError};

@@ -1,6 +1,8 @@
 use crate::{CheckpointCursor, CheckpointDraft, CheckpointError};
-use mind_domain::{MindAggregate, MindCheckpointState, PendingMindCommit};
+use mind_domain::{MindAggregate, MindCheckpointState, PendingMindCommit, PreemptionRequest};
 use serde::{Deserialize, Serialize};
+
+mod accessors;
 
 pub const SCHEMA_VERSION: &str = "1";
 pub const GAME_PROTOCOL_IDENTITY: &str = "live_galaxy.persistence.v1";
@@ -28,6 +30,7 @@ pub struct CheckpointPayload {
     pub(super) replay_identity: String,
     pub(super) admission_identity: String,
     pub(super) reserved_report_identity: String,
+    pub(super) causal_preemption: Option<PreemptionRequest>,
 }
 
 impl CheckpointEnvelope {
@@ -36,6 +39,16 @@ impl CheckpointEnvelope {
         predecessor: Option<CheckpointCursor>,
         commit: &PendingMindCommit,
         draft: CheckpointDraft,
+    ) -> Result<Self, CheckpointError> {
+        Self::from_pending(sequence, predecessor, commit, draft, None)
+    }
+
+    pub(crate) fn from_pending(
+        sequence: u64,
+        predecessor: Option<CheckpointCursor>,
+        commit: &PendingMindCommit,
+        draft: CheckpointDraft,
+        causal_preemption: Option<PreemptionRequest>,
     ) -> Result<Self, CheckpointError> {
         if predecessor
             .as_ref()
@@ -56,6 +69,7 @@ impl CheckpointEnvelope {
             replay_identity: draft.replay,
             admission_identity: draft.admission,
             reserved_report_identity: draft.report,
+            causal_preemption,
         };
         crate::checkpoint_validation::payload(&payload)?;
         let mut envelope = Self {
@@ -92,11 +106,6 @@ impl CheckpointEnvelope {
     }
 
     #[must_use]
-    pub const fn sequence(&self) -> u64 {
-        self.sequence
-    }
-
-    #[must_use]
     pub fn integrity_hash(&self) -> &str {
         &self.integrity_hash
     }
@@ -116,6 +125,11 @@ impl CheckpointEnvelope {
             .typed_mind_commit
             .restore()
             .map_err(|_| CheckpointError::InvalidState)
+    }
+
+    #[must_use]
+    pub const fn causal_preemption(&self) -> Option<&PreemptionRequest> {
+        self.payload.causal_preemption.as_ref()
     }
 
     pub(crate) fn predecessor_matches(&self, expected: Option<&CheckpointCursor>) -> bool {

@@ -29,6 +29,7 @@ pub fn decode_and_convert(bytes: &[u8]) -> Result<CheckpointEnvelope, Checkpoint
         replay_identity: legacy.replay,
         admission_identity: legacy.admission,
         reserved_report_identity: legacy.report,
+        causal_preemption: None,
     };
     crate::checkpoint_validation::payload(&payload)?;
     let mut envelope = CheckpointEnvelope {

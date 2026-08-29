@@ -25,5 +25,14 @@ pub fn payload(payload: &CheckpointPayload) -> Result<(), CheckpointError> {
         .typed_mind_commit
         .restore()
         .map_err(|_| CheckpointError::InvalidState)?;
+    if let Some(preemption) = &payload.causal_preemption {
+        let aggregate = payload
+            .typed_mind_commit
+            .restore()
+            .map_err(|_| CheckpointError::InvalidState)?;
+        if !preemption.valid() || !aggregate.has_initiative_command(&preemption.command()) {
+            return Err(CheckpointError::InvalidState);
+        }
+    }
     Ok(())
 }

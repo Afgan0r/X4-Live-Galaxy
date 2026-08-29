@@ -2,10 +2,11 @@ use crate::{
     CommandId, Initiative, InitiativeCommand, InitiativeLifecycle, InitiativeSpec,
     PreemptionDisposition,
 };
+use serde::{Deserialize, Serialize};
 
 const MAX_REASON: usize = 256;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ExecutiveDecision {
     Approve,
     Revise,
@@ -44,7 +45,8 @@ pub enum ArbitrationError {
     IncompleteCausalRecord,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PreemptionRequest {
     command: CommandId,
     trigger: String,
@@ -66,6 +68,7 @@ impl PreemptionRequest {
         reason: &str,
     ) -> Result<Self, ArbitrationError> {
         if trigger.is_empty()
+            || trigger.len() > MAX_REASON
             || reason.is_empty()
             || reason.len() > MAX_REASON
             || prior.state() != InitiativeLifecycle::Active
@@ -101,8 +104,26 @@ impl PreemptionRequest {
     }
 
     #[must_use]
+    pub const fn command_id(&self) -> &CommandId {
+        &self.command
+    }
+
+    #[must_use]
     pub const fn decision(&self) -> ExecutiveDecision {
         self.decision
+    }
+
+    #[must_use]
+    pub fn valid(&self) -> bool {
+        self.command.valid()
+            && !self.trigger.is_empty()
+            && self.trigger.len() <= MAX_REASON
+            && self.prior.valid()
+            && self.prior.state() == InitiativeLifecycle::Active
+            && self.replacement.valid()
+            && self.decision == ExecutiveDecision::Approve
+            && !self.reason.is_empty()
+            && self.reason.len() <= MAX_REASON
     }
 }
 

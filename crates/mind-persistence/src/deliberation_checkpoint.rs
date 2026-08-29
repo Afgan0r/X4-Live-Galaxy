@@ -1,5 +1,5 @@
 use crate::{CheckpointAck, CheckpointDraft, CheckpointEnvelope, CheckpointPort};
-use mind_domain::{AcceptedProposal, PendingMindCommit};
+use mind_domain::{AcceptedPreemption, AcceptedProposal, PendingMindCommit, PreemptionRequest};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeliberationCheckpointRecord {
@@ -25,24 +25,68 @@ pub fn persist_deliberation<P>(
 where
     P: CheckpointPort,
 {
+    persist(port, accepted, pending, None)
+}
+
+pub fn persist_preemption<P>(
+    port: &mut P,
+    accepted: &AcceptedPreemption,
+) -> Result<DeliberationCheckpointRecord, DeliberationCheckpointError>
+where
+    P: CheckpointPort,
+{
+    persist(
+        port,
+        accepted.accepted(),
+        accepted.pending(),
+        Some(accepted.preemption()),
+    )
+}
+
+fn persist<P>(
+    port: &mut P,
+    accepted: &AcceptedProposal,
+    pending: &PendingMindCommit,
+    preemption: Option<&PreemptionRequest>,
+) -> Result<DeliberationCheckpointRecord, DeliberationCheckpointError>
+where
+    P: CheckpointPort,
+{
     if let Some(existing) = port.load() {
-        if existing.restored_mind().ok().as_ref() == Some(pending.aggregate()) {
-            return Ok(record(
-                accepted,
-                CheckpointAck::from_envelope(&existing),
-                false,
-            ));
-        }
-        let predecessor = existing.cursor();
-        return write(
-            port,
-            accepted,
-            pending,
-            predecessor.sequence() + 1,
-            Some(predecessor),
-        );
+        return persist_existing(port, accepted, pending, &existing, preemption);
     }
-    write(port, accepted, pending, 1, None)
+    write(port, accepted, pending, 1, None, preemption)
+}
+
+fn persist_existing<P>(
+    port: &mut P,
+    accepted: &AcceptedProposal,
+    pending: &PendingMindCommit,
+    existing: &crate::CheckpointEnvelope,
+    preemption: Option<&PreemptionRequest>,
+) -> Result<DeliberationCheckpointRecord, DeliberationCheckpointError>
+where
+    P: CheckpointPort,
+{
+    if existing.restored_mind().ok().as_ref() == Some(pending.aggregate()) {
+        if existing.causal_preemption() != preemption {
+            return Err(DeliberationCheckpointError::Envelope);
+        }
+        return Ok(record(
+            accepted,
+            CheckpointAck::from_envelope(existing),
+            false,
+        ));
+    }
+    let predecessor = existing.cursor();
+    write(
+        port,
+        accepted,
+        pending,
+        predecessor.sequence() + 1,
+        Some(predecessor),
+        preemption,
+    )
 }
 
 fn write<P>(
@@ -51,6 +95,7 @@ fn write<P>(
     pending: &PendingMindCommit,
     sequence: u64,
     predecessor: Option<crate::CheckpointCursor>,
+    preemption: Option<&PreemptionRequest>,
 ) -> Result<DeliberationCheckpointRecord, DeliberationCheckpointError>
 where
     P: CheckpointPort,
@@ -64,8 +109,17 @@ where
         &format!("shadow-none-{correlation_id}"),
     );
     let expected = predecessor.clone();
-    let envelope = CheckpointEnvelope::from_pending_commit(sequence, predecessor, pending, draft)
-        .map_err(|_| DeliberationCheckpointError::Envelope)?;
+    let envelope = match preemption {
+        Some(record) => CheckpointEnvelope::from_pending_preemption(
+            sequence,
+            predecessor,
+            pending,
+            draft,
+            record.clone(),
+        ),
+        None => CheckpointEnvelope::from_pending_commit(sequence, predecessor, pending, draft),
+    }
+    .map_err(|_| DeliberationCheckpointError::Envelope)?;
     let acknowledged = port
         .compare_and_set(expected.as_ref(), envelope)
         .map_err(|_| DeliberationCheckpointError::Port)?;
