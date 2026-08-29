@@ -5,26 +5,35 @@ local telemetry = require("live_galaxy_telemetry")
 local cases = {}
 
 local function fake_api(count)
-    local calls = { convert = 0, metadata = 0, capacity = 0 }
+    local calls = { convert = 0, metadata = 0, capacity = 0, allocations = 0, order = {} }
     local stations = { "station:20", "station:10" }
     return {
         count_stations = function() return count or #stations end,
-        new_buffer = function(_, size) return {} end,
+        new_buffer = function(_, size)
+            calls.allocations = calls.allocations + 1
+            return {}
+        end,
         fill_stations = function(_, buffer, size)
-            for index = 1, size do buffer[index] = stations[index] end
+            for index = 0, size - 1 do buffer[index] = stations[index + 1] end
             return size
         end,
-        stable_id = function(_, station)
+        to_component = function(_, raw_station)
             calls.convert = calls.convert + 1
+            calls.order[#calls.order + 1] = "convert"
+            return raw_station
+        end,
+        stable_id = function(_, station)
             return station:match("%d+")
         end,
         get_component_data = function(_, station)
             calls.metadata = calls.metadata + 1
+            calls.order[#calls.order + 1] = "metadata"
             return station == "station:10" and "faction:argon" or "faction:antigone",
                 station == "station:10" and "sector:argon_prime" or "sector:second_contact"
         end,
         get_people_capacity = function(_, station)
             calls.capacity = calls.capacity + 1
+            calls.order[#calls.order + 1] = "capacity"
             return station == "station:10" and 42 or 24
         end,
     }, calls
@@ -36,6 +45,7 @@ function cases.validates_the_complete_owner_scope_before_component_reads()
 
     assert(observation == nil)
     assert(err == "enumeration_overflow")
+    assert(calls.allocations == 0)
     assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
 end
 
@@ -48,6 +58,7 @@ function cases.emits_sorted_real_station_facts_only_after_all_members_validate()
     assert(facts.assets[1].id == "asset:station:10")
     assert(facts.assets[2].id == "asset:station:20")
     assert(calls.convert == 2 and calls.metadata == 2 and calls.capacity == 2)
+    assert(calls.order[1] == "convert" and calls.order[2] == "convert")
 end
 
 function cases.serializes_the_existing_compact_station_envelope()
@@ -73,7 +84,7 @@ function cases.normalizes_native_count_and_fill_before_validation()
     local api = fake_api()
     api.count_stations = function() return "2" end
     api.fill_stations = function(_, buffer, size)
-        buffer[1], buffer[2] = "station:20", "station:10"
+        buffer[0], buffer[1] = "station:20", "station:10"
         return "2"
     end
 

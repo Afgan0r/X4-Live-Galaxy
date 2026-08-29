@@ -22,10 +22,11 @@ local function runtime_api()
     local globals = _G
     return {
         count_stations = function(_, faction_id) return globals.C.GetNumAllFactionStations(faction_id) end,
-        new_buffer = function(_, count) return require("ffi").new("uint64_t[?]", count) end,
+        new_buffer = function(_, count) return require("ffi").new("UniverseID[?]", count) end,
         fill_stations = function(_, buffer, count, faction_id)
             return globals.C.GetAllFactionStations(buffer, count, faction_id)
         end,
+        to_component = function(_, raw_id) return globals.ConvertStringToLuaID(tostring(raw_id)) end,
         stable_id = function(_, component) return tostring(globals.ConvertIDTo64Bit(component)) end,
         get_component_data = function(_, component)
             return globals.GetComponentData(component, "owner", "sector")
@@ -37,7 +38,7 @@ end
 
 local function api_available(api)
     return callable(api, "count_stations") and callable(api, "new_buffer")
-        and callable(api, "fill_stations") and callable(api, "stable_id")
+        and callable(api, "fill_stations") and callable(api, "to_component") and callable(api, "stable_id")
         and callable(api, "get_component_data") and callable(api, "get_people_capacity")
 end
 
@@ -78,8 +79,9 @@ function discovery.new(api)
         if not fill_ok or not valid_integer(filled) or filled ~= count then return nil, "enumeration_incomplete" end
 
         local candidates, stable_ids = {}, {}
-        for index = 1, count do
-            local component = buffer[index]
+        for index = 0, count - 1 do
+            local component_ok, component = pcall(api.to_component, api, buffer[index])
+            if not component_ok or component == nil then return nil, "identity_invalid" end
             local id_ok, stable_id = pcall(api.stable_id, api, component)
             if not id_ok or not valid_id(stable_id) or stable_ids[stable_id] then return nil, "identity_invalid" end
             stable_ids[stable_id] = true
