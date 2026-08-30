@@ -95,6 +95,7 @@ try {
             'local-contract-partial',
             'local-contract-stale',
             'local-contract-extra-field',
+            'local-contract-noncanonical',
             'local-contract-duplicate'
         )
         foreach ($adapterId in $rejections) {
