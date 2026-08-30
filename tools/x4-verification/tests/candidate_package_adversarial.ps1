@@ -60,6 +60,18 @@ try {
     }
     finally { [IO.File]::WriteAllText($adapterPath, $adapterText, [Text.UTF8Encoding]::new($false)) }
 
+    $anchorPath = Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
+    $anchorText = Get-Content -LiteralPath $anchorPath -Raw
+    try {
+        $anchor = $anchorText | ConvertFrom-Json -Depth 16 -DateKind String
+        $anchor.status = 'configured'
+        $anchor.root_spki_sha256 = '0' * 64
+        [IO.File]::WriteAllText($anchorPath, ($anchor | ConvertTo-Json -Depth 16), [Text.UTF8Encoding]::new($false))
+        $swappedRoot = Invoke-Dispatcher $groupRoot (Join-Path $outputRoot 'swapped-root.jsonl') 1
+        Assert-True ($swappedRoot.reason_code -eq 'COMPONENT_DIGEST_MISMATCH') 'Fresh, swapped, or test root escaped the repository digest pin.'
+    }
+    finally { [IO.File]::WriteAllText($anchorPath, $anchorText, [Text.UTF8Encoding]::new($false)) }
+
     $subsetPath = Join-Path $groupRoot 'manifest/candidate-matrix-subset.v1.json'
     $subsetText = Get-Content -LiteralPath $subsetPath -Raw
     try {
@@ -80,6 +92,10 @@ try {
         $sources = (Get-Content -LiteralPath (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua') -Raw) +
             (Get-Content -LiteralPath (Join-Path $groupRoot 'tools/x4-verification/candidate-adapters.psm1') -Raw)
         Assert-True ($sources -notmatch [regex]::Escape($token)) "Generated untrusted source exposes '$token'."
+    }
+    $dispatcherSource = Get-Content -LiteralPath $dispatcherPath -Raw
+    foreach ($binding in @('dispatcher_digest', 'adapter_digest', 'worker_digest', 'worker_protocol_digest', 'package_conformance_digest', 'matrix_digest', 'candidate_ids', 'evidence_digest', 'expires_at')) {
+        Assert-True ($dispatcherSource.Contains($binding)) "Producer envelope omits '$binding'."
     }
 
     Write-Output 'candidate-package-adversarial: PASS'

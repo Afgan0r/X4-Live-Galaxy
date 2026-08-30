@@ -36,6 +36,18 @@ function Invoke-JsonCommand([string]$File, [string[]]$Arguments, [int]$ExpectedE
 function Test-Adapters {
     Assert-True (Test-Path -LiteralPath $adapterPath -PathType Leaf) 'Candidate adapter module is missing.'
     Assert-True (Test-Path -LiteralPath $dispatcherPath -PathType Leaf) 'Candidate dispatcher is missing.'
+    $dispatcherSource = Get-Content -LiteralPath $dispatcherPath -Raw
+    foreach ($requiredAuthorityToken in @(
+        'owner-root-anchor.v1.json',
+        'candidate-producer-certificate.v1.json',
+        'candidate-evidence:exact-build',
+        'CngKey]::Open',
+        'IeeeP1363FixedFieldConcatenation',
+        'PRODUCER_ATTESTATION_VERIFIED'
+    )) {
+        Assert-True ($dispatcherSource.Contains($requiredAuthorityToken)) "Producer-attestation mechanism is missing '$requiredAuthorityToken'."
+    }
+    Assert-True ($dispatcherSource -notmatch '(?i)param\([\s\S]{0,600}(root|certificate|key|fixture|test)[A-Za-z]*Path') 'Production dispatcher exposes an authority or test selector.'
 
     Import-Module $adapterPath -Force
     $definitions = @(Get-CandidateAdapterDefinitions)

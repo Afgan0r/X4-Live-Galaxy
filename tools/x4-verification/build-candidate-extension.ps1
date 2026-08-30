@@ -20,7 +20,6 @@ $dossierPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/phase-
 $registryPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/known-failures.v1.json'
 $coveragePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/coverage.v1.json'
 $runtimeEvidencePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json'
-$conformanceCommandPath = Join-Path $repositoryRoot 'tools/x4-verification/x4-package-conformance.ps1'
 $runnerSourcePath = Join-Path $repositoryRoot 'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
 $entrypointTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-entry.lua'
 $dispatcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/run-candidate-package.ps1'
@@ -28,6 +27,7 @@ $adapterSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/candidate-
 $workerSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/candidate-worker.ps1'
 $launcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
 $workerProtocolPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
+$ownerRootAnchorPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
 $contentTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-content.xml'
 $uiTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-ui.xml'
 $publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
@@ -266,7 +266,7 @@ function New-Entrypoint([string]$GroupId, [string]$BuildId) {
         Replace('{{SAFE_GROUP_ID}}', $safeGroup)
 }
 
-function Invoke-Conformance([string]$GroupRoot, [string]$ContractPath) {
+function Invoke-Conformance([string]$GroupRoot) {
     $contentPath = Join-Path $GroupRoot 'content.xml'
     $uiPath = Join-Path $GroupRoot 'ui.xml'
     $entryPath = Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua'
@@ -316,6 +316,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     Copy-Item -LiteralPath $launcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1')
     Copy-Item -LiteralPath $workerProtocolPath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json')
     Copy-Item -LiteralPath $runtimeEvidencePath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json')
+    Copy-Item -LiteralPath $ownerRootAnchorPath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json')
 
     $subset = [ordered]@{
         schema_version = $Matrix.schema_version
@@ -331,7 +332,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     $generatedContractPath = Join-Path $groupRoot 'manifest/package-conformance.v1.json'
     Write-Json $generatedContractPath $generatedContract
 
-    $conformance = Invoke-Conformance $groupRoot $generatedContractPath
+    $conformance = Invoke-Conformance $groupRoot
     $requiredFiles = @($ManifestContract.required_generated_files)
     $generatedFiles = foreach ($logicalPath in $requiredFiles) {
         $physicalPath = Join-Path $groupRoot $logicalPath
@@ -372,6 +373,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         build_profile_digest = $Group.build_profile_digest
         package_conformance_digest = Get-Sha256 $packageConformanceBytes
         runtime_evidence_schema_digest = Get-FileDigest $runtimeEvidencePath
+        owner_root_anchor_digest = Get-FileDigest $ownerRootAnchorPath
         dispatcher_digest = Get-FileDigest $dispatcherSourcePath
         adapter_digest = Get-FileDigest $adapterSourcePath
         worker_digest = Get-FileDigest $workerSourcePath

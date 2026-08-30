@@ -19,6 +19,7 @@
     "build_profile_digest",
     "package_conformance_digest",
     "runtime_evidence_schema_digest",
+    "owner_root_anchor_digest",
     "dispatcher_digest",
     "adapter_digest",
     "worker_digest",
@@ -33,12 +34,13 @@
     "matrix_digest",
     "build_profile_digest",
     "package_conformance_digest",
-    "runtime_evidence_schema_digest"
-    ,"dispatcher_digest"
-    ,"adapter_digest"
-    ,"worker_digest"
-    ,"launcher_digest"
-    ,"worker_protocol_digest"
+    "runtime_evidence_schema_digest",
+    "owner_root_anchor_digest",
+    "dispatcher_digest",
+    "adapter_digest",
+    "worker_digest",
+    "launcher_digest",
+    "worker_protocol_digest"
   ],
   "required_generated_files": [
     "content.xml",
@@ -51,6 +53,7 @@
     "tools/x4-verification/isolation/invoke-candidate-worker.ps1",
     "tools/x4-verification/contracts/candidate-worker-protocol.v1.json",
     "tools/x4-verification/contracts/runtime-evidence.v1.json",
+    "tools/x4-verification/contracts/owner-root-anchor.v1.json",
     "manifest/candidate-matrix-subset.v1.json",
     "manifest/package-conformance.v1.json"
   ],
@@ -58,7 +61,7 @@
   "native_execution_statuses": ["terminable-external-isolation"],
   "bounds": {
     "max_candidates": 7,
-    "max_generated_files": 14,
+    "max_generated_files": 15,
     "max_generated_file_bytes": 65536,
     "max_generated_total_bytes": 524288,
     "max_path_depth": 8,

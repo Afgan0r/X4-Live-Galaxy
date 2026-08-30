@@ -190,7 +190,7 @@ function Test-Partition {
     Assert-ValidMatrix $matrix
     Assert-True ($manifestContract.schema_version -eq 'candidate-build-manifest-contract.v1') 'Unexpected build-manifest contract schema.'
     Assert-True ((@($manifestContract.required_fields) -contains 'package_conformance_digest')) 'Build manifest does not require package conformance linkage.'
-    Assert-True ((@($manifestContract.required_digests) -join '|') -eq 'dossier_digest|registry_digest|coverage_digest|matrix_digest|build_profile_digest|package_conformance_digest|runtime_evidence_schema_digest|dispatcher_digest|adapter_digest|worker_digest|launcher_digest|worker_protocol_digest') 'Build manifest digest chain is incomplete or unstable.'
+    Assert-True ((@($manifestContract.required_digests) -join '|') -eq 'dossier_digest|registry_digest|coverage_digest|matrix_digest|build_profile_digest|package_conformance_digest|runtime_evidence_schema_digest|owner_root_anchor_digest|dispatcher_digest|adapter_digest|worker_digest|launcher_digest|worker_protocol_digest') 'Build manifest digest chain is incomplete or unstable.'
 
     Assert-Rejected { param($m) $m.candidates = @() } 'empty'
     Assert-Rejected { param($m) $m.candidates += Copy-JsonValue $m.candidates[0] } 'duplicate'
@@ -228,6 +228,7 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     Assert-True ($manifest.build_profile_digest -eq $Group.build_profile_digest) 'Generated manifest profile linkage is invalid.'
     Assert-True ($manifest.matrix_digest -eq (Get-FileDigest $matrixPath)) 'Generated manifest matrix linkage is stale.'
     Assert-True ($manifest.runtime_evidence_schema_digest -eq (Get-FileDigest $runtimeEvidencePath)) 'Generated manifest evidence-schema linkage is stale.'
+    Assert-True ($manifest.owner_root_anchor_digest -eq (Get-FileDigest (Join-Path $root 'tools/x4-verification/contracts/owner-root-anchor.v1.json'))) 'Generated manifest owner-root linkage is stale.'
     Assert-True ($manifest.developer_only -eq $true -and $manifest.execution_status -eq 'execution-ready-local-process') 'Generated manifest is not locally execution-ready.'
     Assert-True ($manifest.native_execution_status -eq 'terminable-external-isolation') 'Generated manifest does not bind the terminable external worker.'
     Assert-True ($manifest.local_readiness_verified -eq $true) 'Generated manifest copied readiness text without executing the local contract.'
