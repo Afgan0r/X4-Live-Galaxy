@@ -130,9 +130,9 @@ TALKER is not X4 runtime evidence or a Rust design mandate. Its active phases
 may intentionally defer the real LLM/game bridge. Do not copy its code
 mechanically.
 
-### X4 Campaign and Live MCP Repository
+### X4 Live MCP Repository
 
-Location: `F:\Agent Projects\X4`.
+Location: `F:\Agent Projects\X4 Live MCP`.
 
 Use it for existing X4 9.00 integration evidence: UI Lua, Mission Director XML,
 native `ffi.C` calls, `sn_mod_support_apis` named pipes, event identity and
@@ -144,8 +144,9 @@ Start with its `AGENTS.md` profile `x4-live-development`,
 `tools/x4-live-protocol.md`, `tools/README.md`, and
 `tests/test_x4_live.py`.
 
-Do not treat its campaign state as Live Galaxy product scope unless the task
-explicitly needs it. Do not modify the repository while using it as a reference.
+The sibling `F:\Agent Projects\X4` repository owns campaign state. Do not treat
+that state as Live Galaxy product scope unless the task explicitly needs it. Do
+not modify either repository while using it as a reference.
 
 ### Installed Vanilla X4
 
