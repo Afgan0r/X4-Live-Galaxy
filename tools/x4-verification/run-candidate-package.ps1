@@ -18,6 +18,9 @@ $schemaPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/runtime
 $anchorPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
 $manifestContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-build-manifest.v1.json'
 $packageContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/package-conformance.v1.json'
+$packageConformancePath = Join-Path $repositoryRoot 'tools/x4-verification/x4-package-conformance.ps1'
+$dossierPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/phase-05.1-dossier.v1.json'
+$coveragePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/coverage.v1.json'
 $matrixPath = Join-Path $repositoryRoot 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 $runnerSourcePath = Join-Path $repositoryRoot 'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
 $contentTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-content.xml'
@@ -223,7 +226,11 @@ function Assert-TrustedGeneratedPackage([string]$SnapshotRoot, $Manifest) {
         internal_module_prefix = $members[0].build_profile.import_root
         external_modules = @($baseContract.external_modules)
         test_only_prefixes = @($baseContract.test_only_prefixes)
-        native_binding = $baseContract.native_binding
+        native_binding = [ordered]@{
+            module = $baseContract.native_binding.module
+            binding_expression = $baseContract.native_binding.binding_expression
+            policy = 'forbidden'
+        }
         bounds = $baseContract.bounds
         admission_dimensions = @($baseContract.admission_dimensions)
         admission_failure_classes = @($baseContract.admission_failure_classes)
@@ -448,16 +455,29 @@ try {
         @($candidateIds | Sort-Object -Unique).Count -ne $candidateIds.Count -or
         ($candidateIds -join '|') -ne (@($manifest.candidate_ids | Sort-Object) -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
     $script:ReasonCode = 'PACKAGE_CONFORMANCE_VALIDATION_FAILED'
-    $contentPath = Join-Path $groupFull 'content.xml'
-    $uiPath = Join-Path $groupFull 'ui.xml'
-    $entryPath = Join-Path $groupFull 'lua/live_galaxy_candidate_entry.lua'
-    $graphDigest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(((Get-FileDigest $contentPath) + (Get-FileDigest $uiPath) + (Get-FileDigest $entryPath))))
     $packageFields = @('schema_version', 'verdict', 'classification', 'evidence_level', 'graph_digest', 'dossier_digest', 'coverage_digest')
+    $generatedContractPath = Join-Path $groupFull 'manifest/package-conformance.v1.json'
+    $liveOutput = @(& pwsh -NoProfile -File $packageConformancePath `
+        -PackageRoot $groupFull -ContractPath $generatedContractPath `
+        -DossierPath $dossierPath -CoveragePath $coveragePath 2>&1)
+    if ($LASTEXITCODE -ne 0 -or $liveOutput.Count -ne 1) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
+    try { $live = $liveOutput[0].ToString() | ConvertFrom-Json -Depth 32 -DateKind String }
+    catch { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
+    $livePackage = [ordered]@{
+        schema_version = $live.schema_version
+        verdict = $live.verdict
+        classification = $live.classification
+        evidence_level = $live.evidence_level
+        graph_digest = $live.graph_digest
+        dossier_digest = $live.dossier_digest
+        coverage_digest = $live.coverage_digest
+    }
     if ((@($manifest.package_conformance.PSObject.Properties.Name | Sort-Object) -join '|') -ne (@($packageFields | Sort-Object) -join '|') -or
-        $manifest.package_conformance.verdict -ne 'conformant' -or
-        $manifest.package_conformance.classification -ne 'local-only' -or
-        $manifest.package_conformance.evidence_level -ne 'packaged-static' -or
-        $manifest.package_conformance.graph_digest -ne $graphDigest) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
+        $live.verdict -ne 'conformant' -or $live.classification -ne 'local-only' -or
+        ($livePackage | ConvertTo-Json -Compress -Depth 32) -cne
+            ($manifest.package_conformance | ConvertTo-Json -Compress -Depth 32)) {
+        Fail 'PACKAGE_CONFORMANCE_MISMATCH'
+    }
     $packageBytes = [Text.Encoding]::UTF8.GetBytes(($manifest.package_conformance | ConvertTo-Json -Compress -Depth 8))
     if ($manifest.package_conformance_digest -ne (Get-Sha256 $packageBytes)) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
     $script:ReasonCode = 'ADAPTER_VALIDATION_FAILED'

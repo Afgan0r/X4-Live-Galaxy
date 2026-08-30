@@ -406,11 +406,20 @@ try {
         if ($hasFfi -and $hasBinding) { $bindingPaths += $logicalPath }
         elseif ($source -match '(?:globals|_G)\.C|require\s*\([^\r\n]*binding') { $alternateBinding = $true }
     }
-    if ($bindingPaths.Count -gt 1 -or ($bindingPaths.Count -eq 0 -and $alternateBinding)) {
-        Fail 'ALTERNATE_BINDING_SOURCE' 'local-only'
+    $bindingPolicy = if ($null -eq $script:contract.native_binding.PSObject.Properties['policy']) {
+        'required'
+    } else { [string]$script:contract.native_binding.policy }
+    if ($bindingPolicy -notin @('required', 'forbidden')) { Fail 'NATIVE_BINDING_POLICY_INVALID' }
+    if ($bindingPolicy -eq 'required') {
+        if ($bindingPaths.Count -gt 1 -or ($bindingPaths.Count -eq 0 -and $alternateBinding)) {
+            Fail 'ALTERNATE_BINDING_SOURCE' 'local-only'
+        }
+        if ($bindingPaths.Count -ne 1) { Fail 'NATIVE_BINDING_NOT_FOUND' }
+        $script:nativeBindingPath = $bindingPaths[0]
     }
-    if ($bindingPaths.Count -ne 1) { Fail 'NATIVE_BINDING_NOT_FOUND' }
-    $script:nativeBindingPath = $bindingPaths[0]
+    elseif ($bindingPaths.Count -ne 0 -or $alternateBinding) {
+        Fail 'NATIVE_BINDING_FORBIDDEN' 'non-conformant'
+    }
 
     $digestLines = foreach ($logicalPath in $script:importGraph) {
         "$logicalPath=$((Get-Sha256 $script:sources[$logicalPath].Bytes))"

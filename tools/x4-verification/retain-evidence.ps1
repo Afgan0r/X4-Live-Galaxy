@@ -25,6 +25,7 @@ $matrixPath = Join-Path $repositoryRoot 'tests/x4-candidates/phase-05.1-candidat
 $dossierPath = Join-Path $PSScriptRoot 'contracts/phase-05.1-dossier.v1.json'
 $registryPath = Join-Path $PSScriptRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $PSScriptRoot 'contracts/coverage.v1.json'
+$packageConformancePath = Join-Path $PSScriptRoot 'x4-package-conformance.ps1'
 $publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
 $ownerRootAnchorPath = Join-Path $PSScriptRoot 'contracts/owner-root-anchor.v1.json'
 $producerModulePath = Join-Path $PSScriptRoot 'producer-attestation.psm1'
@@ -416,12 +417,29 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
     }
     if ($totalBytes -gt $Contracts.Manifest.bounds.max_generated_total_bytes) { Fail 'BOUND_EXCEEDED' }
     if ($CheckGeneratedFiles) {
-        $graphBytes = [Text.Encoding]::UTF8.GetBytes(
-            (Get-Sha256File (Join-Path $groupRoot 'content.xml')) +
-            (Get-Sha256File (Join-Path $groupRoot 'ui.xml')) +
-            (Get-Sha256File (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua'))
-        )
-        if ($package.graph_digest -ne (Get-Sha256Bytes $graphBytes)) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
+        $generatedContractPath = Join-Path $groupRoot 'manifest/package-conformance.v1.json'
+        $liveOutput = @(& pwsh -NoProfile -File $packageConformancePath `
+            -PackageRoot $groupRoot -ContractPath $generatedContractPath `
+            -DossierPath $dossierPath -CoveragePath $coveragePath 2>&1)
+        if ($LASTEXITCODE -ne 0 -or $liveOutput.Count -ne 1) { Fail 'PACKAGE_CONFORMANCE_LIVE_MISMATCH' }
+        try { $live = $liveOutput[0].ToString() | ConvertFrom-Json -Depth 32 -DateKind String }
+        catch { Fail 'PACKAGE_CONFORMANCE_LIVE_MISMATCH' }
+        $livePackage = [ordered]@{
+            schema_version = $live.schema_version
+            verdict = $live.verdict
+            classification = $live.classification
+            evidence_level = $live.evidence_level
+            graph_digest = $live.graph_digest
+            dossier_digest = $live.dossier_digest
+            coverage_digest = $live.coverage_digest
+        }
+        $liveBytes = [Text.Encoding]::UTF8.GetBytes(($livePackage | ConvertTo-Json -Compress -Depth 32))
+        if ($live.verdict -ne 'conformant' -or $live.classification -ne 'local-only' -or
+            (Get-Sha256Bytes $liveBytes) -ne $manifest.package_conformance_digest -or
+            ($livePackage | ConvertTo-Json -Compress -Depth 32) -cne
+                ($package | ConvertTo-Json -Compress -Depth 32)) {
+            Fail 'PACKAGE_CONFORMANCE_LIVE_MISMATCH'
+        }
         $componentBindings = [ordered]@{
             dispatcher_digest = (Join-Path $PSScriptRoot 'run-candidate-package.ps1')
             adapter_digest = (Join-Path $groupRoot 'tools/x4-verification/candidate-adapters.psm1')

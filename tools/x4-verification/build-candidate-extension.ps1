@@ -16,6 +16,7 @@ $script:createdGroups = @()
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $manifestContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-build-manifest.v1.json'
 $packageContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/package-conformance.v1.json'
+$packageConformanceScriptPath = Join-Path $repositoryRoot 'tools/x4-verification/x4-package-conformance.ps1'
 $dossierPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/phase-05.1-dossier.v1.json'
 $registryPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/known-failures.v1.json'
 $coveragePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/coverage.v1.json'
@@ -284,7 +285,11 @@ function New-GeneratedConformanceContract($Base, [string]$PackageId, $Group, $Ca
         internal_module_prefix = $Candidate.build_profile.import_root
         external_modules = @($Base.external_modules)
         test_only_prefixes = @($Base.test_only_prefixes)
-        native_binding = $Base.native_binding
+        native_binding = [ordered]@{
+            module = $Base.native_binding.module
+            binding_expression = $Base.native_binding.binding_expression
+            policy = 'forbidden'
+        }
         bounds = $Base.bounds
         admission_dimensions = @($Base.admission_dimensions)
         admission_failure_classes = @($Base.admission_failure_classes)
@@ -300,22 +305,19 @@ function New-Entrypoint([string]$GroupId, [string]$BuildId) {
 }
 
 function Invoke-Conformance([string]$GroupRoot) {
-    $contentPath = Join-Path $GroupRoot 'content.xml'
-    $uiPath = Join-Path $GroupRoot 'ui.xml'
-    $entryPath = Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua'
-    try { [xml]$content = Get-Content -LiteralPath $contentPath -Raw; [xml]$ui = Get-Content -LiteralPath $uiPath -Raw }
+    $generatedContractPath = Join-Path $GroupRoot 'manifest/package-conformance.v1.json'
+    $output = @(& pwsh -NoProfile -File $packageConformanceScriptPath `
+        -PackageRoot $GroupRoot -ContractPath $generatedContractPath `
+        -DossierPath $dossierPath -CoveragePath $coveragePath 2>&1)
+    if ($LASTEXITCODE -ne 0 -or $output.Count -ne 1) { Fail 'PACKAGE_CONFORMANCE_FAILED' }
+    try { $result = $output[0].ToString() | ConvertFrom-Json -Depth 32 -DateKind String }
     catch { Fail 'PACKAGE_CONFORMANCE_FAILED' }
-    $entry = Get-Content -LiteralPath $entryPath -Raw
-    if ($content.DocumentElement.LocalName -ne 'content' -or $ui.DocumentElement.LocalName -ne 'addon' -or
-        $entry -match 'ffi\.C' -or $entry -notmatch 'Register_OnLoad_Init' -or
-        $entry -match '(?i)save[_-]?access|game[_-]?mutation|launch[_-]?x4') { Fail 'PACKAGE_CONFORMANCE_FAILED' }
-    $result = [pscustomobject][ordered]@{
-        schema_version = 'candidate-inert-package-conformance.v1'; verdict = 'conformant'
-        classification = 'local-only'; evidence_level = 'packaged-static'
-        graph_digest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(((Get-FileDigest $contentPath) + (Get-FileDigest $uiPath) + (Get-FileDigest $entryPath))))
-        dossier_digest = Get-FileDigest $dossierPath; coverage_digest = Get-FileDigest $coveragePath
+    if ($result.schema_version -ne 'x4-package-conformance-result.v1' -or
+        $result.verdict -ne 'conformant' -or $result.classification -ne 'local-only' -or
+        $result.evidence_level -ne 'packaged-static' -or $null -ne $result.native_binding_path) {
+        Fail 'PACKAGE_CONFORMANCE_FAILED'
     }
-    $canonical = $result | ConvertTo-Json -Compress -Depth 8
+    $canonical = $result | ConvertTo-Json -Compress -Depth 32
     return [pscustomobject]@{ Value = $result; Digest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes($canonical)) }
 }
 
