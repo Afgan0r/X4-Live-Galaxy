@@ -243,6 +243,11 @@ function Test-AggregateRegistration {
     }
     Assert-True (@($output) -contains 'package conformance contract passed: packaged-path') 'Aggregate runner did not execute the production package contract.'
 
+    $fullOutput = @(& pwsh -NoProfile -File $aggregateRunner -Suite all 2>&1)
+    Assert-True (@($fullOutput) -contains 'candidate build contract passed: all') 'Full aggregate omitted the candidate-build gate.'
+    Assert-True (@($fullOutput) -contains 'PASS: evidence retention contract') 'Full aggregate omitted the retention gate.'
+    Assert-True (@($fullOutput) -contains 'PASS: Phase 05.1 sanitized handback contract') 'Full aggregate omitted the handback gate.'
+    Assert-True (@($fullOutput) -contains 'PASS: retention-to-admission integration contract') 'Full aggregate omitted the retained-admission gate.'
 }
 
 switch ($Case) {

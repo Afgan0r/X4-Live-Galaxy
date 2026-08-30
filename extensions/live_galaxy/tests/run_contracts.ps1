@@ -21,7 +21,7 @@ if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     }
 }
 
-if ($Suite -eq 'x4-verification') {
+if ($Suite -in @('all', 'x4-verification')) {
     & pwsh -NoProfile -File $candidateBuildContract -Case all
     if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
     foreach ($retentionCase in @('retention', 'handback', 'retention-admission')) {
