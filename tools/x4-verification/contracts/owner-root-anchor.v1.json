@@ -1,0 +1,19 @@
+{
+  "schema_version": "x4-owner-root-anchor.v1",
+  "status": "unconfigured",
+  "root_id": "live-galaxy-owner-root-v1",
+  "root_spki_der_base64": null,
+  "root_spki_sha256": null,
+  "algorithm": "ECDSA_P256_SHA256",
+  "policy_digest": "6497cd18a4ee0286f0d566978c9225eaa168ba5d71f8fd7042a78507e1462854",
+  "accepted_epochs": {
+    "owner-override": 1,
+    "candidate-producer": 1,
+    "retention-locator": 1
+  },
+  "scopes": {
+    "owner-override": "known-failure:exact-finding",
+    "candidate-producer": "candidate-evidence:exact-build",
+    "retention-locator": "retained-evidence:exact-run"
+  }
+}
