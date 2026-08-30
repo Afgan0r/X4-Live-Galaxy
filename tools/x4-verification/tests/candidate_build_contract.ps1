@@ -276,6 +276,20 @@ function Test-GeneratedBuilds {
         $null = Invoke-Builder $tamperedRoot 1 $tamperedMatrixPath
         Assert-True (-not (Test-Path -LiteralPath $tamperedRoot)) 'Builder wrote output for a stale profile digest.'
 
+        $requiredFields = @('question', 'expected_result', 'evidence_ids', 'failure_classifications', 'bounded_steps', 'stop_conditions', 'verdict_axes')
+        foreach ($field in $requiredFields) {
+            $invalid = Copy-JsonValue $matrix
+            $invalid.candidates[0].PSObject.Properties.Remove($field)
+            $invalidPath = Join-Path $scratch "missing-$field.json"
+            Set-Content -LiteralPath $invalidPath -Value ($invalid | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
+            $null = Invoke-Builder (Join-Path $scratch "reject-missing-$field") 1 $invalidPath
+        }
+        $missingExclusions = Copy-JsonValue $matrix
+        $missingExclusions.source_resolvable_exclusions = @($missingExclusions.source_resolvable_exclusions | Select-Object -Skip 1)
+        $missingExclusionsPath = Join-Path $scratch 'missing-exclusions.json'
+        Set-Content -LiteralPath $missingExclusionsPath -Value ($missingExclusions | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
+        $null = Invoke-Builder (Join-Path $scratch 'reject-missing-exclusions') 1 $missingExclusionsPath
+
         $before = Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')
         $null = Invoke-Builder $publicPackageRoot 1
         Assert-True ((Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')) -eq $before) 'Builder changed the public package after rejecting it.'

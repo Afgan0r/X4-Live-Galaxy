@@ -35,6 +35,19 @@ $expectedCandidateIds = @(
     'p051-native-identity-closure',
     'p051-native-volume-envelope'
 )
+$expectedSourceExclusions = @(
+    'equate-frame-budget-with-native-allocation-bound',
+    'invent-native-offset-pagination',
+    'select-production-ceiling-from-one-run',
+    'treat-emission-paging-as-discovery-paging',
+    'truncate-owner-scope'
+)
+$requiredCandidateFields = @(
+    'id', 'status', 'source_action_only', 'question', 'expected_result',
+    'evidence_ids', 'failure_classifications', 'bounded_steps',
+    'stop_conditions', 'verdict_axes', 'build_group', 'build_profile',
+    'build_profile_digest', 'exclusive_build', 'conflicts_with'
+)
 
 function Fail([string]$Code) {
     $script:reasonCode = $Code
@@ -58,6 +71,12 @@ function Read-Json([string]$Path, [string]$Schema) {
     catch { Fail 'INVALID_JSON' }
     if ($value.schema_version -ne $Schema) { Fail 'UNSUPPORTED_SCHEMA' }
     return $value
+}
+
+function Require-Text($Value) {
+    if ($Value -isnot [string] -or [string]::IsNullOrWhiteSpace($Value) -or $Value.Length -gt 1024) {
+        Fail 'CANDIDATE_TEXT_INVALID'
+    }
 }
 
 function Get-ProfileDigest($Profile) {
@@ -104,6 +123,8 @@ function Assert-ValidMatrix($Matrix) {
     if ((@($Matrix.candidates.id) -join '|') -ne ($expectedCandidateIds -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
     if (@($Matrix.build_groups).Count -lt 1 -or @($Matrix.build_groups).Count -gt $Matrix.bounds.max_groups) { Fail 'GROUP_COUNT_INVALID' }
     if ((@($Matrix.build_groups.id) -join '|') -ne ((@($Matrix.build_groups.id) | Sort-Object) -join '|')) { Fail 'GROUP_ORDER_INVALID' }
+    Test-StringArray $Matrix.source_resolvable_exclusions 5 5 'SOURCE_EXCLUSIONS_INVALID'
+    if ((@($Matrix.source_resolvable_exclusions) -join '|') -ne ($expectedSourceExclusions -join '|')) { Fail 'SOURCE_EXCLUSIONS_INVALID' }
 
     $inputs = @{
         dossier = $dossierPath
@@ -119,9 +140,20 @@ function Assert-ValidMatrix($Matrix) {
 
     $byId = @{}
     foreach ($candidate in @($Matrix.candidates)) {
+        foreach ($field in $requiredCandidateFields) {
+            if ($candidate.PSObject.Properties.Name -notcontains $field) { Fail 'CANDIDATE_FIELD_MISSING' }
+        }
         if ($byId.ContainsKey($candidate.id)) { Fail 'DUPLICATE_CANDIDATE' }
         $byId[$candidate.id] = $candidate
         if ($candidate.status -ne 'runtime-pending' -or $candidate.source_action_only -ne $false) { Fail 'CANDIDATE_STATUS_INVALID' }
+        Require-Text $candidate.question
+        Require-Text $candidate.expected_result
+        Test-StringArray $candidate.evidence_ids 1 16 'CANDIDATE_EVIDENCE_INVALID'
+        Test-StringArray $candidate.failure_classifications 1 8 'CANDIDATE_FAILURE_CLASSES_INVALID'
+        Test-StringArray $candidate.bounded_steps 1 $Matrix.bounds.max_steps_per_candidate 'CANDIDATE_STEPS_INVALID'
+        Test-StringArray $candidate.stop_conditions 1 $Matrix.bounds.max_stop_conditions_per_candidate 'CANDIDATE_STOPS_INVALID'
+        if ((@($candidate.verdict_axes) -join '|') -ne 'execution|contract|effect') { Fail 'CANDIDATE_VERDICT_AXES_INVALID' }
+        if ($candidate.exclusive_build -isnot [bool]) { Fail 'CANDIDATE_EXCLUSIVITY_INVALID' }
         if ($candidate.build_profile_digest -ne (Get-ProfileDigest $candidate.build_profile)) { Fail 'PROFILE_DIGEST_MISMATCH' }
         Test-StringArray $candidate.conflicts_with 0 6 'CONFLICT_SET_INVALID'
         if (@($candidate.conflicts_with) -contains $candidate.id) { Fail 'CONFLICT_SET_INVALID' }
