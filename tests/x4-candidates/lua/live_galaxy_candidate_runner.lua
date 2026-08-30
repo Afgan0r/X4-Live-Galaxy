@@ -97,6 +97,9 @@ local function validate_manifest(manifest, context)
         or type(context.digest.hash) ~= "function" or type(context.digest.verify) ~= "function" then
         return nil, "digest_adapter_missing"
     end
+    if type(context.watchdog) ~= "table" or type(context.watchdog.invoke) ~= "function" then
+        return nil, "watchdog_adapter_missing"
+    end
     return mods
 end
 
@@ -190,22 +193,30 @@ local function ordered_candidates(candidates)
     return ordered
 end
 
+local function invoke_bounded_stage(candidate, stage, context, bounds, callback)
+    -- Reserve the stage's unit before crossing the callback/native boundary. The
+    -- injected watchdog owns the external deadline and must return control even
+    -- when the callback exceeds its instruction or wall-clock allowance.
+    local reserved_work_units = 1
+    if reserved_work_units > bounds.max_work_units_per_step then return nil, "timeout_marker" end
+    local invoked, status, value = pcall(context.watchdog.invoke, candidate.id, stage,
+        reserved_work_units, callback)
+    if not invoked or status == "timeout" then return nil, "timeout_marker" end
+    if status == "callback-error" then return nil, stage .. "_exception" end
+    if status ~= "completed" then return nil, "timeout_marker" end
+    return value
+end
+
 local function execute_candidate(candidate, context, bounds)
     local state = { actual_result = "not_run", completeness = "unknown", failure_point = "none", failure_reason = "none",
         execution_verdict = "not_run", contract_verdict = "not_run", effect_verdict = "not_run" }
     local outcomes = {}
-    local timeout_markers = type(context.timeout_markers) == "table" and context.timeout_markers or {}
-    local candidate_timeouts = type(timeout_markers[candidate.id]) == "table" and timeout_markers[candidate.id] or {}
-    if candidate_timeouts.execution == true then
+    local raw, execution_error = invoke_bounded_stage(candidate, "execution", context, bounds,
+        function() return candidate.execute(context) end)
+    if raw == nil then
+        local reason = execution_error == "execution_exception" and execution_error or "timeout_marker"
         state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
-            "fail", "execution", "timeout_marker", "timeout_marker"
-        outcomes.execution = {}
-        return state, outcomes
-    end
-    local ok, raw = pcall(candidate.execute, context)
-    if not ok then
-        state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
-            "fail", "execution", "execution_exception", "execution_exception"
+            "fail", "execution", reason, reason
         outcomes.execution = {}
         return state, outcomes
     end
@@ -220,14 +231,12 @@ local function execute_candidate(candidate, context, bounds)
     state.actual_result, state.completeness = outcome.actual_result, outcome.completeness
     outcomes.execution = outcome
     outcomes.contract = { work_units = 1 }
-    if candidate_timeouts.contract == true then
-        state.contract_verdict, state.failure_point, state.failure_reason, state.actual_result =
-            "fail", "contract", "timeout_marker", "timeout_marker"
-        return state, outcomes
-    end
-    local contract_ok, valid = pcall(candidate.validate, raw)
-    if not contract_ok then
-        state.contract_verdict, state.failure_point, state.failure_reason = "fail", "contract", "contract_exception"
+    local valid, contract_error = invoke_bounded_stage(candidate, "contract", context, bounds,
+        function() return candidate.validate(raw) end)
+    if valid == nil then
+        local reason = contract_error == "contract_exception" and contract_error or "timeout_marker"
+        state.contract_verdict, state.failure_point, state.failure_reason = "fail", "contract", reason
+        if reason == "timeout_marker" then state.actual_result = reason end
         return state, outcomes
     end
     if valid ~= true then
@@ -236,20 +245,18 @@ local function execute_candidate(candidate, context, bounds)
     end
     state.contract_verdict = "pass"
     outcomes.effect = { work_units = 1 }
-    if candidate_timeouts.effect == true then
-        state.effect_verdict, state.failure_point, state.failure_reason, state.actual_result =
-            "fail", "effect", "timeout_marker", "timeout_marker"
-        return state, outcomes
-    end
-    local effect_ok, matches
+    local matches, effect_error
     if candidate.assess ~= nil then
-        effect_ok, matches = pcall(candidate.assess, raw, candidate.expected_result)
+        matches, effect_error = invoke_bounded_stage(candidate, "effect", context, bounds,
+            function() return candidate.assess(raw, candidate.expected_result) end)
     else
-        effect_ok, matches = true, state.actual_result == candidate.expected_result
+        matches, effect_error = invoke_bounded_stage(candidate, "effect", context, bounds,
+            function() return state.actual_result == candidate.expected_result end)
     end
-    if not effect_ok then
+    if matches == nil then
+        local reason = effect_error == "effect_exception" and effect_error or "timeout_marker"
         state.effect_verdict, state.failure_point, state.failure_reason, state.actual_result =
-            "fail", "effect", "effect_exception", "effect_exception"
+            "fail", "effect", reason, reason
         return state, outcomes
     end
     state.effect_verdict = matches == true and "pass" or "mismatch"

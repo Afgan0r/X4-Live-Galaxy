@@ -49,7 +49,13 @@ local function execution_context()
             end,
         },
         digest = digest_adapter(),
-        timeout_markers = {},
+        watchdog = {
+            invoke = function(_, _, _, callback)
+                local ok, value = pcall(callback)
+                if not ok then return "callback-error" end
+                return "completed", value
+            end,
+        },
     }
 end
 
@@ -314,16 +320,29 @@ function cases.isolates_exceptions_malformed_results_and_work_unit_exhaustion()
     end
 end
 
-function cases.uses_an_external_timeout_marker_without_invoking_the_stage()
+function cases.external_watchdog_preempts_over_budget_execution_and_continues()
     local calls = 0
     local first = successful_candidate("candidate-a-timeout")
-    first.execute = function() calls = calls + 1; return {} end
+    first.execute = function()
+        calls = calls + 1
+        while true do end
+    end
     local context = execution_context()
-    context.timeout_markers = { [first.id] = { execution = true } }
+    context.watchdog.invoke = function(candidate_id, _, _, callback)
+        local timed_out = false
+        if candidate_id == first.id then
+            debug.sethook(function() timed_out = true; error("instruction deadline") end, "", 100)
+        end
+        local ok, value = pcall(callback)
+        debug.sethook()
+        if timed_out then return "timeout" end
+        if not ok then return "callback-error" end
+        return "completed", value
+    end
     local jsonl, result = runner.run(multi_manifest(first), context)
     assert(type(jsonl) == "string", tostring(result))
     local _, rows = validate_jsonl(jsonl)
-    assert(calls == 0)
+    assert(calls == 1)
     assert(rows[1].actual_result == "timeout_marker")
     assert(rows[1].failure_reason == "timeout_marker")
     assert(rows[1].failure_point == "execution")
@@ -387,6 +406,10 @@ function cases.rejects_missing_identity_bounds_and_digest_failures_with_exact_co
     context = execution_context()
     context.digest = nil
     assert(select(2, runner.run(phase_051.single_success(), context)) == "digest_adapter_missing")
+
+    context = execution_context()
+    context.watchdog = nil
+    assert(select(2, runner.run(phase_051.single_success(), context)) == "watchdog_adapter_missing")
 
     context = execution_context()
     context.digest.hash = function() error("hash unavailable") end
