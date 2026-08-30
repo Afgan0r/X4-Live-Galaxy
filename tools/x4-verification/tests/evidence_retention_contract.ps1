@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('retention', 'retention-platform', 'handback', 'retention-admission')]
+    [ValidateSet('retention', 'retention-platform', 'handback', 'retention-admission', 'preallocation-bounds')]
     [string]$Case = 'retention'
 )
 
@@ -16,6 +16,7 @@ $dossierPath = Join-Path $toolRoot 'contracts/phase-05.1-dossier.v1.json'
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 $pendingLedgerPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
 $admissionPath = Join-Path $toolRoot 'x4-admission.ps1'
+$conformancePath = Join-Path $toolRoot 'x4-package-conformance.ps1'
 $registryPath = Join-Path $toolRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $toolRoot 'contracts/coverage.v1.json'
 $fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
@@ -38,6 +39,25 @@ function Get-Digest([string]$Path) {
 function Get-TextDigest([string]$Value) {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
     return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))).ToLowerInvariant()
+}
+
+function New-SparseFile([string]$Path, [long]$Length) {
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try { $stream.SetLength($Length) }
+    finally { $stream.Dispose() }
+}
+
+function Assert-PreallocationGate([string]$Path, [string]$FunctionName) {
+    $source = Get-Content -LiteralPath $Path -Raw
+    $start = $source.IndexOf("function $FunctionName", [StringComparison]::Ordinal)
+    Assert-True ($start -ge 0) "$FunctionName is missing from $Path."
+    $next = $source.IndexOf("`nfunction ", $start + 1, [StringComparison]::Ordinal)
+    if ($next -lt 0) { $next = $source.Length }
+    $body = $source.Substring($start, $next - $start)
+    $lengthGate = $body.IndexOf('.Length -gt', [StringComparison]::Ordinal)
+    $allocation = $body.IndexOf('ReadAllBytes', [StringComparison]::Ordinal)
+    Assert-True ($lengthGate -ge 0 -and $allocation -ge 0 -and $lengthGate -lt $allocation) `
+        "$FunctionName allocates before enforcing its metadata length bound."
 }
 
 function New-DirectoryReparsePoint([string]$Path, [string]$Target) {
@@ -303,6 +323,55 @@ if ($Case -eq 'handback') {
         extensions/live_galaxy/lua extensions/live_galaxy/md 2>&1
     Assert-True ($LASTEXITCODE -eq 0) "Production/public package changed from executor baseline: $($productionDiff -join ' | ')"
     Write-Output 'PASS: Phase 05.1 sanitized handback contract'
+    exit 0
+}
+
+if ($Case -eq 'preallocation-bounds') {
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-preallocation-{0}" -f [guid]::NewGuid().ToString('N'))
+    $null = New-Item -ItemType Directory -Path $scratch
+    try {
+        $admissionSparse = Join-Path $scratch 'admission-over.json'
+        New-SparseFile $admissionSparse 65537
+        $admissionOutput = @(& pwsh -NoProfile -File $admissionPath `
+            -DossierPath $admissionSparse -RegistryPath $registryPath 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0 -and ($admissionOutput -join "`n") -match 'BOUND_EXCEEDED') `
+            'Admission did not reject max-input-plus-one with BOUND_EXCEEDED.'
+
+        $conformanceSparse = Join-Path $scratch 'conformance-over.json'
+        New-SparseFile $conformanceSparse 131073
+        $conformanceOutput = @(& pwsh -NoProfile -File $conformancePath `
+            -PackageRoot (Join-Path $root 'extensions/live_galaxy') `
+            -ContractPath $conformanceSparse -DossierPath $dossierPath -CoveragePath $coveragePath 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0 -and ($conformanceOutput -join "`n") -match 'FILE_BYTES_EXCEEDED') `
+            'Package conformance did not reject max-file-plus-one with FILE_BYTES_EXCEEDED.'
+
+        $buildSparse = Join-Path $scratch 'build-over.json'
+        New-SparseFile $buildSparse 262145
+        $buildDestination = Join-Path $scratch 'rejected-build'
+        $buildOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildDestination -MatrixPath $buildSparse 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0 -and ($buildOutput -join "`n") -match 'INPUT_BYTES_EXCEEDED') `
+            'Candidate build did not reject max-input-plus-one with INPUT_BYTES_EXCEEDED.'
+        Assert-True (-not (Test-Path -LiteralPath $buildDestination)) 'Oversized build input created output.'
+
+        $retentionSparse = Join-Path $scratch 'retention-over.json'
+        New-SparseFile $retentionSparse 262145
+        $retentionDestination = Join-Path $scratch 'rejected-retention'
+        $retentionOutput = @(& pwsh -NoProfile -File $retentionPath `
+            -EvidencePath $dossierPath -BuildManifestPath $retentionSparse `
+            -DestinationRoot $retentionDestination 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0 -and ($retentionOutput -join "`n") -match 'BOUND_EXCEEDED') `
+            'Retention did not reject max-input-plus-one with BOUND_EXCEEDED.'
+        Assert-True (-not (Test-Path -LiteralPath $retentionDestination)) 'Oversized retention input created output.'
+
+        Assert-PreallocationGate $admissionPath 'Read-BoundedJson'
+        Assert-PreallocationGate $conformancePath 'Read-BoundedBytes'
+        Assert-PreallocationGate $builderPath 'Read-Json'
+        Assert-PreallocationGate $retentionPath 'Read-BoundedBytes'
+        Write-Output 'PASS: four-reader preallocation bounds contract'
+    }
+    finally {
+        if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
+    }
     exit 0
 }
 
