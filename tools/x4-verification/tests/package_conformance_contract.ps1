@@ -29,9 +29,17 @@ function Invoke-JsonCommand([string]$Path, [string[]]$Arguments, [int]$ExpectedE
     if ($exitCode -ne $ExpectedExitCode) {
         throw "Unexpected exit code $exitCode (expected $ExpectedExitCode): $($output -join [Environment]::NewLine)"
     }
-    $jsonLine = @($output | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] })[-1]
+    # Native PowerShell output is a scalar JSON string when the child emits one
+    # line. Piping that scalar through Where-Object can enumerate its
+    # characters on Windows PowerShell, leaving only the final character here.
+    $jsonLine = $null
+    foreach ($item in @($output)) {
+        if ($item -isnot [System.Management.Automation.ErrorRecord]) {
+            $jsonLine = $item.ToString()
+        }
+    }
     try {
-        return ($jsonLine | ConvertFrom-Json -Depth 32)
+        return (ConvertFrom-Json -InputObject $jsonLine -Depth 32)
     }
     catch {
         throw "Command did not return JSON: $($output -join [Environment]::NewLine)"
