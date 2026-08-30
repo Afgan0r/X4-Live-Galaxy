@@ -47,6 +47,7 @@ function Invoke-Isolated(
         Result = $result
         ResponsePath = $responsePath
         ChildPidPath = "$responsePath.child.pid"
+        ReadinessPath = "$responsePath.child.ready"
     }
 }
 
@@ -79,11 +80,27 @@ try {
 
         $run = Invoke-Isolated $workspace 'local-contract-child-endless' 500
         Assert-Contract ($run.Result.status -eq 'worker-timeout' -and $run.Result.accepted -eq $false) 'Child worker did not time out.'
+        Assert-Contract ($run.Result.readiness_observed -eq $true) 'Child readiness was not observed before timeout arming.'
+        Assert-Contract ([DateTimeOffset]$run.Result.readiness_observed_at_utc -le [DateTimeOffset]$run.Result.timeout_armed_at_utc) 'Child timeout was armed before readiness.'
+        Assert-Contract (Test-Path -LiteralPath $run.ReadinessPath -PathType Leaf) 'Child readiness evidence is missing.'
         Assert-Contract (Test-Path -LiteralPath $run.ChildPidPath -PathType Leaf) 'Child PID evidence is missing.'
         $childPid = [int](Get-Content -LiteralPath $run.ChildPidPath -Raw)
         Start-Sleep -Milliseconds 100
         Assert-Contract ($null -eq (Get-Process -Id $childPid -ErrorAction SilentlyContinue)) 'Descendant process survived timeout.'
         Assert-Contract (-not (Test-Path -LiteralPath $run.ResponsePath)) 'Child timeout left an accepted response.'
+
+        $forgedRequestPath = Join-Path $workspace 'forged-readiness.request.json'
+        $forgedResponsePath = Join-Path $workspace 'forged-readiness.response.json'
+        (New-Request 'local-contract-child-endless') | ConvertTo-Json -Depth 8 |
+            Set-Content -LiteralPath $forgedRequestPath -Encoding utf8NoBOM
+        '1234' | Set-Content -LiteralPath "$forgedResponsePath.child.pid" -Encoding utf8NoBOM
+        '{"schema_version":"candidate-worker-readiness.v1","request_id":"forged","pid":1234,"ready_at_utc":"2000-01-01T00:00:00Z"}' |
+            Set-Content -LiteralPath "$forgedResponsePath.child.ready" -Encoding utf8NoBOM
+        $forgedOutput = @(& pwsh -NoProfile -File $launcher -RequestPath $forgedRequestPath `
+            -ResponsePath $forgedResponsePath -DeadlineMs 500 2>&1)
+        Assert-Contract ($LASTEXITCODE -eq 0 -and $forgedOutput.Count -eq 1) 'Forged readiness broke canonical output.'
+        $forgedResult = $forgedOutput[0].ToString() | ConvertFrom-Json
+        Assert-Contract ($forgedResult.accepted -eq $false -and $forgedResult.diagnostic_code -eq 'readiness-path-invalid') 'Forged readiness was not rejected before worker launch.'
         Write-Output 'PASS candidate isolation process-tree timeout'
     }
 
