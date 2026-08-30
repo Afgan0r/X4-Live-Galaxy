@@ -8,6 +8,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$dispatcherPath = $PSCommandPath
 $launcherPath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
 $workerPath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/candidate-worker.ps1'
 $adapterPath = Join-Path $repositoryRoot 'tools/x4-verification/candidate-adapters.psm1'
@@ -68,20 +69,54 @@ $workRoot = $null
 try {
     $groupFull = [IO.Path]::GetFullPath($GroupRoot)
     $outputFull = [IO.Path]::GetFullPath($OutputPath)
+    $script:ReasonCode = 'PATH_VALIDATION_FAILED'
     Assert-NoReparse $groupFull
     Assert-NoReparse ([IO.Path]::GetDirectoryName($outputFull))
     if (-not (Test-Path -LiteralPath $groupFull -PathType Container) -or (Test-Path -LiteralPath $outputFull)) { Fail 'DISPATCH_PATH_INVALID' }
+    if (Test-Contained $outputFull $repositoryRoot) { Fail 'OUTPUT_DESTINATION_REJECTED' }
     $manifestPath = Join-Path $groupFull 'manifest/build-manifest.v1.json'
     $subsetPath = Join-Path $groupFull 'manifest/candidate-matrix-subset.v1.json'
+    $script:ReasonCode = 'MANIFEST_VALIDATION_FAILED'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 64 -DateKind String
     $subset = Get-Content -LiteralPath $subsetPath -Raw | ConvertFrom-Json -Depth 64 -DateKind String
     $candidateIds = @($subset.candidates.id | Sort-Object)
     if ($candidateIds.Count -lt 1 -or $candidateIds.Count -gt 7 -or
+        @($candidateIds | Sort-Object -Unique).Count -ne $candidateIds.Count -or
         ($candidateIds -join '|') -ne (@($manifest.candidate_ids | Sort-Object) -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
+    if ($manifest.execution_status -ne 'execution-ready-local-process' -or
+        $manifest.native_execution_status -ne 'terminable-external-isolation' -or
+        $manifest.local_readiness_verified -ne $true) { Fail 'READINESS_STATUS_INVALID' }
     foreach ($file in @($manifest.generated_files)) {
         $candidatePath = Join-Path $groupFull ([string]$file.path)
         if (-not (Test-Contained $candidatePath $groupFull) -or (Get-FileDigest $candidatePath) -ne $file.sha256) { Fail 'COMPONENT_DIGEST_MISMATCH' }
     }
+    $script:ReasonCode = 'COMPONENT_BINDING_VALIDATION_FAILED'
+    $componentBindings = [ordered]@{
+        dispatcher_digest = $dispatcherPath; adapter_digest = $adapterPath
+        worker_digest = $workerPath
+        launcher_digest = Join-Path $repositoryRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
+        worker_protocol_digest = $protocolPath; runtime_evidence_schema_digest = $schemaPath
+    }
+    foreach ($binding in $componentBindings.GetEnumerator()) {
+        $bindingName = [string]$binding.Key
+        $bindingPath = [string]$binding.Value
+        $property = $manifest.PSObject.Properties[$bindingName]
+        if ($null -eq $property -or [string]$property.Value -ne (Get-FileDigest $bindingPath)) { Fail 'COMPONENT_DIGEST_MISMATCH' }
+    }
+    $script:ReasonCode = 'PACKAGE_CONFORMANCE_VALIDATION_FAILED'
+    $contentPath = Join-Path $groupFull 'content.xml'
+    $uiPath = Join-Path $groupFull 'ui.xml'
+    $entryPath = Join-Path $groupFull 'lua/live_galaxy_candidate_entry.lua'
+    $graphDigest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(((Get-FileDigest $contentPath) + (Get-FileDigest $uiPath) + (Get-FileDigest $entryPath))))
+    $packageFields = @('schema_version', 'verdict', 'classification', 'evidence_level', 'graph_digest', 'dossier_digest', 'coverage_digest')
+    if ((@($manifest.package_conformance.PSObject.Properties.Name | Sort-Object) -join '|') -ne (@($packageFields | Sort-Object) -join '|') -or
+        $manifest.package_conformance.verdict -ne 'conformant' -or
+        $manifest.package_conformance.classification -ne 'local-only' -or
+        $manifest.package_conformance.evidence_level -ne 'packaged-static' -or
+        $manifest.package_conformance.graph_digest -ne $graphDigest) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
+    $packageBytes = [Text.Encoding]::UTF8.GetBytes(($manifest.package_conformance | ConvertTo-Json -Compress -Depth 8))
+    if ($manifest.package_conformance_digest -ne (Get-Sha256 $packageBytes)) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
+    $script:ReasonCode = 'ADAPTER_VALIDATION_FAILED'
     Import-Module $adapterPath -Force
     $knownIds = @(Get-CandidateAdapterDefinitions).id
     if (@($candidateIds | Where-Object { $knownIds -cnotcontains $_ }).Count -ne 0) { Fail 'ADAPTER_ID_REJECTED' }
