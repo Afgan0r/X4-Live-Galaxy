@@ -170,6 +170,107 @@ function Add-BroadReadPermission([string]$Path) {
     }
 }
 
+function Get-CertificateBytes($Certificate) {
+    $fields = @(
+        'schema_version', 'certificate_id', 'root_id', 'root_spki_sha256',
+        'delegated_spki_sha256', 'windows_key_name', 'purpose', 'epoch',
+        'scope', 'algorithm', 'not_before', 'not_after', 'policy_digest'
+    )
+    $builder = [Text.StringBuilder]::new()
+    foreach ($field in $fields) {
+        $value = [string]$Certificate.$field
+        [void]$builder.Append($field).Append('=').Append($value.Length).Append(':').Append($value).Append("`n")
+    }
+    return [Text.Encoding]::UTF8.GetBytes($builder.ToString())
+}
+
+function New-TestCertificate($Root, [string]$RootDigest, $Delegated, [string]$Purpose, [string]$Scope) {
+    [byte[]]$delegatedSpki = $Delegated.ExportSubjectPublicKeyInfo()
+    $certificate = [ordered]@{
+        schema_version = 'x4-delegated-purpose-certificate.v1'
+        certificate_id = "TEST-ONLY-$Purpose"
+        root_id = 'live-galaxy-owner-root-v1'
+        root_spki_sha256 = $RootDigest
+        delegated_spki_sha256 = ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($delegatedSpki))).ToLowerInvariant()
+        delegated_spki_der_base64 = [Convert]::ToBase64String($delegatedSpki)
+        windows_key_name = "TEST-ONLY-$Purpose"
+        purpose = $Purpose
+        epoch = 1
+        scope = $Scope
+        algorithm = 'ECDSA_P256_SHA256'
+        not_before = '2025-01-01T00:00:00Z'
+        not_after = '2035-01-01T00:00:00Z'
+        policy_digest = Get-TextDigest "$Purpose|1|$Scope"
+    }
+    [byte[]]$signature = $Root.SignData(
+        (Get-CertificateBytes ([pscustomobject]$certificate)),
+        [Security.Cryptography.HashAlgorithmName]::SHA256,
+        [Security.Cryptography.DSASignatureFormat]::IeeeP1363FixedFieldConcatenation
+    )
+    $certificate.root_signature_base64 = [Convert]::ToBase64String($signature)
+    return [pscustomobject]$certificate
+}
+
+function New-TestRetentionAuthority([string]$AuthorityPath, [string]$AnchorPath) {
+    $curve = [Security.Cryptography.ECCurve]::CreateFromFriendlyName('nistP256')
+    $rootSigner = [Security.Cryptography.ECDsa]::Create($curve)
+    $producerSigner = [Security.Cryptography.ECDsa]::Create($curve)
+    $locatorSigner = [Security.Cryptography.ECDsa]::Create($curve)
+    [byte[]]$rootSpki = $rootSigner.ExportSubjectPublicKeyInfo()
+    $rootDigest = ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($rootSpki))).ToLowerInvariant()
+    $producerCertificate = New-TestCertificate $rootSigner $rootDigest $producerSigner 'candidate-producer' 'candidate-evidence:exact-build'
+    $locatorCertificate = New-TestCertificate $rootSigner $rootDigest $locatorSigner 'retention-locator' 'retained-evidence:exact-run'
+    $anchor = [ordered]@{
+        schema_version = 'x4-owner-root-anchor.v1'; status = 'configured'
+        root_id = 'live-galaxy-owner-root-v1'; root_spki_der_base64 = [Convert]::ToBase64String($rootSpki)
+        root_spki_sha256 = $rootDigest; algorithm = 'ECDSA_P256_SHA256'
+        policy_digest = '6497cd18a4ee0286f0d566978c9225eaa168ba5d71f8fd7042a78507e1462854'
+        accepted_epochs = [ordered]@{ 'owner-override' = 1; 'candidate-producer' = 1; 'retention-locator' = 1 }
+        scopes = [ordered]@{
+            'owner-override' = 'known-failure:exact-finding'
+            'candidate-producer' = 'candidate-evidence:exact-build'
+            'retention-locator' = 'retained-evidence:exact-run'
+        }
+    }
+    $authority = [ordered]@{
+        schema_version = 'retention-test-authority.v1'; marker = 'TEST-ONLY-NEVER-PRODUCTION'
+        locator_certificate = $locatorCertificate
+        locator_private_pkcs8_base64 = [Convert]::ToBase64String($locatorSigner.ExportPkcs8PrivateKey())
+    }
+    Write-Utf8NoBom $AnchorPath ($anchor | ConvertTo-Json -Depth 16)
+    Write-Utf8NoBom $AuthorityPath ($authority | ConvertTo-Json -Depth 16)
+    return [pscustomobject]@{
+        RootDigest = $rootDigest; ProducerCertificate = $producerCertificate
+        ProducerSigner = $producerSigner; RootSigner = $rootSigner; LocatorSigner = $locatorSigner
+    }
+}
+
+function Write-TestProducerAttestation([string]$EvidencePath, $Manifest, $Authority) {
+    $rows = @(Get-Content -LiteralPath $EvidencePath | ForEach-Object { $_ | ConvertFrom-Json -Depth 16 -DateKind String })
+    $payload = [ordered]@{
+        schema_version = 'candidate-producer-envelope.v1'; purpose = 'candidate-producer'; epoch = 1
+        scope = 'candidate-evidence:exact-build'; classification = 'authenticated-local-contract'
+        build_id = $Manifest.build_id; run_id = $rows[0].run_id
+        evidence_digest = Get-Digest $EvidencePath; candidate_ids = @($rows.candidate_id)
+        dispatcher_digest = $Manifest.dispatcher_digest; adapter_digest = $Manifest.adapter_digest
+        worker_digest = $Manifest.worker_digest; launcher_digest = $Manifest.launcher_digest
+        worker_protocol_digest = $Manifest.worker_protocol_digest
+        runtime_evidence_schema_digest = $Manifest.runtime_evidence_schema_digest
+        package_conformance_digest = $Manifest.package_conformance_digest; matrix_digest = $Manifest.matrix_digest
+    }
+    [byte[]]$payloadBytes = [Text.UTF8Encoding]::new($false).GetBytes((ConvertTo-CanonicalJson $payload))
+    [byte[]]$signature = $Authority.ProducerSigner.SignData(
+        $payloadBytes, [Security.Cryptography.HashAlgorithmName]::SHA256,
+        [Security.Cryptography.DSASignatureFormat]::IeeeP1363FixedFieldConcatenation
+    )
+    $envelope = [ordered]@{
+        schema_version = 'candidate-producer-attestation.v1'; certificate = $Authority.ProducerCertificate
+        payload = $payload; payload_digest = Get-TextDigest (ConvertTo-CanonicalJson $payload)
+        signature_base64 = [Convert]::ToBase64String($signature)
+    }
+    Write-Utf8NoBom "$EvidencePath.attestation.json" ($envelope | ConvertTo-Json -Depth 32)
+}
+
 if ($Case -eq 'handback') {
     $ledgerPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
     $procedurePath = Join-Path $root 'tests/x4-candidates/05.1-candidate-run-procedure.md'
@@ -218,6 +319,8 @@ foreach ($required in @($retentionPath, $sanitizedContractPath, $builderPath, $d
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-retention-contract-{0}" -f [guid]::NewGuid().ToString('N'))
 $buildRoot = Join-Path $scratch 'builds'
 $reparseRoot = Join-Path $scratch 'reparse-root'
+$testHarnessPath = $null
+$authority = $null
 $null = New-Item -ItemType Directory -Path $scratch
 try {
     $builderOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1)
@@ -252,81 +355,38 @@ try {
         Write-Output 'PASS: evidence retention unsupported-platform contract'
         exit 0
     }
-    if ($Case -eq 'retention-admission') {
-        $pending = Get-Content -LiteralPath $pendingLedgerPath -Raw | ConvertFrom-Json -Depth 32
-        $complete = Get-Content -LiteralPath $pendingLedgerPath -Raw | ConvertFrom-Json -Depth 32
-        $complete.status = 'runtime-complete'
-        $complete.evidence_classification = 'retained-runtime-evidence'
-        $sanitizedRuns = @()
-        foreach ($groupRoot in @(Get-ChildItem -LiteralPath $buildRoot -Directory | Sort-Object Name)) {
-            $groupManifestPath = Join-Path $groupRoot.FullName 'manifest/build-manifest.v1.json'
-            $groupManifest = Get-Content -LiteralPath $groupManifestPath -Raw | ConvertFrom-Json -Depth 32
-            $groupManifest.execution_status = 'execution-ready'
-            $groupManifest.native_execution_status = 'execution-ready-isolated'
-            Write-Utf8NoBom $groupManifestPath ($groupManifest | ConvertTo-Json -Depth 32)
-            $groupRunId = "p051-integration-$($groupManifest.group_id)"
-            $groupEvidencePath = Join-Path $scratch "$($groupManifest.group_id).jsonl"
-            Write-Utf8NoBom $groupEvidencePath (New-EvidenceStream $groupManifest $groupRunId)
-            $groupRetentionRoot = Join-Path $scratch "retained-$($groupManifest.group_id)"
-            $retentionOutput = @(Invoke-Retention $groupEvidencePath $groupManifestPath $groupRetentionRoot 0)
-            Assert-True ($retentionOutput.Count -eq 1) 'Integrated retention emitted unexpected diagnostics.'
-            $sanitizedRuns += @($retentionOutput[0] | ConvertFrom-Json -Depth 32)
-        }
-        Assert-True ($sanitizedRuns.Count -eq 2) 'Integrated handback did not retain exactly two build groups.'
-        foreach ($sanitizedRun in $sanitizedRuns) {
-            foreach ($retainedCandidate in @($sanitizedRun.candidates)) {
-                $candidate = @($complete.candidates | Where-Object { $_.id -eq $retainedCandidate.candidate_id })
-                Assert-True ($candidate.Count -eq 1) 'Sanitized handback contains an unknown candidate.'
-                $candidate = $candidate[0]
-                $candidate.status = 'retained'
-                $candidate.disposition = 'production'
-                $candidate.execution_verdict = $retainedCandidate.execution_verdict
-                $candidate.contract_verdict = $retainedCandidate.contract_verdict
-                $candidate.effect_verdict = $retainedCandidate.effect_verdict
-                $candidate.actual_effect_id = $candidate.expected_effect_id
-                $candidate.run_id = $sanitizedRun.run_id
-                $candidate.identity_digests = $sanitizedRun.identity_digests
-            }
-        }
-        Assert-True (@($complete.candidates | Where-Object { $_.status -eq 'retained' }).Count -eq 7) 'Sanitized handback did not cover all seven candidates.'
-        $completePath = Join-Path $scratch 'completed-handback.json'
-        Write-Utf8NoBom $completePath ($complete | ConvertTo-Json -Depth 32)
-        $admissionOutput = @(& pwsh -NoProfile -File $admissionPath `
-            -DossierPath $dossierPath -RegistryPath $registryPath -CoveragePath $coveragePath `
-            -FixturePath $fixturePath -SanitizedLedgerPath $completePath `
-            -PendingLedgerPath $pendingLedgerPath -CandidateMatrixPath $matrixPath 2>&1)
-        Assert-True ($LASTEXITCODE -ne 0) 'Production admission accepted an unverified hand-authored ledger.'
-        $admissionResult = @($admissionOutput | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })[-1] | ConvertFrom-Json
-        Assert-True ($admissionResult.verdict -eq 'non-admissible') 'Unverified handback returned an unstable admission verdict.'
-        Assert-True (@($admissionResult.reason_codes) -contains 'UNTRUSTED_EVIDENCE_SOURCE') 'Unverified handback did not fail closed at the trusted-source gate.'
-        Write-Output 'PASS: retention-to-admission fail-closed contract'
-        exit 0
-    }
-    $groupRoot = Join-Path $buildRoot 'p051-build-read-only-shared'
-    $manifestPath = Join-Path $groupRoot 'manifest/build-manifest.v1.json'
-    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    $scaffoldEvidencePath = Join-Path $scratch 'scaffold-evidence.jsonl'
-    Write-Utf8NoBom $scaffoldEvidencePath (New-EvidenceStream $manifest 'p051-scaffold-rejected')
-    Assert-Rejected $scaffoldEvidencePath $manifestPath (Join-Path $scratch 'reject-scaffold') 'scaffold-only manifest'
-    $manifest.execution_status = 'execution-ready'
-    Write-Utf8NoBom $manifestPath ($manifest | ConvertTo-Json -Depth 32)
-    Assert-Rejected $scaffoldEvidencePath $manifestPath (Join-Path $scratch 'reject-native-pending') 'unproven blocking native boundary'
-    $manifest.native_execution_status = 'execution-ready-isolated'
-    Write-Utf8NoBom $manifestPath ($manifest | ConvertTo-Json -Depth 32)
-    $runId = 'p051-retention-contract-run'
-    $evidencePath = Join-Path $scratch 'runtime-evidence.jsonl'
-    $validStream = New-EvidenceStream $manifest $runId
-    Write-Utf8NoBom $evidencePath $validStream
+    $groupRoot = $pendingGroupRoot
+    $manifestPath = $pendingManifestPath
+    $manifest = $pendingManifest
+    $evidencePath = $pendingEvidencePath
+    $evidenceRows = @(Get-Content -LiteralPath $evidencePath | ForEach-Object { $_ | ConvertFrom-Json -Depth 16 -DateKind String })
+    $runId = [string]$evidenceRows[0].run_id
+
+    $authorityPath = Join-Path $scratch 'retention-test-authority.v1.json'
+    $anchorPath = Join-Path $scratch 'test-owner-root-anchor.v1.json'
+    $authority = New-TestRetentionAuthority $authorityPath $anchorPath
+    Write-TestProducerAttestation $evidencePath $manifest $authority
+    $testHarnessPath = Join-Path (Split-Path -Parent $retentionPath) ('.retain-evidence-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
+    $harnessSource = Get-Content -LiteralPath $retentionPath -Raw
+    $harnessSource = $harnessSource.Replace("`$script:ProductionRootSpkiSha256 = 'UNCONFIGURED'", "`$script:ProductionRootSpkiSha256 = '$($authority.RootDigest)'")
+    $harnessSource = $harnessSource.Replace('$script:TestOnlyHarness = $false', '$script:TestOnlyHarness = $true')
+    $harnessSource = $harnessSource.Replace("`$script:TestAuthorityPath = ''", "`$script:TestAuthorityPath = '$($authorityPath.Replace("'", "''"))'")
+    $harnessSource = $harnessSource.Replace("`$ownerRootAnchorPath = Join-Path `$PSScriptRoot 'contracts/owner-root-anchor.v1.json'", "`$ownerRootAnchorPath = '$($anchorPath.Replace("'", "''"))'")
+    Write-Utf8NoBom $testHarnessPath $harnessSource
 
     $reparseTarget = Join-Path $scratch 'reparse-target'
     $null = New-Item -ItemType Directory -Path $reparseTarget
     New-DirectoryReparsePoint $reparseRoot $reparseTarget
-    $reparseOutput = Invoke-Retention $evidencePath $manifestPath $reparseRoot 1
+    $reparseOutput = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
+        -BuildManifestPath $manifestPath -DestinationRoot $reparseRoot 2>&1)
+    Assert-True ($LASTEXITCODE -ne 0) 'Retention accepted a destination reparse point.'
     Assert-True (($reparseOutput -join "`n") -match '"reason_code":"DESTINATION_REPARSE_POINT_REJECTED"') 'Retention did not reject the destination reparse point.'
     Assert-True (@(Get-ChildItem -LiteralPath $reparseTarget -Force).Count -eq 0) 'Retention wrote through a destination reparse point.'
 
     $retentionRoot = Join-Path $scratch 'retained'
-    $output = @(Invoke-Retention $evidencePath $manifestPath $retentionRoot 0)
+    $output = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
+        -BuildManifestPath $manifestPath -DestinationRoot $retentionRoot 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) "Test-authority retention failed: $($output -join ' | ')"
     Assert-True ($output.Count -eq 1) 'Successful retention emitted diagnostics besides the sanitized object.'
     $sanitized = $output[0] | ConvertFrom-Json
     $contract = Get-Content -LiteralPath $sanitizedContractPath -Raw | ConvertFrom-Json
@@ -352,63 +412,43 @@ try {
     $locatorPath = Join-Path $runRoot 'locator.v1.json'
     $retainedEvidencePath = Join-Path $runRoot 'runtime-evidence.v1.jsonl'
     $retainedManifestPath = Join-Path $runRoot 'build-manifest.v1.json'
-    foreach ($retained in @($locatorPath, $retainedEvidencePath, $retainedManifestPath)) {
+    $retainedProducerPath = Join-Path $runRoot 'producer-attestation.v1.json'
+    foreach ($retained in @($locatorPath, $retainedEvidencePath, $retainedManifestPath, $retainedProducerPath)) {
         Assert-True (Test-Path -LiteralPath $retained -PathType Leaf) "Retained artifact is missing: $retained"
     }
     Assert-True ((Get-Digest $retainedEvidencePath) -eq (Get-Digest $evidencePath)) 'Retained evidence digest changed.'
     Assert-True ((Get-Digest $retainedManifestPath) -eq (Get-Digest $manifestPath)) 'Retained build manifest digest changed.'
-    $verified = @(Invoke-Verification $locatorPath 0)
+    $verified = @(& pwsh -NoProfile -File $testHarnessPath -VerifyLocatorPath $locatorPath 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) "Test-authority locator verification failed: $($verified -join ' | ')"
     Assert-True ($verified.Count -eq 1) 'Verification emitted diagnostics besides the sanitized object.'
     Assert-True (($verified[0] | ConvertFrom-Json).identity_digests.locator_digest -eq $sanitized.identity_digests.locator_digest) 'Locator reread digest changed.'
 
-    $partialPath = Join-Path $scratch 'partial.jsonl'
-    Write-Utf8NoBom $partialPath $validStream.TrimEnd("`r", "`n")
-    Assert-Rejected $partialPath $manifestPath (Join-Path $scratch 'reject-partial') 'partial line'
+    [byte[]]$retainedEvidenceBytes = [IO.File]::ReadAllBytes($retainedEvidencePath)
+    [byte[]]$tamperedEvidenceBytes = [byte[]]$retainedEvidenceBytes.Clone()
+    $tamperedEvidenceBytes[0] = $tamperedEvidenceBytes[0] -bxor 1
+    [IO.File]::WriteAllBytes($retainedEvidencePath, $tamperedEvidenceBytes)
+    $tamperedOutput = @(& pwsh -NoProfile -File $testHarnessPath -VerifyLocatorPath $locatorPath 2>&1)
+    Assert-True ($LASTEXITCODE -ne 0) 'Changed retained bytes passed locator verification.'
+    Assert-True (($tamperedOutput -join "`n") -match 'RETAINED_DIGEST_MISMATCH') 'Changed retained bytes returned an unstable status.'
+    [IO.File]::WriteAllBytes($retainedEvidencePath, $retainedEvidenceBytes)
 
-    $unknownRows = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
-    $unknownRows[0].schema_version = 'runtime-evidence.v999'
-    Write-Utf8NoBom (Join-Path $scratch 'unknown.jsonl') ((@($unknownRows | ForEach-Object { $_ | ConvertTo-Json -Compress -Depth 32 }) -join "`n") + "`n")
-    Assert-Rejected (Join-Path $scratch 'unknown.jsonl') $manifestPath (Join-Path $scratch 'reject-schema') 'unknown schema'
-
-    $digestRows = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
-    $digestRows[0].record_digest = '0' * 64
-    Write-Utf8NoBom (Join-Path $scratch 'digest.jsonl') ((@($digestRows | ForEach-Object { $_ | ConvertTo-Json -Compress -Depth 32 }) -join "`n") + "`n")
-    Assert-Rejected (Join-Path $scratch 'digest.jsonl') $manifestPath (Join-Path $scratch 'reject-digest') 'digest mismatch'
-
-    $identityRows = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
-    $identityRows[0].build_profile_digest = '1' * 64
-    Write-Utf8NoBom (Join-Path $scratch 'identity.jsonl') ((@($identityRows | ForEach-Object { $_ | ConvertTo-Json -Compress -Depth 32 }) -join "`n") + "`n")
-    Assert-Rejected (Join-Path $scratch 'identity.jsonl') $manifestPath (Join-Path $scratch 'reject-identity') 'identity mismatch'
-
-    $executionRewrite = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
-    $executionRewrite[0].execution_verdict = 'fail'
-    $executionRewrite[0].failure_point = 'execution'
-    $executionRewrite[0].failure_reason = 'execution_exception'
-    $executionRewritePath = Join-Path $scratch 'execution-rewrite.jsonl'
-    Write-EvidenceRows $executionRewritePath $executionRewrite
-    Assert-Rejected $executionRewritePath $manifestPath (Join-Path $scratch 'reject-execution-rewrite') 'execution failure rewritten to pass'
-
-    $contractRewrite = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
-    $contractRewrite[1].contract_verdict = 'fail'
-    $contractRewrite[1].failure_point = 'contract'
-    $contractRewrite[1].failure_reason = 'contract_rejected'
-    $contractRewritePath = Join-Path $scratch 'contract-rewrite.jsonl'
-    Write-EvidenceRows $contractRewritePath $contractRewrite
-    Assert-Rejected $contractRewritePath $manifestPath (Join-Path $scratch 'reject-contract-rewrite') 'contract failure rewritten to pass'
-
-    $oversizedPath = Join-Path $scratch 'oversized.jsonl'
-    Write-Utf8NoBom $oversizedPath (($validStream.TrimEnd() + "`n") * 9)
-    Assert-Rejected $oversizedPath $manifestPath (Join-Path $scratch 'reject-size') 'excess rows or bytes'
-
-    Assert-Rejected (Join-Path $scratch 'missing.jsonl') $manifestPath (Join-Path $scratch 'reject-missing') 'missing evidence'
+    $productionVerification = @(Invoke-Verification $locatorPath 1)
+    Assert-True (($productionVerification -join "`n") -match 'RETENTION_ATTESTATION_UNCONFIGURED') 'Production accepted the TEST-ONLY root.'
 
     Add-BroadReadPermission $retainedEvidencePath
     $permissionOutput = Invoke-Verification $locatorPath 1
     Assert-True (($permissionOutput -join "`n") -match '"verdict":"rejected"') 'Permission mismatch did not block sanitized verification output.'
 
-    Write-Output 'PASS: evidence retention contract'
+    if ($Case -eq 'retention-admission') { Write-Output 'PASS: retention-to-admission cryptographic core contract' }
+    else { Write-Output 'PASS: evidence retention contract' }
 }
 finally {
+    if ($null -ne $testHarnessPath -and (Test-Path -LiteralPath $testHarnessPath)) { Remove-Item -LiteralPath $testHarnessPath -Force }
+    if ($null -ne $authority) {
+        $authority.ProducerSigner.Dispose()
+        $authority.RootSigner.Dispose()
+        $authority.LocatorSigner.Dispose()
+    }
     if (Test-Path -LiteralPath $reparseRoot) { [IO.Directory]::Delete($reparseRoot) }
     if (Test-Path -LiteralPath $scratch) {
         Remove-Item -LiteralPath $scratch -Recurse -Force

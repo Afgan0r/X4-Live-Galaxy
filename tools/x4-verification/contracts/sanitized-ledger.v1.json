@@ -29,6 +29,7 @@
     "runtime_evidence_schema_digest",
     "build_manifest_digest",
     "evidence_digest",
+    "producer_attestation_digest",
     "run_digest",
     "locator_digest"
   ],
