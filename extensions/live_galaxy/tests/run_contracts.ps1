@@ -11,6 +11,8 @@ $packageConformanceContract = Join-Path $root 'tools/x4-verification/tests/packa
 $candidateBuildContract = Join-Path $root 'tools/x4-verification/tests/candidate_build_contract.ps1'
 $evidenceRetentionContract = Join-Path $root 'tools/x4-verification/tests/evidence_retention_contract.ps1'
 $candidateIsolationContract = Join-Path $root 'tools/x4-verification/tests/candidate_isolation_contract.ps1'
+$candidatePackageRuntimeContract = Join-Path $root 'tools/x4-verification/tests/candidate_package_runtime_contract.ps1'
+$candidatePackageAdversarial = Join-Path $root 'tools/x4-verification/tests/candidate_package_adversarial.ps1'
 $ownerAuthorityContract = Join-Path $root 'tools/x4-verification/tests/owner_authority_contract.ps1'
 $ownerAuthorityAdversarial = Join-Path $root 'tools/x4-verification/tests/owner_authority_adversarial.ps1'
 $evidenceChainAdversarial = Join-Path $root 'tools/x4-verification/tests/evidence_chain_adversarial.ps1'
@@ -37,9 +39,14 @@ if ($Suite -in @('all', 'x4-verification')) {
     if ($LASTEXITCODE -ne 0) { throw 'X4 owner authority adversarial contract failed.' }
     & pwsh -NoProfile -File $candidateBuildContract -Case all
     if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
-    foreach ($retentionCase in @('retention', 'retention-platform', 'handback', 'retention-admission')) {
-        & pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase
+    foreach ($retentionCase in @('retention', 'retention-platform', 'handback', 'retention-admission', 'preallocation-bounds')) {
+        $retentionOutput = @(& pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase)
         if ($LASTEXITCODE -ne 0) { throw "X4 evidence-retention contract failed: $retentionCase" }
+        $retentionOutput | Write-Output
+        if ($retentionCase -eq 'preallocation-bounds' -and
+            $retentionOutput -notcontains 'PASS: shared open-handle race contract') {
+            throw 'X4 open-handle race marker was not reached.'
+        }
     }
     & pwsh -NoProfile -File $evidenceChainAdversarial
     if ($LASTEXITCODE -ne 0) { throw 'X4 held-out evidence-chain adversarial contract failed.' }
@@ -50,9 +57,31 @@ if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
     if ($LASTEXITCODE -ne 0) { throw 'X4 candidate isolation contract failed.' }
 }
 
+if ($Suite -in @('all', 'x4-verification')) {
+    $runtimeOutput = @(& pwsh -NoProfile -File $candidatePackageRuntimeContract -Case all)
+    if ($LASTEXITCODE -ne 0 -or
+        $runtimeOutput -notcontains 'candidate-package-runtime: adapters PASS') {
+        throw 'X4 candidate-package runtime contract failed.'
+    }
+    $runtimeOutput | Write-Output
+    $adversarialOutput = @(& pwsh -NoProfile -File $candidatePackageAdversarial -Case all)
+    if ($LASTEXITCODE -ne 0 -or
+        $adversarialOutput -notcontains 'candidate-package-adversarial: PASS') {
+        throw 'X4 candidate-package adversarial contract failed.'
+    }
+    $adversarialOutput | Write-Output
+}
+
 if ($Suite -in @('all', 'x4-package-conformance', 'x4-verification')) {
-    & pwsh -NoProfile -File $packageConformanceContract -Case packaged-path
+    $packageCase = if ($Suite -eq 'x4-package-conformance') { 'packaged-path' } else { 'all' }
+    $packageArguments = @('-NoProfile', '-File', $packageConformanceContract, '-Case', $packageCase)
+    if ($packageCase -eq 'all') { $packageArguments += '-SkipAggregateRegistration' }
+    $packageOutput = @(& pwsh @packageArguments)
     if ($LASTEXITCODE -ne 0) { throw 'X4 package conformance contract failed.' }
+    $packageOutput | Write-Output
+    if ($packageOutput -notcontains "package conformance contract passed: $packageCase") {
+        throw "X4 package conformance PASS marker is missing: $packageCase"
+    }
     if ($Suite -eq 'x4-package-conformance') {
         exit 0
     }

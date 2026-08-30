@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [ValidateSet('packaged-path', 'all')]
-    [string]$Case = 'all'
+    [string]$Case = 'all',
+    [switch]$SkipAggregateRegistration,
+    [string]$LuaPath
 )
 
 Set-StrictMode -Version Latest
@@ -294,7 +296,25 @@ function Test-AggregateRegistration {
     }
     Assert-True (@($output) -contains 'package conformance contract passed: packaged-path') 'Aggregate runner did not execute the production package contract.'
 
-    $fullOutput = @(& pwsh -NoProfile -File $aggregateRunner -Suite all 2>&1)
+    $verificationArguments = @('-NoProfile', '-File', $aggregateRunner, '-Suite', 'x4-verification')
+    if (-not [string]::IsNullOrWhiteSpace($LuaPath)) {
+        $verificationArguments += @('-LuaPath', $LuaPath)
+    }
+    $verificationOutput = @(& pwsh @verificationArguments 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) `
+        "Canonical X4 verification failed: $($verificationOutput -join [Environment]::NewLine)"
+    Assert-True ($verificationOutput -contains 'package conformance contract passed: all') `
+        'Canonical X4 verification omitted full package conformance.'
+    Assert-True ($verificationOutput -contains 'candidate-package-runtime: adapters PASS') `
+        'Canonical X4 verification omitted candidate runtime.'
+    Assert-True ($verificationOutput -contains 'candidate-package-adversarial: PASS') `
+        'Canonical X4 verification omitted candidate package regressions.'
+    Assert-True ($verificationOutput -contains 'PASS: shared open-handle race contract') `
+        'Canonical X4 verification omitted retention preallocation races.'
+
+    $fullArguments = @('-NoProfile', '-File', $aggregateRunner, '-Suite', 'all')
+    if (-not [string]::IsNullOrWhiteSpace($LuaPath)) { $fullArguments += @('-LuaPath', $LuaPath) }
+    $fullOutput = @(& pwsh @fullArguments 2>&1)
     Assert-True (@($fullOutput) -contains 'candidate build contract passed: all') 'Full aggregate omitted the candidate-build gate.'
     Assert-True (@($fullOutput) -contains 'PASS: evidence retention contract') 'Full aggregate omitted the retention gate.'
     Assert-True (@($fullOutput) -contains 'PASS: Phase 05.1 sanitized handback contract') 'Full aggregate omitted the handback gate.'
@@ -305,7 +325,7 @@ switch ($Case) {
     'packaged-path' { Test-PackagedPath }
     'all' {
         Test-PackagedPath
-        Test-AggregateRegistration
+        if (-not $SkipAggregateRegistration) { Test-AggregateRegistration }
     }
 }
 
