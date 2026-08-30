@@ -228,13 +228,22 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     Assert-True ($manifest.build_profile_digest -eq $Group.build_profile_digest) 'Generated manifest profile linkage is invalid.'
     Assert-True ($manifest.matrix_digest -eq (Get-FileDigest $matrixPath)) 'Generated manifest matrix linkage is stale.'
     Assert-True ($manifest.runtime_evidence_schema_digest -eq (Get-FileDigest $runtimeEvidencePath)) 'Generated manifest evidence-schema linkage is stale.'
-    Assert-True ($manifest.developer_only -eq $true -and $manifest.execution_status -eq 'scaffold-only') 'Generated manifest overstates execution or public scope.'
-    Assert-True ($manifest.native_execution_status -eq 'runtime-pending') 'Generated manifest overstates blocking-native readiness.'
+    Assert-True ($manifest.developer_only -eq $true -and $manifest.execution_status -eq 'execution-ready-local-process') 'Generated manifest is not locally execution-ready.'
+    Assert-True ($manifest.native_execution_status -eq 'terminable-external-isolation') 'Generated manifest does not bind the terminable external worker.'
+    Assert-True ($manifest.local_readiness_verified -eq $true) 'Generated manifest copied readiness text without executing the local contract.'
     $entrypoint = Get-Content -LiteralPath (Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua') -Raw
-    Assert-True ($entrypoint -match 'scaffold_only = true') 'Generated entrypoint is not explicitly scaffold-only.'
-    Assert-True ($entrypoint -notmatch '(?m)^\s*runner = runner,') 'Generated entrypoint exposes a callable runner without runtime adapters.'
-    foreach ($gate in @('seven_candidate_adapters', 'terminable_native_isolation', 'sha256_adapter', 'private_jsonl_sink', 'human_triggered_dispatcher')) {
-        Assert-True ($entrypoint -match [regex]::Escape($gate)) "Generated scaffold omits implementation gate '$gate'."
+    Assert-True ($entrypoint -match 'execution_ready_local_process = true') 'Generated entrypoint omits local-process readiness metadata.'
+    Assert-True ($entrypoint -notmatch 'ffi\.C') 'Generated entrypoint executes or exposes direct native access.'
+    Assert-True ($entrypoint -notmatch '(?i)dispatch|execute|launch|save|mutation') 'Generated entrypoint exposes a runtime control.'
+    foreach ($requiredPath in @(
+        'runtime/candidate-adapters.psm1',
+        'runtime/run-candidate-package.ps1',
+        'runtime/isolation/candidate-worker.ps1',
+        'runtime/isolation/invoke-candidate-worker.ps1',
+        'contracts/candidate-worker-protocol.v1.json',
+        'contracts/runtime-evidence.v1.json'
+    )) {
+        Assert-True (@($manifest.generated_files.path) -contains $requiredPath) "Generated root omits runtime component '$requiredPath'."
     }
     $generatedPaths = @($manifest.generated_files.path)
     Assert-True (($generatedPaths | Sort-Object -Unique).Count -eq $generatedPaths.Count) 'Generated file manifest contains duplicates.'
