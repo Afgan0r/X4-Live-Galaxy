@@ -13,9 +13,10 @@ $evidenceRetentionContract = Join-Path $root 'tools/x4-verification/tests/eviden
 $candidateIsolationContract = Join-Path $root 'tools/x4-verification/tests/candidate_isolation_contract.ps1'
 $ownerAuthorityContract = Join-Path $root 'tools/x4-verification/tests/owner_authority_contract.ps1'
 $ownerAuthorityAdversarial = Join-Path $root 'tools/x4-verification/tests/owner_authority_adversarial.ps1'
+$evidenceChainAdversarial = Join-Path $root 'tools/x4-verification/tests/evidence_chain_adversarial.ps1'
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
-    foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission')) {
+    foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission', 'evidence-chain')) {
         & pwsh -NoProfile -File $admissionContract -Case $admissionCase
         if ($LASTEXITCODE -ne 0) { throw "X4 admission contract failed: $admissionCase" }
     }
@@ -31,10 +32,12 @@ if ($Suite -in @('all', 'x4-verification')) {
     if ($LASTEXITCODE -ne 0) { throw 'X4 owner authority adversarial contract failed.' }
     & pwsh -NoProfile -File $candidateBuildContract -Case all
     if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
-    foreach ($retentionCase in @('retention', 'handback', 'retention-admission')) {
+    foreach ($retentionCase in @('retention', 'retention-platform', 'handback', 'retention-admission')) {
         & pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase
         if ($LASTEXITCODE -ne 0) { throw "X4 evidence-retention contract failed: $retentionCase" }
     }
+    & pwsh -NoProfile -File $evidenceChainAdversarial
+    if ($LASTEXITCODE -ne 0) { throw 'X4 held-out evidence-chain adversarial contract failed.' }
 }
 
 if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {

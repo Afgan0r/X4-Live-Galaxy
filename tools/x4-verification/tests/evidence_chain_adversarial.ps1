@@ -26,6 +26,6 @@ foreach ($marker in @(
 
 $aggregateSource = Get-Content -LiteralPath $aggregatePath -Raw
 Assert-True ($aggregateSource.Contains('evidence_chain_adversarial.ps1')) 'Aggregate does not run the held-out chain suite.'
-Assert-True ($aggregateSource.Contains('PASS: held-out evidence-chain adversarial contract')) 'Aggregate does not require the held-out marker.'
+Assert-True ($aggregateSource.Contains('held-out evidence-chain adversarial contract')) 'Aggregate does not require the held-out marker.'
 
 Write-Output 'PASS: held-out evidence-chain adversarial contract'

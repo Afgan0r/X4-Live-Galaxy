@@ -424,6 +424,33 @@ try {
     Assert-True ($verified.Count -eq 1) 'Verification emitted diagnostics besides the sanitized object.'
     Assert-True (($verified[0] | ConvertFrom-Json).identity_digests.locator_digest -eq $sanitized.identity_digests.locator_digest) 'Locator reread digest changed.'
 
+    [byte[]]$locatorBytes = [IO.File]::ReadAllBytes($locatorPath)
+    $locatorMutations = @(
+        @{ Name = 'purpose confusion'; Apply = { param($value) $value.delegation_certificate.purpose = 'candidate-producer' } },
+        @{ Name = 'epoch rollback'; Apply = { param($value) $value.delegation_certificate.epoch = 0 } },
+        @{ Name = 'delegated key substitution'; Apply = { param($value) $value.delegation_certificate.delegated_spki_sha256 = '0' * 64 } },
+        @{ Name = 'locator signature transplant'; Apply = { param($value) $value.signature_base64 = [Convert]::ToBase64String([byte[]]::new(64)) } },
+        @{ Name = 'cross-run replay'; Apply = { param($value) $value.run_id = 'replayed-run' } }
+    )
+    foreach ($mutation in $locatorMutations) {
+        $changed = [Text.Encoding]::UTF8.GetString($locatorBytes) | ConvertFrom-Json -Depth 32 -DateKind String
+        & $mutation.Apply $changed
+        Write-Utf8NoBom $locatorPath ($changed | ConvertTo-Json -Depth 32)
+        $mutationOutput = @(& pwsh -NoProfile -File $testHarnessPath -VerifyLocatorPath $locatorPath 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0) "$($mutation.Name) passed locator verification."
+        [IO.File]::WriteAllBytes($locatorPath, $locatorBytes)
+    }
+
+    $producerSourcePath = "$evidencePath.attestation.json"
+    [byte[]]$producerBytes = [IO.File]::ReadAllBytes($producerSourcePath)
+    $producerEnvelope = [Text.Encoding]::UTF8.GetString($producerBytes) | ConvertFrom-Json -Depth 32 -DateKind String
+    $producerEnvelope.payload.run_id = 'replayed-producer-run'
+    Write-Utf8NoBom $producerSourcePath ($producerEnvelope | ConvertTo-Json -Depth 32)
+    $producerReplay = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
+        -BuildManifestPath $manifestPath -DestinationRoot (Join-Path $scratch 'reject-producer-replay') 2>&1)
+    Assert-True ($LASTEXITCODE -ne 0) 'Replayed producer envelope passed retention.'
+    [IO.File]::WriteAllBytes($producerSourcePath, $producerBytes)
+
     if ($Case -eq 'retention-admission') {
         $admissionHarnessPath = Join-Path (Split-Path -Parent $admissionPath) ('.x4-admission-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
         $admissionSource = (Get-Content -LiteralPath $admissionPath -Raw).Replace(

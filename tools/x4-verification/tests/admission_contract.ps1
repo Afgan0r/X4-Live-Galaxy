@@ -178,40 +178,12 @@ if ($Case -eq 'evidence-chain') {
     $forged = Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $completeLedger $matrix $pendingLedger $false
     Assert-Rejected $forged 'UNTRUSTED_EVIDENCE_SOURCE' 'hand-authored completed ledger'
     Write-Output 'PASS: hand-authored evidence-chain rejection contract'
-    exit 0
-
-    $missingEvidence = Copy-Json $completeLedger
-    $missingEvidence.candidates[0].identity_digests.PSObject.Properties.Remove('evidence_digest')
-    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $missingEvidence $matrix $pendingLedger $false) 'EVIDENCE_CHAIN_INCOMPLETE' 'missing retained evidence digest'
-
-    $incomplete = Copy-Json $completeLedger
-    $incomplete.candidates[0].status = 'runtime-pending'
-    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $incomplete $matrix $pendingLedger $false) 'RETENTION_INCOMPLETE' 'incomplete retention'
-
-    $sourceAction = Copy-Json $matrix
-    $sourceAction.candidates[0].source_action_only = $true
-    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $completeLedger $sourceAction $pendingLedger $false) 'SOURCE_ACTION_DEFECT' 'source-action candidate'
-
-    foreach ($axis in @('execution', 'contract', 'effect')) {
-        $failed = Copy-Json $completeLedger
-        $failed.candidates[0]."${axis}_verdict" = 'fail'
-        Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $failed $matrix $pendingLedger $false) 'FAILED_RUNTIME_VERDICT' "failed $axis verdict"
-    }
-
-    $unexpected = Copy-Json $completeLedger
-    $unexpected.candidates[0].actual_effect_id = 'valid-unexpected-result'
-    $unexpected.candidates[0].effect_verdict = 'pass'
-    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $unexpected $matrix $pendingLedger $false) 'UNEXPECTED_EFFECT' 'valid unexpected effect marked pass'
-
-    $identityMismatch = Copy-Json $completeLedger
-    $identityMismatch.candidates[0].identity_digests.dossier_digest = '0' * 64
-    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $identityMismatch $matrix $pendingLedger $false) 'IDENTITY_CHAIN_MISMATCH' 'dossier identity mismatch'
-
-    $unsanitized = Copy-Json $completeLedger
-    $unsanitized.candidates[0] | Add-Member -NotePropertyName raw_path -NotePropertyValue 'private-value'
-    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $unsanitized $matrix $pendingLedger $false) 'UNSANITIZED_LEDGER_FIELD' 'unsanitized ledger field'
-
-    Write-Output 'PASS: sanitized evidence-chain admission contract'
+    $retentionContractPath = Join-Path $PSScriptRoot 'evidence_retention_contract.ps1'
+    $retentionOutput = @(& pwsh -NoProfile -File $retentionContractPath -Case retention-admission 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) "Verified-locator contract failed: $($retentionOutput -join ' | ')"
+    Assert-True (($retentionOutput -join "`n").Contains('PASS: retention-to-admission cryptographic core contract')) 'Verified locator did not reach the admission core.'
+    Write-Output 'PASS: verified locator evidence-chain contract'
+    Write-Output 'PASS: evidence-chain forgery rejection contract'
     exit 0
 }
 
