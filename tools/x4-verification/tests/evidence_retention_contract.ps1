@@ -21,8 +21,10 @@ $registryPath = Join-Path $toolRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $toolRoot 'contracts/coverage.v1.json'
 $fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
 $producerModulePath = Join-Path $toolRoot 'producer-attestation.psm1'
+$boundedReaderPath = Join-Path $toolRoot 'bounded-file.psm1'
 
 Import-Module $producerModulePath -Force
+Import-Module $boundedReaderPath -Force
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -47,17 +49,14 @@ function New-SparseFile([string]$Path, [long]$Length) {
     finally { $stream.Dispose() }
 }
 
-function Assert-PreallocationGate([string]$Path, [string]$FunctionName) {
+function Assert-CentralizedBoundedReader([string]$Path) {
     $source = Get-Content -LiteralPath $Path -Raw
-    $start = $source.IndexOf("function $FunctionName", [StringComparison]::Ordinal)
-    Assert-True ($start -ge 0) "$FunctionName is missing from $Path."
-    $next = $source.IndexOf("`nfunction ", $start + 1, [StringComparison]::Ordinal)
-    if ($next -lt 0) { $next = $source.Length }
-    $body = $source.Substring($start, $next - $start)
-    $lengthGate = $body.IndexOf('.Length -gt', [StringComparison]::Ordinal)
-    $allocation = $body.IndexOf('ReadAllBytes', [StringComparison]::Ordinal)
-    Assert-True ($lengthGate -ge 0 -and $allocation -ge 0 -and $lengthGate -lt $allocation) `
-        "$FunctionName allocates before enforcing its metadata length bound."
+    Assert-True ($source -match 'bounded-file\.psm1' -and $source -match '(?m)^Import-Module ') `
+        "Bounded reader module is not imported by $Path."
+    Assert-True ($source -match '\bRead-BoundedFile\b') `
+        "Shared bounded reader is not used by $Path."
+    Assert-True ($source -notmatch '\[IO\.File\]::ReadAllBytes|\[System\.IO\.File\]::ReadAllBytes') `
+        "An equivalent path-reopen reader remains in $Path."
 }
 
 function New-DirectoryReparsePoint([string]$Path, [string]$Target) {
@@ -363,11 +362,89 @@ if ($Case -eq 'preallocation-bounds') {
             'Retention did not reject max-input-plus-one with BOUND_EXCEEDED.'
         Assert-True (-not (Test-Path -LiteralPath $retentionDestination)) 'Oversized retention input created output.'
 
-        Assert-PreallocationGate $admissionPath 'Read-BoundedJson'
-        Assert-PreallocationGate $conformancePath 'Read-BoundedBytes'
-        Assert-PreallocationGate $builderPath 'Read-Json'
-        Assert-PreallocationGate $retentionPath 'Read-BoundedBytes'
+        foreach ($centralizedReader in @(
+            $admissionPath,
+            $conformancePath,
+            $builderPath,
+            $retentionPath,
+            (Join-Path $toolRoot 'run-candidate-package.ps1'),
+            (Join-Path $toolRoot 'isolation/candidate-worker.ps1'),
+            (Join-Path $toolRoot 'isolation/invoke-candidate-worker.ps1'),
+            (Join-Path $toolRoot 'local-attestation.psm1'),
+            (Join-Path $toolRoot 'new-owner-override.ps1')
+        )) {
+            Assert-CentralizedBoundedReader $centralizedReader
+        }
+
+        $racePath = Join-Path $scratch 'same-length-same-time.txt'
+        Write-Utf8NoBom $racePath 'AAAA'
+        $fixedTime = [DateTime]::SpecifyKind([DateTime]'2020-01-02T03:04:05', [DateTimeKind]::Utc)
+        [IO.File]::SetLastWriteTimeUtc($racePath, $fixedTime)
+        $attempts = [pscustomobject]@{
+            BeforeWriteDenied = $false
+            BeforeDeleteDenied = $false
+            AfterWriteDenied = $false
+        }
+        $beforeHook = {
+            param($Context)
+            try {
+                [IO.File]::WriteAllBytes($Context.Path, [Text.Encoding]::UTF8.GetBytes('BBBB'))
+                [IO.File]::SetLastWriteTimeUtc($Context.Path, $fixedTime)
+            }
+            catch [IO.IOException] { $attempts.BeforeWriteDenied = $true }
+            try { [IO.File]::Delete($Context.Path) }
+            catch [IO.IOException] { $attempts.BeforeDeleteDenied = $true }
+        }.GetNewClosure()
+        $afterHook = {
+            param($Context)
+            try {
+                [IO.File]::WriteAllBytes($Context.Path, [Text.Encoding]::UTF8.GetBytes('CCCC'))
+                [IO.File]::SetLastWriteTimeUtc($Context.Path, $fixedTime)
+            }
+            catch [IO.IOException] { $attempts.AfterWriteDenied = $true }
+        }.GetNewClosure()
+        $raceRead = Read-BoundedFile $racePath 4 -BeforeReadTestHook $beforeHook `
+            -AfterReadTestHook $afterHook
+        Assert-True ($attempts.BeforeWriteDenied -and $attempts.BeforeDeleteDenied -and
+            $attempts.AfterWriteDenied) 'The open reader handle allowed synchronized replacement.'
+        Assert-True ([Text.Encoding]::UTF8.GetString($raceRead.Bytes) -ceq 'AAAA') `
+            'The bounded reader returned synchronized replacement bytes.'
+        Assert-True (-not [string]::IsNullOrWhiteSpace($raceRead.Identity)) `
+            'The bounded reader did not validate an opened-file identity.'
+        Assert-True ([IO.Path]::GetFullPath($raceRead.ResolvedTarget).Equals(
+            [IO.Path]::GetFullPath($racePath), [StringComparison]::OrdinalIgnoreCase)) `
+            'The bounded reader did not bind the opened handle to the resolved target.'
+
+        $parentRoot = Join-Path $scratch 'parent-swap'
+        $parentMoved = Join-Path $scratch 'parent-swap-moved'
+        $parentTarget = Join-Path $scratch 'parent-swap-target'
+        $null = New-Item -ItemType Directory -Path $parentRoot
+        $null = New-Item -ItemType Directory -Path $parentTarget
+        $parentFile = Join-Path $parentRoot 'payload.txt'
+        Write-Utf8NoBom $parentFile 'AAAA'
+        Write-Utf8NoBom (Join-Path $parentTarget 'payload.txt') 'BBBB'
+        $parentSwap = [pscustomobject]@{ Denied = $false; Completed = $false }
+        $parentHook = {
+            param($Context)
+            try {
+                [IO.Directory]::Move($parentRoot, $parentMoved)
+                New-DirectoryReparsePoint $parentRoot $parentTarget
+                $parentSwap.Completed = $true
+            }
+            catch [IO.IOException] { $parentSwap.Denied = $true }
+            catch [UnauthorizedAccessException] { $parentSwap.Denied = $true }
+        }.GetNewClosure()
+        $parentRejected = $false
+        try {
+            $parentRead = Read-BoundedFile $parentFile 4 -BeforeReadTestHook $parentHook
+            Assert-True ([Text.Encoding]::UTF8.GetString($parentRead.Bytes) -ceq 'AAAA') `
+                'Parent swap changed bytes read from the held file identity.'
+        }
+        catch { $parentRejected = $_.Exception.Message -eq 'PATH_IDENTITY_CHANGED' }
+        Assert-True ($parentSwap.Denied -or ($parentSwap.Completed -and $parentRejected)) `
+            'A parent/link swap was neither denied nor rejected by opened-target validation.'
         Write-Output 'PASS: four-reader preallocation bounds contract'
+        Write-Output 'PASS: shared open-handle race contract'
     }
     finally {
         if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
@@ -441,6 +518,8 @@ try {
         Write-Utf8NoBom $platformScript $platformSource
         Copy-Item -LiteralPath (Join-Path $toolRoot 'producer-attestation.psm1') `
             -Destination (Join-Path $scratch 'producer-attestation.psm1')
+        Copy-Item -LiteralPath $boundedReaderPath `
+            -Destination (Join-Path $scratch 'bounded-file.psm1')
         $platformRoot = Join-Path $scratch 'unsupported-platform-retained'
         $platformOutput = @(& pwsh -NoProfile -File $platformScript -EvidencePath $pendingEvidencePath `
             -BuildManifestPath $pendingManifestPath -DestinationRoot $platformRoot 2>&1)

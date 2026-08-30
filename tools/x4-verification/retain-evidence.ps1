@@ -29,6 +29,7 @@ $packageConformancePath = Join-Path $PSScriptRoot 'x4-package-conformance.ps1'
 $publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
 $ownerRootAnchorPath = Join-Path $PSScriptRoot 'contracts/owner-root-anchor.v1.json'
 $producerModulePath = Join-Path $PSScriptRoot 'producer-attestation.psm1'
+$boundedReaderPath = Join-Path $PSScriptRoot 'bounded-file.psm1'
 $script:ProductionRootSpkiSha256 = 'UNCONFIGURED'
 $script:TestOnlyHarness = $false
 $script:SimulateUnsupportedPlatform = $false
@@ -46,6 +47,7 @@ $script:cleanupDestination = $null
 $script:createdDestination = $false
 
 Import-Module $producerModulePath -Force
+Import-Module $boundedReaderPath -Force
 
 function Fail([string]$Code) {
     $script:failureCode = $Code
@@ -100,21 +102,11 @@ function Get-Sha256File([string]$Path, [int]$Maximum) {
 }
 
 function Read-BoundedBytes([string]$Path, [int]$Maximum) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
-    $before = Get-Item -LiteralPath $Path -Force
-    if (($before.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $before.LinkType) {
-        Fail 'REPARSE_POINT_REJECTED'
+    try {
+        return (Read-BoundedFile $Path $Maximum 'MISSING_INPUT' 'BOUND_EXCEEDED' `
+            'PATH_IDENTITY_CHANGED' 'REPARSE_POINT_REJECTED').Bytes
     }
-    if ($before.Length -gt $Maximum) { Fail 'BOUND_EXCEEDED' }
-    $bytes = [IO.File]::ReadAllBytes($before.FullName)
-    $after = Get-Item -LiteralPath $Path -Force
-    if (($after.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $after.LinkType -or
-        $after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
-        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc -or $bytes.Length -ne $before.Length) {
-        Fail 'PATH_IDENTITY_CHANGED'
-    }
-    if ($bytes.Length -gt $Maximum) { Fail 'BOUND_EXCEEDED' }
-    return $bytes
+    catch { Fail ([string]$_.Exception.Message) }
 }
 
 function Read-BoundedJson([string]$Path, [int]$Maximum, [string]$SchemaVersion) {
