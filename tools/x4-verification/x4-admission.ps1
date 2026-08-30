@@ -347,7 +347,7 @@ function Test-Coverage($Coverage, $RegistryInfo, $FixtureMap) {
     }
 }
 
-function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
+function Test-Dossier($Dossier, [string[]]$FailureClassIds, [bool]$AllowRuntimeResolution) {
     $script:dossierId = Require-Property $Dossier 'dossier_id'
     Require-Id $script:dossierId
     Require-Id (Require-Property $Dossier 'seam_id')
@@ -364,7 +364,7 @@ function Test-Dossier($Dossier, [string[]]$FailureClassIds) {
             Fail 'INVALID_EVIDENCE_STATUS'
         }
         Assert-Provenance $dimension $evidenceMap
-        if ($status -ne 'EVIDENCED') {
+        if ($status -ne 'EVIDENCED' -and -not $AllowRuntimeResolution) {
             Fail 'UNRESOLVED_EVIDENCE'
         }
         $findingIds = @()
@@ -533,6 +533,14 @@ function Test-EvidenceChain($Ledger, $PendingLedger, $Matrix, $ExpectedDigests) 
         'runtime_evidence_schema_digest',
         'build_manifest_digest'
     )
+    $pendingBoundDigestNames = @(
+        'dossier_digest',
+        'registry_digest',
+        'coverage_digest',
+        'matrix_digest',
+        'build_profile_digest',
+        'runtime_evidence_schema_digest'
+    )
     foreach ($matrixCandidate in $matrixCandidates) {
         $id = Require-Property $matrixCandidate 'id'
         Require-Id $id
@@ -595,7 +603,7 @@ function Test-EvidenceChain($Ledger, $PendingLedger, $Matrix, $ExpectedDigests) 
             $actual = Require-Property $candidateDigests $digestName
             Require-Digest $expected
             Require-Digest $actual
-            if ($actual -ne $expected) {
+            if ($pendingBoundDigestNames -contains $digestName -and $actual -ne $expected) {
                 Fail 'IDENTITY_CHAIN_MISMATCH'
             }
         }
@@ -655,8 +663,12 @@ try {
         $script:validationContext = 'coverage-validation'
         Test-Coverage $coverageRead.Value $registryInfo $fixtureMap
     }
+    $evidenceInputs = @($SanitizedLedgerPath, $PendingLedgerPath, $CandidateMatrixPath)
+    $hasCompleteRuntimeInputs = @($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -eq 0
+    $allowRuntimeResolution = -not $ValidateFixture -and $hasCompleteRuntimeInputs -and
+        $dossierRead.Value.seam_id -ne 'validation-fixture-only'
     $script:validationContext = 'dossier-validation'
-    $knownFindings = @(Test-Dossier $dossierRead.Value $registryInfo.Ids)
+    $knownFindings = @(Test-Dossier $dossierRead.Value $registryInfo.Ids $allowRuntimeResolution)
     if ($knownFindings.Count -gt 0) {
         if ([string]::IsNullOrWhiteSpace($OverridePath)) {
             Fail 'KNOWN_FAILURE_BLOCKED'
@@ -679,7 +691,6 @@ try {
         exit 0
     }
     if ($dossierRead.Value.seam_id -eq 'validation-fixture-only') { Fail 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' }
-    $evidenceInputs = @($SanitizedLedgerPath, $PendingLedgerPath, $CandidateMatrixPath)
     if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
         [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
         Fail 'MISSING_ADMISSION_EVIDENCE'

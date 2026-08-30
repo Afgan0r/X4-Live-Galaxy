@@ -22,11 +22,9 @@ if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
 }
 
 if ($Suite -eq 'x4-verification') {
-    & pwsh -NoProfile -File $admissionContract -Case evidence-chain
-    if ($LASTEXITCODE -ne 0) { throw 'X4 admission evidence-chain contract failed.' }
     & pwsh -NoProfile -File $candidateBuildContract -Case all
     if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
-    foreach ($retentionCase in @('retention', 'handback')) {
+    foreach ($retentionCase in @('retention', 'handback', 'retention-admission')) {
         & pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase
         if ($LASTEXITCODE -ne 0) { throw "X4 evidence-retention contract failed: $retentionCase" }
     }

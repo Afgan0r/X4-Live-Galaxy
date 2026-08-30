@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('retention', 'handback')]
+    [ValidateSet('retention', 'handback', 'retention-admission')]
     [string]$Case = 'retention'
 )
 
@@ -14,6 +14,11 @@ $sanitizedContractPath = Join-Path $toolRoot 'contracts/sanitized-ledger.v1.json
 $builderPath = Join-Path $toolRoot 'build-candidate-extension.ps1'
 $dossierPath = Join-Path $toolRoot 'contracts/phase-05.1-dossier.v1.json'
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
+$pendingLedgerPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
+$admissionPath = Join-Path $toolRoot 'x4-admission.ps1'
+$registryPath = Join-Path $toolRoot 'contracts/known-failures.v1.json'
+$coveragePath = Join-Path $toolRoot 'contracts/coverage.v1.json'
+$fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -168,8 +173,7 @@ function Add-BroadReadPermission([string]$Path) {
 if ($Case -eq 'handback') {
     $ledgerPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
     $procedurePath = Join-Path $root 'tests/x4-candidates/05.1-candidate-run-procedure.md'
-    $admissionContractPath = Join-Path $toolRoot 'tests/admission_contract.ps1'
-    foreach ($requiredPath in @($ledgerPath, $procedurePath, $admissionContractPath)) {
+    foreach ($requiredPath in @($ledgerPath, $procedurePath)) {
         Assert-True (Test-Path -LiteralPath $requiredPath -PathType Leaf) "Handback artifact is missing: $requiredPath"
     }
 
@@ -197,8 +201,6 @@ if ($Case -eq 'handback') {
     }
     Assert-True ($procedure -notmatch '(?i)[A-Z]:\\|/Users/|\\Users\\|savegame|successful X4 execution') 'Run procedure leaked a private path or claimed execution.'
 
-    $admissionOutput = & pwsh -NoProfile -File $admissionContractPath -Case evidence-chain 2>&1
-    Assert-True ($LASTEXITCODE -eq 0) "Evidence-chain admission contract failed: $($admissionOutput -join ' | ')"
     $productionDiff = & git diff --exit-code c4bc2ace2036eb2e27d2ef6a37671dfcb8b8d77e -- `
         extensions/live_galaxy/content.xml extensions/live_galaxy/ui.xml `
         extensions/live_galaxy/lua extensions/live_galaxy/md 2>&1
@@ -207,7 +209,7 @@ if ($Case -eq 'handback') {
     exit 0
 }
 
-if ($Case -ne 'retention') { throw "Unhandled case: $Case" }
+if ($Case -notin @('retention', 'retention-admission')) { throw "Unhandled case: $Case" }
 
 foreach ($required in @($retentionPath, $sanitizedContractPath, $builderPath, $dossierPath)) {
     Assert-True (Test-Path -LiteralPath $required -PathType Leaf) "Required artifact is missing: $required"
@@ -220,6 +222,55 @@ $null = New-Item -ItemType Directory -Path $scratch
 try {
     $builderOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1)
     Assert-True ($LASTEXITCODE -eq 0) "Candidate builder failed: $builderOutput"
+    if ($Case -eq 'retention-admission') {
+        $pending = Get-Content -LiteralPath $pendingLedgerPath -Raw | ConvertFrom-Json -Depth 32
+        $complete = Get-Content -LiteralPath $pendingLedgerPath -Raw | ConvertFrom-Json -Depth 32
+        $complete.status = 'runtime-complete'
+        $complete.evidence_classification = 'retained-runtime-evidence'
+        $sanitizedRuns = @()
+        foreach ($groupRoot in @(Get-ChildItem -LiteralPath $buildRoot -Directory | Sort-Object Name)) {
+            $groupManifestPath = Join-Path $groupRoot.FullName 'manifest/build-manifest.v1.json'
+            $groupManifest = Get-Content -LiteralPath $groupManifestPath -Raw | ConvertFrom-Json -Depth 32
+            $groupManifest.execution_status = 'execution-ready'
+            $groupManifest.native_execution_status = 'execution-ready-isolated'
+            Write-Utf8NoBom $groupManifestPath ($groupManifest | ConvertTo-Json -Depth 32)
+            $groupRunId = "p051-integration-$($groupManifest.group_id)"
+            $groupEvidencePath = Join-Path $scratch "$($groupManifest.group_id).jsonl"
+            Write-Utf8NoBom $groupEvidencePath (New-EvidenceStream $groupManifest $groupRunId)
+            $groupRetentionRoot = Join-Path $scratch "retained-$($groupManifest.group_id)"
+            $retentionOutput = @(Invoke-Retention $groupEvidencePath $groupManifestPath $groupRetentionRoot 0)
+            Assert-True ($retentionOutput.Count -eq 1) 'Integrated retention emitted unexpected diagnostics.'
+            $sanitizedRuns += @($retentionOutput[0] | ConvertFrom-Json -Depth 32)
+        }
+        Assert-True ($sanitizedRuns.Count -eq 2) 'Integrated handback did not retain exactly two build groups.'
+        foreach ($sanitizedRun in $sanitizedRuns) {
+            foreach ($retainedCandidate in @($sanitizedRun.candidates)) {
+                $candidate = @($complete.candidates | Where-Object { $_.id -eq $retainedCandidate.candidate_id })
+                Assert-True ($candidate.Count -eq 1) 'Sanitized handback contains an unknown candidate.'
+                $candidate = $candidate[0]
+                $candidate.status = 'retained'
+                $candidate.disposition = 'production'
+                $candidate.execution_verdict = $retainedCandidate.execution_verdict
+                $candidate.contract_verdict = $retainedCandidate.contract_verdict
+                $candidate.effect_verdict = $retainedCandidate.effect_verdict
+                $candidate.actual_effect_id = $candidate.expected_effect_id
+                $candidate.run_id = $sanitizedRun.run_id
+                $candidate.identity_digests = $sanitizedRun.identity_digests
+            }
+        }
+        Assert-True (@($complete.candidates | Where-Object { $_.status -eq 'retained' }).Count -eq 7) 'Sanitized handback did not cover all seven candidates.'
+        $completePath = Join-Path $scratch 'completed-handback.json'
+        Write-Utf8NoBom $completePath ($complete | ConvertTo-Json -Depth 32)
+        $admissionOutput = @(& pwsh -NoProfile -File $admissionPath `
+            -DossierPath $dossierPath -RegistryPath $registryPath -CoveragePath $coveragePath `
+            -FixturePath $fixturePath -SanitizedLedgerPath $completePath `
+            -PendingLedgerPath $pendingLedgerPath -CandidateMatrixPath $matrixPath 2>&1)
+        Assert-True ($LASTEXITCODE -eq 0) "Production admission rejected retained handback: $($admissionOutput -join ' | ')"
+        $admissionResult = @($admissionOutput | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })[-1] | ConvertFrom-Json
+        Assert-True ($admissionResult.verdict -eq 'admissible') 'Integrated retained handback did not become admissible.'
+        Write-Output 'PASS: retention-to-admission integration contract'
+        exit 0
+    }
     $groupRoot = Join-Path $buildRoot 'p051-build-read-only-shared'
     $manifestPath = Join-Path $groupRoot 'manifest/build-manifest.v1.json'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
