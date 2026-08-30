@@ -335,7 +335,6 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     Write-Utf8NoBom (Join-Path $groupRoot 'ui.xml') $ui
     Write-Utf8NoBom (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua') (New-Entrypoint $Group.id $buildId)
     Copy-Item -LiteralPath $runnerSourcePath -Destination (Join-Path $groupRoot 'lua/live_galaxy_candidate_runner.lua')
-    Copy-Item -LiteralPath $dispatcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1')
     Copy-Item -LiteralPath $adapterSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/candidate-adapters.psm1')
     Copy-Item -LiteralPath $attestationModulePath -Destination (Join-Path $groupRoot 'tools/x4-verification/producer-attestation.psm1')
     Copy-Item -LiteralPath $workerSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/candidate-worker.ps1')

@@ -423,17 +423,17 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
         )
         if ($package.graph_digest -ne (Get-Sha256Bytes $graphBytes)) { Fail 'PACKAGE_CONFORMANCE_MISMATCH' }
         $componentBindings = [ordered]@{
-            dispatcher_digest = 'tools/x4-verification/run-candidate-package.ps1'
-            adapter_digest = 'tools/x4-verification/candidate-adapters.psm1'
-            attestation_module_digest = 'tools/x4-verification/producer-attestation.psm1'
-            worker_digest = 'tools/x4-verification/isolation/candidate-worker.ps1'
-            launcher_digest = 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
-            worker_protocol_digest = 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
-            runtime_evidence_schema_digest = 'tools/x4-verification/contracts/runtime-evidence.v1.json'
-            owner_root_anchor_digest = 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
+            dispatcher_digest = (Join-Path $PSScriptRoot 'run-candidate-package.ps1')
+            adapter_digest = (Join-Path $groupRoot 'tools/x4-verification/candidate-adapters.psm1')
+            attestation_module_digest = (Join-Path $groupRoot 'tools/x4-verification/producer-attestation.psm1')
+            worker_digest = (Join-Path $groupRoot 'tools/x4-verification/isolation/candidate-worker.ps1')
+            launcher_digest = (Join-Path $groupRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1')
+            worker_protocol_digest = (Join-Path $groupRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json')
+            runtime_evidence_schema_digest = (Join-Path $groupRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json')
+            owner_root_anchor_digest = (Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json')
         }
         foreach ($binding in $componentBindings.GetEnumerator()) {
-            if ($manifest.([string]$binding.Key) -ne (Get-Sha256File (Join-Path $groupRoot ([string]$binding.Value)))) {
+            if ($manifest.([string]$binding.Key) -ne (Get-Sha256File ([string]$binding.Value))) {
                 Fail 'GENERATED_FILE_DIGEST_MISMATCH'
             }
         }

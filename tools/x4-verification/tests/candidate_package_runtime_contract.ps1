@@ -12,6 +12,7 @@ $builderPath = Join-Path $root 'tools/x4-verification/build-candidate-extension.
 $dispatcherPath = Join-Path $root 'tools/x4-verification/run-candidate-package.ps1'
 $adapterPath = Join-Path $root 'tools/x4-verification/candidate-adapters.psm1'
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
+$procedurePath = Join-Path $root 'tests/x4-candidates/05.1-candidate-run-procedure.md'
 $expectedIds = @(
     'p051-cadence-seta',
     'p051-lifecycle-reload',
@@ -103,10 +104,17 @@ function Test-Adapters {
     try {
         $build = Invoke-JsonCommand $builderPath @('-BuildRoot', $buildRoot, '-MatrixPath', $matrixPath)
         Assert-True ($build.verdict -in @('generated', 'pass')) 'Candidate builder failed before dispatcher verification.'
+        $expectedCommand = 'pwsh -NoProfile -File tools/x4-verification/run-candidate-package.ps1 -GroupRoot $GroupRoot -OutputPath $PrivateJsonlPath'
+        Assert-True ((Get-Content -LiteralPath $procedurePath -Raw).Contains($expectedCommand)) `
+            'Human handoff does not name the repository-fixed dispatcher call chain.'
         $observed = @()
         foreach ($group in @('p051-build-lifecycle', 'p051-build-read-only-shared')) {
+            $groupRoot = Join-Path $buildRoot $group
+            Assert-True (-not (Test-Path -LiteralPath (
+                Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1'
+            ))) 'Generated package exposes a misleading package-local dispatcher.'
             $output = Join-Path $outputRoot "$group.jsonl"
-            $run = Invoke-JsonCommand $dispatcherPath @('-GroupRoot', (Join-Path $buildRoot $group), '-OutputPath', $output)
+            $run = Invoke-JsonCommand $dispatcherPath @('-GroupRoot', $groupRoot, '-OutputPath', $output)
             Assert-True ($run.local_process_ready -eq $true) "Dispatcher did not prove local readiness for '$group'."
             Assert-True ($run.evidence_classification -eq 'authenticated-local-contract') 'Dispatcher made a non-local evidence claim.'
             Assert-True ($run.retainable -eq $false -and $run.attestation_status -eq 'PRODUCER_ATTESTATION_UNCONFIGURED') 'Unprovisioned production authority did not remain explicitly non-retainable.'

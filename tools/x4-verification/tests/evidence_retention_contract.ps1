@@ -317,6 +317,7 @@ $buildRoot = Join-Path $scratch 'builds'
 $reparseRoot = Join-Path $scratch 'reparse-root'
 $testHarnessPath = $null
 $admissionHarnessPath = $null
+$dispatcherHarnessPath = $null
 $authority = $null
 $null = New-Item -ItemType Directory -Path $scratch
 if ($IsWindows) {
@@ -369,8 +370,9 @@ try {
     $authorityPath = Join-Path $scratch 'retention-test-authority.v1.json'
     $anchorPath = Join-Path $scratch 'test-owner-root-anchor.v1.json'
     $authority = New-TestRetentionAuthority $authorityPath $anchorPath
-    $dispatcherHarnessPath = Join-Path $pendingGroupRoot 'tools/x4-verification/.run-candidate-package-test.ps1'
-    $productionDispatcherPath = Join-Path $pendingGroupRoot 'tools/x4-verification/run-candidate-package.ps1'
+    $productionDispatcherPath = Join-Path $root 'tools/x4-verification/run-candidate-package.ps1'
+    $dispatcherHarnessPath = Join-Path (Split-Path -Parent $productionDispatcherPath) `
+        ('.run-candidate-package-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
     $dispatcherHarnessSource = Get-Content -LiteralPath $productionDispatcherPath -Raw
     $dispatcherHarnessSource = $dispatcherHarnessSource.Replace(
         '$dispatcherPath = $PSCommandPath',
@@ -583,6 +585,7 @@ try {
     else { Write-Output 'PASS: evidence retention contract' }
 }
 finally {
+    if ($null -ne $dispatcherHarnessPath -and (Test-Path -LiteralPath $dispatcherHarnessPath)) { Remove-Item -LiteralPath $dispatcherHarnessPath -Force }
     if ($null -ne $admissionHarnessPath -and (Test-Path -LiteralPath $admissionHarnessPath)) { Remove-Item -LiteralPath $admissionHarnessPath -Force }
     if ($null -ne $testHarnessPath -and (Test-Path -LiteralPath $testHarnessPath)) { Remove-Item -LiteralPath $testHarnessPath -Force }
     if ($null -ne $authority) {

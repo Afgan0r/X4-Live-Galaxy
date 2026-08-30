@@ -239,7 +239,6 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     foreach ($requiredPath in @(
         'tools/x4-verification/candidate-adapters.psm1',
         'tools/x4-verification/producer-attestation.psm1',
-        'tools/x4-verification/run-candidate-package.ps1',
         'tools/x4-verification/isolation/candidate-worker.ps1',
         'tools/x4-verification/isolation/invoke-candidate-worker.ps1',
         'tools/x4-verification/contracts/candidate-worker-protocol.v1.json',

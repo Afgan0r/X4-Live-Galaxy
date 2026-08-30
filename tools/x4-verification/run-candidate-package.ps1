@@ -418,7 +418,7 @@ try {
     $anchorPath = Join-Path $groupFull 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
     $script:ReasonCode = 'COMPONENT_BINDING_VALIDATION_FAILED'
     $componentBindings = [ordered]@{
-        dispatcher_digest = (Join-Path $groupFull 'tools/x4-verification/run-candidate-package.ps1')
+        dispatcher_digest = $dispatcherPath
         adapter_digest = $adapterPath
         attestation_module_digest = $attestationModulePath
         worker_digest = $workerPath
