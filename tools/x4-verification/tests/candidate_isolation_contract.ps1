@@ -24,6 +24,7 @@ function New-Request([string]$AdapterId) {
         issued_at_utc = [DateTimeOffset]::UtcNow.ToString('O')
         input = [ordered]@{
             expected_result = 'local-contract-valid'
+            fixture = [ordered]@{}
             max_work_units = 8
         }
     }

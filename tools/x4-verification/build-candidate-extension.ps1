@@ -24,6 +24,7 @@ $runnerSourcePath = Join-Path $repositoryRoot 'tests/x4-candidates/lua/live_gala
 $entrypointTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-entry.lua'
 $dispatcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/run-candidate-package.ps1'
 $adapterSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/candidate-adapters.psm1'
+$attestationModulePath = Join-Path $repositoryRoot 'tools/x4-verification/producer-attestation.psm1'
 $workerSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/candidate-worker.ps1'
 $launcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
 $workerProtocolPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
@@ -67,6 +68,22 @@ function Get-Sha256([byte[]]$Bytes) {
 function Get-FileDigest([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
     return Get-Sha256 ([IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path))
+}
+
+function Set-OwnerOnly([string]$Path, [bool]$Directory) {
+    if (-not $IsWindows) {
+        [IO.File]::SetUnixFileMode(
+            $Path,
+            $(if ($Directory) {
+                [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite -bor [IO.UnixFileMode]::UserExecute
+            } else { [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite })
+        )
+        return
+    }
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    $grant = if ($Directory) { "*$($sid.Value):(OI)(CI)F" } else { "*$($sid.Value):F" }
+    $null = & icacls.exe $Path /inheritance:r /grant:r $grant
+    if ($LASTEXITCODE -ne 0) { Fail 'OWNER_ONLY_PERMISSION_FAILED' }
 }
 
 function Read-Json([string]$Path, [string]$Schema) {
@@ -133,6 +150,13 @@ function Resolve-SafeBuildRoot([string]$Path) {
     if (Test-ContainedPath $full $repositoryRoot) { Fail 'REPOSITORY_DESTINATION_REJECTED' }
     if (Test-ContainedPath $full $publicPackageRoot) { Fail 'PUBLIC_PACKAGE_DESTINATION_REJECTED' }
     if ($full -match '(?i)[\\/]steamapps[\\/]common[\\/]X4 Foundations(?:[\\/]|$)') { Fail 'GAME_INSTALLATION_DESTINATION_REJECTED' }
+    if ($full -match '(?i)[\\/]X4 Foundations[\\/]extensions(?:[\\/]|$)' -or
+        $full -match '(?i)[\\/]extensions[\\/]live_galaxy(?:[\\/]|$)') {
+        Fail 'PUBLIC_RUNTIME_DESTINATION_REJECTED'
+    }
+    if ($full -match '(?i)[\\/]Egosoft[\\/]X4[\\/][0-9]+[\\/]save(?:[\\/]|$)') {
+        Fail 'GAME_SAVE_DESTINATION_REJECTED'
+    }
     if ($full.Length -gt 240) { Fail 'DESTINATION_PATH_EXCEEDED' }
     return $full
 }
@@ -297,6 +321,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     if (-not (Test-ContainedPath $groupRoot $Destination)) { Fail 'GROUP_PATH_ESCAPE' }
     if (Test-Path -LiteralPath $groupRoot) { Fail 'GROUP_DESTINATION_EXISTS' }
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'lua') -Force
+    Set-OwnerOnly $groupRoot $true
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'manifest') -Force
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'tools/x4-verification/isolation') -Force
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'tools/x4-verification/contracts') -Force
@@ -312,6 +337,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     Copy-Item -LiteralPath $runnerSourcePath -Destination (Join-Path $groupRoot 'lua/live_galaxy_candidate_runner.lua')
     Copy-Item -LiteralPath $dispatcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1')
     Copy-Item -LiteralPath $adapterSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/candidate-adapters.psm1')
+    Copy-Item -LiteralPath $attestationModulePath -Destination (Join-Path $groupRoot 'tools/x4-verification/producer-attestation.psm1')
     Copy-Item -LiteralPath $workerSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/candidate-worker.ps1')
     Copy-Item -LiteralPath $launcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1')
     Copy-Item -LiteralPath $workerProtocolPath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json')
@@ -376,6 +402,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         owner_root_anchor_digest = Get-FileDigest $ownerRootAnchorPath
         dispatcher_digest = Get-FileDigest $dispatcherSourcePath
         adapter_digest = Get-FileDigest $adapterSourcePath
+        attestation_module_digest = Get-FileDigest $attestationModulePath
         worker_digest = Get-FileDigest $workerSourcePath
         launcher_digest = Get-FileDigest $launcherSourcePath
         worker_protocol_digest = Get-FileDigest $workerProtocolPath
@@ -383,6 +410,9 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         generated_files = @($generatedFiles)
     }
     Write-Json (Join-Path $groupRoot 'manifest/build-manifest.v1.json') $manifest
+    foreach ($item in @(Get-ChildItem -LiteralPath $groupRoot -Recurse -Force | Sort-Object FullName -Descending)) {
+        Set-OwnerOnly $item.FullName $item.PSIsContainer
+    }
     $readinessOutput = Join-Path $Destination (".$($Group.id)-readiness.jsonl")
     $readiness = & pwsh -NoProfile -File (Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1') -GroupRoot $groupRoot -OutputPath $readinessOutput 2>&1
     if ($LASTEXITCODE -ne 0) { Fail 'LOCAL_READINESS_FAILED' }
@@ -411,6 +441,7 @@ try {
     Assert-ValidMatrix $matrix
     $matrixDigest = Get-FileDigest $MatrixPath
     $null = New-Item -ItemType Directory -Path $destination -Force
+    Set-OwnerOnly $destination $true
     foreach ($group in @($matrix.build_groups)) {
         New-GroupBuild $matrix $group $destination $manifestContract $packageContract $matrixDigest
     }

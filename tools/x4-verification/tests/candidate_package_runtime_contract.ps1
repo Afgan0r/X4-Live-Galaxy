@@ -33,50 +33,45 @@ function Invoke-JsonCommand([string]$File, [string[]]$Arguments, [int]$ExpectedE
     catch { throw "Command did not emit JSON: $text" }
 }
 
+function Get-IndependentAdapterCases {
+    return @(
+        @{ id = 'p051-cadence-seta'; expected = 'cadence:seta-ratio=6'; good = [pscustomobject]@{ real_ms = 1000; game_ms = 6000; seta_active = $true; sample_count = 4 }; bad = [pscustomobject]@{ real_ms = 1000; game_ms = 5000; seta_active = $true; sample_count = 4 } },
+        @{ id = 'p051-lifecycle-reload'; expected = 'lifecycle:single-registration'; good = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate'); reload_count = 1 }; bad = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate', 'live-galaxy-candidate'); reload_count = 1 } },
+        @{ id = 'p051-mod-stack-compatibility'; expected = 'mod-stack:declared-coexistence'; good = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') }; bad = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'faction-enhancer', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') } },
+        @{ id = 'p051-native-count-fill-runtime'; expected = 'count-fill:3-of-3'; good = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta') } },
+        @{ id = 'p051-native-fill-completeness'; expected = 'fill:complete=3'; good = [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ requested_count = 3; returned_count = 2; records = @('alpha', 'beta') } },
+        @{ id = 'p051-native-identity-closure'; expected = 'identity:closed'; good = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' }; bad = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-02'; owner_id = 'argon'; canonical_owner_id = 'argon' } },
+        @{ id = 'p051-native-volume-envelope'; expected = 'volume:8-samples/2048-bytes'; good = [pscustomobject]@{ sample_count = 8; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 }; bad = [pscustomobject]@{ sample_count = 17; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 } }
+    )
+}
+
 function Test-Adapters {
     Assert-True (Test-Path -LiteralPath $adapterPath -PathType Leaf) 'Candidate adapter module is missing.'
     Assert-True (Test-Path -LiteralPath $dispatcherPath -PathType Leaf) 'Candidate dispatcher is missing.'
-    $dispatcherSource = Get-Content -LiteralPath $dispatcherPath -Raw
-    foreach ($requiredAuthorityToken in @(
-        'owner-root-anchor.v1.json',
-        'candidate-producer-certificate.v1.json',
-        'candidate-evidence:exact-build',
-        'CngKey]::Open',
-        'IeeeP1363FixedFieldConcatenation',
-        'PRODUCER_ATTESTATION_VERIFIED'
-    )) {
-        Assert-True ($dispatcherSource.Contains($requiredAuthorityToken)) "Producer-attestation mechanism is missing '$requiredAuthorityToken'."
-    }
-    Assert-True ($dispatcherSource -notmatch '(?i)param\([\s\S]{0,600}(root|certificate|key|fixture|test)[A-Za-z]*Path') 'Production dispatcher exposes an authority or test selector.'
-
     Import-Module $adapterPath -Force
     $definitions = @(Get-CandidateAdapterDefinitions)
     Assert-True ((@($definitions.id | Sort-Object) -join '|') -eq ($expectedIds -join '|')) 'Adapter ID set is incomplete or unstable.'
     Assert-True (@($definitions | Where-Object { $_.classification -ne 'authenticated-local-contract' }).Count -eq 0) 'Adapters overstate or weaken evidence classification.'
     Assert-True (@($definitions | Where-Object { $_.max_work_units -lt 1 -or $_.max_work_units -gt 64 }).Count -eq 0) 'Adapter work bounds are invalid.'
 
-    foreach ($definition in $definitions) {
-        $result = Invoke-CandidateAdapter -CandidateId $definition.id -ExpectedResult "expected-$($definition.id)" -MaxWorkUnits $definition.max_work_units
-        Assert-True ($result.status -eq 'completed' -and $result.completeness -eq 'complete') "Adapter '$($definition.id)' did not complete its local fixture."
-        Assert-True ($result.actual_result -eq "expected-$($definition.id)") "Adapter '$($definition.id)' changed the expected effect identity."
-    }
-    foreach ($attack in @(
-        @{ id = 'p051-native-fill-completeness'; fixture = 'partial' },
-        @{ id = 'p051-native-identity-closure'; fixture = 'foreign-owner' },
-        @{ id = 'p051-native-volume-envelope'; fixture = 'bound-exceeded' },
-        @{ id = 'p051-cadence-seta'; fixture = 'timeout' },
-        @{ id = 'p051-lifecycle-reload'; fixture = 'duplicate-registration' },
-        @{ id = 'p051-mod-stack-compatibility'; fixture = 'excluded-suite' },
-        @{ id = 'p051-native-count-fill-runtime'; fixture = 'malformed-count' }
-    )) {
-        $closed = Invoke-CandidateAdapter -CandidateId $attack.id -ExpectedResult 'never-pass' -MaxWorkUnits 8 -Fixture $attack.fixture
-        Assert-True ($closed.status -eq 'rejected' -and $closed.completeness -eq 'incomplete') "Adapter attack '$($attack.fixture)' did not fail closed."
+    foreach ($case in Get-IndependentAdapterCases) {
+        $definition = @($definitions | Where-Object id -CEQ $case.id)[0]
+        $result = Invoke-CandidateAdapter -CandidateId $case.id -Fixture $case.good -MaxWorkUnits $definition.max_work_units
+        Assert-True ($result.status -eq 'completed' -and $result.completeness -eq 'complete') "Adapter '$($case.id)' did not complete its typed local fixture."
+        Assert-True ($result.actual_result -ceq $case.expected) "Adapter '$($case.id)' failed the independent result oracle."
+        $closed = Invoke-CandidateAdapter -CandidateId $case.id -Fixture $case.bad -MaxWorkUnits $definition.max_work_units
+        Assert-True ($closed.status -eq 'rejected' -and $closed.completeness -eq 'incomplete') "Adapter '$($case.id)' accepted a plausible semantic mismatch."
     }
 
     $temp = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-plan08-runtime-" + [guid]::NewGuid().ToString('N'))
     $buildRoot = Join-Path $temp 'builds'
     $outputRoot = Join-Path $temp 'output'
     $null = New-Item -ItemType Directory -Path $outputRoot -Force
+    if ($IsWindows) {
+        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $null = & icacls.exe $outputRoot /inheritance:r /grant:r "*$sid`:(OI)(CI)F"
+        Assert-True ($LASTEXITCODE -eq 0) 'Unable to protect dispatcher output fixture.'
+    }
     try {
         $build = Invoke-JsonCommand $builderPath @('-BuildRoot', $buildRoot, '-MatrixPath', $matrixPath)
         Assert-True ($build.verdict -in @('generated', 'pass')) 'Candidate builder failed before dispatcher verification.'

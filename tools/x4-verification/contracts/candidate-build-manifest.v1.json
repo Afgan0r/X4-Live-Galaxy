@@ -22,6 +22,7 @@
     "owner_root_anchor_digest",
     "dispatcher_digest",
     "adapter_digest",
+    "attestation_module_digest",
     "worker_digest",
     "launcher_digest",
     "worker_protocol_digest",
@@ -38,6 +39,7 @@
     "owner_root_anchor_digest",
     "dispatcher_digest",
     "adapter_digest",
+    "attestation_module_digest",
     "worker_digest",
     "launcher_digest",
     "worker_protocol_digest"
@@ -48,6 +50,7 @@
     "lua/live_galaxy_candidate_entry.lua",
     "lua/live_galaxy_candidate_runner.lua",
     "tools/x4-verification/candidate-adapters.psm1",
+    "tools/x4-verification/producer-attestation.psm1",
     "tools/x4-verification/run-candidate-package.ps1",
     "tools/x4-verification/isolation/candidate-worker.ps1",
     "tools/x4-verification/isolation/invoke-candidate-worker.ps1",
@@ -61,7 +64,7 @@
   "native_execution_statuses": ["terminable-external-isolation"],
   "bounds": {
     "max_candidates": 7,
-    "max_generated_files": 15,
+    "max_generated_files": 16,
     "max_generated_file_bytes": 65536,
     "max_generated_total_bytes": 524288,
     "max_path_depth": 8,

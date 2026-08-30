@@ -9,7 +9,7 @@
     "issued_at_utc",
     "input"
   ],
-  "input_fields": ["expected_result", "max_work_units"],
+  "input_fields": ["expected_result", "fixture", "max_work_units"],
   "response_fields": [
     "schema_version",
     "request_id",

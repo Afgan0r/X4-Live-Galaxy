@@ -12,6 +12,7 @@ $modulePath = Join-Path $toolRoot 'local-attestation.psm1'
 $anchorPath = Join-Path $toolRoot 'contracts/owner-root-anchor.v1.json'
 $certificatePath = Join-Path $toolRoot 'contracts/delegated-purpose-certificate.v1.json'
 $fixturePath = Join-Path $PSScriptRoot 'fixtures/test-owner-root-fixture.v1.json'
+$producerModulePath = Join-Path $toolRoot 'producer-attestation.psm1'
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -25,6 +26,7 @@ foreach ($path in @($modulePath, $anchorPath, $certificatePath, $fixturePath)) {
     Assert-True (Test-Path -LiteralPath $path -PathType Leaf) "Required authority artifact is missing: $path"
 }
 
+Import-Module $producerModulePath -Force
 Import-Module $modulePath -Force
 $status = Get-OwnerAuthorityStatus
 Assert-Code $status 'OWNER_ROOT_UNCONFIGURED' 'production anchor'
@@ -34,6 +36,21 @@ Assert-Code (Get-OwnerOverrideDelegationStatus) 'OWNER_ROOT_UNCONFIGURED' 'produ
 $signingStatus = Get-OwnerOverrideSigningStatus
 if ($IsWindows) {
     Assert-Code $signingStatus 'OWNER_ROOT_UNCONFIGURED' 'production signing authority'
+    $silentKey = [Security.Cryptography.CngKey]::Create([Security.Cryptography.CngAlgorithm]::ECDsaP256)
+    try {
+        $silentSigner = [Security.Cryptography.ECDsaCng]::new($silentKey)
+        try {
+            $silentSignature = $silentSigner.SignData(
+                [Text.Encoding]::UTF8.GetBytes('TEST-ONLY-silent-signing'),
+                [Security.Cryptography.HashAlgorithmName]::SHA256
+            )
+            Assert-True ($silentSignature.Length -gt 0) 'Silent test key could not demonstrate unattended signing.'
+        }
+        finally { $silentSigner.Dispose() }
+        Assert-True (-not (Test-ProductionCngSigningKeyPolicy $silentKey)) `
+            'Shared producer/locator policy accepted a silent non-exportable key.'
+    }
+    finally { $silentKey.Dispose() }
 }
 else {
     Assert-Code $signingStatus 'OWNER_AUTHORITY_PLATFORM_UNSUPPORTED' 'non-Windows production signing authority'
@@ -64,6 +81,7 @@ $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-root-swap-{0}" -f
 [void](New-Item -ItemType Directory -Path (Join-Path $tempRoot 'contracts') -Force)
 try {
     Copy-Item -LiteralPath $modulePath -Destination (Join-Path $tempRoot 'local-attestation.psm1')
+    Copy-Item -LiteralPath $producerModulePath -Destination (Join-Path $tempRoot 'producer-attestation.psm1')
     $swapped = $fixture.root_anchor | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     $swapped.root_id = 'live-galaxy-owner-root-v1'
     $swapped | Add-Member -NotePropertyName policy_digest -NotePropertyValue '6497cd18a4ee0286f0d566978c9225eaa168ba5d71f8fd7042a78507e1462854'

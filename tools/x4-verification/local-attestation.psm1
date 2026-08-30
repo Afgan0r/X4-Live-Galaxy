@@ -21,6 +21,8 @@ $script:OverridePayloadFields = @(
     'signature_algorithm'
 )
 
+Import-Module (Join-Path $PSScriptRoot 'producer-attestation.psm1') -Force
+
 function New-AuthorityResult([string]$Status, [bool]$Ready = $false) {
     return [pscustomobject][ordered]@{
         schema_version = 'x4-owner-authority-result.v1'
@@ -31,6 +33,32 @@ function New-AuthorityResult([string]$Status, [bool]$Ready = $false) {
 
 function Get-Sha256Hex([byte[]]$Bytes) {
     return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes))).ToLowerInvariant()
+}
+
+function Test-CngUserPresencePolicy([Security.Cryptography.CngKey]$Key) {
+    return Test-CngSigningKeyPolicy $Key
+}
+
+function Test-ProductionCngSigningKeyPolicy([Security.Cryptography.CngKey]$Key) {
+    return Test-CngUserPresencePolicy $Key
+}
+
+function Get-CngUserPresenceStatus([Parameter(Mandatory)][string]$KeyName) {
+    if (-not $IsWindows) { return New-AuthorityResult 'OWNER_AUTHORITY_PLATFORM_UNSUPPORTED' }
+    try {
+        $key = [Security.Cryptography.CngKey]::Open(
+            $KeyName, [Security.Cryptography.CngProvider]::MicrosoftSoftwareKeyStorageProvider,
+            [Security.Cryptography.CngKeyOpenOptions]::UserKey
+        )
+        try {
+            if (-not (Test-CngUserPresencePolicy $key)) {
+                return New-AuthorityResult 'OWNER_DELEGATED_KEY_USER_PRESENCE_REQUIRED'
+            }
+            return New-AuthorityResult 'OWNER_DELEGATED_KEY_USER_PRESENCE_VERIFIED' $true
+        }
+        finally { $key.Dispose() }
+    }
+    catch { return New-AuthorityResult 'OWNER_DELEGATED_KEY_UNCONFIGURED' }
 }
 
 function Assert-NoReparsePath([string]$Path) {
@@ -363,6 +391,9 @@ function Get-OwnerOverrideSigningStatus {
             if (($key.ExportPolicy -band $disallowed) -ne 0) {
                 return New-AuthorityResult 'OWNER_DELEGATED_KEY_EXPORTABLE'
             }
+            if (-not (Test-CngUserPresencePolicy $key)) {
+                return New-AuthorityResult 'OWNER_DELEGATED_KEY_USER_PRESENCE_REQUIRED'
+            }
             $signer = [Security.Cryptography.ECDsaCng]::new($key)
             try { [byte[]]$spki = $signer.ExportSubjectPublicKeyInfo() }
             finally { $signer.Dispose() }
@@ -470,6 +501,9 @@ function New-ProductionOwnerOverrideEnvelope {
             [Security.Cryptography.CngKeyOpenOptions]::UserKey
         )
         try {
+            if (-not (Test-CngUserPresencePolicy $key)) {
+                return New-AuthorityResult 'OWNER_DELEGATED_KEY_USER_PRESENCE_REQUIRED'
+            }
             $signer = [Security.Cryptography.ECDsaCng]::new($key)
             try { return New-SignedOwnerOverrideEnvelope $Payload $signer }
             finally { $signer.Dispose() }
@@ -485,6 +519,8 @@ Export-ModuleMember -Function @(
     'Get-OwnerAuthorityStatus',
     'Get-OwnerOverrideDelegationStatus',
     'Get-OwnerOverrideSigningStatus',
+    'Get-CngUserPresenceStatus',
+    'Test-ProductionCngSigningKeyPolicy',
     'Test-TestOnlyDelegatedCertificate',
     'Test-TestOnlyDelegatedCertificateObject',
     'New-TestOnlyOwnerOverrideEnvelope',

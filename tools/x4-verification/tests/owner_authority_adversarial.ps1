@@ -10,6 +10,7 @@ $admissionPath = Join-Path $toolRoot 'x4-admission.ps1'
 $signerPath = Join-Path $toolRoot 'new-owner-override.ps1'
 $fixturePath = Join-Path $PSScriptRoot 'fixtures/test-owner-root-fixture.v1.json'
 $certificatePath = Join-Path $toolRoot 'contracts/delegated-purpose-certificate.v1.json'
+$producerModulePath = Join-Path $toolRoot 'producer-attestation.psm1'
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -92,6 +93,7 @@ function Invoke-CopiedAnchorProbe($Anchor) {
     [void](New-Item -ItemType Directory -Path (Join-Path $copyRoot 'contracts') -Force)
     try {
         Copy-Item -LiteralPath $modulePath -Destination (Join-Path $copyRoot 'local-attestation.psm1')
+        Copy-Item -LiteralPath $producerModulePath -Destination (Join-Path $copyRoot 'producer-attestation.psm1')
         $Anchor | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $copyRoot 'contracts/owner-root-anchor.v1.json') -Encoding utf8NoBOM
         Copy-Item -LiteralPath $certificatePath -Destination (Join-Path $copyRoot 'contracts/delegated-purpose-certificate.v1.json')
         $probe = "Import-Module '$($copyRoot.Replace("'", "''"))\local-attestation.psm1' -Force; Get-OwnerAuthorityStatus | ConvertTo-Json -Compress"
@@ -124,6 +126,7 @@ $probeRoot = Join-Path $junctionRoot 'probe'
 [void](New-Item -ItemType Directory -Path $probeRoot -Force)
 try {
     Copy-Item -LiteralPath $modulePath -Destination (Join-Path $probeRoot 'local-attestation.psm1')
+    Copy-Item -LiteralPath $producerModulePath -Destination (Join-Path $probeRoot 'producer-attestation.psm1')
     $swapped = $fixture.root_anchor | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     $swapped.root_id = 'live-galaxy-owner-root-v1'
     $swapped | Add-Member -NotePropertyName policy_digest -NotePropertyValue '6497cd18a4ee0286f0d566978c9225eaa168ba5d71f8fd7042a78507e1462854'

@@ -101,7 +101,7 @@ if ($candidateAdapterIds -ccontains [string]$request.candidate_id) {
     Import-Module $adapterModulePath -Force
     $adapterResult = Invoke-CandidateAdapter `
         -CandidateId $request.candidate_id `
-        -ExpectedResult $request.input.expected_result `
+        -Fixture $request.input.fixture `
         -MaxWorkUnits $request.input.max_work_units
     $response.status = $adapterResult.status
     $response.actual_result = $adapterResult.actual_result

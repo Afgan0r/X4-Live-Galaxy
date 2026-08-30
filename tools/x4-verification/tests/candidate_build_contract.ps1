@@ -190,7 +190,7 @@ function Test-Partition {
     Assert-ValidMatrix $matrix
     Assert-True ($manifestContract.schema_version -eq 'candidate-build-manifest-contract.v1') 'Unexpected build-manifest contract schema.'
     Assert-True ((@($manifestContract.required_fields) -contains 'package_conformance_digest')) 'Build manifest does not require package conformance linkage.'
-    Assert-True ((@($manifestContract.required_digests) -join '|') -eq 'dossier_digest|registry_digest|coverage_digest|matrix_digest|build_profile_digest|package_conformance_digest|runtime_evidence_schema_digest|owner_root_anchor_digest|dispatcher_digest|adapter_digest|worker_digest|launcher_digest|worker_protocol_digest') 'Build manifest digest chain is incomplete or unstable.'
+    Assert-True ((@($manifestContract.required_digests) -join '|') -eq 'dossier_digest|registry_digest|coverage_digest|matrix_digest|build_profile_digest|package_conformance_digest|runtime_evidence_schema_digest|owner_root_anchor_digest|dispatcher_digest|adapter_digest|attestation_module_digest|worker_digest|launcher_digest|worker_protocol_digest') 'Build manifest digest chain is incomplete or unstable.'
 
     Assert-Rejected { param($m) $m.candidates = @() } 'empty'
     Assert-Rejected { param($m) $m.candidates += Copy-JsonValue $m.candidates[0] } 'duplicate'
@@ -238,6 +238,7 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     Assert-True ($entrypoint -notmatch '(?i)dispatch|execute|launch|save|mutation') 'Generated entrypoint exposes a runtime control.'
     foreach ($requiredPath in @(
         'tools/x4-verification/candidate-adapters.psm1',
+        'tools/x4-verification/producer-attestation.psm1',
         'tools/x4-verification/run-candidate-package.ps1',
         'tools/x4-verification/isolation/candidate-worker.ps1',
         'tools/x4-verification/isolation/invoke-candidate-worker.ps1',
@@ -357,6 +358,15 @@ function Test-GeneratedBuilds {
         Assert-True ((Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')) -eq $before) 'Builder changed the public package after rejecting it.'
         $null = Invoke-Builder $root 1
         $null = Invoke-Builder ([IO.Path]::GetPathRoot($root)) 1
+        foreach ($forbiddenRoot in @(
+            (Join-Path $scratch 'steamapps/common/X4 Foundations/extensions/live_galaxy'),
+            (Join-Path $scratch 'staging/extensions/live_galaxy'),
+            (Join-Path $scratch 'Documents/Egosoft/X4/123456/save/builds')
+        )) {
+            $null = Invoke-Builder $forbiddenRoot 1
+            Assert-True (-not (Test-Path -LiteralPath $forbiddenRoot)) `
+                "Builder created a forbidden destination: $forbiddenRoot"
+        }
         $gameRoot = 'F:\SteamLibrary\steamapps\common\X4 Foundations'
         if (Test-Path -LiteralPath $gameRoot -PathType Container) {
             $null = Invoke-Builder $gameRoot 1

@@ -19,6 +19,9 @@ $admissionPath = Join-Path $toolRoot 'x4-admission.ps1'
 $registryPath = Join-Path $toolRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $toolRoot 'contracts/coverage.v1.json'
 $fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
+$producerModulePath = Join-Path $toolRoot 'producer-attestation.psm1'
+
+Import-Module $producerModulePath -Force
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -234,6 +237,8 @@ function New-TestRetentionAuthority([string]$AuthorityPath, [string]$AnchorPath)
     }
     $authority = [ordered]@{
         schema_version = 'retention-test-authority.v1'; marker = 'TEST-ONLY-NEVER-PRODUCTION'
+        producer_certificate = $producerCertificate
+        producer_private_pkcs8_base64 = [Convert]::ToBase64String($producerSigner.ExportPkcs8PrivateKey())
         locator_certificate = $locatorCertificate
         locator_private_pkcs8_base64 = [Convert]::ToBase64String($locatorSigner.ExportPkcs8PrivateKey())
     }
@@ -245,30 +250,21 @@ function New-TestRetentionAuthority([string]$AuthorityPath, [string]$AnchorPath)
     }
 }
 
-function Write-TestProducerAttestation([string]$EvidencePath, $Manifest, $Authority) {
-    $rows = @(Get-Content -LiteralPath $EvidencePath | ForEach-Object { $_ | ConvertFrom-Json -Depth 16 -DateKind String })
-    $payload = [ordered]@{
-        schema_version = 'candidate-producer-envelope.v1'; purpose = 'candidate-producer'; epoch = 1
-        scope = 'candidate-evidence:exact-build'; classification = 'authenticated-local-contract'
-        build_id = $Manifest.build_id; run_id = $rows[0].run_id
-        evidence_digest = Get-Digest $EvidencePath; candidate_ids = @($rows.candidate_id)
-        dispatcher_digest = $Manifest.dispatcher_digest; adapter_digest = $Manifest.adapter_digest
-        worker_digest = $Manifest.worker_digest; launcher_digest = $Manifest.launcher_digest
-        worker_protocol_digest = $Manifest.worker_protocol_digest
-        runtime_evidence_schema_digest = $Manifest.runtime_evidence_schema_digest
-        package_conformance_digest = $Manifest.package_conformance_digest; matrix_digest = $Manifest.matrix_digest
-    }
-    [byte[]]$payloadBytes = [Text.UTF8Encoding]::new($false).GetBytes((ConvertTo-CanonicalJson $payload))
-    [byte[]]$signature = $Authority.ProducerSigner.SignData(
-        $payloadBytes, [Security.Cryptography.HashAlgorithmName]::SHA256,
-        [Security.Cryptography.DSASignatureFormat]::IeeeP1363FixedFieldConcatenation
+function Write-ResignedProducerMutation([string]$Path, [byte[]]$Baseline, $Authority, [scriptblock]$Apply) {
+    $envelope = [Text.Encoding]::UTF8.GetString($Baseline) | ConvertFrom-Json -Depth 32 -DateKind String
+    & $Apply $envelope
+    $payloadJson = producer-attestation\ConvertTo-CanonicalJson $envelope.payload
+    [byte[]]$payloadBytes = [Text.UTF8Encoding]::new($false).GetBytes($payloadJson)
+    $envelope.payload_digest = ([Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($payloadBytes)
+    )).ToLowerInvariant()
+    $envelope.signature_base64 = [Convert]::ToBase64String(
+        $Authority.ProducerSigner.SignData(
+            $payloadBytes, [Security.Cryptography.HashAlgorithmName]::SHA256,
+            [Security.Cryptography.DSASignatureFormat]::IeeeP1363FixedFieldConcatenation
+        )
     )
-    $envelope = [ordered]@{
-        schema_version = 'candidate-producer-attestation.v1'; certificate = $Authority.ProducerCertificate
-        payload = $payload; payload_digest = Get-TextDigest (ConvertTo-CanonicalJson $payload)
-        signature_base64 = [Convert]::ToBase64String($signature)
-    }
-    Write-Utf8NoBom "$EvidencePath.attestation.json" ($envelope | ConvertTo-Json -Depth 32)
+    Write-Utf8NoBom $Path (producer-attestation\ConvertTo-CanonicalJson $envelope)
 }
 
 if ($Case -eq 'handback') {
@@ -323,6 +319,11 @@ $testHarnessPath = $null
 $admissionHarnessPath = $null
 $authority = $null
 $null = New-Item -ItemType Directory -Path $scratch
+if ($IsWindows) {
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $null = & icacls.exe $scratch /inheritance:r /grant:r "*$sid`:(OI)(CI)F"
+    Assert-True ($LASTEXITCODE -eq 0) 'Unable to protect retention scratch fixture.'
+}
 try {
     $builderOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1)
     Assert-True ($LASTEXITCODE -eq 0) "Candidate builder failed: $builderOutput"
@@ -347,6 +348,8 @@ try {
         $platformScript = Join-Path $scratch 'retain-evidence-non-windows.ps1'
         $platformSource = (Get-Content -LiteralPath $retentionPath -Raw).Replace('$script:SimulateUnsupportedPlatform = $false', '$script:SimulateUnsupportedPlatform = $true')
         Write-Utf8NoBom $platformScript $platformSource
+        Copy-Item -LiteralPath (Join-Path $toolRoot 'producer-attestation.psm1') `
+            -Destination (Join-Path $scratch 'producer-attestation.psm1')
         $platformRoot = Join-Path $scratch 'unsupported-platform-retained'
         $platformOutput = @(& pwsh -NoProfile -File $platformScript -EvidencePath $pendingEvidencePath `
             -BuildManifestPath $pendingManifestPath -DestinationRoot $platformRoot 2>&1)
@@ -366,7 +369,34 @@ try {
     $authorityPath = Join-Path $scratch 'retention-test-authority.v1.json'
     $anchorPath = Join-Path $scratch 'test-owner-root-anchor.v1.json'
     $authority = New-TestRetentionAuthority $authorityPath $anchorPath
-    Write-TestProducerAttestation $evidencePath $manifest $authority
+    $dispatcherHarnessPath = Join-Path $pendingGroupRoot 'tools/x4-verification/.run-candidate-package-test.ps1'
+    $productionDispatcherPath = Join-Path $pendingGroupRoot 'tools/x4-verification/run-candidate-package.ps1'
+    $dispatcherHarnessSource = Get-Content -LiteralPath $productionDispatcherPath -Raw
+    $dispatcherHarnessSource = $dispatcherHarnessSource.Replace(
+        '$dispatcherPath = $PSCommandPath',
+        "`$dispatcherPath = '$($productionDispatcherPath.Replace("'", "''"))'"
+    )
+    $dispatcherHarnessSource = $dispatcherHarnessSource.Replace(
+        '$script:TestOnlyHarness = $false', '$script:TestOnlyHarness = $true'
+    )
+    $dispatcherHarnessSource = $dispatcherHarnessSource.Replace(
+        "`$script:TestAuthorityPath = ''",
+        "`$script:TestAuthorityPath = '$($authorityPath.Replace("'", "''"))'"
+    )
+    Write-Utf8NoBom $dispatcherHarnessPath $dispatcherHarnessSource
+    $trustedEvidencePath = Join-Path $scratch 'trusted-runtime.jsonl'
+    $trustedDispatcherOutput = @(& pwsh -NoProfile -File $dispatcherHarnessPath `
+        -GroupRoot $pendingGroupRoot -OutputPath $trustedEvidencePath 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) "Test-authority dispatcher failed: $($trustedDispatcherOutput -join ' | ')"
+    $trustedDispatcherResult = @($trustedDispatcherOutput)[-1] | ConvertFrom-Json -Depth 16 -DateKind String
+    Assert-True ($trustedDispatcherResult.retainable -eq $true -and
+        $trustedDispatcherResult.attestation_status -eq 'PRODUCER_ATTESTATION_VERIFIED') `
+        'Real dispatcher serialization did not produce a retainable envelope.'
+    Assert-True (Test-Path -LiteralPath "$trustedEvidencePath.attestation.json" -PathType Leaf) `
+        'Real dispatcher did not publish its producer envelope.'
+    $evidencePath = $trustedEvidencePath
+    $evidenceRows = @(Get-Content -LiteralPath $evidencePath | ForEach-Object { $_ | ConvertFrom-Json -Depth 16 -DateKind String })
+    $runId = [string]$evidenceRows[0].run_id
     $testHarnessPath = Join-Path (Split-Path -Parent $retentionPath) ('.retain-evidence-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
     $harnessSource = Get-Content -LiteralPath $retentionPath -Raw
     $harnessSource = $harnessSource.Replace("`$script:ProductionRootSpkiSha256 = 'UNCONFIGURED'", "`$script:ProductionRootSpkiSha256 = '$($authority.RootDigest)'")
@@ -374,6 +404,18 @@ try {
     $harnessSource = $harnessSource.Replace("`$script:TestAuthorityPath = ''", "`$script:TestAuthorityPath = '$($authorityPath.Replace("'", "''"))'")
     $harnessSource = $harnessSource.Replace("`$ownerRootAnchorPath = Join-Path `$PSScriptRoot 'contracts/owner-root-anchor.v1.json'", "`$ownerRootAnchorPath = '$($anchorPath.Replace("'", "''"))'")
     Write-Utf8NoBom $testHarnessPath $harnessSource
+
+    foreach ($forbiddenDestination in @(
+        (Join-Path $scratch 'steamapps/common/X4 Foundations/extensions/live_galaxy/retained'),
+        (Join-Path $scratch 'staging/extensions/live_galaxy/retained'),
+        (Join-Path $scratch 'Documents/Egosoft/X4/123456/save/retained')
+    )) {
+        $forbiddenOutput = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
+            -BuildManifestPath $manifestPath -DestinationRoot $forbiddenDestination 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0) "Retention accepted forbidden destination: $forbiddenDestination"
+        Assert-True (-not (Test-Path -LiteralPath $forbiddenDestination)) `
+            "Retention created a forbidden destination: $forbiddenDestination"
+    }
 
     $reparseTarget = Join-Path $scratch 'reparse-target'
     $null = New-Item -ItemType Directory -Path $reparseTarget
@@ -449,6 +491,45 @@ try {
     $producerReplay = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
         -BuildManifestPath $manifestPath -DestinationRoot (Join-Path $scratch 'reject-producer-replay') 2>&1)
     Assert-True ($LASTEXITCODE -ne 0) 'Replayed producer envelope passed retention.'
+    [IO.File]::WriteAllBytes($producerSourcePath, $producerBytes)
+
+    $baselineEnvelope = [Text.Encoding]::UTF8.GetString($producerBytes) | ConvertFrom-Json -Depth 32 -DateKind String
+    $baselineCanonical = producer-attestation\ConvertTo-CanonicalJson $baselineEnvelope
+    Assert-True ([Text.Encoding]::UTF8.GetString($producerBytes) -ceq $baselineCanonical) `
+        'Dispatcher producer envelope is not exact shared canonical JSON.'
+    $validNow = [DateTimeOffset]::Parse([string]$baselineEnvelope.payload.completed_at).AddSeconds(1)
+    $null = producer-attestation\Test-CandidateProducerPayload -Payload $baselineEnvelope.payload `
+        -CertificateId ([string]$baselineEnvelope.certificate.certificate_id) -Epoch 1 `
+        -Scope 'candidate-evidence:exact-build' -Now $validNow
+    $expiredNow = [DateTimeOffset]::Parse([string]$baselineEnvelope.payload.expires_at).AddTicks(1)
+    $expiredRejected = $false
+    try {
+        $null = producer-attestation\Test-CandidateProducerPayload -Payload $baselineEnvelope.payload `
+            -CertificateId ([string]$baselineEnvelope.certificate.certificate_id) -Epoch 1 `
+            -Scope 'candidate-evidence:exact-build' -Now $expiredNow
+    }
+    catch { $expiredRejected = $_.Exception.Message -eq 'PRODUCER_ATTESTATION_EXPIRED' }
+    Assert-True $expiredRejected 'An unchanged valid producer envelope remained valid after expiry.'
+
+    $now = [DateTimeOffset]::UtcNow
+    $producerMutations = @(
+        @{ Name = 'missing exact field'; Apply = { param($v) $v.payload.PSObject.Properties.Remove('protocol_version') } },
+        @{ Name = 'validly signed expired'; Apply = { param($v) $v.payload.started_at = $now.AddHours(-2).ToString('O'); $v.payload.completed_at = $now.AddMinutes(-90).ToString('O'); $v.payload.expires_at = $now.AddHours(-1).ToString('O') } },
+        @{ Name = 'future issuance'; Apply = { param($v) $v.payload.started_at = $now.AddMinutes(10).ToString('O'); $v.payload.completed_at = $now.AddMinutes(11).ToString('O'); $v.payload.expires_at = $now.AddHours(1).ToString('O') } },
+        @{ Name = 'overlong lifetime'; Apply = { param($v) $v.payload.started_at = $now.AddHours(-1).ToString('O'); $v.payload.completed_at = $now.ToString('O'); $v.payload.expires_at = $now.AddHours(24).AddMinutes(1).ToString('O') } },
+        @{ Name = 'cross-certificate identity'; Apply = { param($v) $v.payload.delegation_certificate_id = 'TEST-ONLY-retention-locator' } },
+        @{ Name = 'protocol confusion'; Apply = { param($v) $v.payload.protocol_version = 'candidate-worker.v2' } },
+        @{ Name = 'validly signed replay'; Apply = { param($v) $v.payload.run_id = 'replayed-signed-run' } }
+    )
+    foreach ($mutation in $producerMutations) {
+        Write-ResignedProducerMutation $producerSourcePath $producerBytes $authority $mutation.Apply
+        $mutationRoot = Join-Path $scratch ('reject-producer-' + ($mutation.Name -replace '[^a-z]+', '-'))
+        $mutationOutput = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
+            -BuildManifestPath $manifestPath -DestinationRoot $mutationRoot 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0) "Producer mutation '$($mutation.Name)' passed retention."
+        Assert-True (-not (Test-Path -LiteralPath $mutationRoot)) `
+            "Producer mutation '$($mutation.Name)' left a retained artifact."
+    }
     [IO.File]::WriteAllBytes($producerSourcePath, $producerBytes)
 
     if ($Case -eq 'retention-admission') {

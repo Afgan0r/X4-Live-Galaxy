@@ -801,33 +801,6 @@ try {
         Fail 'OBSERVED_X4_EVIDENCE_INCOMPLETE'
     }
     Fail 'RUNTIME_ADMISSION_PENDING'
-    if ($dossierRead.Value.seam_id -eq 'validation-fixture-only') { Fail 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' }
-    if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
-        [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
-        Fail 'MISSING_ADMISSION_EVIDENCE'
-    }
-    if (@($evidenceInputs | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
-        if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
-            [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
-            Fail 'MISSING_ADMISSION_EVIDENCE'
-        }
-        $script:validationContext = 'candidate-matrix-read'
-        $matrixRead = Read-BoundedJson $CandidateMatrixPath 'phase-05.1-candidates.v1' 'UNSUPPORTED_MATRIX_SCHEMA'
-        $script:validationContext = 'pending-ledger-read'
-        $pendingLedgerRead = Read-BoundedJson $PendingLedgerPath 'phase-05.1-candidate-ledger.v1' 'UNSUPPORTED_LEDGER_SCHEMA'
-        $script:validationContext = 'sanitized-ledger-read'
-        $ledgerRead = Read-BoundedJson $SanitizedLedgerPath 'phase-05.1-candidate-ledger.v1' 'UNSUPPORTED_LEDGER_SCHEMA'
-        $expectedDigests = [pscustomobject]@{
-            dossier_digest = $script:dossierDigest
-            registry_digest = Get-Sha256Hex $registryRead.Bytes
-            coverage_digest = Get-Sha256Hex $coverageRead.Bytes
-            matrix_digest = Get-Sha256Hex $matrixRead.Bytes
-        }
-        $script:validationContext = 'evidence-chain-validation'
-        Test-EvidenceChain $ledgerRead.Value $pendingLedgerRead.Value $matrixRead.Value $expectedDigests
-    }
-    Write-Result 'admissible' @('ADMISSIBLE')
-    exit 0
 }
 catch {
     Write-Result 'non-admissible' @($script:failureCode)

@@ -27,6 +27,7 @@ $registryPath = Join-Path $PSScriptRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $PSScriptRoot 'contracts/coverage.v1.json'
 $publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
 $ownerRootAnchorPath = Join-Path $PSScriptRoot 'contracts/owner-root-anchor.v1.json'
+$producerModulePath = Join-Path $PSScriptRoot 'producer-attestation.psm1'
 $script:ProductionRootSpkiSha256 = 'UNCONFIGURED'
 $script:TestOnlyHarness = $false
 $script:SimulateUnsupportedPlatform = $false
@@ -42,6 +43,8 @@ $script:diagnosticId = 'startup'
 $script:cleanupRoot = $null
 $script:cleanupDestination = $null
 $script:createdDestination = $false
+
+Import-Module $producerModulePath -Force
 
 function Fail([string]$Code) {
     $script:failureCode = $Code
@@ -251,6 +254,13 @@ function Resolve-SafeDestination([string]$Path) {
     if ($full -match '(?i)[\\/]steamapps[\\/]common[\\/]X4 Foundations(?:[\\/]|$)') {
         Fail 'GAME_INSTALLATION_DESTINATION_REJECTED'
     }
+    if ($full -match '(?i)[\\/]X4 Foundations[\\/]extensions(?:[\\/]|$)' -or
+        $full -match '(?i)[\\/]extensions[\\/]live_galaxy(?:[\\/]|$)') {
+        Fail 'PUBLIC_RUNTIME_DESTINATION_REJECTED'
+    }
+    if ($full -match '(?i)[\\/]Egosoft[\\/]X4[\\/][0-9]+[\\/]save(?:[\\/]|$)') {
+        Fail 'GAME_SAVE_DESTINATION_REJECTED'
+    }
     $segments = @($full.Split([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) | Where-Object { $_ })
     if ($segments.Count -gt 16) { Fail 'PATH_DEPTH_EXCEEDED' }
     return $full
@@ -415,6 +425,7 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
         $componentBindings = [ordered]@{
             dispatcher_digest = 'tools/x4-verification/run-candidate-package.ps1'
             adapter_digest = 'tools/x4-verification/candidate-adapters.psm1'
+            attestation_module_digest = 'tools/x4-verification/producer-attestation.psm1'
             worker_digest = 'tools/x4-verification/isolation/candidate-worker.ps1'
             launcher_digest = 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
             worker_protocol_digest = 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
@@ -608,15 +619,22 @@ function Test-ProducerAttestation([string]$EvidencePath, $Build, $Evidence, [str
     if (-not (Test-Path -LiteralPath $attestationPath -PathType Leaf)) { Fail 'RETENTION_PRODUCER_ATTESTATION_MISSING' }
     $read = Read-BoundedJson $attestationPath 65536 'candidate-producer-attestation.v1'
     $envelope = $read.Value
-    Assert-ExactFields $envelope @('schema_version', 'certificate', 'payload', 'payload_digest', 'signature_base64')
+    try { $null = producer-attestation\Test-CandidateProducerEnvelopeFields $envelope }
+    catch { Fail ([string]$_.Exception.Message) }
     $certificate = $envelope.certificate
     [byte[]]$delegatedSpki = Test-DelegatedCertificate $RootContext $certificate $script:ProducerPurpose $script:ProducerScope
     $payload = $envelope.payload
-    $payloadBytes = [Text.UTF8Encoding]::new($false).GetBytes((ConvertTo-CanonicalJson $payload))
+    try {
+        $null = producer-attestation\Test-CandidateProducerPayload -Payload $payload `
+            -CertificateId ([string]$certificate.certificate_id) `
+            -Epoch ([int]$RootContext.Anchor.accepted_epochs.'candidate-producer') `
+            -Scope $script:ProducerScope -Now ([DateTimeOffset]::UtcNow)
+    }
+    catch { Fail ([string]$_.Exception.Message) }
+    $payloadBytes = [Text.UTF8Encoding]::new($false).GetBytes(
+        (producer-attestation\ConvertTo-CanonicalJson $payload)
+    )
     if ($envelope.payload_digest -ne (Get-Sha256Bytes $payloadBytes) -or
-        $payload.schema_version -ne 'candidate-producer-envelope.v1' -or
-        $payload.purpose -ne $script:ProducerPurpose -or $payload.scope -ne $script:ProducerScope -or
-        [int]$payload.epoch -ne [int]$RootContext.Anchor.accepted_epochs.'candidate-producer' -or
         $payload.classification -ne 'authenticated-local-contract' -or
         $payload.build_id -ne $Build.Value.build_id -or $payload.run_id -ne $Evidence.RunId -or
         $payload.evidence_digest -ne $EvidenceDigest -or
@@ -624,7 +642,7 @@ function Test-ProducerAttestation([string]$EvidencePath, $Build, $Evidence, [str
         Fail 'RETENTION_PRODUCER_IDENTITY_MISMATCH'
     }
     foreach ($binding in @(
-        'dispatcher_digest', 'adapter_digest', 'worker_digest', 'launcher_digest',
+        'dispatcher_digest', 'adapter_digest', 'attestation_module_digest', 'worker_digest', 'launcher_digest',
         'worker_protocol_digest', 'runtime_evidence_schema_digest',
         'package_conformance_digest', 'matrix_digest'
     )) {
@@ -667,9 +685,9 @@ function Get-LocatorSigningAuthority($RootContext) {
             [Security.Cryptography.CngProvider]::MicrosoftSoftwareKeyStorageProvider,
             [Security.Cryptography.CngKeyOpenOptions]::UserKey
         )
-        $disallowed = [Security.Cryptography.CngExportPolicies]::AllowExport -bor
-            [Security.Cryptography.CngExportPolicies]::AllowPlaintextExport
-        if (($key.ExportPolicy -band $disallowed) -ne 0) { $key.Dispose(); Fail 'RETENTION_DELEGATED_KEY_EXPORTABLE' }
+        if (-not (producer-attestation\Test-CngSigningKeyPolicy $key)) {
+            $key.Dispose(); Fail 'RETENTION_DELEGATED_KEY_USER_PRESENCE_REQUIRED'
+        }
         $signer = [Security.Cryptography.ECDsaCng]::new($key)
         if ((Get-Sha256Bytes $signer.ExportSubjectPublicKeyInfo()) -ne $certificate.delegated_spki_sha256) {
             $signer.Dispose(); $key.Dispose(); Fail 'RETENTION_DELEGATED_KEY_MISMATCH'
@@ -929,6 +947,7 @@ try {
     $locatorBytes = [Text.UTF8Encoding]::new($false).GetBytes(($locator | ConvertTo-Json -Depth 32))
     if ($locatorBytes.Length -gt $contracts.Sanitized.bounds.max_locator_bytes) { Fail 'BOUND_EXCEEDED' }
     Write-PrivateBytes (Join-Path $stagingRoot 'locator.v1.json') $locatorBytes
+    $null = Resolve-SafeDestination $destination
     Move-Item -LiteralPath $stagingRoot -Destination $finalRoot
     $script:cleanupRoot = $finalRoot
     $script:diagnosticId = 'retained-reread'

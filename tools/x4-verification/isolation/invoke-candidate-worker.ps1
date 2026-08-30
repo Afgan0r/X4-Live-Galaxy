@@ -73,6 +73,8 @@ try {
         }
     }
     if (-not (Test-BoundedText $request.input.expected_result $protocol.bounds.max_result_bytes) -or
+        $request.input.fixture -isnot [pscustomobject] -or
+        [Text.Encoding]::UTF8.GetByteCount(($request.input.fixture | ConvertTo-Json -Compress -Depth 8)) -gt 2048 -or
         $request.input.max_work_units -isnot [long] -and $request.input.max_work_units -isnot [int] -or
         $request.input.max_work_units -lt 1 -or
         $request.input.max_work_units -gt $protocol.bounds.max_work_units) {
