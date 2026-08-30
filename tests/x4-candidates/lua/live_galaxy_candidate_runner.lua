@@ -125,6 +125,7 @@ local function make_payload(manifest, mods, candidate, stage, state, outcome)
         elapsed_game_ms = outcome.elapsed_game_ms or 0, elapsed_real_ms = outcome.elapsed_real_ms or 0,
         evidence_classification = EVIDENCE_CLASSIFICATION, execution_verdict = state.execution_verdict,
         expected_result = candidate.expected_result, failure_point = state.failure_point,
+        failure_reason = state.failure_reason,
         game_version = manifest.game_version, mod_list = mods,
         observation_count = outcome.observation_count or 0,
         prior_dossier_digest = manifest.prior_dossier_digest, prior_dossier_id = manifest.prior_dossier_id,
@@ -190,25 +191,28 @@ local function ordered_candidates(candidates)
 end
 
 local function execute_candidate(candidate, context, bounds)
-    local state = { actual_result = "not_run", completeness = "unknown", failure_point = "none",
+    local state = { actual_result = "not_run", completeness = "unknown", failure_point = "none", failure_reason = "none",
         execution_verdict = "not_run", contract_verdict = "not_run", effect_verdict = "not_run" }
     local outcomes = {}
     local timeout_markers = type(context.timeout_markers) == "table" and context.timeout_markers or {}
     local candidate_timeouts = type(timeout_markers[candidate.id]) == "table" and timeout_markers[candidate.id] or {}
     if candidate_timeouts.execution == true then
-        state.execution_verdict, state.failure_point, state.actual_result = "fail", "execution", "timeout_marker"
+        state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
+            "fail", "execution", "timeout_marker", "timeout_marker"
         outcomes.execution = {}
         return state, outcomes
     end
     local ok, raw = pcall(candidate.execute, context)
     if not ok then
-        state.execution_verdict, state.failure_point, state.actual_result = "fail", "execution", "execution_exception"
+        state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
+            "fail", "execution", "execution_exception", "execution_exception"
         outcomes.execution = {}
         return state, outcomes
     end
     local outcome, reason = normalize_outcome(raw, bounds)
     if outcome == nil then
-        state.execution_verdict, state.failure_point, state.actual_result = "fail", "execution", reason
+        state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
+            "fail", "execution", reason, reason
         outcomes.execution = {}
         return state, outcomes
     end
@@ -217,18 +221,24 @@ local function execute_candidate(candidate, context, bounds)
     outcomes.execution = outcome
     outcomes.contract = { work_units = 1 }
     if candidate_timeouts.contract == true then
-        state.contract_verdict, state.failure_point, state.actual_result = "fail", "contract", "timeout_marker"
+        state.contract_verdict, state.failure_point, state.failure_reason, state.actual_result =
+            "fail", "contract", "timeout_marker", "timeout_marker"
         return state, outcomes
     end
     local contract_ok, valid = pcall(candidate.validate, raw)
-    if not contract_ok or valid ~= true then
-        state.contract_verdict, state.failure_point = "fail", "contract"
+    if not contract_ok then
+        state.contract_verdict, state.failure_point, state.failure_reason = "fail", "contract", "contract_exception"
+        return state, outcomes
+    end
+    if valid ~= true then
+        state.contract_verdict, state.failure_point, state.failure_reason = "fail", "contract", "contract_rejected"
         return state, outcomes
     end
     state.contract_verdict = "pass"
     outcomes.effect = { work_units = 1 }
     if candidate_timeouts.effect == true then
-        state.effect_verdict, state.failure_point, state.actual_result = "fail", "effect", "timeout_marker"
+        state.effect_verdict, state.failure_point, state.failure_reason, state.actual_result =
+            "fail", "effect", "timeout_marker", "timeout_marker"
         return state, outcomes
     end
     local effect_ok, matches
@@ -238,11 +248,14 @@ local function execute_candidate(candidate, context, bounds)
         effect_ok, matches = true, state.actual_result == candidate.expected_result
     end
     if not effect_ok then
-        state.effect_verdict, state.failure_point, state.actual_result = "fail", "effect", "effect_exception"
+        state.effect_verdict, state.failure_point, state.failure_reason, state.actual_result =
+            "fail", "effect", "effect_exception", "effect_exception"
         return state, outcomes
     end
     state.effect_verdict = matches == true and "pass" or "mismatch"
-    if state.effect_verdict ~= "pass" then state.failure_point = "effect" end
+    if state.effect_verdict ~= "pass" then
+        state.failure_point, state.failure_reason = "effect", "effect_mismatch"
+    end
     return state, outcomes
 end
 
@@ -257,7 +270,7 @@ function runner.run(manifest, context)
     local lines = {}
     for _, candidate in ipairs(candidates) do
         local final_state, outcomes = execute_candidate(candidate, context, bounds)
-        local visible = { actual_result = "not_run", completeness = "unknown", failure_point = "none",
+        local visible = { actual_result = "not_run", completeness = "unknown", failure_point = "none", failure_reason = "none",
             execution_verdict = "not_run", contract_verdict = "not_run", effect_verdict = "not_run" }
         for _, stage in ipairs(STAGES) do
             if stage == "execution" then
@@ -268,7 +281,9 @@ function runner.run(manifest, context)
             elseif stage == "effect" and final_state.contract_verdict == "pass" then
                 visible.effect_verdict = final_state.effect_verdict
             end
-            if final_state.failure_point == stage then visible.failure_point = stage end
+            if final_state.failure_point == stage then
+                visible.failure_point, visible.failure_reason = stage, final_state.failure_reason
+            end
             local row, row_err = digest_row(make_payload(manifest, mods, candidate, stage, visible,
                 outcomes[stage] or {}), context.digest)
             if row == nil then return nil, row_err end
