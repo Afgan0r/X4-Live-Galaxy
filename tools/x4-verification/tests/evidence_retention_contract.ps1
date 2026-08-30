@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('retention', 'handback', 'retention-admission')]
+    [ValidateSet('retention', 'retention-platform', 'handback', 'retention-admission')]
     [string]$Case = 'retention'
 )
 
@@ -209,7 +209,7 @@ if ($Case -eq 'handback') {
     exit 0
 }
 
-if ($Case -notin @('retention', 'retention-admission')) { throw "Unhandled case: $Case" }
+if ($Case -notin @('retention', 'retention-platform', 'retention-admission')) { throw "Unhandled case: $Case" }
 
 foreach ($required in @($retentionPath, $sanitizedContractPath, $builderPath, $dossierPath)) {
     Assert-True (Test-Path -LiteralPath $required -PathType Leaf) "Required artifact is missing: $required"
@@ -226,9 +226,12 @@ try {
     $pendingManifestPath = Join-Path $pendingGroupRoot 'manifest/build-manifest.v1.json'
     $pendingManifest = Get-Content -LiteralPath $pendingManifestPath -Raw | ConvertFrom-Json -Depth 32
     $pendingEvidencePath = Join-Path $scratch 'pending-runtime.jsonl'
-    Write-Utf8NoBom $pendingEvidencePath (New-EvidenceStream $pendingManifest 'p051-security-pending')
+    $dispatcherPath = Join-Path $pendingGroupRoot 'tools/x4-verification/run-candidate-package.ps1'
+    $dispatcherOutput = @(& pwsh -NoProfile -File $dispatcherPath -GroupRoot $pendingGroupRoot -OutputPath $pendingEvidencePath 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) "Candidate dispatcher failed: $($dispatcherOutput -join ' | ')"
+    Assert-True (Test-Path -LiteralPath $pendingEvidencePath -PathType Leaf) 'Candidate dispatcher did not create evidence.'
     $pendingOutput = Invoke-Retention $pendingEvidencePath $pendingManifestPath (Join-Path $scratch 'reject-untrusted-runtime') 1
-    Assert-True (($pendingOutput -join "`n") -match 'TRUSTED_RUNTIME_ATTESTATION_MISSING') "Self-asserted runtime readiness did not fail closed: $($pendingOutput -join ' | ')"
+    Assert-True (($pendingOutput -join "`n") -match 'RETENTION_ATTESTATION_UNCONFIGURED') "Unconfigured retention authority did not fail closed: $($pendingOutput -join ' | ')"
 
     $tamperedManifest = Get-Content -LiteralPath $pendingManifestPath -Raw | ConvertFrom-Json -Depth 32
     $tamperedManifest.package_conformance_digest = '0' * 64
@@ -236,13 +239,19 @@ try {
     Write-Utf8NoBom $tamperedManifestPath ($tamperedManifest | ConvertTo-Json -Depth 32)
     $digestOutput = Invoke-Retention $pendingEvidencePath $tamperedManifestPath (Join-Path $scratch 'reject-package-digest') 1
     Assert-True (($digestOutput -join "`n") -match 'PACKAGE_CONFORMANCE_DIGEST_MISMATCH') 'Package conformance digest was not independently recomputed.'
-    if ($Case -eq 'retention-admission') {
-        Write-Output 'PASS: retention-to-admission fail-closed contract'
+    if ($Case -eq 'retention-platform') {
+        $platformScript = Join-Path $scratch 'retain-evidence-non-windows.ps1'
+        $platformSource = (Get-Content -LiteralPath $retentionPath -Raw).Replace('$script:SimulateUnsupportedPlatform = $false', '$script:SimulateUnsupportedPlatform = $true')
+        Write-Utf8NoBom $platformScript $platformSource
+        $platformRoot = Join-Path $scratch 'unsupported-platform-retained'
+        $platformOutput = @(& pwsh -NoProfile -File $platformScript -EvidencePath $pendingEvidencePath `
+            -BuildManifestPath $pendingManifestPath -DestinationRoot $platformRoot 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0) 'Simulated unsupported platform returned success.'
+        Assert-True (($platformOutput -join "`n") -match 'RETENTION_ATTESTATION_PLATFORM_UNSUPPORTED') 'Unsupported platform status was not stable.'
+        Assert-True (-not (Test-Path -LiteralPath $platformRoot)) 'Unsupported platform created retained output.'
+        Write-Output 'PASS: evidence retention unsupported-platform contract'
+        exit 0
     }
-    else {
-        Write-Output 'PASS: evidence retention contract'
-    }
-    exit 0
     if ($Case -eq 'retention-admission') {
         $pending = Get-Content -LiteralPath $pendingLedgerPath -Raw | ConvertFrom-Json -Depth 32
         $complete = Get-Content -LiteralPath $pendingLedgerPath -Raw | ConvertFrom-Json -Depth 32
