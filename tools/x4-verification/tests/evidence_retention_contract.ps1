@@ -55,7 +55,7 @@ function Assert-CentralizedBoundedReader([string]$Path) {
         "Bounded reader module is not imported by $Path."
     Assert-True ($source -match '\bRead-BoundedFile\b') `
         "Shared bounded reader is not used by $Path."
-    Assert-True ($source -notmatch '\[IO\.File\]::ReadAllBytes|\[System\.IO\.File\]::ReadAllBytes') `
+    Assert-True ($source -notmatch '\[(?:System\.)?IO\.File\]::ReadAll(?:Bytes|Text)') `
         "An equivalent path-reopen reader remains in $Path."
 }
 

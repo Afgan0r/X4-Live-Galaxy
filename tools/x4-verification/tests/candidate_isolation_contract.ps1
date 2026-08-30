@@ -105,6 +105,52 @@ try {
     }
 
     if ($Case -in @('all', 'responses')) {
+        $launcherSource = Get-Content -LiteralPath $launcher -Raw
+        $sidecarHookMarker = Join-Path $workspace 'sidecar-read-hook.txt'
+        $escapedMarker = $sidecarHookMarker.Replace("'", "''")
+        $hookSource = @"
+`$script:ReadinessBeforeReadTestHook = {
+    param(`$Context)
+    [IO.File]::WriteAllText('$escapedMarker', 'observed')
+    `$item = Get-Item -LiteralPath `$Context.Path
+    `$bytes = [IO.File]::ReadAllBytes(`$Context.Path)
+    `$bytes[0] = `$bytes[0] -bxor 1
+    `$replacementSucceeded = `$false
+    try {
+        [IO.File]::WriteAllBytes(`$Context.Path, `$bytes)
+        [IO.File]::SetLastWriteTimeUtc(`$Context.Path, `$item.LastWriteTimeUtc)
+        `$replacementSucceeded = `$true
+    }
+    catch [IO.IOException] { }
+    if (`$replacementSucceeded) { throw 'SIDE_CAR_REPLACEMENT_SUCCEEDED' }
+}
+"@
+        $launcherHarness = Join-Path (Split-Path -Parent $launcher) `
+            ('.invoke-candidate-worker-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        try {
+            $launcherSource.Replace('$script:ReadinessBeforeReadTestHook = $null', $hookSource) |
+                Set-Content -LiteralPath $launcherHarness -Encoding utf8NoBOM
+            $requestPath = Join-Path $workspace 'sidecar-race.request.json'
+            $responsePath = Join-Path $workspace 'sidecar-race.response.json'
+            (New-Request 'local-contract-child-endless') | ConvertTo-Json -Depth 8 |
+                Set-Content -LiteralPath $requestPath -Encoding utf8NoBOM
+            $raceOutput = @(& pwsh -NoProfile -File $launcherHarness -RequestPath $requestPath `
+                -ResponsePath $responsePath -DeadlineMs 500 2>&1)
+            Assert-Contract ($LASTEXITCODE -eq 0 -and $raceOutput.Count -eq 1) `
+                'Bounded sidecar replacement probe broke canonical output.'
+            $raceResult = $raceOutput[0].ToString() | ConvertFrom-Json
+            Assert-Contract ($raceResult.status -eq 'worker-timeout' -and
+                $raceResult.readiness_observed -eq $true) `
+                'Bounded sidecar replacement probe did not preserve readiness.'
+            Assert-Contract (Test-Path -LiteralPath $sidecarHookMarker -PathType Leaf) `
+                'Bounded sidecar replacement hook was not exercised.'
+        }
+        finally {
+            if (Test-Path -LiteralPath $launcherHarness) {
+                Remove-Item -LiteralPath $launcherHarness -Force
+            }
+        }
+
         $rejections = @(
             'local-contract-malformed',
             'local-contract-identity-swap',
@@ -151,7 +197,6 @@ try {
         $result = $output[0].ToString() | ConvertFrom-Json
         Assert-Contract ($result.status -eq 'request-rejected' -and $result.accepted -eq $false) 'Forged preexisting success was accepted.'
 
-        $launcherSource = Get-Content -LiteralPath $launcher -Raw
         $workerSource = Get-Content -LiteralPath (Join-Path $root 'tools/x4-verification/isolation/candidate-worker.ps1') -Raw
         Assert-Contract ($launcherSource -notmatch 'Invoke-Expression') 'Launcher admits dynamic command execution.'
         Assert-Contract ($workerSource -notmatch 'Invoke-Expression') 'Worker admits dynamic command execution.'

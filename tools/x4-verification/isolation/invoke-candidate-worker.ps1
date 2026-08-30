@@ -21,6 +21,7 @@ $validatedResponsePath = $null
 $readinessObserved = $false
 $readinessObservedAt = $null
 $timeoutArmedAt = $null
+$script:ReadinessBeforeReadTestHook = $null
 
 function Write-Result([string]$Status, [string]$Code, [object]$Response = $null) {
     [ordered]@{
@@ -150,19 +151,22 @@ try {
             Write-Result 'worker-response-rejected' 'worker-readiness-missing'
             exit 0
         }
-        $pidInfo = Get-Item -LiteralPath $childPidPath
-        $readinessInfo = Get-Item -LiteralPath $readinessPath
-        if (($pidInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-            ($readinessInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
-            $pidInfo.Length -lt 1 -or $pidInfo.Length -gt 16 -or
-            $readinessInfo.Length -lt 1 -or $readinessInfo.Length -gt 512) {
+        try {
+            $pidRead = Read-BoundedFile $childPidPath 16 'worker-readiness-invalid' `
+                'worker-readiness-invalid' 'worker-readiness-invalid' `
+                'worker-readiness-invalid' $script:ReadinessBeforeReadTestHook
+            $readinessRead = Read-BoundedFile $readinessPath 512 'worker-readiness-invalid' `
+                'worker-readiness-invalid' 'worker-readiness-invalid' `
+                'worker-readiness-invalid' $script:ReadinessBeforeReadTestHook
+        }
+        catch {
             $process.Kill($true)
             [void]$process.WaitForExit($protocol.bounds.kill_wait_ms)
             Write-Result 'worker-response-rejected' 'worker-readiness-invalid'
             exit 0
         }
-        $pidText = [IO.File]::ReadAllText($pidInfo.FullName, [Text.UTF8Encoding]::new($false))
-        $readinessText = [IO.File]::ReadAllText($readinessInfo.FullName, [Text.UTF8Encoding]::new($false))
+        $pidText = [Text.Encoding]::UTF8.GetString($pidRead.Bytes)
+        $readinessText = [Text.Encoding]::UTF8.GetString($readinessRead.Bytes)
         try { $readiness = $readinessText | ConvertFrom-Json -DateKind String }
         catch { $readiness = $null }
         $childPid = 0
