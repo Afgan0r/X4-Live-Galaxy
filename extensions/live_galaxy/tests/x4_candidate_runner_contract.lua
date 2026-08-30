@@ -189,6 +189,12 @@ local function validate_jsonl(jsonl)
         assert(row.digest_algorithm == contract.digest_algorithm)
         assert(#row.record_digest == contract.digest_hex_length)
         assert(row.record_digest == digest_value(row.canonical_digest_payload))
+        local allowed_reason = false
+        for _, reason in ipairs(contract.failure_reasons) do
+            if row.failure_reason == reason then allowed_reason = true end
+        end
+        assert(allowed_reason)
+        assert((row.failure_point == "none") == (row.failure_reason == "none"))
         local stage_index = ((index - 1) % #contract.stage_order) + 1
         if stage_index == 1 then
             assert(row.contract_verdict == "not_run" and row.effect_verdict == "not_run")
@@ -269,6 +275,7 @@ function cases.isolates_exceptions_malformed_results_and_work_unit_exhaustion()
         assert(rows[1].candidate_id == "candidate-a-first")
         assert(rows[1].execution_verdict == "fail")
         assert(rows[1].actual_result == failure.expected)
+        assert(rows[1].failure_reason == failure.expected)
         assert(rows[1].failure_point == "execution")
         assert(rows[4].candidate_id == "candidate-z-later")
         assert(rows[6].effect_verdict == "pass")
@@ -286,6 +293,7 @@ function cases.uses_an_external_timeout_marker_without_invoking_the_stage()
     local _, rows = validate_jsonl(jsonl)
     assert(calls == 0)
     assert(rows[1].actual_result == "timeout_marker")
+    assert(rows[1].failure_reason == "timeout_marker")
     assert(rows[1].failure_point == "execution")
     assert(rows[4].candidate_id == "candidate-z-later")
     assert(rows[6].effect_verdict == "pass")
@@ -301,6 +309,25 @@ function cases.never_passes_a_valid_but_unexpected_effect()
     assert(rows[3].contract_verdict == "pass")
     assert(rows[3].effect_verdict == "mismatch")
     assert(rows[3].failure_point == "effect")
+    assert(rows[3].failure_reason == "effect_mismatch")
+end
+
+function cases.records_protected_contract_and_effect_failure_reasons_then_continues()
+    local contract_failure = successful_candidate("candidate-a-contract")
+    contract_failure.validate = function() error("private contract detail") end
+    local jsonl = assert(runner.run(multi_manifest(contract_failure), execution_context()))
+    local _, rows = validate_jsonl(jsonl)
+    assert(rows[2].contract_verdict == "fail")
+    assert(rows[2].failure_reason == "contract_exception")
+    assert(rows[6].effect_verdict == "pass")
+
+    local effect_failure = successful_candidate("candidate-a-effect")
+    effect_failure.assess = function() error("private effect detail") end
+    jsonl = assert(runner.run(multi_manifest(effect_failure), execution_context()))
+    _, rows = validate_jsonl(jsonl)
+    assert(rows[3].effect_verdict == "fail")
+    assert(rows[3].failure_reason == "effect_exception")
+    assert(rows[6].effect_verdict == "pass")
 end
 
 function cases.rejects_missing_identity_bounds_and_digest_failures_with_exact_codes()
@@ -324,6 +351,14 @@ function cases.rejects_missing_identity_bounds_and_digest_failures_with_exact_co
     local context = execution_context()
     context.digest.verify = function() return false end
     assert(select(2, runner.run(phase_051.single_success(), context)) == "digest_mismatch")
+
+    context = execution_context()
+    context.digest = nil
+    assert(select(2, runner.run(phase_051.single_success(), context)) == "digest_adapter_missing")
+
+    context = execution_context()
+    context.digest.hash = function() error("hash unavailable") end
+    assert(select(2, runner.run(phase_051.single_success(), context)) == "digest_result_invalid")
 end
 
 function cases.independent_contract_rejects_collapsed_verdicts_and_noncanonical_order()
