@@ -48,9 +48,29 @@ function Get-Sha256([byte[]]$Bytes) {
     return [Convert]::ToHexString($hash).ToLowerInvariant()
 }
 
+function Assert-NoReparsePath([string]$Path, [string]$FailureCode) {
+    $full = [IO.Path]::GetFullPath($Path)
+    $root = [IO.Path]::GetPathRoot($full)
+    $current = $root
+    foreach ($segment in @($full.Substring($root.Length) -split '[\\/]+' | Where-Object { $_ -ne '' })) {
+        $current = Join-Path $current $segment
+        $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
+        if ($null -eq $item) { Fail $FailureCode }
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $item.LinkType) {
+            Fail 'REPARSE_POINT_ESCAPE' 'non-conformant'
+        }
+    }
+}
+
 function Read-BoundedBytes([string]$Path, [int]$Maximum, [string]$FailureCode) {
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail $FailureCode }
-    $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path)
+    Assert-NoReparsePath $Path $FailureCode
+    $before = Get-Item -LiteralPath $Path -Force
+    if ($before.PSIsContainer) { Fail $FailureCode }
+    $bytes = [System.IO.File]::ReadAllBytes($before.FullName)
+    Assert-NoReparsePath $Path $FailureCode
+    $after = Get-Item -LiteralPath $Path -Force
+    if ($after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
+        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc) { Fail 'PATH_IDENTITY_CHANGED' }
     if ($bytes.Length -gt $Maximum) { Fail 'FILE_BYTES_EXCEEDED' }
     return $bytes
 }
@@ -396,7 +416,9 @@ try {
         "$logicalPath=$((Get-Sha256 $script:sources[$logicalPath].Bytes))"
     }
     $script:graphDigest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(($digestLines -join "`n")))
-    $script:classification = 'production-faithful'
+    $repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    $canonicalPackageRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot 'extensions/live_galaxy'))
+    $script:classification = if ($script:packageRoot -eq $canonicalPackageRoot) { 'production-faithful' } else { 'local-only' }
     Write-Result 'conformant' @('CONFORMANT')
     exit 0
 }

@@ -333,6 +333,15 @@ function Test-GeneratedBuilds {
             Assert-True (-not (Test-Path -LiteralPath $invalidMembershipRoot)) "Builder wrote output for '$($mutation.Name)'."
         }
 
+        $invalidGroup = Copy-JsonValue $matrix
+        $invalidGroup.build_groups[0].id = 'group"; os.execute("unsafe") --'
+        $invalidGroup.candidates[0].build_group = $invalidGroup.build_groups[0].id
+        $invalidGroupPath = Join-Path $scratch 'reject-injected-group.json'
+        Set-Content -LiteralPath $invalidGroupPath -Value ($invalidGroup | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
+        $invalidGroupRoot = Join-Path $scratch 'reject-injected-group'
+        $null = Invoke-Builder $invalidGroupRoot 1 $invalidGroupPath
+        Assert-True (-not (Test-Path -LiteralPath $invalidGroupRoot)) 'Builder wrote output for an injected group ID.'
+
         $before = Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')
         $null = Invoke-Builder $publicPackageRoot 1
         Assert-True ((Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')) -eq $before) 'Builder changed the public package after rejecting it.'

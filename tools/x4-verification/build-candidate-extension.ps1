@@ -178,6 +178,8 @@ function Assert-ValidMatrix($Matrix) {
         if ((@($candidate.verdict_axes) -join '|') -ne 'execution|contract|effect') { Fail 'CANDIDATE_VERDICT_AXES_INVALID' }
         if ($candidate.exclusive_build -isnot [bool]) { Fail 'CANDIDATE_EXCLUSIVITY_INVALID' }
         if ($candidate.build_profile_digest -ne (Get-ProfileDigest $candidate.build_profile)) { Fail 'PROFILE_DIGEST_MISMATCH' }
+        if ($candidate.build_profile.entrypoint -notmatch '^lua/[a-z0-9_/-]+\.lua$' -or
+            $candidate.build_profile.import_root -notmatch '^[a-z0-9_/-]+/$') { Fail 'PROFILE_PATH_INVALID' }
         Test-StringArray $candidate.conflicts_with 0 6 'CONFLICT_SET_INVALID'
         if (@($candidate.conflicts_with) -contains $candidate.id) { Fail 'CONFLICT_SET_INVALID' }
     }
@@ -192,6 +194,7 @@ function Assert-ValidMatrix($Matrix) {
     $membershipCounts = @{}
     foreach ($candidateId in $expectedCandidateIds) { $membershipCounts[$candidateId] = 0 }
     foreach ($group in @($Matrix.build_groups)) {
+        if ($group.id -isnot [string] -or $group.id -notmatch '^[a-z0-9][a-z0-9-]{0,63}$') { Fail 'GROUP_ID_INVALID' }
         if ($groups.ContainsKey($group.id)) { Fail 'DUPLICATE_GROUP' }
         $groups[$group.id] = $group
         $members = @($group.candidate_ids)
@@ -284,7 +287,7 @@ function Invoke-Conformance([string]$GroupRoot, [string]$ContractPath) {
     $line = @($output | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })[-1]
     try { $result = $line | ConvertFrom-Json -Depth 32 }
     catch { Fail 'PACKAGE_CONFORMANCE_RESULT_INVALID' }
-    if ($result.verdict -ne 'conformant' -or $result.classification -ne 'production-faithful' -or $result.evidence_level -ne 'packaged-static') {
+    if ($result.verdict -ne 'conformant' -or $result.classification -ne 'local-only' -or $result.evidence_level -ne 'packaged-static') {
         Fail 'PACKAGE_CONFORMANCE_FAILED'
     }
     $canonical = $result | ConvertTo-Json -Compress -Depth 32
@@ -300,12 +303,15 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     if (-not (Test-ContainedPath $groupRoot $Destination)) { Fail 'GROUP_PATH_ESCAPE' }
     $groupRoot = Resolve-NoReparseDestination $groupRoot
     if (-not (Test-ContainedPath $groupRoot $Destination)) { Fail 'GROUP_PATH_ESCAPE' }
-    if (Test-Path -LiteralPath $groupRoot) { Remove-Item -LiteralPath $groupRoot -Recurse -Force }
+    if (Test-Path -LiteralPath $groupRoot) { Fail 'GROUP_DESTINATION_EXISTS' }
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'lua') -Force
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'manifest') -Force
 
-    $content = (Get-Content -LiteralPath $contentTemplatePath -Raw).Replace('{{PACKAGE_ID}}', $packageId).Replace('{{PACKAGE_NAME}}', "Live Galaxy Candidate $($Group.id)")
-    $ui = (Get-Content -LiteralPath $uiTemplatePath -Raw).Replace('{{PACKAGE_ID}}', $packageId).Replace('{{ENTRYPOINT}}', [string]$members[0].build_profile.entrypoint)
+    $escapedPackageId = [Security.SecurityElement]::Escape($packageId)
+    $escapedPackageName = [Security.SecurityElement]::Escape("Live Galaxy Candidate $($Group.id)")
+    $escapedEntrypoint = [Security.SecurityElement]::Escape([string]$members[0].build_profile.entrypoint)
+    $content = (Get-Content -LiteralPath $contentTemplatePath -Raw).Replace('{{PACKAGE_ID}}', $escapedPackageId).Replace('{{PACKAGE_NAME}}', $escapedPackageName)
+    $ui = (Get-Content -LiteralPath $uiTemplatePath -Raw).Replace('{{PACKAGE_ID}}', $escapedPackageId).Replace('{{ENTRYPOINT}}', $escapedEntrypoint)
     Write-Utf8NoBom (Join-Path $groupRoot 'content.xml') $content
     Write-Utf8NoBom (Join-Path $groupRoot 'ui.xml') $ui
     Write-Utf8NoBom (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua') (New-Entrypoint $Group.id $buildId)

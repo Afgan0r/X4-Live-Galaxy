@@ -154,6 +154,7 @@ local dependency = require(PREFIX .. "dependency")
 '@ @{ 'lua/dependency.lua' = 'return {}' }
         $staticResult = Invoke-Conformance $staticPackage 0
         Assert-True ($staticResult.verdict -eq 'conformant') 'Lexer rejected supported multiline/concatenated imports or scanned comments/long strings.'
+        Assert-True ($staticResult.classification -eq 'local-only') 'Alternate package root was mislabeled production-faithful.'
 
         $staticHelperPackage = Join-Path $scratch 'lexer-static-helper'
         New-SyntaxPackage $staticHelperPackage @'
