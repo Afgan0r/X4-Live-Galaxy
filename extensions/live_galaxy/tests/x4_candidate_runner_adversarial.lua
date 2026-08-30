@@ -81,4 +81,38 @@ function cases.runner_source_has_no_direct_native_binding()
     assert(not source:find("loadstring"))
 end
 
+function cases.sparse_collections_and_undeclared_fields_fail_closed()
+    local manifest = phase_051.single_success()
+    manifest.candidates[1000] = manifest.candidates[1]
+    assert(select(2, runner.run(manifest, trusted_services())) == "candidate_count_invalid")
+
+    manifest = phase_051.single_success()
+    manifest.mod_list[1000] = "sparse-mod"
+    assert(select(2, runner.run(manifest, trusted_services())) == "mod_list_invalid")
+
+    manifest = phase_051.single_success()
+    local context = trusted_services()
+    context.adapters["count-fill-local-contract"] = function()
+        local observations = { "first" }
+        observations[1000] = "hidden"
+        return {
+            actual_result = "count-fill-contract-valid",
+            completeness = "complete",
+            observations = observations,
+            work_units = 1,
+        }
+    end
+    local jsonl, result = runner.run(manifest, context)
+    assert(type(jsonl) == "string" and result.candidate_count == 1)
+    assert(jsonl:find('"failure_reason":"observations_invalid"', 1, true) ~= nil)
+
+    manifest = phase_051.single_success()
+    manifest.undeclared = true
+    assert(select(2, runner.run(manifest, trusted_services())) == "manifest_schema_invalid")
+
+    manifest = phase_051.single_success()
+    manifest.bounds.undeclared = 1
+    assert(select(2, runner.run(manifest, trusted_services())) == "bounds_schema_invalid")
+end
+
 return cases

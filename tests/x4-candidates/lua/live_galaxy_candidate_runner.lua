@@ -6,6 +6,11 @@ local STAGES = { "execution", "contract", "effect" }
 local CANDIDATE_FIELDS = {
     adapter_id = true, bounds = true, expected_result = true, id = true, source = true,
 }
+local MANIFEST_FIELDS = {
+    bounds = true, build_id = true, build_profile_digest = true, candidates = true,
+    game_version = true, mod_list = true, prior_dossier_digest = true,
+    prior_dossier_id = true, run_id = true, scenario_id = true, schema_version = true,
+}
 local OUTCOME_FIELDS = {
     actual_result = true, completeness = true, elapsed_game_ms = true,
     elapsed_real_ms = true, observations = true, seta_state = true, work_units = true,
@@ -18,6 +23,7 @@ local HARD_BOUNDS = {
 }
 
 local function is_array(value)
+    if type(value) ~= "table" or getmetatable(value) ~= nil then return false, 0 end
     local count = 0
     for key in pairs(value) do
         if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then return false end
@@ -77,9 +83,11 @@ local function valid_digest(value)
 end
 
 local function copy_sorted_strings(values, maximum)
-    if type(values) ~= "table" or #values > maximum then return nil end
+    local dense, count = is_array(values)
+    if not dense or count > maximum then return nil end
     local result = {}
-    for index, value in ipairs(values) do
+    for index = 1, count do
+        local value = values[index]
         if not valid_string(value) then return nil end
         result[index] = value
     end
@@ -102,23 +110,33 @@ local function validate_services(context)
 end
 
 local function validate_manifest(manifest)
-    if type(manifest) ~= "table" or manifest.schema_version ~= SCHEMA_VERSION then
+    if type(manifest) ~= "table" or getmetatable(manifest) ~= nil
+        or manifest.schema_version ~= SCHEMA_VERSION then
         return nil, "schema_version_invalid"
+    end
+    for field in pairs(manifest) do
+        if not MANIFEST_FIELDS[field] then return nil, "manifest_schema_invalid" end
     end
     for _, field in ipairs({ "run_id", "game_version", "scenario_id", "prior_dossier_id", "build_id" }) do
         if not valid_string(manifest[field]) then return nil, field .. "_invalid" end
     end
     if not valid_digest(manifest.prior_dossier_digest) then return nil, "prior_dossier_digest_invalid" end
     if not valid_digest(manifest.build_profile_digest) then return nil, "build_profile_digest_invalid" end
-    if type(manifest.candidates) ~= "table" or #manifest.candidates == 0
-        or #manifest.candidates > HARD_BOUNDS.max_candidates then return nil, "candidate_count_invalid" end
+    local dense_candidates, candidate_count = is_array(manifest.candidates)
+    if not dense_candidates or candidate_count == 0
+        or candidate_count > HARD_BOUNDS.max_candidates then return nil, "candidate_count_invalid" end
     local mods = copy_sorted_strings(manifest.mod_list, HARD_BOUNDS.max_mods)
     if mods == nil then return nil, "mod_list_invalid" end
-    return mods
+    return mods, nil, candidate_count
 end
 
 local function effective_bounds(requested)
-    if type(requested) ~= "table" then return nil, "bounds_missing" end
+    if type(requested) ~= "table" or getmetatable(requested) ~= nil then
+        return nil, "bounds_missing"
+    end
+    for name in pairs(requested) do
+        if HARD_BOUNDS[name] == nil then return nil, "bounds_schema_invalid" end
+    end
     local bounds = {}
     for name, hard_limit in pairs(HARD_BOUNDS) do
         local value = requested[name] or hard_limit
@@ -207,9 +225,10 @@ local function validate_candidate_bounds(value, hard_bounds)
     return { max_work_units = value.max_work_units }
 end
 
-local function ordered_candidates(candidates, context, bounds)
+local function ordered_candidates(candidates, candidate_count, context, bounds)
     local ordered, seen = {}, {}
-    for _, candidate in ipairs(candidates) do
+    for index = 1, candidate_count do
+        local candidate = candidates[index]
         if type(candidate) ~= "table" or getmetatable(candidate) ~= nil then
             return nil, "candidate_schema_invalid"
         end
@@ -289,11 +308,11 @@ end
 function runner.run(manifest, context)
     local services_ok, services_err = validate_services(context)
     if services_ok == nil then return nil, services_err end
-    local mods, manifest_err = validate_manifest(manifest)
+    local mods, manifest_err, candidate_count = validate_manifest(manifest)
     if mods == nil then return nil, manifest_err end
     local bounds, bounds_err = effective_bounds(manifest.bounds)
     if bounds == nil then return nil, bounds_err end
-    local candidates, candidates_err = ordered_candidates(manifest.candidates, context, bounds)
+    local candidates, candidates_err = ordered_candidates(manifest.candidates, candidate_count, context, bounds)
     if candidates == nil then return nil, candidates_err end
     if #candidates * #STAGES > bounds.max_output_rows then return nil, "output_rows_exceeded" end
     local lines = {}
@@ -330,11 +349,13 @@ function runner.run_native()
 end
 
 function runner.verify_digest_adapter(adapter, vectors)
+    local dense_vectors, vector_count = is_array(vectors)
     if type(adapter) ~= "table" or type(adapter.hash) ~= "function"
-        or type(adapter.verify) ~= "function" or type(vectors) ~= "table" or #vectors == 0 then
+        or type(adapter.verify) ~= "function" or not dense_vectors or vector_count == 0 then
         return nil, "digest_adapter_missing"
     end
-    for _, vector in ipairs(vectors) do
+    for index = 1, vector_count do
+        local vector = vectors[index]
         if type(vector) ~= "table" or type(vector.payload) ~= "string" or not valid_digest(vector.sha256) then
             return nil, "digest_vector_invalid"
         end
