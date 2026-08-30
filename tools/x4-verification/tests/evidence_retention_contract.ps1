@@ -265,10 +265,11 @@ try {
             -DossierPath $dossierPath -RegistryPath $registryPath -CoveragePath $coveragePath `
             -FixturePath $fixturePath -SanitizedLedgerPath $completePath `
             -PendingLedgerPath $pendingLedgerPath -CandidateMatrixPath $matrixPath 2>&1)
-        Assert-True ($LASTEXITCODE -eq 0) "Production admission rejected retained handback: $($admissionOutput -join ' | ')"
+        Assert-True ($LASTEXITCODE -ne 0) 'Production admission accepted an unverified hand-authored ledger.'
         $admissionResult = @($admissionOutput | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })[-1] | ConvertFrom-Json
-        Assert-True ($admissionResult.verdict -eq 'admissible') 'Integrated retained handback did not become admissible.'
-        Write-Output 'PASS: retention-to-admission integration contract'
+        Assert-True ($admissionResult.verdict -eq 'non-admissible') 'Unverified handback returned an unstable admission verdict.'
+        Assert-True (@($admissionResult.reason_codes) -contains 'UNTRUSTED_EVIDENCE_SOURCE') 'Unverified handback did not fail closed at the trusted-source gate.'
+        Write-Output 'PASS: retention-to-admission fail-closed contract'
         exit 0
     }
     $groupRoot = Join-Path $buildRoot 'p051-build-read-only-shared'

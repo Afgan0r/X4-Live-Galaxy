@@ -643,6 +643,9 @@ function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
 }
 
 try {
+    if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
+        Fail 'OWNER_OVERRIDE_DISABLED'
+    }
     $script:validationContext = 'dossier-read'
     $dossierRead = Read-BoundedJson $DossierPath 'x4-integration-dossier.v1' 'UNSUPPORTED_DOSSIER_SCHEMA'
     $script:dossierDigest = Get-Sha256Hex $dossierRead.Bytes
@@ -670,26 +673,35 @@ try {
     $script:validationContext = 'dossier-validation'
     $knownFindings = @(Test-Dossier $dossierRead.Value $registryInfo.Ids $allowRuntimeResolution)
     if ($knownFindings.Count -gt 0) {
-        if ([string]::IsNullOrWhiteSpace($OverridePath)) {
-            Fail 'KNOWN_FAILURE_BLOCKED'
-        }
-        $script:validationContext = 'override-read'
-        $overrideRead = Read-BoundedJson $OverridePath 'x4-owner-override.v1' 'UNSUPPORTED_OVERRIDE_SCHEMA'
-        $script:validationContext = 'override-validation'
-        $script:overriddenFindingIds = @(Test-OwnerOverride $overrideRead.Value $knownFindings)
-        if ($script:overriddenFindingIds.Count -ne $knownFindings.Count) {
-            Fail 'KNOWN_FAILURE_BLOCKED'
-        }
-    }
-    if ($knownFindings.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($OverridePath)) {
-        Fail 'OVERRIDE_SCOPE_MISMATCH'
+        Fail 'KNOWN_FAILURE_BLOCKED'
     }
     if ($ValidateFixture) {
-        $fixtureVerdict = if ($script:overriddenFindingIds.Count -gt 0) { 'validation-passed-with-owner-override' } else { 'validation-passed' }
-        $fixtureReason = if ($script:overriddenFindingIds.Count -gt 0) { 'OWNER_OVERRIDE_APPLIED' } else { 'VALIDATION_PASSED' }
-        Write-Result $fixtureVerdict @($fixtureReason)
+        Write-Result 'validation-passed' @('VALIDATION_PASSED')
         exit 0
     }
+    if ($dossierRead.Value.seam_id -eq 'validation-fixture-only') { Fail 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' }
+    $trustedInputs = [ordered]@{
+        dossier = Join-Path $PSScriptRoot 'contracts/phase-05.1-dossier.v1.json'
+        registry = Join-Path $PSScriptRoot 'contracts/known-failures.v1.json'
+        coverage = Join-Path $PSScriptRoot 'contracts/coverage.v1.json'
+        fixtures = Join-Path $PSScriptRoot 'fixtures/negative-fixtures.v1.json'
+        matrix = Join-Path (Split-Path -Parent $PSScriptRoot) 'tests/x4-candidates/phase-05.1-candidates.v1.json'
+        pending = Join-Path (Split-Path -Parent $PSScriptRoot) 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
+    }
+    $actualInputs = [ordered]@{
+        dossier = $DossierPath; registry = $RegistryPath; coverage = $CoveragePath; fixtures = $FixturePath
+        matrix = $CandidateMatrixPath; pending = $PendingLedgerPath
+    }
+    foreach ($name in $trustedInputs.Keys) {
+        if ([string]::IsNullOrWhiteSpace($actualInputs[$name]) -or
+            [IO.Path]::GetFullPath($actualInputs[$name]) -ne [IO.Path]::GetFullPath($trustedInputs[$name])) {
+            Fail 'UNTRUSTED_EVIDENCE_SOURCE'
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($SanitizedLedgerPath)) {
+        Fail 'UNVERIFIED_LEDGER_INPUT'
+    }
+    Fail 'RUNTIME_ADMISSION_PENDING'
     if ($dossierRead.Value.seam_id -eq 'validation-fixture-only') { Fail 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' }
     if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
         [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
