@@ -196,9 +196,15 @@ foundation for inherited OBS-X4 evidence and future X4 seams
    candidate matrix for one later human X4 run; Phase 05.2 itself performs no
    game mutation and requires no X4 execution.
 
-**Plans:** 5/5 plans executed
+**Plans:** 6/10 plans executed
 
 Plans:
+
+- [x] 05.2-06-PLAN.md
+- [ ] 05.2-07-PLAN.md
+- [ ] 05.2-08-PLAN.md
+- [ ] 05.2-09-PLAN.md
+- [ ] 05.2-PLAN-CHECK.md
 
 - [x] 05.2-01-PLAN.md
 - [x] 05.2-02-PLAN.md

@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: executing
-stopped_at: Completed 05.2-05-PLAN.md
-last_updated: "2026-08-30T01:10:15.134Z"
+stopped_at: Completed 05.2-06-PLAN.md
+last_updated: "2026-08-30T05:16:07.091Z"
 last_activity: 2026-08-30
 last_activity_desc: Completed Phase 05.2 Plan 05 private evidence retention and sanitized handback
-state_head: ebef69934b491f1edf440a67b943ab8e18916eb6
+state_head: 414b3be39d2de2b74655a841921d34e24e3ea7f9
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 36
-  completed_plans: 29
+  total_plans: 40
+  completed_plans: 30
   percent: 40
 ---
 
@@ -82,6 +82,7 @@ Progress: [████░░░░░░] 40%
 | Phase 05.2 P03 | 15min | 2 tasks | 5 files |
 | Phase 05.2 P04 | 14min | 2 tasks | 6 files |
 | Phase 05.2 P05 | 31min | 2 tasks | 7 files |
+| Phase 05.2 P06 | 27min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Recent decisions affecting current work:
 - [Phase 05.2]: Retained runtime evidence remains private; Git receives only sanitized logical identities, verdicts, dispositions, and digests.
 - [Phase 05.2]: Admission compares a completed sanitized ledger with the committed pending ledger and candidate matrix, never raw JSONL or private locator paths.
 - [Phase 05.2]: Phase 05.1 runtime execution remains a later human-only disposable-campaign gate; Phase 05.2 makes no execution or admission claim.
+- [Phase 05.2]: Production owner authority remains explicitly unconfigured until a separate owner-controlled reviewed ceremony updates both the fixed anchor contract and compiled pin.
+- [Phase 05.2]: Owner overrides require a root-signed owner-override delegation bound to exact purpose, epoch, scope, policy, delegated SPKI, and matching non-exportable Windows CNG key.
+- [Phase 05.2]: TEST-ONLY authority stays confined to explicit fixture helpers and is never accepted by production admission or signing entry points.
 
 ### Pending Todos
 
@@ -175,6 +179,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-30T01:10:14.584Z
-Stopped at: Completed 05.2-05-PLAN.md
+Last session: 2026-08-30T05:16:06.510Z
+Stopped at: Completed 05.2-06-PLAN.md
 Resume file: None
