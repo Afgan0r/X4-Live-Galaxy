@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
-status: executing
-stopped_at: Completed 05.2-06-PLAN.md
-last_updated: "2026-08-30T05:16:07.091Z"
+status: paused
+stopped_at: Final re-review NOT CLEAN (3 P1, 1 P2)
+last_updated: "2026-08-30T08:55:08.908Z"
 last_activity: 2026-08-30
-last_activity_desc: Completed Phase 05.2 Plan 05 private evidence retention and sanitized handback
-state_head: 414b3be39d2de2b74655a841921d34e24e3ea7f9
+last_activity_desc: Paused after final Phase 05.2 re-review found three blocking trust and adapter defects
+state_head: aaca3e127b522a19e46278008c7cf40371ad9217
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 40
-  completed_plans: 30
+  completed_plans: 34
   percent: 40
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 
 ## Current Position
 
-Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — EXECUTING
-Plan: 5 of 5
-Status: Ready to verify
+Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — PAUSED
+Plan: 9 of 9
+Status: Final review blocked by three P1 findings and one P2 coverage warning
 Last activity: 2026-08-30 — Completed Phase 05.2 Plan 05 private evidence retention and sanitized handback
 
 Progress: [████░░░░░░] 40%
@@ -83,6 +83,7 @@ Progress: [████░░░░░░] 40%
 | Phase 05.2 P04 | 14min | 2 tasks | 6 files |
 | Phase 05.2 P05 | 31min | 2 tasks | 7 files |
 | Phase 05.2 P06 | 27min | 3 tasks | 10 files |
+| Phase 05.2 P07 | 49 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,9 @@ Recent decisions affecting current work:
 - [Phase 05.2]: Production owner authority remains explicitly unconfigured until a separate owner-controlled reviewed ceremony updates both the fixed anchor contract and compiled pin.
 - [Phase 05.2]: Owner overrides require a root-signed owner-override delegation bound to exact purpose, epoch, scope, policy, delegated SPKI, and matching non-exportable Windows CNG key.
 - [Phase 05.2]: TEST-ONLY authority stays confined to explicit fixture helpers and is never accepted by production admission or signing entry points.
+- [Phase 05.2]: Candidate declarations are exact inert data; callbacks, metatables, digests, watchdogs, and verdict authority are rejected.
+- [Phase 05.2]: The pure runner owns completeness and expected-effect verdicts; only the trusted registry supplies local-contract adapters.
+- [Phase 05.2]: Blocking candidate work uses one fixed no-shell worker with canonical bounded files, deadlines, and process-tree termination.
 
 ### Pending Todos
 
@@ -179,6 +183,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-30T05:16:06.510Z
-Stopped at: Completed 05.2-06-PLAN.md
-Resume file: None
+Last session: 2026-08-30T08:55:08.908Z
+Stopped at: Final re-review NOT CLEAN (3 P1, 1 P2)
+Resume file: .planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted/.continue-here.md

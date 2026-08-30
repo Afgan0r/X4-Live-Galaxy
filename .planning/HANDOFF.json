@@ -1,39 +1,37 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-30T04:26:59.4930444+07:00",
-  "phase": "05.1",
-  "phase_name": "bounded-real-component-discovery-inserted",
-  "phase_dir": ".planning/phases/05.1-bounded-real-component-discovery-inserted",
-  "plan": 5,
-  "task": 0,
+  "timestamp": "2026-08-30T15:55:08.9080572+07:00",
+  "phase": "05.2",
+  "phase_name": "layered-lua-and-x4-verification-foundation-inserted",
+  "phase_dir": ".planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted",
+  "plan": 9,
+  "task": 3,
   "total_tasks": 3,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "bounded station-frame prototype", "status": "done", "commit": "2d1108b"},
-    {"id": 2, "name": "backpressure and reconnect atomicity fixes", "status": "done", "commit": "66adbe9"}
+    {"id": 1, "name": "Execute Plans 01-09", "status": "done", "commit": "29ebfd2"},
+    {"id": 2, "name": "Serialize Plan 08 producer authority closure", "status": "done", "commit": "7f42ce8"},
+    {"id": 3, "name": "Apply first final-review fix set", "status": "done", "commit": "aaca3e1"}
   ],
   "remaining_tasks": [
-    {"id": 1, "name": "replace prototype bounds with MCP-oriented bounded FIFO", "status": "not_started"},
-    {"id": 2, "name": "bridge and ingest stream-bound alignment", "status": "not_started"},
-    {"id": 3, "name": "disposable X4 normal-speed and SETA UAT", "status": "not_started"}
+    {"id": 4, "name": "Fix three P1 findings and add executable held-out coverage", "status": "not_started"},
+    {"id": 5, "name": "Obtain CLEAN code review", "status": "not_started"},
+    {"id": 6, "name": "Rerun Nyquist, security, and phase verifier", "status": "not_started"},
+    {"id": 7, "name": "Close Phase 05.2 state and roadmap", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "05.1-05 plan check found the implementation scope omits existing 64/128/2 KiB limits in batch, bridge server, and listener; it also lacks a precise framed-wire-byte accounting definition.", "type": "technical", "workaround": "Revise plan before execution; do not run 05.1-05."}
+    {"description": "Coordinated adapter plus manifest digest forgery can execute a substituted adapter and publish PASS.", "type": "technical", "workaround": "Anchor executable component digests in authenticated producer authority rather than a caller-rewritable manifest; add a black-box forgery test."},
+    {"description": "Identity and volume adapters still return hard-coded observations for valid alternate fixtures.", "type": "technical", "workaround": "Derive observations from bounded inputs and add independent metamorphic fixtures."},
+    {"description": "Producer chronology accepts completed_at in the future when started_at is current.", "type": "technical", "workaround": "Bound all signed timestamps against verification time and test a valid unchanged signature with future completion."}
   ],
+  "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Use X4 MCP as the clean-room architectural baseline for FIFO, drain, retry, cadence, and transport envelope.", "rationale": "Owner states MCP works well; do not copy its domain model or global reconciliation semantics.", "phase": "05.1"},
-    {"decision": "Do not use 16 or 64 as a global faction-station scope limit.", "rationale": "Native UAT observed Argon scope above 64; transport flow control and native enumeration safety are separate concerns.", "phase": "05.1"}
+    {"decision": "Phase 05.2 precedes further Phase 05.1 work.", "rationale": "The X4 human probe requires a trustworthy package, runner, failure registry, retention, and admission foundation first.", "phase": "05.2"},
+    {"decision": "Production owner authority remains unconfigured.", "rationale": "No agent may fabricate or perform the owner-controlled root and delegated-key ceremony.", "phase": "05.2"},
+    {"decision": "Local evidence remains authenticated-local-contract or chain-verified-x4-pending, never observed-in-X4.", "rationale": "No X4 runtime or save was accessed during Phase 05.2.", "phase": "05.2"}
   ],
-  "uncommitted_files": [
-    ".planning/ROADMAP.md",
-    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-PATTERNS.md",
-    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-REVIEW.md",
-    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-VALIDATION.md",
-    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-PLAN-CHECK.md",
-    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-PLAN.md",
-    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-RESEARCH.md"
-  ],
-  "next_action": "Revise 05.1-05 planning scope to include current bridge/ingest limits and define framed-wire byte accounting, then rerun GSD plan checker before any execution.",
-  "context_notes": "Trace is default-off; X4 and x4-bridge are stopped. No save was read or modified."
+  "uncommitted_files": [],
+  "next_action": "Read 05.2-REVIEW.md, reproduce its three P1 findings, create a narrowly scoped GSD fix plan, and require executable held-out tests before another clean review.",
+  "context_notes": "Plans 01-09 are implemented. Final re-review is NOT CLEAN with 3 P1 and 1 P2. All focused Phase 05.2 gates currently pass false-green; the full Lua suite reaches only the pre-existing telemetry_contract.lua:32 baseline, and the Rust size gate retains the pre-existing 231/222/226 baselines. No X4 launch, game mutation, installed-mod edit, or save access occurred."
 }
