@@ -95,15 +95,24 @@ function Get-Sha256Bytes([byte[]]$Bytes) {
     return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes))).ToLowerInvariant()
 }
 
-function Get-Sha256File([string]$Path) {
-    return Get-Sha256Bytes ([IO.File]::ReadAllBytes($Path))
+function Get-Sha256File([string]$Path, [int]$Maximum) {
+    return Get-Sha256Bytes (Read-BoundedBytes $Path $Maximum)
 }
 
 function Read-BoundedBytes([string]$Path, [int]$Maximum) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
-    $item = Get-Item -LiteralPath $Path
-    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail 'REPARSE_POINT_REJECTED' }
-    $bytes = [IO.File]::ReadAllBytes($item.FullName)
+    $before = Get-Item -LiteralPath $Path -Force
+    if (($before.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $before.LinkType) {
+        Fail 'REPARSE_POINT_REJECTED'
+    }
+    if ($before.Length -gt $Maximum) { Fail 'BOUND_EXCEEDED' }
+    $bytes = [IO.File]::ReadAllBytes($before.FullName)
+    $after = Get-Item -LiteralPath $Path -Force
+    if (($after.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $after.LinkType -or
+        $after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
+        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc -or $bytes.Length -ne $before.Length) {
+        Fail 'PATH_IDENTITY_CHANGED'
+    }
     if ($bytes.Length -gt $Maximum) { Fail 'BOUND_EXCEEDED' }
     return $bytes
 }
@@ -381,7 +390,9 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
         @{ Name = 'coverage_digest'; Path = $coveragePath },
         @{ Name = 'matrix_digest'; Path = $matrixPath }
     )) {
-        if ($manifest.($source.Name) -ne (Get-Sha256File $source.Path)) { Fail 'STALE_IDENTITY_DIGEST' }
+        if ($manifest.($source.Name) -ne (Get-Sha256File $source.Path $Contracts.Sanitized.bounds.max_input_bytes)) {
+            Fail 'STALE_IDENTITY_DIGEST'
+        }
     }
     $package = Require-Property $manifest 'package_conformance'
     $packageBytes = [Text.Encoding]::UTF8.GetBytes(($package | ConvertTo-Json -Compress -Depth 32))
@@ -410,7 +421,8 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
             if (-not (Test-ContainedPath $physical $groupRoot) -or -not (Test-Path -LiteralPath $physical -PathType Leaf)) {
                 Fail 'GENERATED_FILE_MISSING'
             }
-            if ((Get-Item -LiteralPath $physical).Length -ne [long]$file.bytes -or (Get-Sha256File $physical) -ne $file.sha256) {
+            if ((Get-Item -LiteralPath $physical).Length -ne [long]$file.bytes -or
+                (Get-Sha256File $physical $Contracts.Manifest.bounds.max_generated_file_bytes) -ne $file.sha256) {
                 Fail 'GENERATED_FILE_DIGEST_MISMATCH'
             }
         }
@@ -451,7 +463,8 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
             owner_root_anchor_digest = (Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json')
         }
         foreach ($binding in $componentBindings.GetEnumerator()) {
-            if ($manifest.([string]$binding.Key) -ne (Get-Sha256File ([string]$binding.Value))) {
+            if ($manifest.([string]$binding.Key) -ne
+                (Get-Sha256File ([string]$binding.Value) $Contracts.Manifest.bounds.max_generated_file_bytes)) {
                 Fail 'GENERATED_FILE_DIGEST_MISMATCH'
             }
         }
@@ -852,9 +865,9 @@ function Read-VerifiedLocator([string]$Path, $Contracts) {
     Assert-OwnerOnly $retainedEvidence $false
     Assert-OwnerOnly $retainedManifest $false
     Assert-OwnerOnly $retainedProducer $false
-    if ((Get-Sha256File $retainedEvidence) -ne $locator.evidence_digest -or
-        (Get-Sha256File $retainedManifest) -ne $locator.build_manifest_digest -or
-        (Get-Sha256File $retainedProducer) -ne $locator.producer_attestation_digest) {
+    if ((Get-Sha256File $retainedEvidence $Contracts.Runtime.bounds.max_total_bytes) -ne $locator.evidence_digest -or
+        (Get-Sha256File $retainedManifest $Contracts.Sanitized.bounds.max_input_bytes) -ne $locator.build_manifest_digest -or
+        (Get-Sha256File $retainedProducer 65536) -ne $locator.producer_attestation_digest) {
         Fail 'RETAINED_DIGEST_MISMATCH'
     }
     $build = Test-BuildManifest $retainedManifest $Contracts $false
@@ -943,10 +956,11 @@ try {
     Write-PrivateBytes $retainedEvidence $evidence.Bytes
     Write-PrivateBytes $retainedManifest $build.Bytes
     Write-PrivateBytes $retainedProducer $producer.Bytes
-    if ((Get-Sha256File $retainedEvidence) -ne $evidenceDigest -or (Get-Sha256File $retainedManifest) -ne $manifestDigest) {
+    if ((Get-Sha256File $retainedEvidence $contracts.Runtime.bounds.max_total_bytes) -ne $evidenceDigest -or
+        (Get-Sha256File $retainedManifest $contracts.Sanitized.bounds.max_input_bytes) -ne $manifestDigest) {
         Fail 'RETAINED_DIGEST_MISMATCH'
     }
-    if ((Get-Sha256File $retainedProducer) -ne $producer.Digest) { Fail 'RETAINED_DIGEST_MISMATCH' }
+    if ((Get-Sha256File $retainedProducer 65536) -ne $producer.Digest) { Fail 'RETAINED_DIGEST_MISMATCH' }
     $locatorPayload = [ordered]@{
         schema_version = $contracts.Sanitized.private_locator_schema_version
         logical_artifact_id = "runtime-evidence-$($evidence.RunId)"

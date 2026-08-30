@@ -123,7 +123,20 @@ function Read-BoundedJson([string]$Path, [string]$SchemaVersion, [string]$Schema
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         Fail 'MISSING_INPUT'
     }
-    $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path)
+    $before = Get-Item -LiteralPath $Path -Force
+    if (($before.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $before.LinkType) {
+        Fail 'REPARSE_POINT_REJECTED'
+    }
+    if ($before.Length -gt $maxInputBytes) {
+        Fail 'BOUND_EXCEEDED'
+    }
+    $bytes = [System.IO.File]::ReadAllBytes($before.FullName)
+    $after = Get-Item -LiteralPath $Path -Force
+    if (($after.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $after.LinkType -or
+        $after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
+        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc -or $bytes.Length -ne $before.Length) {
+        Fail 'PATH_IDENTITY_CHANGED'
+    }
     if ($bytes.Length -gt $maxInputBytes) {
         Fail 'BOUND_EXCEEDED'
     }

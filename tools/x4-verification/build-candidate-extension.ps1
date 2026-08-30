@@ -68,9 +68,26 @@ function Get-Sha256([byte[]]$Bytes) {
     return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes)).ToLowerInvariant()
 }
 
-function Get-FileDigest([string]$Path) {
+function Read-BoundedBytes([string]$Path, [int]$Maximum, [string]$FailureCode) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
-    return Get-Sha256 ([IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path))
+    $before = Get-Item -LiteralPath $Path -Force
+    if (($before.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $before.LinkType) {
+        Fail 'INPUT_REPARSE_POINT_REJECTED'
+    }
+    if ($before.Length -gt $Maximum) { Fail $FailureCode }
+    $bytes = [IO.File]::ReadAllBytes($before.FullName)
+    $after = Get-Item -LiteralPath $Path -Force
+    if (($after.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $after.LinkType -or
+        $after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
+        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc -or $bytes.Length -ne $before.Length) {
+        Fail 'PATH_IDENTITY_CHANGED'
+    }
+    if ($bytes.Length -gt $Maximum) { Fail $FailureCode }
+    return $bytes
+}
+
+function Get-FileDigest([string]$Path, [int]$Maximum = 262144, [string]$FailureCode = 'INPUT_BYTES_EXCEEDED') {
+    return Get-Sha256 (Read-BoundedBytes $Path $Maximum $FailureCode)
 }
 
 function Set-OwnerOnly([string]$Path, [bool]$Directory) {
@@ -91,7 +108,18 @@ function Set-OwnerOnly([string]$Path, [bool]$Directory) {
 
 function Read-Json([string]$Path, [string]$Schema) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
-    $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path)
+    $before = Get-Item -LiteralPath $Path -Force
+    if (($before.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $before.LinkType) {
+        Fail 'INPUT_REPARSE_POINT_REJECTED'
+    }
+    if ($before.Length -gt 262144) { Fail 'INPUT_BYTES_EXCEEDED' }
+    $bytes = [IO.File]::ReadAllBytes($before.FullName)
+    $after = Get-Item -LiteralPath $Path -Force
+    if (($after.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $after.LinkType -or
+        $after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
+        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc -or $bytes.Length -ne $before.Length) {
+        Fail 'PATH_IDENTITY_CHANGED'
+    }
     if ($bytes.Length -gt 262144) { Fail 'INPUT_BYTES_EXCEEDED' }
     try { $value = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json -Depth 64 }
     catch { Fail 'INVALID_JSON' }
@@ -375,7 +403,11 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         if (-not (Test-Path -LiteralPath $physicalPath -PathType Leaf)) { Fail 'GENERATED_FILE_MISSING' }
         $item = Get-Item -LiteralPath $physicalPath
         if ($item.Length -gt $ManifestContract.bounds.max_generated_file_bytes) { Fail 'GENERATED_FILE_BYTES_EXCEEDED' }
-        [ordered]@{ path = $logicalPath; bytes = $item.Length; sha256 = Get-FileDigest $physicalPath }
+        [ordered]@{
+            path = $logicalPath
+            bytes = $item.Length
+            sha256 = Get-FileDigest $physicalPath $ManifestContract.bounds.max_generated_file_bytes 'GENERATED_FILE_BYTES_EXCEEDED'
+        }
     }
     [long]$generatedTotalBytes = 0
     foreach ($generatedFile in @($generatedFiles)) { $generatedTotalBytes += [long]$generatedFile.bytes }

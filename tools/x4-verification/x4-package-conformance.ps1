@@ -66,11 +66,14 @@ function Read-BoundedBytes([string]$Path, [int]$Maximum, [string]$FailureCode) {
     Assert-NoReparsePath $Path $FailureCode
     $before = Get-Item -LiteralPath $Path -Force
     if ($before.PSIsContainer) { Fail $FailureCode }
+    if ($before.Length -gt $Maximum) { Fail 'FILE_BYTES_EXCEEDED' }
     $bytes = [System.IO.File]::ReadAllBytes($before.FullName)
     Assert-NoReparsePath $Path $FailureCode
     $after = Get-Item -LiteralPath $Path -Force
     if ($after.FullName -ne $before.FullName -or $after.Length -ne $before.Length -or
-        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc) { Fail 'PATH_IDENTITY_CHANGED' }
+        $after.LastWriteTimeUtc -ne $before.LastWriteTimeUtc -or $bytes.Length -ne $before.Length) {
+        Fail 'PATH_IDENTITY_CHANGED'
+    }
     if ($bytes.Length -gt $Maximum) { Fail 'FILE_BYTES_EXCEEDED' }
     return $bytes
 }
