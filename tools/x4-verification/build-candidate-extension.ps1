@@ -28,6 +28,7 @@ $adapterSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/candidate-
 $attestationModulePath = Join-Path $repositoryRoot 'tools/x4-verification/producer-attestation.psm1'
 $workerSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/candidate-worker.ps1'
 $launcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
+$boundedReaderSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/bounded-file.psm1'
 $workerProtocolPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $ownerRootAnchorPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
 $contentTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-content.xml'
@@ -378,6 +379,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     Copy-Item -LiteralPath $attestationModulePath -Destination (Join-Path $groupRoot 'tools/x4-verification/producer-attestation.psm1')
     Copy-Item -LiteralPath $workerSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/candidate-worker.ps1')
     Copy-Item -LiteralPath $launcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1')
+    Copy-Item -LiteralPath $boundedReaderSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/bounded-file.psm1')
     Copy-Item -LiteralPath $workerProtocolPath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json')
     Copy-Item -LiteralPath $runtimeEvidencePath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json')
     Copy-Item -LiteralPath $ownerRootAnchorPath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json')
@@ -445,6 +447,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         dispatcher_digest = Get-FileDigest $dispatcherSourcePath
         adapter_digest = Get-FileDigest $adapterSourcePath
         attestation_module_digest = Get-FileDigest $attestationModulePath
+        bounded_reader_digest = Get-FileDigest $boundedReaderSourcePath
         worker_digest = Get-FileDigest $workerSourcePath
         launcher_digest = Get-FileDigest $launcherSourcePath
         worker_protocol_digest = Get-FileDigest $workerProtocolPath

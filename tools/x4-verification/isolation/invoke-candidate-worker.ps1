@@ -13,7 +13,10 @@ Set-StrictMode -Version Latest
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $workerPath = Join-Path $root 'tools/x4-verification/isolation/candidate-worker.ps1'
 $protocolPath = Join-Path $root 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
-$protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
+$boundedReaderPath = Join-Path $root 'tools/x4-verification/bounded-file.psm1'
+Import-Module $boundedReaderPath -Force
+$protocolRead = Read-BoundedFile $protocolPath 32768 'worker-protocol-invalid'
+$protocol = [Text.Encoding]::UTF8.GetString($protocolRead.Bytes) | ConvertFrom-Json
 $validatedResponsePath = $null
 $readinessObserved = $false
 $readinessObservedAt = $null
@@ -65,12 +68,19 @@ try {
         Write-Result 'request-rejected' 'readiness-path-invalid'
         exit 0
     }
-    $requestInfo = Get-Item -LiteralPath $requestFull
-    if ($requestInfo.Length -gt $protocol.bounds.max_request_bytes) {
-        Write-Result 'request-rejected' 'request-bytes-exceeded'
+    try {
+        $requestRead = Read-BoundedFile $requestFull $protocol.bounds.max_request_bytes `
+            'request-path-invalid' 'request-bytes-exceeded' 'request-identity-changed'
+    }
+    catch {
+        $requestCode = [string]$_.Exception.Message
+        if ($requestCode -notin @('request-path-invalid', 'request-bytes-exceeded', 'request-identity-changed')) {
+            $requestCode = 'request-path-invalid'
+        }
+        Write-Result 'request-rejected' $requestCode
         exit 0
     }
-    $request = Get-Content -LiteralPath $requestFull -Raw | ConvertFrom-Json -DateKind String
+    $request = [Text.Encoding]::UTF8.GetString($requestRead.Bytes) | ConvertFrom-Json -DateKind String
     if (-not (Test-ExactFields $request $protocol.request_fields) -or
         -not (Test-ExactFields $request.input $protocol.input_fields) -or
         $request.schema_version -ne $protocol.schema_version -or
@@ -187,13 +197,20 @@ try {
         Write-Result 'worker-response-rejected' 'worker-output-missing'
         exit 0
     }
-    $responseInfo = Get-Item -LiteralPath $responseFull
-    if ($responseInfo.Length -gt $protocol.bounds.max_response_bytes) {
-        Remove-Item -LiteralPath $responseFull -Force
-        Write-Result 'worker-response-rejected' 'worker-output-bytes-exceeded'
+    try {
+        $responseRead = Read-BoundedFile $responseFull $protocol.bounds.max_response_bytes `
+            'worker-output-missing' 'worker-output-bytes-exceeded' 'worker-output-identity-changed'
+    }
+    catch {
+        if (Test-Path -LiteralPath $responseFull) { Remove-Item -LiteralPath $responseFull -Force }
+        $responseCode = [string]$_.Exception.Message
+        if ($responseCode -notin @('worker-output-missing', 'worker-output-bytes-exceeded', 'worker-output-identity-changed')) {
+            $responseCode = 'worker-output-malformed'
+        }
+        Write-Result 'worker-response-rejected' $responseCode
         exit 0
     }
-    $responseText = Get-Content -LiteralPath $responseFull -Raw
+    $responseText = [Text.Encoding]::UTF8.GetString($responseRead.Bytes)
     try { $response = $responseText | ConvertFrom-Json -DateKind String }
     catch {
         Remove-Item -LiteralPath $responseFull -Force

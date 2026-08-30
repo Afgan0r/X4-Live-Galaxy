@@ -1,4 +1,6 @@
 Set-StrictMode -Version Latest
+$boundedReaderPath = Join-Path $PSScriptRoot 'bounded-file.psm1'
+Import-Module $boundedReaderPath -Force
 $ErrorActionPreference = 'Stop'
 
 $script:ProductionRootId = 'live-galaxy-owner-root-v1'
@@ -80,14 +82,10 @@ function Read-AuthorityJson([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw [IO.FileNotFoundException]::new('authority contract missing')
     }
-    Assert-NoReparsePath $Path
-    $item = Get-Item -LiteralPath $Path -Force
-    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -gt 32768) {
-        throw [IO.InvalidDataException]::new('authority contract path rejected')
-    }
-    $value = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
-    Assert-NoReparsePath $Path
-    return $value
+    $read = Read-BoundedFile $Path 32768 'authority contract path rejected' `
+        'authority contract path rejected' 'authority contract identity changed' `
+        -ReparseCode 'OWNER_ROOT_PATH_REJECTED'
+    return [Text.Encoding]::UTF8.GetString($read.Bytes) | ConvertFrom-Json
 }
 
 function Test-ExactAnchorPolicy($Anchor) {

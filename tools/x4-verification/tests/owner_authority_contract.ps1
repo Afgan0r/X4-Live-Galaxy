@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Stop'
 
 $toolRoot = Split-Path -Parent $PSScriptRoot
 $modulePath = Join-Path $toolRoot 'local-attestation.psm1'
+$boundedReaderPath = Join-Path $toolRoot 'bounded-file.psm1'
 $anchorPath = Join-Path $toolRoot 'contracts/owner-root-anchor.v1.json'
 $certificatePath = Join-Path $toolRoot 'contracts/delegated-purpose-certificate.v1.json'
 $fixturePath = Join-Path $PSScriptRoot 'fixtures/test-owner-root-fixture.v1.json'
@@ -81,6 +82,7 @@ $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-root-swap-{0}" -f
 [void](New-Item -ItemType Directory -Path (Join-Path $tempRoot 'contracts') -Force)
 try {
     Copy-Item -LiteralPath $modulePath -Destination (Join-Path $tempRoot 'local-attestation.psm1')
+    Copy-Item -LiteralPath $boundedReaderPath -Destination (Join-Path $tempRoot 'bounded-file.psm1')
     Copy-Item -LiteralPath $producerModulePath -Destination (Join-Path $tempRoot 'producer-attestation.psm1')
     $swapped = $fixture.root_anchor | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     $swapped.root_id = 'live-galaxy-owner-root-v1'

@@ -23,9 +23,11 @@
     "dispatcher_digest",
     "adapter_digest",
     "attestation_module_digest",
+    "bounded_reader_digest",
     "worker_digest",
     "launcher_digest",
     "worker_protocol_digest",
+    "package_conformance",
     "generated_files"
   ],
   "required_digests": [
@@ -40,6 +42,7 @@
     "dispatcher_digest",
     "adapter_digest",
     "attestation_module_digest",
+    "bounded_reader_digest",
     "worker_digest",
     "launcher_digest",
     "worker_protocol_digest"
@@ -51,6 +54,7 @@
     "lua/live_galaxy_candidate_runner.lua",
     "tools/x4-verification/candidate-adapters.psm1",
     "tools/x4-verification/producer-attestation.psm1",
+    "tools/x4-verification/bounded-file.psm1",
     "tools/x4-verification/isolation/candidate-worker.ps1",
     "tools/x4-verification/isolation/invoke-candidate-worker.ps1",
     "tools/x4-verification/contracts/candidate-worker-protocol.v1.json",

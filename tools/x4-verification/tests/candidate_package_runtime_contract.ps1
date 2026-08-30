@@ -13,6 +13,7 @@ $dispatcherPath = Join-Path $root 'tools/x4-verification/run-candidate-package.p
 $adapterPath = Join-Path $root 'tools/x4-verification/candidate-adapters.psm1'
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 $procedurePath = Join-Path $root 'tests/x4-candidates/05.1-candidate-run-procedure.md'
+$manifestContractPath = Join-Path $root 'tools/x4-verification/contracts/candidate-build-manifest.v1.json'
 $expectedIds = @(
     'p051-cadence-seta',
     'p051-lifecycle-reload',
@@ -124,6 +125,51 @@ function Test-Adapters {
     try {
         $build = Invoke-JsonCommand $builderPath @('-BuildRoot', $buildRoot, '-MatrixPath', $matrixPath)
         Assert-True ($build.verdict -in @('generated', 'pass')) 'Candidate builder failed before dispatcher verification.'
+        $attackGroupRoot = Join-Path $buildRoot 'p051-build-lifecycle'
+        $attackManifestPath = Join-Path $attackGroupRoot 'manifest/build-manifest.v1.json'
+        [byte[]]$originalManifestBytes = [IO.File]::ReadAllBytes($attackManifestPath)
+        $manifestContract = Get-Content -LiteralPath $manifestContractPath -Raw | ConvertFrom-Json
+        $boundCases = @(
+            [pscustomobject]@{
+                Name = 'generated-count-max-plus-one'; Code = 'GENERATED_BOUNDS_EXCEEDED'
+                Mutate = { param($manifest)
+                    $extra = $manifest.generated_files[0]
+                    $manifest.generated_files = @($manifest.generated_files) + @(
+                        $extra
+                    ) * ($manifestContract.bounds.max_generated_files + 1 - @($manifest.generated_files).Count)
+                }
+            },
+            [pscustomobject]@{
+                Name = 'generated-file-bytes-max-plus-one'; Code = 'GENERATED_FILE_BYTES_EXCEEDED'
+                Mutate = { param($manifest)
+                    $manifest.generated_files[0].bytes = $manifestContract.bounds.max_generated_file_bytes + 1
+                }
+            },
+            [pscustomobject]@{
+                Name = 'generated-total-bytes-max-plus-one'; Code = 'GENERATED_BOUNDS_EXCEEDED'
+                Mutate = { param($manifest)
+                    foreach ($file in @($manifest.generated_files)) {
+                        $file.bytes = $manifestContract.bounds.max_generated_file_bytes
+                    }
+                }
+            }
+        )
+        foreach ($boundCase in $boundCases) {
+            $manifest = [Text.Encoding]::UTF8.GetString($originalManifestBytes) |
+                ConvertFrom-Json -Depth 64 -DateKind String
+            & $boundCase.Mutate $manifest
+            [IO.File]::WriteAllText($attackManifestPath,
+                ($manifest | ConvertTo-Json -Compress -Depth 64), [Text.UTF8Encoding]::new($false))
+            $attackOutput = Join-Path $outputRoot "$($boundCase.Name).jsonl"
+            $rejected = Invoke-JsonCommand $dispatcherPath @(
+                '-GroupRoot', $attackGroupRoot, '-OutputPath', $attackOutput
+            ) 1
+            Assert-True ($rejected.reason_code -eq $boundCase.Code) `
+                "Dispatcher returned '$($rejected.reason_code)' for '$($boundCase.Name)'."
+            Assert-True (-not (Test-Path -LiteralPath $attackOutput)) `
+                "Rejected dispatcher bound '$($boundCase.Name)' wrote evidence."
+        }
+        [IO.File]::WriteAllBytes($attackManifestPath, $originalManifestBytes)
         $expectedCommand = 'pwsh -NoProfile -File tools/x4-verification/run-candidate-package.ps1 -GroupRoot $GroupRoot -OutputPath $PrivateJsonlPath'
         Assert-True ((Get-Content -LiteralPath $procedurePath -Raw).Contains($expectedCommand)) `
             'Human handoff does not name the repository-fixed dispatcher call chain.'

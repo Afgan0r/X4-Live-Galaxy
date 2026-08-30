@@ -12,6 +12,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'local-attestation.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'bounded-file.psm1') -Force
 
 function Write-Failure([string]$Status) {
     [pscustomobject][ordered]@{
@@ -25,11 +26,13 @@ function Write-Failure([string]$Status) {
 
 try {
     if (-not (Test-Path -LiteralPath $DossierPath -PathType Leaf)) { Write-Failure 'OWNER_OVERRIDE_DOSSIER_MISSING' }
-    $item = Get-Item -LiteralPath $DossierPath -Force
-    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -gt 65536) {
-        Write-Failure 'OWNER_OVERRIDE_DOSSIER_INVALID'
+    try {
+        $dossierRead = Read-BoundedFile $DossierPath 65536 `
+            'OWNER_OVERRIDE_DOSSIER_INVALID' 'OWNER_OVERRIDE_DOSSIER_INVALID' `
+            'OWNER_OVERRIDE_DOSSIER_IDENTITY_CHANGED'
     }
-    [byte[]]$dossierBytes = [IO.File]::ReadAllBytes($item.FullName)
+    catch { Write-Failure ([string]$_.Exception.Message) }
+    [byte[]]$dossierBytes = $dossierRead.Bytes
     $dossier = [Text.Encoding]::UTF8.GetString($dossierBytes) | ConvertFrom-Json
     if ($dossier.PSObject.Properties.Name -notcontains 'dossier_id' -or
         $dossier.PSObject.Properties.Name -notcontains 'findings') {

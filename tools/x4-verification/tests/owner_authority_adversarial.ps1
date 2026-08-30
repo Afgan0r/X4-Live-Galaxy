@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 
 $toolRoot = Split-Path -Parent $PSScriptRoot
 $modulePath = Join-Path $toolRoot 'local-attestation.psm1'
+$boundedReaderPath = Join-Path $toolRoot 'bounded-file.psm1'
 $admissionPath = Join-Path $toolRoot 'x4-admission.ps1'
 $signerPath = Join-Path $toolRoot 'new-owner-override.ps1'
 $fixturePath = Join-Path $PSScriptRoot 'fixtures/test-owner-root-fixture.v1.json'
@@ -93,6 +94,7 @@ function Invoke-CopiedAnchorProbe($Anchor) {
     [void](New-Item -ItemType Directory -Path (Join-Path $copyRoot 'contracts') -Force)
     try {
         Copy-Item -LiteralPath $modulePath -Destination (Join-Path $copyRoot 'local-attestation.psm1')
+        Copy-Item -LiteralPath $boundedReaderPath -Destination (Join-Path $copyRoot 'bounded-file.psm1')
         Copy-Item -LiteralPath $producerModulePath -Destination (Join-Path $copyRoot 'producer-attestation.psm1')
         $Anchor | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $copyRoot 'contracts/owner-root-anchor.v1.json') -Encoding utf8NoBOM
         Copy-Item -LiteralPath $certificatePath -Destination (Join-Path $copyRoot 'contracts/delegated-purpose-certificate.v1.json')
@@ -126,6 +128,7 @@ $probeRoot = Join-Path $junctionRoot 'probe'
 [void](New-Item -ItemType Directory -Path $probeRoot -Force)
 try {
     Copy-Item -LiteralPath $modulePath -Destination (Join-Path $probeRoot 'local-attestation.psm1')
+    Copy-Item -LiteralPath $boundedReaderPath -Destination (Join-Path $probeRoot 'bounded-file.psm1')
     Copy-Item -LiteralPath $producerModulePath -Destination (Join-Path $probeRoot 'producer-attestation.psm1')
     $swapped = $fixture.root_anchor | ConvertTo-Json -Depth 8 | ConvertFrom-Json
     $swapped.root_id = 'live-galaxy-owner-root-v1'

@@ -11,7 +11,10 @@ Set-StrictMode -Version Latest
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $protocolPath = Join-Path $root 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $adapterModulePath = Join-Path $root 'tools/x4-verification/candidate-adapters.psm1'
-$protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
+$boundedReaderPath = Join-Path $root 'tools/x4-verification/bounded-file.psm1'
+Import-Module $boundedReaderPath -Force
+$protocolRead = Read-BoundedFile $protocolPath 32768 'worker-protocol-invalid'
+$protocol = [Text.Encoding]::UTF8.GetString($protocolRead.Bytes) | ConvertFrom-Json
 
 function Test-ExactFields([psobject]$Value, [string[]]$Expected) {
     if ($null -eq $Value -or $Value -isnot [pscustomobject]) { return $false }
@@ -38,9 +41,12 @@ function Write-AtomicSidecar([string]$Path, [string]$Text) {
     Move-Item -LiteralPath $temporaryPath -Destination $Path
 }
 
-$requestInfo = Get-Item -LiteralPath $RequestPath -ErrorAction Stop
-if ($requestInfo.Length -gt $protocol.bounds.max_request_bytes) { exit 20 }
-$request = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json -DateKind String
+try {
+    $requestRead = Read-BoundedFile $RequestPath $protocol.bounds.max_request_bytes `
+        'request-path-invalid' 'request-bytes-exceeded' 'request-identity-changed'
+}
+catch { exit 20 }
+$request = [Text.Encoding]::UTF8.GetString($requestRead.Bytes) | ConvertFrom-Json -DateKind String
 if (-not (Test-ExactFields $request $protocol.request_fields)) { exit 21 }
 if (-not (Test-ExactFields $request.input $protocol.input_fields)) { exit 22 }
 if ($request.schema_version -ne $protocol.schema_version) { exit 23 }

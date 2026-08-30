@@ -128,7 +128,7 @@ try {
         else {
             $swapResult = @($swapText | Where-Object { $_.ToString().TrimStart().StartsWith('{') })[-1] |
                 ConvertFrom-Json -Depth 8
-            Assert-True ($swapResult.reason_code -in @('COMPONENT_DIGEST_MISMATCH', 'SNAPSHOT_DIGEST_MISMATCH')) `
+            Assert-True ($swapResult.reason_code -in @('PATH_IDENTITY_CHANGED', 'COMPONENT_DIGEST_MISMATCH', 'SNAPSHOT_DIGEST_MISMATCH')) `
                 "Synchronized swap returned unstable rejection: $($swapResult.reason_code)"
             Assert-True (-not (Test-Path -LiteralPath $swapOutputPath)) 'Rejected swap left an evidence artifact.'
         }
@@ -194,7 +194,7 @@ try {
         }
         $coordinated = Invoke-Dispatcher $groupRoot $coordinatedOutput 1
         Assert-True ($coordinated.reason_code -eq 'COMPONENT_DIGEST_MISMATCH') `
-            'Coordinated component and manifest forgery was not rejected.'
+            "Coordinated component and manifest forgery returned '$($coordinated.reason_code)'."
         Assert-True (-not (Test-Path -LiteralPath $coordinatedMarker)) `
             'Coordinated forged component executed before rejection.'
         Assert-True (-not (Test-Path -LiteralPath $coordinatedOutput)) `
@@ -245,7 +245,7 @@ try {
             )
             $forged = Invoke-Dispatcher $groupRoot $forgedOutput 1
             Assert-True ($forged.reason_code -eq 'COMPONENT_DIGEST_MISMATCH') `
-                "Coordinated $($case.Name) and manifest forgery was not rejected."
+                "Coordinated $($case.Name) forgery returned '$($forged.reason_code)'."
             Assert-True (-not (Test-Path -LiteralPath $forgedOutput)) `
                 "Coordinated $($case.Name) forgery published evidence."
             Assert-True (-not (Test-Path -LiteralPath "$forgedOutput.attestation.json")) `
