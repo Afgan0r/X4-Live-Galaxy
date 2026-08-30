@@ -16,6 +16,9 @@ $registryPath = Join-Path $contractsRoot 'known-failures.v1.json'
 $coveragePath = Join-Path $contractsRoot 'coverage.v1.json'
 $fixturePath = Join-Path $toolRoot 'fixtures/negative-fixtures.v1.json'
 $overrideContractPath = Join-Path $contractsRoot 'owner-override.v1.json'
+$authorityModulePath = Join-Path $toolRoot 'local-attestation.psm1'
+$newOverridePath = Join-Path $toolRoot 'new-owner-override.ps1'
+$testAuthorityFixturePath = Join-Path $PSScriptRoot 'fixtures/test-owner-root-fixture.v1.json'
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 $ledgerPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
 
@@ -134,7 +137,7 @@ if ($Case -eq 'negative-fixtures') {
     $requiredPaths += @($coveragePath, $fixturePath)
 }
 if ($Case -eq 'admission') {
-    $requiredPaths += @($coveragePath, $fixturePath, $overrideContractPath)
+    $requiredPaths += @($coveragePath, $fixturePath, $overrideContractPath, $authorityModulePath, $newOverridePath, $testAuthorityFixturePath)
 }
 if ($Case -eq 'evidence-chain') {
     $requiredPaths += @($coveragePath, $fixturePath, $ledgerPath, $matrixPath)
@@ -213,6 +216,7 @@ if ($Case -eq 'evidence-chain') {
 }
 
 if ($Case -eq 'admission') {
+    Import-Module $authorityModulePath -Force
     $coverage = Get-Content -LiteralPath $coveragePath -Raw -Encoding utf8 | ConvertFrom-Json
     $fixtures = Get-Content -LiteralPath $fixturePath -Raw -Encoding utf8 | ConvertFrom-Json
     $override = Get-Content -LiteralPath $overrideContractPath -Raw -Encoding utf8 | ConvertFrom-Json
@@ -229,13 +233,61 @@ if ($Case -eq 'admission') {
     Assert-Rejected $blocked 'KNOWN_FAILURE_BLOCKED' 'known failure without override'
     Assert-True ($blocked.InputDigestBefore -eq $blocked.InputDigestAfter) 'Admission mutated the source dossier.'
 
-    $override.dossier_id = $knownFailure.dossier_id
-    $override.dossier_digest = '__DOSSIER_DIGEST__'
-    $override.finding_id = 'finding-small-loader-exception'
-    $override.expires_at = [DateTimeOffset]::UtcNow.AddDays(30).ToString('yyyy-MM-ddTHH:mm:ssZ')
-    $disabled = Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $override
-    Assert-Rejected $disabled 'OWNER_OVERRIDE_DISABLED' 'fabricated local owner override'
-    Write-Output 'PASS: owner override disabled contract'
+    $dossierBytes = [Text.Encoding]::UTF8.GetBytes(($knownFailure | ConvertTo-Json -Depth 32))
+    $dossierDigest = ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($dossierBytes))).ToLowerInvariant()
+    $issuedAt = [DateTimeOffset]::UtcNow.AddMinutes(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    $expiresAt = [DateTimeOffset]::UtcNow.AddDays(30).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    $payload = [pscustomobject][ordered]@{
+        schema_version = 'x4-owner-override.v1'
+        override_id = 'owner-override-test-exact'
+        authority_purpose = 'owner-override'
+        delegation_certificate_id = 'test-only-owner-override-delegation'
+        dossier_id = $knownFailure.dossier_id
+        dossier_digest = $dossierDigest
+        finding_id = 'finding-small-loader-exception'
+        owner_decision_id = 'owner-decision-test-exact'
+        decision = 'accept-risk'
+        rationale = 'TEST-ONLY exact acceptance for the isolated evaluator contract.'
+        remaining_risk = 'TEST-ONLY loader mismatch remains isolated to this exact finding.'
+        issued_at = $issuedAt
+        expires_at = $expiresAt
+        nonce = 'test-only-nonce-0001'
+        signature_algorithm = 'ECDSA_P256_SHA256'
+    }
+    $signed = New-TestOnlyOwnerOverrideEnvelope -Payload $payload -FixturePath $testAuthorityFixturePath
+    $verified = Test-TestOnlyExactOwnerOverride -Override $signed -FixturePath $testAuthorityFixturePath -ExpectedDossierId $knownFailure.dossier_id -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
+    Assert-True ($verified.status -eq 'OWNER_OVERRIDE_VERIFIED') 'Exact TEST-ONLY cryptographic/evaluator core did not pass.'
+    Assert-True (($verified.overridden_finding_ids -join '|') -eq 'finding-small-loader-exception') 'Exact override changed the wrong finding.'
+    $replayed = Test-TestOnlyExactOwnerOverride -Override $signed -FixturePath $testAuthorityFixturePath -ExpectedDossierId $knownFailure.dossier_id -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
+    Assert-True ($replayed.status -eq 'OWNER_OVERRIDE_VERIFIED') 'Unchanged exact decision was not idempotent.'
+
+    $productionAttempt = Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $signed
+    Assert-Rejected $productionAttempt 'OWNER_ROOT_UNCONFIGURED' 'TEST-ONLY root at production admission'
+
+    foreach ($mutation in @(
+        @{ field = 'finding_id'; value = 'finding-stale'; code = 'OVERRIDE_SCOPE_MISMATCH' },
+        @{ field = 'dossier_digest'; value = ('0' * 64); code = 'OVERRIDE_DIGEST_MISMATCH' },
+        @{ field = 'decision'; value = 'auto-admit-small-change'; code = 'INVALID_OWNER_DECISION' },
+        @{ field = 'rationale'; value = 'altered rationale'; code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' },
+        @{ field = 'remaining_risk'; value = 'altered risk'; code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' },
+        @{ field = 'expires_at'; value = [DateTimeOffset]::UtcNow.AddDays(60).ToString('yyyy-MM-ddTHH:mm:ssZ'); code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' },
+        @{ field = 'nonce'; value = 'test-only-nonce-0002'; code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' }
+    )) {
+        $altered = Copy-Json $signed
+        $altered.($mutation.field) = $mutation.value
+        $result = Test-TestOnlyExactOwnerOverride -Override $altered -FixturePath $testAuthorityFixturePath -ExpectedDossierId $knownFailure.dossier_id -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
+        Assert-True ($result.status -eq $mutation.code) "Altered $($mutation.field) returned $($result.status), expected $($mutation.code)."
+    }
+
+    $transplant = Test-TestOnlyExactOwnerOverride -Override $signed -FixturePath $testAuthorityFixturePath -ExpectedDossierId 'different-dossier' -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
+    Assert-True ($transplant.status -eq 'OVERRIDE_SCOPE_MISMATCH') 'Signature transplant to another dossier was accepted.'
+
+    $newOverrideCommand = Get-Command $newOverridePath
+    foreach ($forbiddenParameter in @('AnchorPath', 'RootPath', 'PublicKeyPath', 'KeyName', 'Sid', 'TestMode', 'VerifierPath')) {
+        Assert-True ($newOverrideCommand.Parameters.Keys -notcontains $forbiddenParameter) "Production signer exposes forbidden $forbiddenParameter parameter."
+    }
+
+    Write-Output 'PASS: authenticated exact owner override contract'
     exit 0
 
     foreach ($field in @('schema_version', 'override_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'expires_at')) {
