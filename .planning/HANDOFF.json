@@ -1,37 +1,38 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-30T15:55:08.9080572+07:00",
+  "timestamp": "2026-08-30T12:44:22.234Z",
   "phase": "05.2",
   "phase_name": "layered-lua-and-x4-verification-foundation-inserted",
   "phase_dir": ".planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted",
   "plan": 9,
-  "task": 3,
-  "total_tasks": 3,
+  "task": 5,
+  "total_tasks": 8,
   "status": "paused",
   "completed_tasks": [
     {"id": 1, "name": "Execute Plans 01-09", "status": "done", "commit": "29ebfd2"},
-    {"id": 2, "name": "Serialize Plan 08 producer authority closure", "status": "done", "commit": "7f42ce8"},
-    {"id": 3, "name": "Apply first final-review fix set", "status": "done", "commit": "aaca3e1"}
+    {"id": 2, "name": "Close all final code-review findings through three adversarial fix iterations", "status": "done", "commit": "331c023"},
+    {"id": 3, "name": "Obtain independent CLEAN deep review", "status": "done", "commit": "8e23f19"},
+    {"id": 4, "name": "Rerun Nyquist and security audits", "status": "done", "progress": "Nyquist PARTIAL with one isolation race; security OPEN_THREATS with one blocking retention gap and four medium bounds"}
   ],
   "remaining_tasks": [
-    {"id": 4, "name": "Fix three P1 findings and add executable held-out coverage", "status": "not_started"},
-    {"id": 5, "name": "Obtain CLEAN code review", "status": "not_started"},
-    {"id": 6, "name": "Rerun Nyquist, security, and phase verifier", "status": "not_started"},
-    {"id": 7, "name": "Close Phase 05.2 state and roadmap", "status": "not_started"}
+    {"id": 5, "name": "Make descendant PID readiness deterministic in the isolation timeout test", "status": "not_started"},
+    {"id": 6, "name": "Rerun canonical package conformance during retention and close four pre-allocation byte bounds", "status": "not_started"},
+    {"id": 7, "name": "Rerun CLEAN review, Nyquist, and security after gap closure", "status": "not_started"},
+    {"id": 8, "name": "Run phase verifier and close STATE/ROADMAP only after every gate passes", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "Coordinated adapter plus manifest digest forgery can execute a substituted adapter and publish PASS.", "type": "technical", "workaround": "Anchor executable component digests in authenticated producer authority rather than a caller-rewritable manifest; add a black-box forgery test."},
-    {"description": "Identity and volume adapters still return hard-coded observations for valid alternate fixtures.", "type": "technical", "workaround": "Derive observations from bounded inputs and add independent metamorphic fixtures."},
-    {"description": "Producer chronology accepts completed_at in the future when started_at is current.", "type": "technical", "workaround": "Bound all signed timestamps against verification time and test a valid unchanged signature with future completion."}
+    {"description": "Nyquist R4 is not compliant: candidate isolation timeout testing races child PID sidecar publication and failed three focused runs even though the aggregate passed once.", "type": "technical", "workaround": "Add a deterministic descendant-readiness handshake before the timeout deadline and retain the existing process-tree termination assertion."},
+    {"description": "Security T-05.2-15 remains open at high severity: retention trusts an embedded conformance object and three hashes instead of rerunning the canonical package-conformance graph verifier.", "type": "technical", "workaround": "Invoke the fixed canonical verifier or an exactly equivalent full graph walk against the retained build root, with an embedded-only forgery regression."},
+    {"description": "Security T-05.2-03, T-05.2-07, T-05.2-16, and T-05.2-20 remain open below the blocking threshold because byte limits are checked after ReadAllBytes allocation.", "type": "technical", "workaround": "Check bounded file length before allocation in admission, conformance, build, and retention readers, then add oversized sparse-file regressions."}
   ],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 05.2 precedes further Phase 05.1 work.", "rationale": "The X4 human probe requires a trustworthy package, runner, failure registry, retention, and admission foundation first.", "phase": "05.2"},
-    {"decision": "Production owner authority remains unconfigured.", "rationale": "No agent may fabricate or perform the owner-controlled root and delegated-key ceremony.", "phase": "05.2"},
-    {"decision": "Local evidence remains authenticated-local-contract or chain-verified-x4-pending, never observed-in-X4.", "rationale": "No X4 runtime or save was accessed during Phase 05.2.", "phase": "05.2"}
+    {"decision": "Phase 05.2 remains before further Phase 05.1 X4 work.", "rationale": "The human X4 candidate run needs trustworthy package, isolation, retention, and admission gates first.", "phase": "05.2"},
+    {"decision": "Production authority remains unconfigured.", "rationale": "No agent may fabricate or perform the owner-controlled root and delegated-key ceremony.", "phase": "05.2"},
+    {"decision": "A green aggregate does not override a repeatedly failing focused behavioral gate.", "rationale": "The Nyquist auditor reproduced the isolation child-PID race three times while one aggregate run passed by timing luck.", "phase": "05.2"}
   ],
   "uncommitted_files": [],
-  "next_action": "Read 05.2-REVIEW.md, reproduce its three P1 findings, create a narrowly scoped GSD fix plan, and require executable held-out tests before another clean review.",
-  "context_notes": "Plans 01-09 are implemented. Final re-review is NOT CLEAN with 3 P1 and 1 P2. All focused Phase 05.2 gates currently pass false-green; the full Lua suite reaches only the pre-existing telemetry_contract.lua:32 baseline, and the Rust size gate retains the pre-existing 231/222/226 baselines. No X4 launch, game mutation, installed-mod edit, or save access occurred."
+  "next_action": "Resume with a narrowly scoped GSD fix plan for the deterministic isolation readiness handshake and canonical retention conformance rerun; include the four related pre-allocation bounds, then repeat CLEAN review, Nyquist, security, and phase verification.",
+  "context_notes": "Current HEAD 8e23f19 is 101 commits ahead and 0 behind refreshed upstream 54e0e34. Final code review is CLEAN after three adversarial fix iterations. Nyquist returned PARTIAL: 5/6 requirements covered, R4 escalated because candidate_isolation_contract.ps1 -Case all failed three times with Child PID evidence is missing; success and response cases pass. Security returned OPEN_THREATS: 25/30 closed/documented, T-05.2-15 high blocking plus four medium pre-allocation gaps. No X4, save, installed mod, private evidence, production authority, server, watcher, or external async job is active."
 }

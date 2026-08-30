@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: paused
-stopped_at: Final re-review NOT CLEAN (3 P1, 1 P2)
-last_updated: "2026-08-30T08:55:08.908Z"
+stopped_at: CLEAN review obtained; Nyquist PARTIAL and security OPEN_THREATS
+last_updated: "2026-08-30T12:44:22.234Z"
 last_activity: 2026-08-30
-last_activity_desc: Paused after final Phase 05.2 re-review found three blocking trust and adapter defects
-state_head: aaca3e127b522a19e46278008c7cf40371ad9217
+last_activity_desc: Paused after post-CLEAN Nyquist and security audits found isolation and retention blockers
+state_head: 8e23f19d7e4bd2d772b9a018e75c73c787f35b7e
 progress:
   total_phases: 10
   completed_phases: 4
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 
 Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — PAUSED
 Plan: 9 of 9
-Status: Final review blocked by three P1 findings and one P2 coverage warning
-Last activity: 2026-08-30 — Completed Phase 05.2 Plan 05 private evidence retention and sanitized handback
+Status: CLEAN review; Nyquist PARTIAL and security blocked by one high threat
+Last activity: 2026-08-30 — Completed final review/fix convergence and post-review audits
 
 Progress: [████░░░░░░] 40%
 
@@ -183,6 +183,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-30T08:55:08.908Z
-Stopped at: Final re-review NOT CLEAN (3 P1, 1 P2)
+Last session: 2026-08-30T12:44:22.234Z
+Stopped at: CLEAN review obtained; fix Nyquist isolation race and security retention conformance gap next
 Resume file: .planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted/.continue-here.md
