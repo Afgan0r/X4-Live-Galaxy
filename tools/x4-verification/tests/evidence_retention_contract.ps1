@@ -32,6 +32,11 @@ function Get-TextDigest([string]$Value) {
     return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))).ToLowerInvariant()
 }
 
+function New-DirectoryReparsePoint([string]$Path, [string]$Target) {
+    $itemType = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+    $null = New-Item -ItemType $itemType -Path $Path -Target $Target
+}
+
 function ConvertTo-CanonicalValue($Value) {
     if ($null -eq $Value -or $Value -is [string] -or $Value -is [bool] -or
         $Value -is [byte] -or $Value -is [int16] -or $Value -is [int32] -or
@@ -210,6 +215,7 @@ foreach ($required in @($retentionPath, $sanitizedContractPath, $builderPath, $d
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-retention-contract-{0}" -f [guid]::NewGuid().ToString('N'))
 $buildRoot = Join-Path $scratch 'builds'
+$reparseRoot = Join-Path $scratch 'reparse-root'
 $null = New-Item -ItemType Directory -Path $scratch
 try {
     $builderOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1)
@@ -226,6 +232,13 @@ try {
     $evidencePath = Join-Path $scratch 'runtime-evidence.jsonl'
     $validStream = New-EvidenceStream $manifest $runId
     Write-Utf8NoBom $evidencePath $validStream
+
+    $reparseTarget = Join-Path $scratch 'reparse-target'
+    $null = New-Item -ItemType Directory -Path $reparseTarget
+    New-DirectoryReparsePoint $reparseRoot $reparseTarget
+    $reparseOutput = Invoke-Retention $evidencePath $manifestPath $reparseRoot 1
+    Assert-True (($reparseOutput -join "`n") -match '"reason_code":"DESTINATION_REPARSE_POINT_REJECTED"') 'Retention did not reject the destination reparse point.'
+    Assert-True (@(Get-ChildItem -LiteralPath $reparseTarget -Force).Count -eq 0) 'Retention wrote through a destination reparse point.'
 
     $retentionRoot = Join-Path $scratch 'retained'
     $output = @(Invoke-Retention $evidencePath $manifestPath $retentionRoot 0)
@@ -311,6 +324,7 @@ try {
     Write-Output 'PASS: evidence retention contract'
 }
 finally {
+    if (Test-Path -LiteralPath $reparseRoot) { [IO.Directory]::Delete($reparseRoot) }
     if (Test-Path -LiteralPath $scratch) {
         Remove-Item -LiteralPath $scratch -Recurse -Force
     }

@@ -71,6 +71,11 @@ function Copy-JsonValue($Value) {
     return ($Value | ConvertTo-Json -Depth 64 | ConvertFrom-Json -Depth 64)
 }
 
+function New-DirectoryReparsePoint([string]$Path, [string]$Target) {
+    $itemType = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+    $null = New-Item -ItemType $itemType -Path $Path -Target $Target
+}
+
 function Test-StringArray($Values, [int]$Minimum, [int]$Maximum, [string]$Name) {
     $array = @($Values)
     Assert-True ($array.Count -ge $Minimum -and $array.Count -le $Maximum) "$Name count is invalid."
@@ -241,7 +246,16 @@ function Test-GeneratedBuilds {
     $matrix = Read-Json $matrixPath
     Assert-ValidMatrix $matrix
     $scratch = Join-Path ([IO.Path]::GetTempPath()) ('live-galaxy-candidate-build-' + [guid]::NewGuid().ToString('N'))
+    $reparseRoot = Join-Path $scratch 'reparse-root'
     try {
+        $reparseTarget = Join-Path $scratch 'reparse-target'
+        $null = New-Item -ItemType Directory -Path $reparseTarget -Force
+        New-DirectoryReparsePoint $reparseRoot $reparseTarget
+        $null = Invoke-Builder $reparseRoot 1
+        Assert-True (@(Get-ChildItem -LiteralPath $reparseTarget -Force).Count -eq 0) 'Builder wrote through a destination reparse point.'
+        [IO.Directory]::Delete($reparseRoot)
+        [IO.Directory]::Delete($reparseTarget)
+
         $null = Invoke-Builder $scratch 0
         $roots = @(Get-ChildItem -LiteralPath $scratch -Directory | Sort-Object Name)
         Assert-True ($roots.Count -eq @($matrix.build_groups).Count) 'Builder did not create exactly one root per group.'
@@ -307,6 +321,7 @@ function Test-GeneratedBuilds {
         }
     }
     finally {
+        if (Test-Path -LiteralPath $reparseRoot) { [IO.Directory]::Delete($reparseRoot) }
         if (Test-Path -LiteralPath $scratch) {
             $resolved = [IO.Path]::GetFullPath($scratch)
             $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())

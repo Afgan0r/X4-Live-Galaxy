@@ -25,6 +25,7 @@ $matrixPath = Join-Path $repositoryRoot 'tests/x4-candidates/phase-05.1-candidat
 $dossierPath = Join-Path $PSScriptRoot 'contracts/phase-05.1-dossier.v1.json'
 $registryPath = Join-Path $PSScriptRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $PSScriptRoot 'contracts/coverage.v1.json'
+$publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
 
 $script:failureCode = 'INTERNAL_RETENTION_ERROR'
 $script:diagnosticId = 'startup'
@@ -134,8 +135,31 @@ function Test-ContainedPath([string]$Path, [string]$Parent) {
     return $full.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 
-function Resolve-SafeDestination([string]$Path) {
+function Resolve-NoReparseDestination([string]$Path) {
     $full = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $root = [IO.Path]::GetPathRoot($full)
+    $relative = $full.Substring($root.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $segments = if ([string]::IsNullOrWhiteSpace($relative)) { @() } else { @($relative -split '[\\/]+' ) }
+    $current = $root
+    $existingCount = 0
+    foreach ($segment in $segments) {
+        $next = Join-Path $current $segment
+        if (-not (Test-Path -LiteralPath $next)) { break }
+        $item = Get-Item -LiteralPath $next -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail 'DESTINATION_REPARSE_POINT_REJECTED' }
+        if (-not $item.PSIsContainer) { Fail 'DESTINATION_NOT_DIRECTORY' }
+        $current = $item.FullName
+        $existingCount += 1
+    }
+    $resolved = if (Test-Path -LiteralPath $current) { (Resolve-Path -LiteralPath $current).Path } else { $current }
+    for ($index = $existingCount; $index -lt $segments.Count; $index += 1) {
+        $resolved = Join-Path $resolved $segments[$index]
+    }
+    return [IO.Path]::GetFullPath($resolved).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+}
+
+function Resolve-SafeDestination([string]$Path) {
+    $full = Resolve-NoReparseDestination $Path
     $volume = [IO.Path]::GetPathRoot($full).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
     if ([string]::IsNullOrWhiteSpace($full) -or $full.Equals($volume, [StringComparison]::OrdinalIgnoreCase)) {
         Fail 'FILESYSTEM_ROOT_REJECTED'
@@ -143,6 +167,11 @@ function Resolve-SafeDestination([string]$Path) {
     if ($full.Equals($repositoryRoot, [StringComparison]::OrdinalIgnoreCase) -or
         (Test-ContainedPath $full $repositoryRoot)) {
         Fail 'REPOSITORY_DESTINATION_REJECTED'
+    }
+    if ($full.Equals($publicPackageRoot, [StringComparison]::OrdinalIgnoreCase) -or
+        (Test-ContainedPath $full $publicPackageRoot)) { Fail 'PUBLIC_PACKAGE_DESTINATION_REJECTED' }
+    if ($full -match '(?i)[\\/]steamapps[\\/]common[\\/]X4 Foundations(?:[\\/]|$)') {
+        Fail 'GAME_INSTALLATION_DESTINATION_REJECTED'
     }
     $segments = @($full.Split([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) | Where-Object { $_ })
     if ($segments.Count -gt 16) { Fail 'PATH_DEPTH_EXCEEDED' }

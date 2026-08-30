@@ -97,8 +97,31 @@ function Test-ContainedPath([string]$Candidate, [string]$Container) {
         $candidateFull.StartsWith($containerFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
 }
 
-function Resolve-SafeBuildRoot([string]$Path) {
+function Resolve-NoReparseDestination([string]$Path) {
     $full = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $root = [IO.Path]::GetPathRoot($full)
+    $relative = $full.Substring($root.Length).TrimStart([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $segments = if ([string]::IsNullOrWhiteSpace($relative)) { @() } else { @($relative -split '[\\/]+' ) }
+    $current = $root
+    $existingCount = 0
+    foreach ($segment in $segments) {
+        $next = Join-Path $current $segment
+        if (-not (Test-Path -LiteralPath $next)) { break }
+        $item = Get-Item -LiteralPath $next -Force
+        if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail 'DESTINATION_REPARSE_POINT_REJECTED' }
+        if (-not $item.PSIsContainer) { Fail 'DESTINATION_NOT_DIRECTORY' }
+        $current = $item.FullName
+        $existingCount += 1
+    }
+    $resolved = if (Test-Path -LiteralPath $current) { (Resolve-Path -LiteralPath $current).Path } else { $current }
+    for ($index = $existingCount; $index -lt $segments.Count; $index += 1) {
+        $resolved = Join-Path $resolved $segments[$index]
+    }
+    return [IO.Path]::GetFullPath($resolved).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+}
+
+function Resolve-SafeBuildRoot([string]$Path) {
+    $full = Resolve-NoReparseDestination $Path
     $volumeRoot = [IO.Path]::GetPathRoot($full).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
     if ([string]::IsNullOrWhiteSpace($full) -or $full.Equals($volumeRoot, [StringComparison]::OrdinalIgnoreCase)) { Fail 'FILESYSTEM_ROOT_REJECTED' }
     if (Test-ContainedPath $full $repositoryRoot) { Fail 'REPOSITORY_DESTINATION_REJECTED' }
@@ -268,6 +291,8 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     $packageId = 'live_galaxy_candidate_' + ($Group.id -replace '[^a-z0-9_]', '_')
     $buildId = "candidate-$($Group.id)-$($Group.build_profile_digest.Substring(0, 12))"
     $groupRoot = Join-Path $Destination $Group.id
+    if (-not (Test-ContainedPath $groupRoot $Destination)) { Fail 'GROUP_PATH_ESCAPE' }
+    $groupRoot = Resolve-NoReparseDestination $groupRoot
     if (-not (Test-ContainedPath $groupRoot $Destination)) { Fail 'GROUP_PATH_ESCAPE' }
     if (Test-Path -LiteralPath $groupRoot) { Remove-Item -LiteralPath $groupRoot -Recurse -Force }
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'lua') -Force
