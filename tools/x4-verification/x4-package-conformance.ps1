@@ -179,6 +179,7 @@ function Get-Imports([string]$Source) {
     $imports = [Collections.Generic.List[string]]::new()
     $constants = @{}
     $helpers = @{}
+    $helperDeclarationIndexes = @{}
     $helperRequireIndexes = @{}
     for ($i = 0; $i + 3 -lt $tokens.Count; $i++) {
         if ($tokens[$i].Value -eq 'local' -and $tokens[$i + 1].Kind -eq 'identifier' -and $tokens[$i + 2].Value -eq '=') {
@@ -215,13 +216,16 @@ function Get-Imports([string]$Source) {
             $suffix = if ($suffixStart -eq $end) { '' } else { Resolve-StaticExpression $tokens $suffixStart $end $constants }
             if ($null -eq $prefix -or $null -eq $suffix) { Fail 'DYNAMIC_REQUIRE' 'local-only' }
             $helpers[$helperName] = [pscustomobject]@{ Prefix = $prefix; Suffix = $suffix }
+            $helperDeclarationIndexes[$i + 2] = $true
             $helperRequireIndexes[$j] = $true
         }
     }
     for ($i = 0; $i -lt $tokens.Count; $i++) {
-        if ($tokens[$i].Kind -eq 'identifier' -and $helpers.ContainsKey($tokens[$i].Value) -and
-            $i + 1 -lt $tokens.Count -and $tokens[$i + 1].Value -eq '(' -and
-            -not ($i -gt 0 -and $tokens[$i - 1].Value -eq 'function')) {
+        if ($tokens[$i].Kind -eq 'identifier' -and $helpers.ContainsKey($tokens[$i].Value)) {
+            if ($helperDeclarationIndexes.ContainsKey($i)) { continue }
+            if ($i + 1 -ge $tokens.Count -or $tokens[$i + 1].Value -ne '(') {
+                Fail 'REQUIRE_HELPER_ALIAS_UNSUPPORTED' 'local-only'
+            }
             $end = $i + 2
             $depth = 1
             while ($end -lt $tokens.Count -and $depth -gt 0) {

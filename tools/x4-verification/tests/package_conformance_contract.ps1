@@ -182,6 +182,28 @@ $($dynamicHelperCalls[$helperIndex])
             Assert-True (@($dynamicHelperResult.reason_codes) -contains 'DYNAMIC_REQUIRE') "Dynamic helper call $helperIndex did not fail closed."
         }
 
+        $helperAliasUses = @(
+            'local loader = load_module; local dependency = loader("dependency")',
+            'local loader = load_module; local dependency = loader(get_name())',
+            'local loader = load_module; local loader2 = loader; local dependency = loader2("dependency")',
+            'local loaders = { load_module }; local dependency = loaders[1]("dependency")'
+        )
+        for ($aliasIndex = 0; $aliasIndex -lt $helperAliasUses.Count; $aliasIndex += 1) {
+            $helperAliasPackage = Join-Path $scratch "lexer-helper-alias-$aliasIndex"
+            $helperAliasSource = @"
+local PREFIX = "live_galaxy/lua/"
+local function load_module(name)
+    return require(PREFIX .. name)
+end
+local ffi = require("ffi")
+local C = ffi.C
+$($helperAliasUses[$aliasIndex])
+"@
+            New-SyntaxPackage $helperAliasPackage $helperAliasSource @{ 'lua/dependency.lua' = 'return {}' }
+            $helperAliasResult = Invoke-Conformance $helperAliasPackage 1
+            Assert-True (@($helperAliasResult.reason_codes) -contains 'REQUIRE_HELPER_ALIAS_UNSUPPORTED') "Require-helper alias use $aliasIndex did not fail closed."
+        }
+
         $aliasPackage = Join-Path $scratch 'lexer-alias'
         New-SyntaxPackage $aliasPackage 'local r = require; local ffi = r("ffi"); local C = ffi.C'
         $aliasResult = Invoke-Conformance $aliasPackage 1
@@ -220,6 +242,7 @@ function Test-AggregateRegistration {
         throw "Aggregate package conformance failed: $($output -join [Environment]::NewLine)"
     }
     Assert-True (@($output) -contains 'package conformance contract passed: packaged-path') 'Aggregate runner did not execute the production package contract.'
+
 }
 
 switch ($Case) {
