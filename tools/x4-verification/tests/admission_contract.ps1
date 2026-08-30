@@ -191,7 +191,6 @@ if ($Case -eq 'admission') {
     Import-Module $authorityModulePath -Force
     $coverage = Get-Content -LiteralPath $coveragePath -Raw -Encoding utf8 | ConvertFrom-Json
     $fixtures = Get-Content -LiteralPath $fixturePath -Raw -Encoding utf8 | ConvertFrom-Json
-    $override = Get-Content -LiteralPath $overrideContractPath -Raw -Encoding utf8 | ConvertFrom-Json
     $knownFailure = Copy-Json $baseDossier
     $knownFailure.dimensions[0] | Add-Member -NotePropertyName finding_ids -NotePropertyValue @('finding-small-loader-exception')
     $knownFailure.findings = @([pscustomobject]@{
@@ -238,6 +237,8 @@ if ($Case -eq 'admission') {
 
     foreach ($mutation in @(
         @{ field = 'finding_id'; value = 'finding-stale'; code = 'OVERRIDE_SCOPE_MISMATCH'; resign = $true },
+        @{ field = 'finding_id'; value = '*'; code = 'INVALID_FIELD_VALUE'; resign = $true },
+        @{ field = 'dossier_id'; value = 'different-dossier'; code = 'OVERRIDE_SCOPE_MISMATCH'; resign = $true },
         @{ field = 'dossier_digest'; value = ('0' * 64); code = 'OVERRIDE_DIGEST_MISMATCH'; resign = $true },
         @{ field = 'decision'; value = 'auto-admit-small-change'; code = 'INVALID_OWNER_DECISION'; resign = $true },
         @{ field = 'rationale'; value = 'altered rationale'; code = 'OWNER_OVERRIDE_PAYLOAD_DIGEST_MISMATCH' },
@@ -298,38 +299,6 @@ if ($Case -eq 'admission') {
     }
 
     Write-Output 'PASS: authenticated exact owner override contract'
-    exit 0
-
-    foreach ($field in @('schema_version', 'override_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'expires_at')) {
-        $missing = Copy-Json $override
-        $missing.PSObject.Properties.Remove($field)
-        Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $missing) 'MISSING_REQUIRED_FIELD' "missing override.$field"
-    }
-
-    $broad = Copy-Json $override
-    $broad.finding_id = '*'
-    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $broad) 'OVERRIDE_SCOPE_MISMATCH' 'broad override'
-
-    $stale = Copy-Json $override
-    $stale.finding_id = 'finding-stale'
-    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $stale) 'OVERRIDE_SCOPE_MISMATCH' 'stale override'
-
-    $expired = Copy-Json $override
-    $expired.expires_at = '2000-01-01T00:00:00Z'
-    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $expired) 'OVERRIDE_EXPIRED' 'expired override'
-
-    $digestMismatch = Copy-Json $override
-    $digestMismatch.dossier_digest = '0' * 64
-    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $digestMismatch) 'OVERRIDE_DIGEST_MISMATCH' 'digest-mismatched override'
-
-    $dossierMismatch = Copy-Json $override
-    $dossierMismatch.dossier_id = 'different-dossier'
-    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $dossierMismatch) 'OVERRIDE_SCOPE_MISMATCH' 'dossier-mismatched override'
-
-    $invalidDecision = Copy-Json $override
-    $invalidDecision.decision = 'auto-admit-small-change'
-    Assert-Rejected (Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $invalidDecision) 'INVALID_OWNER_DECISION' 'severity-based override'
-
     Write-Output 'PASS: owner override admission contract'
     exit 0
 }

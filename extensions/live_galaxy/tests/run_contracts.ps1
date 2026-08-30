@@ -17,8 +17,13 @@ $evidenceChainAdversarial = Join-Path $root 'tools/x4-verification/tests/evidenc
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission', 'evidence-chain')) {
-        & pwsh -NoProfile -File $admissionContract -Case $admissionCase
+        $admissionOutput = @(& pwsh -NoProfile -File $admissionContract -Case $admissionCase)
         if ($LASTEXITCODE -ne 0) { throw "X4 admission contract failed: $admissionCase" }
+        $admissionOutput | Write-Output
+        if ($admissionCase -eq 'admission' -and
+            $admissionOutput -notcontains 'PASS: owner override admission contract') {
+            throw 'X4 owner override admission marker was not reached.'
+        }
     }
     if ($Suite -eq 'x4-admission') {
         exit 0
