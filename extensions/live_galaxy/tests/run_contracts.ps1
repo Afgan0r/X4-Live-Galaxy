@@ -10,6 +10,7 @@ $admissionContract = Join-Path $root 'tools/x4-verification/tests/admission_cont
 $packageConformanceContract = Join-Path $root 'tools/x4-verification/tests/package_conformance_contract.ps1'
 $candidateBuildContract = Join-Path $root 'tools/x4-verification/tests/candidate_build_contract.ps1'
 $evidenceRetentionContract = Join-Path $root 'tools/x4-verification/tests/evidence_retention_contract.ps1'
+$candidateIsolationContract = Join-Path $root 'tools/x4-verification/tests/candidate_isolation_contract.ps1'
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission')) {
@@ -28,6 +29,11 @@ if ($Suite -in @('all', 'x4-verification')) {
         & pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase
         if ($LASTEXITCODE -ne 0) { throw "X4 evidence-retention contract failed: $retentionCase" }
     }
+}
+
+if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
+    & pwsh -NoProfile -File $candidateIsolationContract -Case all
+    if ($LASTEXITCODE -ne 0) { throw 'X4 candidate isolation contract failed.' }
 }
 
 if ($Suite -in @('all', 'x4-package-conformance', 'x4-verification')) {
@@ -119,16 +125,48 @@ $tests = if ($Suite -eq 'x4_discovery') {
 } elseif ($Suite -eq 'component_discovery') {
     @('component_discovery_contract.lua')
 } elseif ($Suite -in @('x4-candidate-runner', 'x4-verification')) {
-    @('x4_candidate_runner_contract.lua')
+    @('x4_candidate_runner_contract.lua', 'x4_candidate_runner_adversarial.lua')
 } else {
-    Get-ChildItem $PSScriptRoot -Filter '*_contract.lua' | ForEach-Object Name
+    @(
+        Get-ChildItem $PSScriptRoot -Filter '*_contract.lua' | ForEach-Object Name
+        'x4_candidate_runner_adversarial.lua'
+    )
 }
 
+$candidateMarkers = @()
 foreach ($test in $tests) {
     $path = Join-Path $PSScriptRoot $test
     $modulePath = Join-Path $root 'extensions\?.lua'
     $moduleInitPath = Join-Path $root 'extensions\?\init.lua'
     $extensionLuaPath = Join-Path $root 'extensions\live_galaxy\lua\?.lua'
-    & $lua -e "package.path = [[${modulePath};${moduleInitPath};${extensionLuaPath};]] .. package.path local cases = dofile([[${path}]]) for name, case in pairs(cases) do case() end"
+    $caseOutput = @(& $lua -e "package.path = [[${modulePath};${moduleInitPath};${extensionLuaPath};]] .. package.path local cases = dofile([[${path}]]) for name, case in pairs(cases) do case() print('PASS x4-candidate-runner:' .. name) end")
     if ($LASTEXITCODE -ne 0) { throw "Lua contract failed: $test" }
+    if ($caseOutput.Count -eq 0) { throw "Lua contract produced no behavior markers: $test" }
+    $caseOutput | ForEach-Object { Write-Output $_ }
+    if ($test -in @('x4_candidate_runner_contract.lua', 'x4_candidate_runner_adversarial.lua')) {
+        $candidateMarkers += $caseOutput
+    }
+}
+
+if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
+    $requiredCandidateMarkers = @(
+        'fixed_sha256_vectors_reject_same_length_tampering',
+        'emits_one_candidate_as_three_digest_bound_jsonl_stages',
+        'isolates_exceptions_malformed_results_and_work_unit_exhaustion',
+        'lua_instruction_watchdog_preempts_cooperative_execution_and_continues',
+        'never_passes_a_valid_but_unexpected_effect',
+        'records_protected_contract_and_effect_failure_reasons_then_continues',
+        'rejects_missing_identity_bounds_and_digest_failures_with_exact_codes',
+        'independent_contract_rejects_collapsed_verdicts_and_noncanonical_order',
+        'rejects_candidate_owned_authority_and_unattested_native_dispatch',
+        'candidate_authority_fields_never_execute',
+        'candidate_metatable_authority_never_executes',
+        'direct_native_and_dynamic_authority_fail_closed',
+        'runner_source_has_no_direct_native_binding'
+    )
+    foreach ($marker in $requiredCandidateMarkers) {
+        if ($candidateMarkers -notcontains "PASS x4-candidate-runner:$marker") {
+            throw "Required candidate behavior marker is missing: $marker"
+        }
+    }
 }

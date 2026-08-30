@@ -210,13 +210,16 @@ end
 local function ordered_candidates(candidates, context, bounds)
     local ordered, seen = {}, {}
     for _, candidate in ipairs(candidates) do
-        if type(candidate) ~= "table" then return nil, "candidate_schema_invalid" end
+        if type(candidate) ~= "table" or getmetatable(candidate) ~= nil then
+            return nil, "candidate_schema_invalid"
+        end
         for field in pairs(candidate) do
             if not CANDIDATE_FIELDS[field] then return nil, "candidate_schema_invalid" end
         end
         if not valid_string(candidate.id) or seen[candidate.id]
             or not valid_string(candidate.adapter_id) or not valid_string(candidate.source)
             or not valid_string(candidate.expected_result)
+            or type(candidate.bounds) ~= "table" or getmetatable(candidate.bounds) ~= nil
             or validate_candidate_bounds(candidate.bounds, bounds) == nil then
             return nil, "candidate_schema_invalid"
         end
