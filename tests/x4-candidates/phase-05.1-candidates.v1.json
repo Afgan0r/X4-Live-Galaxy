@@ -2,7 +2,7 @@
   "schema_version": "phase-05.1-candidates.v1",
   "matrix_id": "phase-05.1-runtime-candidates",
   "status": "runtime-pending",
-  "evidence_classification": "prepared-not-executed",
+  "evidence_classification": "scaffold-only",
   "source_inputs": [
     { "id": "coverage", "reference": "tools/x4-verification/contracts/coverage.v1.json", "sha256": "3f2d74a8aba91e390aecf38650f1866ac64fc093f5878a4f2e4e07e5c34ba715" },
     { "id": "dossier", "reference": "tools/x4-verification/contracts/phase-05.1-dossier.v1.json", "sha256": "8a7761e27ea700a5683776c9796b16d91e42a20d44acf98f6703c5033bc432da" },

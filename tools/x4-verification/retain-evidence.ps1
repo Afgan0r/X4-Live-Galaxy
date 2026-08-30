@@ -247,7 +247,7 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
     foreach ($field in @($Contracts.Manifest.required_digests)) { Require-Digest $manifest.$field }
     Require-Id $manifest.build_id
     Require-Id $manifest.group_id
-    if ($manifest.developer_only -ne $true -or $manifest.execution_status -ne 'prepared-not-executed') {
+    if ($manifest.developer_only -ne $true -or $manifest.execution_status -ne 'execution-ready') {
         Fail 'INVALID_BUILD_STATUS'
     }
     $candidateIds = Require-Array $manifest.candidate_ids $Contracts.Manifest.bounds.max_candidates 1

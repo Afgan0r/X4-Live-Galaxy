@@ -118,7 +118,7 @@ function Test-StringArray($Values, [int]$Minimum, [int]$Maximum, [string]$Code) 
 }
 
 function Assert-ValidMatrix($Matrix) {
-    if ($Matrix.status -ne 'runtime-pending' -or $Matrix.evidence_classification -ne 'prepared-not-executed') { Fail 'MATRIX_STATUS_INVALID' }
+    if ($Matrix.status -ne 'runtime-pending' -or $Matrix.evidence_classification -ne 'scaffold-only') { Fail 'MATRIX_STATUS_INVALID' }
     if ($Matrix.bounds.max_candidates -ne 7 -or @($Matrix.candidates).Count -ne 7) { Fail 'CANDIDATE_SET_INVALID' }
     if ((@($Matrix.candidates.id) -join '|') -ne ($expectedCandidateIds -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
     if (@($Matrix.build_groups).Count -lt 1 -or @($Matrix.build_groups).Count -gt $Matrix.bounds.max_groups) { Fail 'GROUP_COUNT_INVALID' }
@@ -231,10 +231,18 @@ local function initialize()
     _G.live_galaxy_candidate_build = {
         build_id = "$BuildId",
         group_id = "$GroupId",
-        native_binding = C,
-        runner = runner,
-        prepared_not_executed = true,
+        scaffold_only = true,
+        implementation_gates = {
+            "seven_candidate_adapters",
+            "external_watchdog",
+            "sha256_adapter",
+            "private_jsonl_sink",
+            "human_triggered_dispatcher",
+        },
     }
+    -- Keep source-faithful imports under static conformance without exposing a
+    -- callable runtime. A later implementation gate must supply all adapters.
+    if C == nil or runner == nil then _G.live_galaxy_candidate_build = nil end
 end
 
 Register_OnLoad_Init(initialize, "live_galaxy_candidate_$safeGroup")
@@ -307,7 +315,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         group_id = $Group.id
         candidate_ids = @($Group.candidate_ids)
         developer_only = $true
-        execution_status = 'prepared-not-executed'
+        execution_status = 'scaffold-only'
         dossier_digest = Get-FileDigest $dossierPath
         registry_digest = Get-FileDigest $registryPath
         coverage_digest = Get-FileDigest $coveragePath
@@ -335,7 +343,7 @@ function Write-Result([string]$Verdict, [string]$ReasonCode) {
         schema_version = 'candidate-build-result.v1'
         verdict = $Verdict
         reason_code = $ReasonCode
-        evidence_classification = 'prepared-not-executed'
+        evidence_classification = 'scaffold-only'
         generated_group_ids = @($script:createdGroups | Sort-Object)
     } | ConvertTo-Json -Compress -Depth 8 | Write-Output
 }

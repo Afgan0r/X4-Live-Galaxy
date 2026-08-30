@@ -502,7 +502,7 @@ function Test-EvidenceChain($Ledger, $PendingLedger, $Matrix, $ExpectedDigests) 
     if ((Require-Property $Ledger 'status') -ne 'runtime-complete') {
         Fail 'RETENTION_INCOMPLETE'
     }
-    if ((Require-Property $PendingLedger 'evidence_classification') -ne 'prepared-not-executed' -or
+    if ((Require-Property $PendingLedger 'evidence_classification') -ne 'scaffold-only' -or
         (Require-Property $Ledger 'evidence_classification') -ne 'retained-runtime-evidence') {
         Fail 'RETENTION_INCOMPLETE'
     }

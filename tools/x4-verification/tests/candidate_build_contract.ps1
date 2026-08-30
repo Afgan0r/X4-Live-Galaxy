@@ -83,7 +83,7 @@ function Test-StringArray($Values, [int]$Minimum, [int]$Maximum, [string]$Name) 
 function Assert-ValidMatrix($Matrix) {
     Assert-True ($Matrix.schema_version -eq 'phase-05.1-candidates.v1') 'Unexpected matrix schema.'
     Assert-True ($Matrix.status -eq 'runtime-pending') 'Matrix must remain runtime-pending.'
-    Assert-True ($Matrix.evidence_classification -eq 'prepared-not-executed') 'Matrix overstated runtime evidence.'
+    Assert-True ($Matrix.evidence_classification -eq 'scaffold-only') 'Matrix must remain scaffold-only until runtime adapters exist.'
     Assert-True ($Matrix.bounds.max_candidates -eq 7) 'Matrix must be bounded to the exact seven candidates.'
     Assert-True (@($Matrix.candidates).Count -eq 7) 'Matrix must contain exactly seven candidates.'
     Assert-True ((@($Matrix.candidates.id) -join '|') -eq ($expectedCandidateIds -join '|')) 'Candidates are missing, duplicated, or not sorted.'
@@ -216,7 +216,13 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     Assert-True ($manifest.build_profile_digest -eq $Group.build_profile_digest) 'Generated manifest profile linkage is invalid.'
     Assert-True ($manifest.matrix_digest -eq (Get-FileDigest $matrixPath)) 'Generated manifest matrix linkage is stale.'
     Assert-True ($manifest.runtime_evidence_schema_digest -eq (Get-FileDigest $runtimeEvidencePath)) 'Generated manifest evidence-schema linkage is stale.'
-    Assert-True ($manifest.developer_only -eq $true -and $manifest.execution_status -eq 'prepared-not-executed') 'Generated manifest overstates execution or public scope.'
+    Assert-True ($manifest.developer_only -eq $true -and $manifest.execution_status -eq 'scaffold-only') 'Generated manifest overstates execution or public scope.'
+    $entrypoint = Get-Content -LiteralPath (Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua') -Raw
+    Assert-True ($entrypoint -match 'scaffold_only = true') 'Generated entrypoint is not explicitly scaffold-only.'
+    Assert-True ($entrypoint -notmatch '(?m)^\s*runner = runner,') 'Generated entrypoint exposes a callable runner without runtime adapters.'
+    foreach ($gate in @('seven_candidate_adapters', 'external_watchdog', 'sha256_adapter', 'private_jsonl_sink', 'human_triggered_dispatcher')) {
+        Assert-True ($entrypoint -match [regex]::Escape($gate)) "Generated scaffold omits implementation gate '$gate'."
+    }
     $generatedPaths = @($manifest.generated_files.path)
     Assert-True (($generatedPaths | Sort-Object -Unique).Count -eq $generatedPaths.Count) 'Generated file manifest contains duplicates.'
     foreach ($file in @($manifest.generated_files)) {

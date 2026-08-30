@@ -36,7 +36,7 @@
     "manifest/candidate-matrix-subset.v1.json",
     "manifest/package-conformance.v1.json"
   ],
-  "execution_statuses": ["prepared-not-executed"],
+  "execution_statuses": ["scaffold-only", "execution-ready"],
   "bounds": {
     "max_candidates": 7,
     "max_generated_files": 8,

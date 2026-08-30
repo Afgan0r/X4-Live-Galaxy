@@ -187,7 +187,7 @@ if ($Case -eq 'handback') {
     }
 
     $procedure = Get-Content -LiteralPath $procedurePath -Raw -Encoding utf8
-    foreach ($requiredPhrase in @('human-only', 'disposable', 'stop condition', 'retain-evidence.ps1', 'runtime-pending')) {
+    foreach ($requiredPhrase in @('human-only', 'disposable', 'stop condition', 'retain-evidence.ps1', 'runtime-pending', 'scaffold-only', 'implementation gate')) {
         Assert-True ($procedure -match [regex]::Escape($requiredPhrase)) "Run procedure omits required boundary: $requiredPhrase"
     }
     Assert-True ($procedure -notmatch '(?i)[A-Z]:\\|/Users/|\\Users\\|savegame|successful X4 execution') 'Run procedure leaked a private path or claimed execution.'
@@ -217,6 +217,11 @@ try {
     $groupRoot = Join-Path $buildRoot 'p051-build-read-only-shared'
     $manifestPath = Join-Path $groupRoot 'manifest/build-manifest.v1.json'
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    $scaffoldEvidencePath = Join-Path $scratch 'scaffold-evidence.jsonl'
+    Write-Utf8NoBom $scaffoldEvidencePath (New-EvidenceStream $manifest 'p051-scaffold-rejected')
+    Assert-Rejected $scaffoldEvidencePath $manifestPath (Join-Path $scratch 'reject-scaffold') 'scaffold-only manifest'
+    $manifest.execution_status = 'execution-ready'
+    Write-Utf8NoBom $manifestPath ($manifest | ConvertTo-Json -Depth 32)
     $runId = 'p051-retention-contract-run'
     $evidencePath = Join-Path $scratch 'runtime-evidence.jsonl'
     $validStream = New-EvidenceStream $manifest $runId
