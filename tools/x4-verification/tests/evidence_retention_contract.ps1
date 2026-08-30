@@ -59,6 +59,22 @@ function ConvertTo-CanonicalJson($Value) {
     return (ConvertTo-CanonicalValue $Value | ConvertTo-Json -Compress -Depth 32)
 }
 
+function Set-RowDigest($Row) {
+    $payload = [ordered]@{}
+    foreach ($property in @($Row.PSObject.Properties | Sort-Object Name)) {
+        if ($property.Name -notin @('digest_algorithm', 'canonical_digest_payload', 'record_digest')) {
+            $payload[$property.Name] = $property.Value
+        }
+    }
+    $Row.canonical_digest_payload = ConvertTo-CanonicalJson $payload
+    $Row.record_digest = Get-TextDigest $Row.canonical_digest_payload
+}
+
+function Write-EvidenceRows([string]$Path, $Rows) {
+    foreach ($row in @($Rows)) { Set-RowDigest $row }
+    Write-Utf8NoBom $Path ((@($Rows | ForEach-Object { $_ | ConvertTo-Json -Compress -Depth 32 }) -join "`n") + "`n")
+}
+
 function New-EvidenceStream($Manifest, [string]$RunId) {
     $dossier = Get-Content -LiteralPath $dossierPath -Raw | ConvertFrom-Json
     $rows = [System.Collections.Generic.List[string]]::new()
@@ -260,6 +276,22 @@ try {
     $identityRows[0].build_profile_digest = '1' * 64
     Write-Utf8NoBom (Join-Path $scratch 'identity.jsonl') ((@($identityRows | ForEach-Object { $_ | ConvertTo-Json -Compress -Depth 32 }) -join "`n") + "`n")
     Assert-Rejected (Join-Path $scratch 'identity.jsonl') $manifestPath (Join-Path $scratch 'reject-identity') 'identity mismatch'
+
+    $executionRewrite = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
+    $executionRewrite[0].execution_verdict = 'fail'
+    $executionRewrite[0].failure_point = 'execution'
+    $executionRewrite[0].failure_reason = 'execution_exception'
+    $executionRewritePath = Join-Path $scratch 'execution-rewrite.jsonl'
+    Write-EvidenceRows $executionRewritePath $executionRewrite
+    Assert-Rejected $executionRewritePath $manifestPath (Join-Path $scratch 'reject-execution-rewrite') 'execution failure rewritten to pass'
+
+    $contractRewrite = @($validStream.Trim().Split("`n") | ForEach-Object { $_ | ConvertFrom-Json })
+    $contractRewrite[1].contract_verdict = 'fail'
+    $contractRewrite[1].failure_point = 'contract'
+    $contractRewrite[1].failure_reason = 'contract_rejected'
+    $contractRewritePath = Join-Path $scratch 'contract-rewrite.jsonl'
+    Write-EvidenceRows $contractRewritePath $contractRewrite
+    Assert-Rejected $contractRewritePath $manifestPath (Join-Path $scratch 'reject-contract-rewrite') 'contract failure rewritten to pass'
 
     $oversizedPath = Join-Path $scratch 'oversized.jsonl'
     Write-Utf8NoBom $oversizedPath (($validStream.TrimEnd() + "`n") * 9)

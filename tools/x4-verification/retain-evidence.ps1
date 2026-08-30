@@ -379,6 +379,28 @@ function Test-EvidenceStream([string]$Path, $Build, $Contracts) {
             $group[1].effect_verdict -ne 'not_run') {
             Fail 'INVALID_VERDICT_PROGRESSION'
         }
+        if ($group[1].execution_verdict -ne $group[0].execution_verdict -or
+            $group[2].execution_verdict -ne $group[0].execution_verdict -or
+            $group[2].contract_verdict -ne $group[1].contract_verdict) {
+            Fail 'NON_MONOTONIC_VERDICT'
+        }
+        if ($group[0].execution_verdict -ne 'pass') {
+            if ($group[1].contract_verdict -ne 'not_run' -or $group[2].contract_verdict -ne 'not_run' -or
+                $group[2].effect_verdict -ne 'not_run') { Fail 'FAILED_STAGE_CONTINUED' }
+        }
+        elseif ($group[1].contract_verdict -ne 'pass' -and $group[2].effect_verdict -ne 'not_run') {
+            Fail 'FAILED_STAGE_CONTINUED'
+        }
+        $failureRows = @($group | Where-Object { $_.failure_point -ne 'none' })
+        if ($failureRows.Count -gt 0) {
+            $firstFailure = $failureRows[0]
+            foreach ($later in @($group | Where-Object { [array]::IndexOf($group, $_) -ge [array]::IndexOf($group, $firstFailure) })) {
+                if ($later.failure_point -ne $firstFailure.failure_point -or
+                    $later.failure_reason -ne $firstFailure.failure_reason) {
+                    Fail 'FAILURE_IDENTITY_CHANGED'
+                }
+            }
+        }
         if ($group[2].effect_verdict -eq 'pass' -and $group[2].actual_result -ne $group[2].expected_result) {
             Fail 'UNEXPECTED_EFFECT_PASS'
         }
