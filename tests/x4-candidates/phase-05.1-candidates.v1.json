@@ -1,0 +1,220 @@
+{
+  "schema_version": "phase-05.1-candidates.v1",
+  "matrix_id": "phase-05.1-runtime-candidates",
+  "status": "runtime-pending",
+  "evidence_classification": "prepared-not-executed",
+  "source_inputs": [
+    { "id": "coverage", "reference": "tools/x4-verification/contracts/coverage.v1.json", "sha256": "3f2d74a8aba91e390aecf38650f1866ac64fc093f5878a4f2e4e07e5c34ba715" },
+    { "id": "dossier", "reference": "tools/x4-verification/contracts/dossier.v1.json", "sha256": "4eb006d235e903497b43d55417e6e771096b5a6ae1ccc9891b9ea176f8222eb0" },
+    { "id": "package_conformance", "reference": "tools/x4-verification/contracts/package-conformance.v1.json", "sha256": "31dae75a465d59e5835df14a258f6f0f4197c53169ac85e576ae519adf2b7b0a" },
+    { "id": "registry", "reference": "tools/x4-verification/contracts/known-failures.v1.json", "sha256": "6d797176715a7af020f1e16f2b7eee843897f26a86776d0aa5ca5e7d791e6c3b" },
+    { "id": "runtime_evidence", "reference": "tools/x4-verification/contracts/runtime-evidence.v1.json", "sha256": "ae47614e5cb616f8ff38cd8ead636cda15619087f700f21190476db65a6000a0" }
+  ],
+  "source_resolvable_exclusions": [
+    "equate-frame-budget-with-native-allocation-bound",
+    "invent-native-offset-pagination",
+    "select-production-ceiling-from-one-run",
+    "treat-emission-paging-as-discovery-paging",
+    "truncate-owner-scope"
+  ],
+  "bounds": {
+    "max_candidates": 7,
+    "max_groups": 2,
+    "max_steps_per_candidate": 8,
+    "max_stop_conditions_per_candidate": 8,
+    "max_conflicts_per_candidate": 6,
+    "max_generated_files_per_group": 8,
+    "max_generated_bytes_per_group": 196608,
+    "max_path_depth": 8,
+    "max_diagnostics": 16
+  },
+  "build_groups": [
+    {
+      "id": "p051-build-lifecycle",
+      "build_profile_digest": "6054b6d90eca4b79b5c26801f8f0d957199aeaeb1d322d7fa5fb7b1ffa6a655a",
+      "candidate_ids": ["p051-lifecycle-reload"]
+    },
+    {
+      "id": "p051-build-read-only-shared",
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "candidate_ids": [
+        "p051-cadence-seta",
+        "p051-mod-stack-compatibility",
+        "p051-native-count-fill-runtime",
+        "p051-native-fill-completeness",
+        "p051-native-identity-closure",
+        "p051-native-volume-envelope"
+      ]
+    }
+  ],
+  "candidates": [
+    {
+      "id": "p051-cadence-seta",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "How do requested cadence, real and game time, SETA, and transport backpressure correlate?",
+      "expected_result": "Every requested slice records real/game elapsed time, SETA state, accepted or dropped frame counts, and bounded health without claiming native completeness.",
+      "evidence_ids": ["primary-cadence", "precedent-cadence", "primary-volume", "precedent-volume"],
+      "failure_classifications": ["invented-unmeasured-bounds", "partial-results-represented-complete"],
+      "bounded_steps": ["start one attempt-scoped cadence trace", "sample normal-speed slices", "sample bounded SETA slices", "record accepted and dropped frames", "stop and retain health classification"],
+      "stop_conditions": ["trace bound reached", "transport unavailable", "candidate timeout", "unexpected game-state write signal"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-read-only-shared",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "exclusive_build": false,
+      "conflicts_with": ["p051-lifecycle-reload"]
+    },
+    {
+      "id": "p051-lifecycle-reload",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "Do initial load, game start, UI reload, and bridge reconnect preserve one initializer and discard incomplete work?",
+      "expected_result": "Each lifecycle transition retains one registration, never replays a partial frame, and reconnects without a save or mutation path.",
+      "evidence_ids": ["primary-lifecycle", "precedent-lifecycle", "primary-loader-failure", "precedent-loader-failure"],
+      "failure_classifications": ["loader-mismatch", "partial-results-represented-complete", "permissive-local-harness"],
+      "bounded_steps": ["register attempt-scoped lifecycle trace", "observe initial load", "observe game start", "observe one UI reload", "observe one bridge reconnect", "close trace"],
+      "stop_conditions": ["duplicate initializer", "duplicate handler", "partial frame replay", "registration mismatch", "unexpected game-state write signal"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-lifecycle",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init-lifecycle-instrumented.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6054b6d90eca4b79b5c26801f8f0d957199aeaeb1d322d7fa5fb7b1ffa6a655a",
+      "exclusive_build": true,
+      "conflicts_with": [
+        "p051-cadence-seta",
+        "p051-mod-stack-compatibility",
+        "p051-native-count-fill-runtime",
+        "p051-native-fill-completeness",
+        "p051-native-identity-closure",
+        "p051-native-volume-envelope"
+      ]
+    },
+    {
+      "id": "p051-mod-stack-compatibility",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "Does the exact installed target stack coexist with the read-only observation shell without registration, import, or identity changes?",
+      "expected_result": "The exact supported-target stack preserves package registration, import closure, native identity closure, and health-only failure behavior; the excluded Faction Enhancer suite remains unsupported.",
+      "evidence_ids": ["primary-loader", "precedent-loader", "primary-identity", "precedent-identity"],
+      "failure_classifications": ["loader-mismatch", "native-canonical-identity-mismatch", "permissive-local-harness"],
+      "bounded_steps": ["verify exact installed manifest identities", "verify static archive overlap", "start one disposable stack attempt", "observe registration and import closure", "record identity and health classification"],
+      "stop_conditions": ["manifest identity mismatch", "registration or import collision", "identity closure failure", "excluded suite enabled", "unexpected game-state write signal"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-read-only-shared",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "exclusive_build": false,
+      "conflicts_with": ["p051-lifecycle-reload"]
+    },
+    {
+      "id": "p051-native-count-fill-runtime",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "Does installed X4 expose the source-derived count/fill station calls with the recorded argument order and integral bounded returns?",
+      "expected_result": "Count and fill symbols execute through protected calls, return integral non-negative values, and no allocation occurs before count validation.",
+      "evidence_ids": ["primary-calls", "precedent-calls", "primary-binding-failure", "precedent-binding-failure"],
+      "failure_classifications": ["native-binding-assumptions", "isolated-call-shape-research"],
+      "bounded_steps": ["acquire ffi.C", "resolve count and fill symbols", "invoke protected count", "validate count before allocation", "invoke protected fill", "record closed result"],
+      "stop_conditions": ["binding unavailable", "symbol unavailable", "count non-integral", "count exceeds candidate bound", "protected call failure"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-read-only-shared",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "exclusive_build": false,
+      "conflicts_with": ["p051-lifecycle-reload"]
+    },
+    {
+      "id": "p051-native-fill-completeness",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "Does fill return exactly the requested count for one stable read, and how is mismatch classified?",
+      "expected_result": "An exact fill can proceed to member validation; any count/fill mismatch is incomplete, emits no completion marker, and records elapsed time.",
+      "evidence_ids": ["primary-completeness", "precedent-completeness", "primary-bounds-failure", "precedent-bounds-failure"],
+      "failure_classifications": ["partial-results-represented-complete", "invented-unmeasured-bounds"],
+      "bounded_steps": ["capture validated count", "allocate only within candidate bound", "invoke protected fill", "compare requested and returned counts", "record completeness and timing"],
+      "stop_conditions": ["allocation refused", "fill call failure", "fill count mismatch", "candidate timeout", "completion marker observed after partial result"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-read-only-shared",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "exclusive_build": false,
+      "conflicts_with": ["p051-lifecycle-reload"]
+    },
+    {
+      "id": "p051-native-identity-closure",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "Do returned native IDs convert to stable canonical components whose owner and sector identities close exactly?",
+      "expected_result": "Every unique native station ID converts through Lua and 64-bit forms to one exact canonical owner and sector identity before any fact is admitted.",
+      "evidence_ids": ["primary-identity", "precedent-identity", "primary-identity-failure", "precedent-identity-failure"],
+      "failure_classifications": ["native-canonical-identity-mismatch", "partial-results-represented-complete"],
+      "bounded_steps": ["convert each native ID to Lua identity", "convert each Lua identity to component-local 64-bit identity", "read canonical owner and sector", "reject duplicate or stale members", "record identity closure"],
+      "stop_conditions": ["conversion failure", "duplicate native ID", "foreign owner", "missing sector", "identity changes during attempt"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-read-only-shared",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "exclusive_build": false,
+      "conflicts_with": ["p051-lifecycle-reload"]
+    },
+    {
+      "id": "p051-native-volume-envelope",
+      "status": "runtime-pending",
+      "source_action_only": false,
+      "question": "What observed count, allocation, and elapsed-time envelope exists for the exact installed stack and chosen owner scope?",
+      "expected_result": "The attempt records observed count, candidate allocation outcome, fill consistency, and elapsed time without selecting or widening a production ceiling.",
+      "evidence_ids": ["primary-volume", "precedent-volume", "primary-bounds-failure", "precedent-bounds-failure"],
+      "failure_classifications": ["invented-unmeasured-bounds", "partial-results-represented-complete"],
+      "bounded_steps": ["record exact stack and owner scope", "read count once", "exercise only declared candidate ceilings", "record allocation and fill outcome", "record elapsed real and game time", "retain measurement classification"],
+      "stop_conditions": ["candidate ceiling exceeded", "allocation failure", "fill mismatch", "candidate timeout", "production bound mutation attempted"],
+      "verdict_axes": ["execution", "contract", "effect"],
+      "build_group": "p051-build-read-only-shared",
+      "build_profile": {
+        "content_profile": "developer-read-only-candidate-extension.v1",
+        "ui_registration_profile": "menus-register-on-load-init.v1",
+        "entrypoint": "lua/live_galaxy_candidate_entry.lua",
+        "import_root": "live_galaxy_candidate/lua/",
+        "binding_profile": "ffi-c-read-only-station-observation.v1"
+      },
+      "build_profile_digest": "6f8f1f6a3c737b639698a2eb2bace7508737c13b267e590430fa557193f20f84",
+      "exclusive_build": false,
+      "conflicts_with": ["p051-lifecycle-reload"]
+    }
+  ]
+}

@@ -56,7 +56,7 @@ function Get-ProfileDigest($Profile) {
         Assert-True (-not [string]::IsNullOrWhiteSpace($value)) "Build profile '$field' is empty."
         "$field=$value"
     }
-    Assert-True ($Profile.PSObject.Properties.Count -eq $profileFields.Count) 'Build profile contains undeclared fields.'
+    Assert-True (@($Profile.PSObject.Properties).Count -eq $profileFields.Count) 'Build profile contains undeclared fields.'
     return Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(($lines -join "`n")))
 }
 
@@ -75,7 +75,7 @@ function Test-StringArray($Values, [int]$Minimum, [int]$Maximum, [string]$Name) 
     foreach ($value in $array) {
         Assert-True ($value -is [string] -and -not [string]::IsNullOrWhiteSpace($value) -and $value.Length -le 256) "$Name contains an invalid value."
     }
-    Assert-True (($array | Sort-Object -Unique).Count -eq $array.Count) "$Name contains duplicates."
+    Assert-True (@($array | Sort-Object -Unique).Count -eq $array.Count) "$Name contains duplicates."
 }
 
 function Assert-ValidMatrix($Matrix) {

@@ -1,0 +1,62 @@
+{
+  "schema_version": "candidate-build-manifest-contract.v1",
+  "generated_schema_version": "candidate-build-manifest.v1",
+  "contract_id": "live-galaxy-candidate-build-manifest",
+  "digest_algorithm": "sha256",
+  "required_fields": [
+    "schema_version",
+    "build_id",
+    "group_id",
+    "candidate_ids",
+    "developer_only",
+    "execution_status",
+    "dossier_digest",
+    "registry_digest",
+    "coverage_digest",
+    "matrix_digest",
+    "build_profile_digest",
+    "package_conformance_digest",
+    "runtime_evidence_schema_digest",
+    "generated_files"
+  ],
+  "required_digests": [
+    "dossier_digest",
+    "registry_digest",
+    "coverage_digest",
+    "matrix_digest",
+    "build_profile_digest",
+    "package_conformance_digest",
+    "runtime_evidence_schema_digest"
+  ],
+  "required_generated_files": [
+    "content.xml",
+    "ui.xml",
+    "lua/live_galaxy_candidate_entry.lua",
+    "lua/live_galaxy_candidate_runner.lua",
+    "manifest/candidate-matrix-subset.v1.json",
+    "manifest/package-conformance.v1.json"
+  ],
+  "execution_statuses": ["prepared-not-executed"],
+  "bounds": {
+    "max_candidates": 7,
+    "max_generated_files": 8,
+    "max_generated_file_bytes": 65536,
+    "max_generated_total_bytes": 196608,
+    "max_path_depth": 8,
+    "max_diagnostics": 16
+  },
+  "prohibited_destinations": [
+    "repository-root",
+    "public-package-root",
+    "game-installation-root",
+    "filesystem-root"
+  ],
+  "prohibited_controls": [
+    "game-launch",
+    "save-access",
+    "game-mutation",
+    "acknowledgement",
+    "player-report",
+    "public-package-control"
+  ]
+}
