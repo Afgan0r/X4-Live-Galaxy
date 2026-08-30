@@ -55,6 +55,7 @@ Assert-Contract ($protocol.schema_version -eq 'candidate-worker.v1') 'Worker pro
 Assert-Contract ($protocol.bounds.max_request_bytes -le 4096) 'Request byte bound is too broad.'
 Assert-Contract ($protocol.bounds.max_response_bytes -le 8192) 'Response byte bound is too broad.'
 Assert-Contract ($protocol.native_modes -contains 'forbidden') 'Direct native mode is not explicitly forbidden.'
+Assert-Contract (@($protocol.native_modes).Count -eq 1) 'A native or in-process mode was admitted.'
 
 $workspaceRoot = Join-Path $root 'tools/.cache/candidate-isolation-contract'
 $workspace = Join-Path $workspaceRoot ([Guid]::NewGuid().ToString('N'))
@@ -105,6 +106,37 @@ try {
         Assert-Contract ($run.Result.status -eq 'worker-timeout' -and $run.Result.accepted -eq $false) 'Late success won the timeout race.'
         Start-Sleep -Milliseconds 400
         Assert-Contract (-not (Test-Path -LiteralPath $run.ResponsePath)) 'Post-timeout response became visible.'
+
+        foreach ($field in @('command', 'module', 'executable', 'native_mode')) {
+            $requestPath = Join-Path $workspace "authority-$field.request.json"
+            $responsePath = Join-Path $workspace "authority-$field.response.json"
+            $request = New-Request 'local-contract-success'
+            $request[$field] = 'forged-authority'
+            $request | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $requestPath -Encoding utf8NoBOM
+            $output = @(& pwsh -NoProfile -File $launcher -RequestPath $requestPath `
+                -ResponsePath $responsePath -DeadlineMs 1500 2>&1)
+            Assert-Contract ($LASTEXITCODE -eq 0 -and $output.Count -eq 1) "$field injection broke canonical output."
+            $result = $output[0].ToString() | ConvertFrom-Json
+            Assert-Contract ($result.status -eq 'request-rejected' -and $result.accepted -eq $false) "$field injection was accepted."
+        }
+
+        $requestPath = Join-Path $workspace 'forged-success.request.json'
+        $responsePath = Join-Path $workspace 'forged-success.response.json'
+        (New-Request 'local-contract-success') | ConvertTo-Json -Depth 8 |
+            Set-Content -LiteralPath $requestPath -Encoding utf8NoBOM
+        '{"status":"completed","actual_result":"forged"}' |
+            Set-Content -LiteralPath $responsePath -Encoding utf8NoBOM
+        $output = @(& pwsh -NoProfile -File $launcher -RequestPath $requestPath `
+            -ResponsePath $responsePath -DeadlineMs 1500 2>&1)
+        Assert-Contract ($LASTEXITCODE -eq 0 -and $output.Count -eq 1) 'Forged response broke canonical output.'
+        $result = $output[0].ToString() | ConvertFrom-Json
+        Assert-Contract ($result.status -eq 'request-rejected' -and $result.accepted -eq $false) 'Forged preexisting success was accepted.'
+
+        $launcherSource = Get-Content -LiteralPath $launcher -Raw
+        $workerSource = Get-Content -LiteralPath (Join-Path $root 'tools/x4-verification/isolation/candidate-worker.ps1') -Raw
+        Assert-Contract ($launcherSource -notmatch 'Invoke-Expression') 'Launcher admits dynamic command execution.'
+        Assert-Contract ($workerSource -notmatch 'Invoke-Expression') 'Worker admits dynamic command execution.'
+        Assert-Contract ($workerSource -notmatch 'ffi\.C') 'Worker contains a direct native binding.'
         Write-Output 'PASS candidate isolation response rejection'
     }
 }
