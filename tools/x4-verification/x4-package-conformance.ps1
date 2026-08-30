@@ -123,6 +123,18 @@ function Resolve-PackagePath([string]$LogicalPath, [string]$MissingCode = 'UNRES
     return [pscustomobject]@{ FullPath = $full; LogicalPath = $normalized }
 }
 
+function Get-LuaLongBracket([string]$Source, [int]$Index) {
+    if ($Index -ge $Source.Length -or $Source[$Index] -ne '[') { return $null }
+    $cursor = $Index + 1
+    while ($cursor -lt $Source.Length -and $Source[$cursor] -eq '=') { $cursor++ }
+    if ($cursor -ge $Source.Length -or $Source[$cursor] -ne '[') { return $null }
+    $equals = $Source.Substring($Index + 1, $cursor - $Index - 1)
+    return [pscustomobject]@{
+        ContentStart = $cursor + 1
+        Close = "]$equals]"
+    }
+}
+
 function Get-LuaTokens([string]$Source) {
     $tokens = [Collections.Generic.List[object]]::new()
     $index = 0
@@ -130,10 +142,11 @@ function Get-LuaTokens([string]$Source) {
         $character = $Source[$index]
         if ([char]::IsWhiteSpace($character)) { $index++; continue }
         if ($character -eq '-' -and $index + 1 -lt $Source.Length -and $Source[$index + 1] -eq '-') {
-            if ($index + 3 -lt $Source.Length -and $Source.Substring($index, 4) -eq '--[[') {
-                $end = $Source.IndexOf(']]', $index + 4, [StringComparison]::Ordinal)
+            $longComment = Get-LuaLongBracket $Source ($index + 2)
+            if ($null -ne $longComment) {
+                $end = $Source.IndexOf($longComment.Close, $longComment.ContentStart, [StringComparison]::Ordinal)
                 if ($end -lt 0) { Fail 'INVALID_LUA_SOURCE' }
-                $index = $end + 2
+                $index = $end + $longComment.Close.Length
             }
             else {
                 $end = $Source.IndexOf("`n", $index + 2, [StringComparison]::Ordinal)
@@ -141,11 +154,15 @@ function Get-LuaTokens([string]$Source) {
             }
             continue
         }
-        if ($character -eq '[' -and $index + 1 -lt $Source.Length -and $Source[$index + 1] -eq '[') {
-            $end = $Source.IndexOf(']]', $index + 2, [StringComparison]::Ordinal)
+        $longString = Get-LuaLongBracket $Source $index
+        if ($null -ne $longString) {
+            $end = $Source.IndexOf($longString.Close, $longString.ContentStart, [StringComparison]::Ordinal)
             if ($end -lt 0) { Fail 'INVALID_LUA_SOURCE' }
-            $tokens.Add([pscustomobject]@{ Kind = 'string'; Value = $Source.Substring($index + 2, $end - $index - 2) })
-            $index = $end + 2
+            $tokens.Add([pscustomobject]@{
+                Kind = 'string'
+                Value = $Source.Substring($longString.ContentStart, $end - $longString.ContentStart)
+            })
+            $index = $end + $longString.Close.Length
             continue
         }
         if ($character -eq '"' -or $character -eq "'") {
@@ -178,6 +195,23 @@ function Get-LuaTokens([string]$Source) {
         $tokens.Add([pscustomobject]@{ Kind = 'symbol'; Value = [string]$character }); $index++
     }
     return @($tokens)
+}
+
+function Test-ExecutableLocalFfiCBinding([object[]]$Tokens) {
+    for ($index = 0; $index + 5 -lt $Tokens.Count; $index++) {
+        $values = @($Tokens[$index..($index + 5)] | ForEach-Object Value)
+        if (($values -join '|') -ceq 'local|C|=|ffi|.|C') { return $true }
+    }
+    return $false
+}
+
+function Test-ExecutableAlternateBinding([object[]]$Tokens) {
+    for ($index = 0; $index + 2 -lt $Tokens.Count; $index++) {
+        $values = @($Tokens[$index..($index + 2)] | ForEach-Object Value)
+        if (($values[0] -cin @('globals', '_G')) -and
+            ($values -join '|') -ceq "$($values[0])|.|C") { return $true }
+    }
+    return $false
 }
 
 function Resolve-StaticExpression($Tokens, [int]$Start, [int]$End, $Constants) {
@@ -404,10 +438,11 @@ try {
     foreach ($logicalPath in $script:importGraph) {
         $source = $script:sources[$logicalPath].Source
         $imports = @(Get-Imports $source)
+        $tokens = @(Get-LuaTokens $source)
         $hasFfi = $imports -ccontains $script:contract.native_binding.module
-        $hasBinding = $source -match '(?m)^\s*local\s+C\s*=\s*ffi\.C\s*$'
+        $hasBinding = Test-ExecutableLocalFfiCBinding $tokens
         if ($hasFfi -and $hasBinding) { $bindingPaths += $logicalPath }
-        elseif ($source -match '(?:globals|_G)\.C|require\s*\([^\r\n]*binding') { $alternateBinding = $true }
+        elseif (Test-ExecutableAlternateBinding $tokens) { $alternateBinding = $true }
     }
     $bindingPolicy = if ($null -eq $script:contract.native_binding.PSObject.Properties['policy']) {
         'required'

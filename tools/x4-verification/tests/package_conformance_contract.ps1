@@ -156,6 +156,23 @@ local dependency = require(PREFIX .. "dependency")
         Assert-True ($staticResult.verdict -eq 'conformant') 'Lexer rejected supported multiline/concatenated imports or scanned comments/long strings.'
         Assert-True ($staticResult.classification -eq 'local-only') 'Alternate package root was mislabeled production-faithful.'
 
+        $bindingDecoys = [ordered]@{
+            'line-comment' = '-- local C = ffi.C'
+            'long-comment' = '--[=[ local C = ffi.C ]=]'
+            'double-quoted' = 'local decoy = "local C = ffi.C"'
+            'single-quoted' = "local decoy = 'local C = ffi.C'"
+            'long-bracket-zero' = 'local decoy = [[ local C = ffi.C ]]'
+            'long-bracket-one' = 'local decoy = [=[ local C = ffi.C ]=]'
+            'long-bracket-two' = 'local decoy = [==[ local C = ffi.C ]==]'
+        }
+        foreach ($decoy in $bindingDecoys.GetEnumerator()) {
+            $decoyPackage = Join-Path $scratch "binding-decoy-$($decoy.Key)"
+            New-SyntaxPackage $decoyPackage "local ffi = require(`"ffi`")`n$($decoy.Value)"
+            $decoyResult = Invoke-Conformance $decoyPackage 1
+            Assert-True (@($decoyResult.reason_codes) -contains 'NATIVE_BINDING_NOT_FOUND') `
+                "Inert native-binding decoy '$($decoy.Key)' satisfied package conformance."
+        }
+
         $staticHelperPackage = Join-Path $scratch 'lexer-static-helper'
         New-SyntaxPackage $staticHelperPackage @'
 local PREFIX = "live_galaxy/lua/"
