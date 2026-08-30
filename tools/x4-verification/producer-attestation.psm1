@@ -118,13 +118,15 @@ function Test-CandidateProducerPayload {
         )
     }
     catch { throw [IO.InvalidDataException]::new('PRODUCER_TIME_INVALID') }
-    if ($completed -lt $started -or $expires -le $completed -or
-        ($expires - $started) -gt [TimeSpan]::FromHours(24) -or
-        $started -gt $Now.AddMinutes(5)) {
-        throw [IO.InvalidDataException]::new('PRODUCER_CHRONOLOGY_INVALID')
-    }
     if ($Now -ge $expires) {
         throw [IO.InvalidDataException]::new('PRODUCER_ATTESTATION_EXPIRED')
+    }
+    $verificationCeiling = $Now.AddMinutes(5)
+    if ($completed -lt $started -or $completed -gt $verificationCeiling -or
+        $expires -le $verificationCeiling -or
+        ($expires - $started) -gt [TimeSpan]::FromHours(24) -or
+        $started -gt $verificationCeiling) {
+        throw [IO.InvalidDataException]::new('PRODUCER_CHRONOLOGY_INVALID')
     }
     return $true
 }

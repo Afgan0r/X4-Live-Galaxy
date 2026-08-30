@@ -516,6 +516,7 @@ try {
         @{ Name = 'missing exact field'; Apply = { param($v) $v.payload.PSObject.Properties.Remove('protocol_version') } },
         @{ Name = 'validly signed expired'; Apply = { param($v) $v.payload.started_at = $now.AddHours(-2).ToString('O'); $v.payload.completed_at = $now.AddMinutes(-90).ToString('O'); $v.payload.expires_at = $now.AddHours(-1).ToString('O') } },
         @{ Name = 'future issuance'; Apply = { param($v) $v.payload.started_at = $now.AddMinutes(10).ToString('O'); $v.payload.completed_at = $now.AddMinutes(11).ToString('O'); $v.payload.expires_at = $now.AddHours(1).ToString('O') } },
+        @{ Name = 'future completion'; Apply = { param($v) $v.payload.started_at = $now.AddMinutes(-1).ToString('O'); $v.payload.completed_at = $now.AddHours(1).ToString('O'); $v.payload.expires_at = $now.AddHours(2).ToString('O') } },
         @{ Name = 'overlong lifetime'; Apply = { param($v) $v.payload.started_at = $now.AddHours(-1).ToString('O'); $v.payload.completed_at = $now.ToString('O'); $v.payload.expires_at = $now.AddHours(24).AddMinutes(1).ToString('O') } },
         @{ Name = 'cross-certificate identity'; Apply = { param($v) $v.payload.delegation_certificate_id = 'TEST-ONLY-retention-locator' } },
         @{ Name = 'protocol confusion'; Apply = { param($v) $v.payload.protocol_version = 'candidate-worker.v2' } },
@@ -527,6 +528,10 @@ try {
         $mutationOutput = @(& pwsh -NoProfile -File $testHarnessPath -EvidencePath $evidencePath `
             -BuildManifestPath $manifestPath -DestinationRoot $mutationRoot 2>&1)
         Assert-True ($LASTEXITCODE -ne 0) "Producer mutation '$($mutation.Name)' passed retention."
+        if ($mutation.Name -eq 'future completion') {
+            Assert-True (($mutationOutput -join ' | ') -match 'PRODUCER_CHRONOLOGY_INVALID') `
+                'Future completion was not rejected by the signed chronology bound.'
+        }
         Assert-True (-not (Test-Path -LiteralPath $mutationRoot)) `
             "Producer mutation '$($mutation.Name)' left a retained artifact."
     }
