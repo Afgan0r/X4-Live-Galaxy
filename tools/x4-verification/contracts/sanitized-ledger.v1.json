@@ -12,6 +12,7 @@
     "run_id",
     "build_id",
     "group_id",
+    "evidence_classification",
     "runtime_evidence_schema_version",
     "build_manifest_schema_version",
     "verdict",
@@ -41,6 +42,7 @@
     "disposition"
   ],
   "verdict": "retained",
+  "evidence_classifications": ["authenticated-local-contract", "observed-in-X4"],
   "retention_dispositions": ["retained"],
   "candidate_dispositions": ["retain", "remove", "fallback", "repeat", "production", "runtime-pending"],
   "execution_verdicts": ["pass", "fail", "not_run"],

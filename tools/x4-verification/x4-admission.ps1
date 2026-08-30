@@ -10,6 +10,7 @@ param(
     [string]$FixturePath,
     [string]$OverridePath,
     [string]$SanitizedLedgerPath,
+    [string]$VerifiedLocatorPath,
     [string]$PendingLedgerPath,
     [string]$CandidateMatrixPath,
     [switch]$ValidateFixture
@@ -18,6 +19,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'local-attestation.psm1') -Force
+$retentionVerifierPath = Join-Path $PSScriptRoot 'retain-evidence.ps1'
 
 $maxInputBytes = 65536
 $maxEvidenceSources = 64
@@ -492,6 +494,55 @@ function Test-OwnerOverride($Override, $KnownFindings) {
 
 function Test-EvidenceChain($Ledger, $PendingLedger, $Matrix, $ExpectedDigests) {
     $script:validationContext = 'evidence-chain-structure'
+    if ($Ledger.schema_version -eq 'sanitized-ledger.v1') {
+        $ledgerFields = @(
+            'schema_version', 'ledger_id', 'run_id', 'build_id', 'group_id',
+            'evidence_classification', 'runtime_evidence_schema_version',
+            'build_manifest_schema_version', 'verdict', 'retention_disposition',
+            'identity_digests', 'candidates'
+        )
+        Require-ExactProperties $Ledger $ledgerFields
+        if ($Ledger.verdict -ne 'retained' -or $Ledger.retention_disposition -ne 'retained' -or
+            $Ledger.evidence_classification -notin @('authenticated-local-contract', 'observed-in-X4')) {
+            Fail 'RETENTION_INCOMPLETE'
+        }
+        $matrixCandidates = Require-Array (Require-Property $Matrix 'candidates') 7
+        $pendingCandidates = Require-Array (Require-Property $PendingLedger 'candidates') 7
+        $retainedCandidates = Require-Array (Require-Property $Ledger 'candidates') 7
+        if ($matrixCandidates.Count -ne 7 -or $pendingCandidates.Count -ne 7 -or $retainedCandidates.Count -lt 1) {
+            Fail 'EVIDENCE_CHAIN_INCOMPLETE'
+        }
+        $digests = Require-Property $Ledger 'identity_digests'
+        $digestFields = @(
+            'dossier_digest', 'registry_digest', 'coverage_digest', 'matrix_digest',
+            'build_profile_digest', 'package_conformance_digest',
+            'runtime_evidence_schema_digest', 'build_manifest_digest',
+            'evidence_digest', 'producer_attestation_digest', 'run_digest', 'locator_digest'
+        )
+        Require-ExactProperties $digests $digestFields
+        foreach ($name in $digestFields) { Require-Digest (Require-Property $digests $name) }
+        if ($digests.dossier_digest -ne $ExpectedDigests.dossier_digest -or
+            $digests.registry_digest -ne $ExpectedDigests.registry_digest -or
+            $digests.coverage_digest -ne $ExpectedDigests.coverage_digest -or
+            $digests.matrix_digest -ne $ExpectedDigests.matrix_digest) {
+            Fail 'IDENTITY_CHAIN_MISMATCH'
+        }
+        $expectedIds = @($matrixCandidates | Where-Object { $_.build_profile_digest -eq $digests.build_profile_digest } | ForEach-Object id | Sort-Object)
+        $actualIds = @($retainedCandidates | ForEach-Object candidate_id | Sort-Object)
+        if ($expectedIds.Count -lt 1 -or ($actualIds -join '|') -ne ($expectedIds -join '|')) {
+            Fail 'IDENTITY_CHAIN_MISMATCH'
+        }
+        foreach ($candidate in $retainedCandidates) {
+            Require-ExactProperties $candidate @('candidate_id', 'execution_verdict', 'contract_verdict', 'effect_verdict', 'disposition')
+            if ($candidate.execution_verdict -ne 'pass' -or $candidate.contract_verdict -ne 'pass' -or
+                $candidate.effect_verdict -ne 'pass' -or $candidate.disposition -ne 'retain') {
+                Fail 'FAILED_RUNTIME_VERDICT'
+            }
+            $pending = @($pendingCandidates | Where-Object { $_.id -eq $candidate.candidate_id })
+            if ($pending.Count -ne 1 -or $pending[0].status -ne 'runtime-pending') { Fail 'IDENTITY_CHAIN_MISMATCH' }
+        }
+        return $Ledger.evidence_classification
+    }
     $ledgerFields = @('schema_version', 'ledger_id', 'status', 'evidence_classification', 'candidates')
     Require-ExactProperties $Ledger $ledgerFields
     Require-ExactProperties $PendingLedger $ledgerFields
@@ -664,7 +715,7 @@ try {
         $script:validationContext = 'coverage-validation'
         Test-Coverage $coverageRead.Value $registryInfo $fixtureMap
     }
-    $evidenceInputs = @($SanitizedLedgerPath, $PendingLedgerPath, $CandidateMatrixPath)
+    $evidenceInputs = @($VerifiedLocatorPath, $PendingLedgerPath, $CandidateMatrixPath)
     $hasCompleteRuntimeInputs = @($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -eq 0
     $allowRuntimeResolution = -not $ValidateFixture -and $hasCompleteRuntimeInputs -and
         $dossierRead.Value.seam_id -ne 'validation-fixture-only'
@@ -699,8 +750,8 @@ try {
         registry = Join-Path $PSScriptRoot 'contracts/known-failures.v1.json'
         coverage = Join-Path $PSScriptRoot 'contracts/coverage.v1.json'
         fixtures = Join-Path $PSScriptRoot 'fixtures/negative-fixtures.v1.json'
-        matrix = Join-Path (Split-Path -Parent $PSScriptRoot) 'tests/x4-candidates/phase-05.1-candidates.v1.json'
-        pending = Join-Path (Split-Path -Parent $PSScriptRoot) 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
+        matrix = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tests/x4-candidates/phase-05.1-candidates.v1.json'
+        pending = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
     }
     $actualInputs = [ordered]@{
         dossier = $DossierPath; registry = $RegistryPath; coverage = $CoveragePath; fixtures = $FixturePath
@@ -714,6 +765,40 @@ try {
     }
     if (-not [string]::IsNullOrWhiteSpace($SanitizedLedgerPath)) {
         Fail 'UNVERIFIED_LEDGER_INPUT'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($VerifiedLocatorPath)) {
+        if (-not (Test-Path -LiteralPath $retentionVerifierPath -PathType Leaf)) { Fail 'RETENTION_VERIFIER_MISSING' }
+        $verifiedOutput = @(& pwsh -NoProfile -File $retentionVerifierPath -VerifyLocatorPath $VerifiedLocatorPath 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            $retentionJson = @($verifiedOutput | ForEach-Object { $_.ToString() } | Where-Object { $_.TrimStart().StartsWith('{') }) | Select-Object -Last 1
+            if ($null -eq $retentionJson) { Fail 'RETENTION_VERIFICATION_FAILED' }
+            try { $retentionResult = $retentionJson | ConvertFrom-Json -Depth 8 -DateKind String }
+            catch { Fail 'RETENTION_VERIFICATION_FAILED' }
+            if ($retentionResult.reason_code -isnot [string] -or $retentionResult.reason_code -notmatch '^[A-Z0-9_]{3,64}$') {
+                Fail 'RETENTION_VERIFICATION_FAILED'
+            }
+            Fail ([string]$retentionResult.reason_code)
+        }
+        $verifiedJson = @($verifiedOutput | ForEach-Object { $_.ToString() } | Where-Object { $_.TrimStart().StartsWith('{') })
+        if ($verifiedJson.Count -ne 1 -or [Text.Encoding]::UTF8.GetByteCount($verifiedJson[0]) -gt $maxInputBytes) {
+            Fail 'RETENTION_VERIFICATION_FAILED'
+        }
+        try { $ledger = $verifiedJson[0] | ConvertFrom-Json -Depth 32 -DateKind String }
+        catch { Fail 'RETENTION_VERIFICATION_FAILED' }
+        $matrixRead = Read-BoundedJson $CandidateMatrixPath 'phase-05.1-candidates.v1' 'UNSUPPORTED_MATRIX_SCHEMA'
+        $pendingLedgerRead = Read-BoundedJson $PendingLedgerPath 'phase-05.1-candidate-ledger.v1' 'UNSUPPORTED_LEDGER_SCHEMA'
+        $expectedDigests = [pscustomobject]@{
+            dossier_digest = $script:dossierDigest
+            registry_digest = Get-Sha256Hex $registryRead.Bytes
+            coverage_digest = Get-Sha256Hex $coverageRead.Bytes
+            matrix_digest = Get-Sha256Hex $matrixRead.Bytes
+        }
+        $classification = Test-EvidenceChain $ledger $pendingLedgerRead.Value $matrixRead.Value $expectedDigests
+        if ($classification -eq 'authenticated-local-contract') {
+            Write-Result 'chain-verified-x4-pending' @('CHAIN_VERIFIED_X4_PENDING')
+            exit 0
+        }
+        Fail 'OBSERVED_X4_EVIDENCE_INCOMPLETE'
     }
     Fail 'RUNTIME_ADMISSION_PENDING'
     if ($dossierRead.Value.seam_id -eq 'validation-fixture-only') { Fail 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' }

@@ -725,6 +725,7 @@ function New-SanitizedBase($Build, $Evidence, $Contracts, [string]$EvidenceDiges
         run_id = $Evidence.RunId
         build_id = $Build.Value.build_id
         group_id = $Build.Value.group_id
+        evidence_classification = 'authenticated-local-contract'
         runtime_evidence_schema_version = $Contracts.Runtime.schema_version
         build_manifest_schema_version = $Contracts.Manifest.generated_schema_version
         verdict = $Contracts.Sanitized.verdict
@@ -750,7 +751,8 @@ function Test-SanitizedBase($Value, $Contracts, [bool]$LocatorDigestExpected) {
     $script:diagnosticId = 'sanitized-top-fields'
     Assert-ExactFields $Value @($Contracts.Sanitized.required_fields)
     if ($Value.schema_version -ne $Contracts.Sanitized.schema_version -or $Value.verdict -ne 'retained' -or
-        $Value.retention_disposition -notin @($Contracts.Sanitized.retention_dispositions)) {
+        $Value.retention_disposition -notin @($Contracts.Sanitized.retention_dispositions) -or
+        $Value.evidence_classification -notin @($Contracts.Sanitized.evidence_classifications)) {
         Fail 'INVALID_SANITIZED_LEDGER'
     }
     foreach ($id in @('ledger_id', 'run_id', 'build_id', 'group_id')) { Require-Id $Value.$id }
