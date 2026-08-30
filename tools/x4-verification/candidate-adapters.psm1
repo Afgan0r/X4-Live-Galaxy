@@ -29,6 +29,17 @@ function Test-ExactFields($Value, [string[]]$Expected) {
         (@($Expected | Sort-Object) -join '|')
 }
 
+function Test-BoundedIdentity($Value) {
+    return $Value -is [string] -and $Value -cmatch '^[a-z0-9][a-z0-9._:-]{0,63}$'
+}
+
+function Test-Integer($Value) {
+    return $Value -is [byte] -or $Value -is [sbyte] -or
+        $Value -is [int16] -or $Value -is [uint16] -or
+        $Value -is [int32] -or $Value -is [uint32] -or
+        $Value -is [int64] -or $Value -is [uint64]
+}
+
 function New-Rejection([string]$Code) {
     return [pscustomobject]@{
         status = 'rejected'; actual_result = 'none'; completeness = 'incomplete'
@@ -104,20 +115,42 @@ function Invoke-CandidateAdapter {
         }
         'p051-native-identity-closure' {
             if (-not (Test-ExactFields $Fixture @('native_id', 'canonical_id', 'owner_id', 'canonical_owner_id')) -or
+                -not (Test-BoundedIdentity $Fixture.native_id) -or
+                -not (Test-BoundedIdentity $Fixture.canonical_id) -or
+                -not (Test-BoundedIdentity $Fixture.owner_id) -or
+                -not (Test-BoundedIdentity $Fixture.canonical_owner_id) -or
                 $Fixture.native_id -cne $Fixture.canonical_id -or
                 $Fixture.owner_id -cne $Fixture.canonical_owner_id) {
                 return New-Rejection 'adapter-identity-semantic-invalid'
             }
-            return New-Completion 'identity:closed' @('object=station-01', 'owner=argon') 4
+            $identityWorkUnits = @(
+                $Fixture.native_id, $Fixture.canonical_id,
+                $Fixture.owner_id, $Fixture.canonical_owner_id
+            ).Count
+            return New-Completion `
+                "identity:object=$($Fixture.native_id)/owner=$($Fixture.owner_id)" `
+                @("object=$($Fixture.native_id)", "owner=$($Fixture.owner_id)") `
+                $identityWorkUnits
         }
         'p051-native-volume-envelope' {
             if (-not (Test-ExactFields $Fixture @('sample_count', 'max_samples', 'payload_bytes', 'max_payload_bytes')) -or
+                -not (Test-Integer $Fixture.sample_count) -or
+                -not (Test-Integer $Fixture.max_samples) -or
+                -not (Test-Integer $Fixture.payload_bytes) -or
+                -not (Test-Integer $Fixture.max_payload_bytes) -or
                 $Fixture.sample_count -lt 1 -or $Fixture.sample_count -gt $Fixture.max_samples -or
                 $Fixture.max_samples -ne 16 -or $Fixture.payload_bytes -gt $Fixture.max_payload_bytes -or
+                $Fixture.payload_bytes -lt 1 -or
                 $Fixture.max_payload_bytes -ne 4096) {
                 return New-Rejection 'adapter-volume-bound-exceeded'
             }
-            return New-Completion 'volume:8-samples/2048-bytes' @('samples=8/16', 'bytes=2048/4096') 8
+            return New-Completion `
+                "volume:$($Fixture.sample_count)-samples/$($Fixture.payload_bytes)-bytes" `
+                @(
+                    "samples=$($Fixture.sample_count)/$($Fixture.max_samples)",
+                    "bytes=$($Fixture.payload_bytes)/$($Fixture.max_payload_bytes)"
+                ) `
+                ([int]$Fixture.sample_count)
         }
     }
 }

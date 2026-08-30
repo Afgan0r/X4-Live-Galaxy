@@ -40,7 +40,7 @@ function Get-IndependentAdapterCases {
         @{ id = 'p051-mod-stack-compatibility'; expected = 'mod-stack:declared-coexistence'; good = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') }; bad = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'faction-enhancer', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') } },
         @{ id = 'p051-native-count-fill-runtime'; expected = 'count-fill:3-of-3'; good = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta') } },
         @{ id = 'p051-native-fill-completeness'; expected = 'fill:complete=3'; good = [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ requested_count = 3; returned_count = 2; records = @('alpha', 'beta') } },
-        @{ id = 'p051-native-identity-closure'; expected = 'identity:closed'; good = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' }; bad = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-02'; owner_id = 'argon'; canonical_owner_id = 'argon' } },
+        @{ id = 'p051-native-identity-closure'; expected = 'identity:object=station-01/owner=argon'; good = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' }; bad = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-02'; owner_id = 'argon'; canonical_owner_id = 'argon' } },
         @{ id = 'p051-native-volume-envelope'; expected = 'volume:8-samples/2048-bytes'; good = [pscustomobject]@{ sample_count = 8; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 }; bad = [pscustomobject]@{ sample_count = 17; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 } }
     )
 }
@@ -62,6 +62,34 @@ function Test-Adapters {
         $closed = Invoke-CandidateAdapter -CandidateId $case.id -Fixture $case.bad -MaxWorkUnits $definition.max_work_units
         Assert-True ($closed.status -eq 'rejected' -and $closed.completeness -eq 'incomplete') "Adapter '$($case.id)' accepted a plausible semantic mismatch."
     }
+
+    $alternateIdentity = [pscustomobject]@{
+        native_id = 'ship-99'; canonical_id = 'ship-99'
+        owner_id = 'boron'; canonical_owner_id = 'boron'
+    }
+    $identityResult = Invoke-CandidateAdapter -CandidateId 'p051-native-identity-closure' `
+        -Fixture $alternateIdentity -MaxWorkUnits 16
+    $identityExpected = "identity:object=$($alternateIdentity.native_id)/owner=$($alternateIdentity.owner_id)"
+    Assert-True ($identityResult.actual_result -ceq $identityExpected) `
+        'Alternate valid identity did not derive its result from the fixture.'
+    Assert-True (($identityResult.observations -join '|') -ceq 'object=ship-99|owner=boron') `
+        'Alternate valid identity did not derive its observations from the fixture.'
+    Assert-True ($identityResult.work_units -eq 4) `
+        'Alternate valid identity reported unexpected work units.'
+
+    $alternateVolume = [pscustomobject]@{
+        sample_count = 7; max_samples = 16
+        payload_bytes = 1000; max_payload_bytes = 4096
+    }
+    $volumeResult = Invoke-CandidateAdapter -CandidateId 'p051-native-volume-envelope' `
+        -Fixture $alternateVolume -MaxWorkUnits 16
+    $volumeExpected = "volume:$($alternateVolume.sample_count)-samples/$($alternateVolume.payload_bytes)-bytes"
+    Assert-True ($volumeResult.actual_result -ceq $volumeExpected) `
+        'Alternate valid volume did not derive its result from the fixture.'
+    Assert-True (($volumeResult.observations -join '|') -ceq 'samples=7/16|bytes=1000/4096') `
+        'Alternate valid volume did not derive its observations from the fixture.'
+    Assert-True ($volumeResult.work_units -eq $alternateVolume.sample_count) `
+        'Alternate valid volume did not derive work units from the fixture.'
 
     $temp = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-plan08-runtime-" + [guid]::NewGuid().ToString('N'))
     $buildRoot = Join-Path $temp 'builds'

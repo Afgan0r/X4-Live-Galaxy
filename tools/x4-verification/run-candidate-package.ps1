@@ -152,7 +152,7 @@ function Get-LocalContractVector([string]$CandidateId) {
             return [pscustomobject]@{ Expected = 'fill:complete=3'; Fixture = [ordered]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', 'gamma') } }
         }
         'p051-native-identity-closure' {
-            return [pscustomobject]@{ Expected = 'identity:closed'; Fixture = [ordered]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' } }
+            return [pscustomobject]@{ Expected = 'identity:object=station-01/owner=argon'; Fixture = [ordered]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' } }
         }
         'p051-native-volume-envelope' {
             return [pscustomobject]@{ Expected = 'volume:8-samples/2048-bytes'; Fixture = [ordered]@{ sample_count = 8; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 } }
