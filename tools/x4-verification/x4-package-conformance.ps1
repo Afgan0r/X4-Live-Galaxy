@@ -191,20 +191,34 @@ function Get-LuaTokens([string]$Source) {
     return @($tokens)
 }
 
-function Get-ExecutableLocalFfiCBindingCount([object[]]$Tokens) {
-    $count = 0
-    for ($index = 0; $index + 5 -lt $Tokens.Count; $index++) {
-        $candidate = @($Tokens[$index..($index + 5)])
-        if ($candidate[0].Value -ceq 'local' -and
-            $candidate[1].Kind -ceq 'identifier' -and
-            $candidate[2].Value -ceq '=' -and
-            $candidate[3].Value -ceq 'ffi' -and
-            $candidate[4].Value -ceq '.' -and
-            $candidate[5].Value -ceq 'C') {
-            $count += 1
+function Get-ExecutableFfiCAccesses([object[]]$Tokens) {
+    $accessCount = 0
+    $approvedCount = 0
+    for ($index = 0; $index + 2 -lt $Tokens.Count; $index++) {
+        if ($Tokens[$index].Kind -cne 'identifier' -or
+            $Tokens[$index].Value -cne 'ffi') { continue }
+        $isMemberAccess = $Tokens[$index + 1].Value -ceq '.' -and
+            $Tokens[$index + 2].Kind -ceq 'identifier' -and
+            $Tokens[$index + 2].Value -ceq 'C'
+        $isIndexedAccess = $index + 3 -lt $Tokens.Count -and
+            $Tokens[$index + 1].Value -ceq '[' -and
+            $Tokens[$index + 2].Kind -ceq 'string' -and
+            $Tokens[$index + 2].Value -ceq 'C' -and
+            $Tokens[$index + 3].Value -ceq ']'
+        if (-not $isMemberAccess -and -not $isIndexedAccess) { continue }
+
+        $accessCount += 1
+        if ($isMemberAccess -and $index -ge 3 -and
+            $Tokens[$index - 3].Value -ceq 'local' -and
+            $Tokens[$index - 2].Kind -ceq 'identifier' -and
+            $Tokens[$index - 1].Value -ceq '=') {
+            $approvedCount += 1
         }
     }
-    return $count
+    return [pscustomobject]@{
+        AccessCount = $accessCount
+        ApprovedCount = $approvedCount
+    }
 }
 
 function Test-ExecutableAlternateBinding([object[]]$Tokens) {
@@ -437,13 +451,15 @@ try {
     $script:importGraph = @($script:visited.Keys | Sort-Object)
     $bindingPaths = @()
     $bindingCount = 0
+    $bindingAccessCount = 0
     $alternateBinding = $false
     foreach ($logicalPath in $script:importGraph) {
         $source = $script:sources[$logicalPath].Source
         $tokens = @(Get-LuaTokens $source)
-        $moduleBindingCount = Get-ExecutableLocalFfiCBindingCount $tokens
-        if ($moduleBindingCount -gt 0) {
-            $bindingCount += $moduleBindingCount
+        $moduleBinding = Get-ExecutableFfiCAccesses $tokens
+        $bindingAccessCount += $moduleBinding.AccessCount
+        if ($moduleBinding.ApprovedCount -gt 0) {
+            $bindingCount += $moduleBinding.ApprovedCount
             $bindingPaths += $logicalPath
         }
         elseif (Test-ExecutableAlternateBinding $tokens) { $alternateBinding = $true }
@@ -453,13 +469,15 @@ try {
     } else { [string]$script:contract.native_binding.policy }
     if ($bindingPolicy -notin @('required', 'forbidden')) { Fail 'NATIVE_BINDING_POLICY_INVALID' }
     if ($bindingPolicy -eq 'required') {
-        if ($bindingCount -gt 1 -or ($bindingCount -eq 0 -and $alternateBinding)) {
+        if ($bindingAccessCount -eq 0 -and $bindingCount -eq 0 -and -not $alternateBinding) {
+            Fail 'NATIVE_BINDING_NOT_FOUND'
+        }
+        if ($bindingAccessCount -ne 1 -or $bindingCount -ne 1) {
             Fail 'ALTERNATE_BINDING_SOURCE' 'local-only'
         }
-        if ($bindingCount -ne 1) { Fail 'NATIVE_BINDING_NOT_FOUND' }
         $script:nativeBindingPath = $bindingPaths[0]
     }
-    elseif ($bindingCount -ne 0 -or $alternateBinding) {
+    elseif ($bindingAccessCount -ne 0 -or $alternateBinding) {
         Fail 'NATIVE_BINDING_FORBIDDEN' 'non-conformant'
     }
 

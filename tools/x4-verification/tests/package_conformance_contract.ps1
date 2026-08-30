@@ -200,6 +200,27 @@ local native = ffi.C
         Assert-True ($renamedWithInertResult.native_binding_path -eq 'lua/live_galaxy_runtime.lua') `
             'Inert text changed the renamed executable native-binding count.'
 
+        $executableAccesses = [ordered]@{
+            'parenthesized' = 'local bypass = (ffi.C)'
+            'deferred-assignment' = 'target = ffi.C'
+            'direct-member-call' = 'ffi.C.Call()'
+            'indexed-member' = 'local bypass = ffi["C"]'
+        }
+        foreach ($access in $executableAccesses.GetEnumerator()) {
+            $accessPackage = Join-Path $scratch "binding-access-$($access.Key)"
+            New-SyntaxPackage $accessPackage @"
+local ffi = require("ffi")
+-- target = ffi.C; ffi["C"]; ffi.C.Call()
+local inert = "(ffi.C) target = ffi.C ffi[\"C\"]"
+local long_inert = [===[ ffi.C.Call() ]===]
+local C = ffi.C
+$($access.Value)
+"@
+            $accessResult = Invoke-Conformance $accessPackage 1
+            Assert-True (@($accessResult.reason_codes) -contains 'ALTERNATE_BINDING_SOURCE') `
+                "Executable native access '$($access.Key)' bypassed the single acquisition policy."
+        }
+
         $staticHelperPackage = Join-Path $scratch 'lexer-static-helper'
         New-SyntaxPackage $staticHelperPackage @'
 local PREFIX = "live_galaxy/lua/"
