@@ -15,6 +15,9 @@ $workerPath = Join-Path $root 'tools/x4-verification/isolation/candidate-worker.
 $protocolPath = Join-Path $root 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
 $validatedResponsePath = $null
+$readinessObserved = $false
+$readinessObservedAt = $null
+$timeoutArmedAt = $null
 
 function Write-Result([string]$Status, [string]$Code, [object]$Response = $null) {
     [ordered]@{
@@ -22,6 +25,9 @@ function Write-Result([string]$Status, [string]$Code, [object]$Response = $null)
         status = $Status
         accepted = $Status -eq 'ok'
         diagnostic_code = $Code
+        readiness_observed = $script:readinessObserved
+        readiness_observed_at_utc = $script:readinessObservedAt
+        timeout_armed_at_utc = $script:timeoutArmedAt
         response = $Response
     } | ConvertTo-Json -Depth 10 -Compress
 }
@@ -53,6 +59,12 @@ try {
         exit 0
     }
     $validatedResponsePath = $responseFull
+    $childPidPath = "$responseFull.child.pid"
+    $readinessPath = "$responseFull.child.ready"
+    if ((Test-Path -LiteralPath $childPidPath) -or (Test-Path -LiteralPath $readinessPath)) {
+        Write-Result 'request-rejected' 'readiness-path-invalid'
+        exit 0
+    }
     $requestInfo = Get-Item -LiteralPath $requestFull
     if ($requestInfo.Length -gt $protocol.bounds.max_request_bytes) {
         Write-Result 'request-rejected' 'request-bytes-exceeded'
@@ -112,6 +124,58 @@ try {
 
     $startedAt = [DateTimeOffset]::UtcNow
     $process = [Diagnostics.Process]::Start($startInfo)
+    if ($request.adapter_id -eq 'local-contract-child-endless') {
+        $readinessDeadline = $startedAt.AddMilliseconds([Math]::Min(2000, [int]$protocol.bounds.max_deadline_ms))
+        while (-not (Test-Path -LiteralPath $readinessPath -PathType Leaf) -and
+            -not $process.HasExited -and [DateTimeOffset]::UtcNow -lt $readinessDeadline) {
+            Start-Sleep -Milliseconds 10
+            $process.Refresh()
+        }
+        if (-not (Test-Path -LiteralPath $readinessPath -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $childPidPath -PathType Leaf)) {
+            if (-not $process.HasExited) {
+                $process.Kill($true)
+                [void]$process.WaitForExit($protocol.bounds.kill_wait_ms)
+            }
+            Write-Result 'worker-response-rejected' 'worker-readiness-missing'
+            exit 0
+        }
+        $pidInfo = Get-Item -LiteralPath $childPidPath
+        $readinessInfo = Get-Item -LiteralPath $readinessPath
+        if (($pidInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            ($readinessInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+            $pidInfo.Length -lt 1 -or $pidInfo.Length -gt 16 -or
+            $readinessInfo.Length -lt 1 -or $readinessInfo.Length -gt 512) {
+            $process.Kill($true)
+            [void]$process.WaitForExit($protocol.bounds.kill_wait_ms)
+            Write-Result 'worker-response-rejected' 'worker-readiness-invalid'
+            exit 0
+        }
+        $pidText = [IO.File]::ReadAllText($pidInfo.FullName, [Text.UTF8Encoding]::new($false))
+        $readinessText = [IO.File]::ReadAllText($readinessInfo.FullName, [Text.UTF8Encoding]::new($false))
+        try { $readiness = $readinessText | ConvertFrom-Json -DateKind String }
+        catch { $readiness = $null }
+        $childPid = 0
+        $readyAt = [DateTimeOffset]::MinValue
+        $readinessFields = @('schema_version', 'request_id', 'child_pid', 'ready_at_utc')
+        if ($null -eq $readiness -or -not (Test-ExactFields $readiness $readinessFields) -or
+            $readinessText -cne ($readiness | ConvertTo-Json -Compress) -or
+            $readiness.schema_version -ne 'candidate-worker-readiness.v1' -or
+            $readiness.request_id -ne $request.request_id -or
+            -not [int]::TryParse($pidText, [ref]$childPid) -or
+            $readiness.child_pid -ne $childPid -or
+            -not [DateTimeOffset]::TryParse([string]$readiness.ready_at_utc, [ref]$readyAt) -or
+            $readyAt -lt $startedAt.AddSeconds(-1) -or $readyAt -gt [DateTimeOffset]::UtcNow.AddSeconds(1) -or
+            $null -eq (Get-Process -Id $childPid -ErrorAction SilentlyContinue)) {
+            $process.Kill($true)
+            [void]$process.WaitForExit($protocol.bounds.kill_wait_ms)
+            Write-Result 'worker-response-rejected' 'worker-readiness-invalid'
+            exit 0
+        }
+        $readinessObserved = $true
+        $readinessObservedAt = [DateTimeOffset]::UtcNow.ToString('O')
+    }
+    $timeoutArmedAt = [DateTimeOffset]::UtcNow.ToString('O')
     if (-not $process.WaitForExit($DeadlineMs)) {
         $process.Kill($true)
         [void]$process.WaitForExit($protocol.bounds.kill_wait_ms)

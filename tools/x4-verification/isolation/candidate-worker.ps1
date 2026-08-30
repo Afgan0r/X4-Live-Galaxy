@@ -32,6 +32,12 @@ function Write-WorkerText([string]$Text, [bool]$Atomic = $true) {
     }
 }
 
+function Write-AtomicSidecar([string]$Path, [string]$Text) {
+    $temporaryPath = "$Path.$PID.tmp"
+    [IO.File]::WriteAllText($temporaryPath, $Text, [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $temporaryPath -Destination $Path
+}
+
 $requestInfo = Get-Item -LiteralPath $RequestPath -ErrorAction Stop
 if ($requestInfo.Length -gt $protocol.bounds.max_request_bytes) { exit 20 }
 $request = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json -DateKind String
@@ -54,7 +60,18 @@ if ($request.adapter_id -eq 'local-contract-child-endless') {
     $childStart.ArgumentList.Add('-Command')
     $childStart.ArgumentList.Add('Start-Sleep -Seconds 120')
     $child = [Diagnostics.Process]::Start($childStart)
-    [IO.File]::WriteAllText("$ResponsePath.child.pid", $child.Id.ToString(), [Text.UTF8Encoding]::new($false))
+    $child.Refresh()
+    if ($child.HasExited) { exit 26 }
+    $pidPath = "$ResponsePath.child.pid"
+    $readinessPath = "$ResponsePath.child.ready"
+    Write-AtomicSidecar $pidPath $child.Id.ToString()
+    $readiness = [ordered]@{
+        schema_version = 'candidate-worker-readiness.v1'
+        request_id = $request.request_id
+        child_pid = $child.Id
+        ready_at_utc = [DateTimeOffset]::UtcNow.ToString('O')
+    } | ConvertTo-Json -Compress
+    Write-AtomicSidecar $readinessPath $readiness
     while ($true) { Start-Sleep -Seconds 1 }
 }
 if ($request.adapter_id -eq 'local-contract-late-success') {
