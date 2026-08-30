@@ -71,6 +71,50 @@ function Test-Adapters {
             "Adapter '$($case.id)' accepted a budget below its derived work."
     }
 
+    $typeRejections = @(
+        @{ id = 'p051-cadence-seta'; fixtures = @(
+            [pscustomobject]@{ real_ms = '1000'; game_ms = 6000; seta_active = $true; sample_count = 4 },
+            [pscustomobject]@{ real_ms = 1000.0; game_ms = 6000; seta_active = $true; sample_count = 4 },
+            [pscustomobject]@{ real_ms = 1000; game_ms = 6000; seta_active = 'true'; sample_count = 4 },
+            [pscustomobject]@{ real_ms = 1000; game_ms = 6000; seta_active = $true; sample_count = '4' }
+        ) },
+        @{ id = 'p051-lifecycle-reload'; fixtures = @(
+            [pscustomobject]@{ registration_ids = 'live-galaxy-candidate'; reload_count = 1 },
+            [pscustomobject]@{ registration_ids = @('live-galaxy-candidate'); reload_count = '1' },
+            [pscustomobject]@{ registration_ids = @('live-galaxy-candidate'); reload_count = 1.0 }
+        ) },
+        @{ id = 'p051-mod-stack-compatibility'; fixtures = @(
+            [pscustomobject]@{ enabled_mod_ids = 'add-more-sectors'; excluded_mod_ids = @('faction-enhancer') },
+            [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = 'faction-enhancer' }
+        ) },
+        @{ id = 'p051-native-count-fill-runtime'; fixtures = @(
+            [pscustomobject]@{ reported_count = '3'; records = @('alpha', 'beta', 'gamma') },
+            [pscustomobject]@{ reported_count = 3.0; records = @('alpha', 'beta', 'gamma') },
+            [pscustomobject]@{ reported_count = 3; records = 'abc' }
+        ) },
+        @{ id = 'p051-native-fill-completeness'; fixtures = @(
+            [pscustomobject]@{ requested_count = '3'; returned_count = 3; records = @('alpha', 'beta', 'gamma') },
+            [pscustomobject]@{ requested_count = 3; returned_count = 3.0; records = @('alpha', 'beta', 'gamma') },
+            [pscustomobject]@{ requested_count = 3; returned_count = 3; records = 'abc' }
+        ) },
+        @{ id = 'p051-native-identity-closure'; fixtures = @(
+            [pscustomobject]@{ native_id = 1; canonical_id = '1'; owner_id = 'argon'; canonical_owner_id = 'argon' }
+        ) },
+        @{ id = 'p051-native-volume-envelope'; fixtures = @(
+            [pscustomobject]@{ sample_count = '8'; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 },
+            [pscustomobject]@{ sample_count = 8.0; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 }
+        ) }
+    )
+    foreach ($typeCase in $typeRejections) {
+        $definition = @($definitions | Where-Object id -CEQ $typeCase.id)[0]
+        foreach ($fixture in $typeCase.fixtures) {
+            $result = Invoke-CandidateAdapter -CandidateId $typeCase.id -Fixture $fixture `
+                -MaxWorkUnits $definition.max_work_units
+            Assert-True ($result.status -eq 'rejected' -and $result.completeness -eq 'incomplete') `
+                "Adapter '$($typeCase.id)' accepted a malformed field type."
+        }
+    }
+
     $alternateIdentity = [pscustomobject]@{
         native_id = 'ship-99'; canonical_id = 'ship-99'
         owner_id = 'boron'; canonical_owner_id = 'boron'
