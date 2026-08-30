@@ -14,6 +14,7 @@ $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot
 $workerPath = Join-Path $root 'tools/x4-verification/isolation/candidate-worker.ps1'
 $protocolPath = Join-Path $root 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
+$validatedResponsePath = $null
 
 function Write-Result([string]$Status, [string]$Code, [object]$Response = $null) {
     [ordered]@{
@@ -51,12 +52,13 @@ try {
         Write-Result 'request-rejected' 'request-path-invalid'
         exit 0
     }
+    $validatedResponsePath = $responseFull
     $requestInfo = Get-Item -LiteralPath $requestFull
     if ($requestInfo.Length -gt $protocol.bounds.max_request_bytes) {
         Write-Result 'request-rejected' 'request-bytes-exceeded'
         exit 0
     }
-    $request = Get-Content -LiteralPath $requestFull -Raw | ConvertFrom-Json
+    $request = Get-Content -LiteralPath $requestFull -Raw | ConvertFrom-Json -DateKind String
     if (-not (Test-ExactFields $request $protocol.request_fields) -or
         -not (Test-ExactFields $request.input $protocol.input_fields) -or
         $request.schema_version -ne $protocol.schema_version -or
@@ -125,10 +127,17 @@ try {
         Write-Result 'worker-response-rejected' 'worker-output-bytes-exceeded'
         exit 0
     }
-    try { $response = Get-Content -LiteralPath $responseFull -Raw | ConvertFrom-Json }
+    $responseText = Get-Content -LiteralPath $responseFull -Raw
+    try { $response = $responseText | ConvertFrom-Json -DateKind String }
     catch {
         Remove-Item -LiteralPath $responseFull -Force
         Write-Result 'worker-response-rejected' 'worker-output-malformed'
+        exit 0
+    }
+    $canonicalResponse = $response | ConvertTo-Json -Depth 10 -Compress
+    if ($responseText -cne $canonicalResponse) {
+        Remove-Item -LiteralPath $responseFull -Force
+        Write-Result 'worker-response-rejected' 'worker-output-noncanonical'
         exit 0
     }
     if (-not (Test-ExactFields $response $protocol.response_fields)) {
@@ -162,6 +171,8 @@ try {
     Write-Result 'ok' 'none' $response
 }
 catch {
-    if (Test-Path -LiteralPath $ResponsePath) { Remove-Item -LiteralPath $ResponsePath -Force }
+    if ($null -ne $validatedResponsePath -and (Test-Path -LiteralPath $validatedResponsePath)) {
+        Remove-Item -LiteralPath $validatedResponsePath -Force
+    }
     Write-Result 'worker-response-rejected' 'worker-internal-failure'
 }

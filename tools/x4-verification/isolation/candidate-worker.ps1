@@ -33,7 +33,7 @@ function Write-WorkerText([string]$Text, [bool]$Atomic = $true) {
 
 $requestInfo = Get-Item -LiteralPath $RequestPath -ErrorAction Stop
 if ($requestInfo.Length -gt $protocol.bounds.max_request_bytes) { exit 20 }
-$request = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json
+$request = Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json -DateKind String
 if (-not (Test-ExactFields $request $protocol.request_fields)) { exit 21 }
 if (-not (Test-ExactFields $request.input $protocol.input_fields)) { exit 22 }
 if ($request.schema_version -ne $protocol.schema_version) { exit 23 }
@@ -95,6 +95,9 @@ switch ($request.adapter_id) {
 }
 
 $json = $response | ConvertTo-Json -Depth 8 -Compress
+if ($request.adapter_id -eq 'local-contract-noncanonical') {
+    $json = $response | ConvertTo-Json -Depth 8
+}
 if ($request.adapter_id -eq 'local-contract-duplicate') {
     $json = "[$json,$json]"
 }
