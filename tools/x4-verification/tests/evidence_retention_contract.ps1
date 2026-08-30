@@ -490,7 +490,10 @@ try {
     $permissionOutput = Invoke-Verification $locatorPath 1
     Assert-True (($permissionOutput -join "`n") -match '"verdict":"rejected"') 'Permission mismatch did not block sanitized verification output.'
 
-    if ($Case -eq 'retention-admission') { Write-Output 'PASS: retention-to-admission cryptographic core contract' }
+    if ($Case -eq 'retention-admission') {
+        Write-Output 'PASS: retention-to-admission fail-closed contract'
+        Write-Output 'PASS: retention-to-admission cryptographic core contract'
+    }
     else { Write-Output 'PASS: evidence retention contract' }
 }
 finally {
