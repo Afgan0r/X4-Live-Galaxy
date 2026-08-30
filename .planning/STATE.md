@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: executing
-stopped_at: Completed 05.2-02-PLAN.md
-last_updated: "2026-08-29T23:43:15.342Z"
+stopped_at: Completed 05.2-04-PLAN.md
+last_updated: "2026-08-30T00:27:56.578Z"
 last_activity: 2026-08-30
-last_activity_desc: Completed Phase 05.2 Plan 02 package conformance
-state_head: 2388be9d08fdd272b1c376f6937058c41af0f615
+last_activity_desc: Completed Phase 05.2 Plan 04 conflict-safe candidate builds
+state_head: 062f27d81b39568f4a36518dce83664d2d16d765
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 36
-  completed_plans: 26
+  completed_plans: 28
   percent: 40
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — EXECUTING
-Plan: 2 of 5
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-08-30 — Completed Phase 05.2 Plan 02 package conformance
+Last activity: 2026-08-30 — Completed Phase 05.2 Plan 04 conflict-safe candidate builds
 
 Progress: [████░░░░░░] 40%
 
@@ -79,6 +79,8 @@ Progress: [████░░░░░░] 40%
 | Phase 05.1 P02 | 24m | 2 tasks | 8 files |
 | Phase 05.2 P01 | 19min | 3 tasks | 8 files |
 | Phase 05.2 P02 | 14min | 2 tasks | 5 files |
+| Phase 05.2 P03 | 15min | 2 tasks | 5 files |
+| Phase 05.2 P04 | 14min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -137,6 +139,12 @@ Recent decisions affecting current work:
 - [Phase 05.2]: Production-faithful package evidence requires the registered entrypoint, contained complete import graph, and one direct ffi.C acquisition site.
 - [Phase 05.2]: Package conformance remains packaged-static and digest-bound; Plan 01 remains the independent admission authority.
 - [Phase 05.2]: Bare, test-only, and alternate-binding-only loading is local-only and cannot satisfy AC-04.
+- [Phase 05.2]: Every candidate emits exactly three ordered rows whose verdict progression is explicit and whose canonical payload is verified through an injected SHA-256 adapter.
+- [Phase 05.2]: Candidate exceptions, timeouts, invalid results, digest failures, and effect mismatches emit closed privacy-safe reason codes; later candidates continue in sorted order.
+- [Phase 05.2]: The source-derived fixture proves only a local developer contract and never claims observed-in-X4 evidence.
+- [Phase 05.2]: Phase 05.2 Plan 04 partitions six identical read-only profiles together and isolates lifecycle registration instrumentation in one exclusive build.
+- [Phase 05.2]: Generated candidate roots remain developer-only and prepared-not-executed, with per-group package conformance bound into each manifest.
+- [Phase 05.2]: Source-resolvable Phase 05.1 design defects remain explicit exclusions rather than X4 runtime candidates.
 
 ### Pending Todos
 
@@ -163,6 +171,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-29T23:43:14.815Z
-Stopped at: Completed 05.2-02-PLAN.md
+Last session: 2026-08-30T00:27:56.040Z
+Stopped at: Completed 05.2-04-PLAN.md
 Resume file: None

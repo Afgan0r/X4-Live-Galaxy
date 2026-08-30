@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 4
+open_count: 9
 waived_count: 0
 fixed_count: 0
-total_count: 4
-last_updated: 2026-08-29T15:51:46.129Z
+total_count: 9
+last_updated: 2026-08-30T00:28:28.726Z
 ---
 
 # Broken Windows Ledger
@@ -19,6 +19,11 @@ last_updated: 2026-08-29T15:51:46.129Z
 | 2 | 01 | unrun-verify | extensions/live_galaxy/tests/telemetry_contract.lua |  | Pure Lua contract execution remains pending a compatible X4-evidenced runner. | open |  | 2026-08-28T19:17:05.468Z |  |
 | 3 | 01 | unrun-verify | extensions/live_galaxy/tests/scheduler_contract.lua |  | Pure Lua scheduler contract execution remains pending a compatible X4-evidenced runner. | open |  | 2026-08-28T19:19:05.974Z |  |
 | 4 | 05.1 | unrun-verify | extensions/live_galaxy/tests/telemetry_contract.lua | 32 | Full Lua contract runner fails in unchanged telemetry_contract.lua:32; focused plan checks pass. | open |  | 2026-08-29T15:51:46.129Z |  |
+| 5 | 05.2 | deviation | extensions/live_galaxy/tests/run_contracts.ps1 |  | Registered the focused candidate suite during Task 1 GREEN so the mandated tracer verify was runnable. | open |  | 2026-08-30T00:07:54.028Z |  |
+| 6 | 05.2 | deviation | tools/x4-verification/contracts/runtime-evidence.v1.json |  | Added closed privacy-safe failure reasons required by the evidence threat contract. | open |  | 2026-08-30T00:07:54.420Z |  |
+| 7 | 05.2 | deviation | .planning/ROADMAP.md |  | Corrected roadmap progress after PLAN-CHECK was miscounted as an executable plan. | open |  | 2026-08-30T00:07:54.818Z |  |
+| 8 | 05.2 | deviation | tools/x4-verification/tests/candidate_build_contract.ps1 |  | Normalized one-item PowerShell validation collections before count comparisons. | open |  | 2026-08-30T00:28:28.330Z |  |
+| 9 | 05.2 | deviation | tools/x4-verification/build-candidate-extension.ps1 |  | Summed generated-file bytes explicitly for ordered dictionary entries. | open |  | 2026-08-30T00:28:28.726Z |  |
 
 ````json
 [
@@ -68,6 +73,66 @@ last_updated: 2026-08-29T15:51:46.129Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-29T15:51:46.129Z",
+    "resolved_at": null
+  },
+  {
+    "id": 5,
+    "kind": "deviation",
+    "phase": "05.2",
+    "file": "extensions/live_galaxy/tests/run_contracts.ps1",
+    "line": null,
+    "description": "Registered the focused candidate suite during Task 1 GREEN so the mandated tracer verify was runnable.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-30T00:07:54.028Z",
+    "resolved_at": null
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "05.2",
+    "file": "tools/x4-verification/contracts/runtime-evidence.v1.json",
+    "line": null,
+    "description": "Added closed privacy-safe failure reasons required by the evidence threat contract.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-30T00:07:54.420Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "05.2",
+    "file": ".planning/ROADMAP.md",
+    "line": null,
+    "description": "Corrected roadmap progress after PLAN-CHECK was miscounted as an executable plan.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-30T00:07:54.818Z",
+    "resolved_at": null
+  },
+  {
+    "id": 8,
+    "kind": "deviation",
+    "phase": "05.2",
+    "file": "tools/x4-verification/tests/candidate_build_contract.ps1",
+    "line": null,
+    "description": "Normalized one-item PowerShell validation collections before count comparisons.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-30T00:28:28.330Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "deviation",
+    "phase": "05.2",
+    "file": "tools/x4-verification/build-candidate-extension.ps1",
+    "line": null,
+    "description": "Summed generated-file bytes explicitly for ordered dictionary entries.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-30T00:28:28.726Z",
     "resolved_at": null
   }
 ]
