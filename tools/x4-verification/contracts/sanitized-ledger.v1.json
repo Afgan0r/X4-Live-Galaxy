@@ -1,0 +1,58 @@
+{
+  "schema_version": "sanitized-ledger.v1",
+  "contract_id": "live-galaxy-sanitized-runtime-ledger",
+  "runtime_evidence_schema_version": "runtime-evidence.v1",
+  "build_manifest_schema_version": "candidate-build-manifest.v1",
+  "private_locator_schema_version": "private-evidence-locator.v1",
+  "digest_algorithm": "sha256",
+  "digest_hex_length": 64,
+  "required_fields": [
+    "schema_version",
+    "ledger_id",
+    "run_id",
+    "build_id",
+    "group_id",
+    "runtime_evidence_schema_version",
+    "build_manifest_schema_version",
+    "verdict",
+    "retention_disposition",
+    "identity_digests",
+    "candidates"
+  ],
+  "required_identity_digests": [
+    "dossier_digest",
+    "registry_digest",
+    "coverage_digest",
+    "matrix_digest",
+    "build_profile_digest",
+    "package_conformance_digest",
+    "runtime_evidence_schema_digest",
+    "build_manifest_digest",
+    "evidence_digest",
+    "run_digest",
+    "locator_digest"
+  ],
+  "candidate_required_fields": [
+    "candidate_id",
+    "execution_verdict",
+    "contract_verdict",
+    "effect_verdict",
+    "disposition"
+  ],
+  "verdict": "retained",
+  "retention_dispositions": ["retained"],
+  "candidate_dispositions": ["retain", "remove", "fallback", "repeat", "production", "runtime-pending"],
+  "execution_verdicts": ["pass", "fail", "not_run"],
+  "contract_verdicts": ["pass", "fail", "not_run"],
+  "effect_verdicts": ["pass", "mismatch", "fail", "not_run"],
+  "bounds": {
+    "max_input_bytes": 65536,
+    "max_candidates": 16,
+    "max_rows": 48,
+    "max_row_bytes": 4096,
+    "max_string_bytes": 256,
+    "max_locator_bytes": 32768,
+    "max_path_depth": 16,
+    "max_diagnostics": 16
+  }
+}

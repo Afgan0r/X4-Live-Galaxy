@@ -13,6 +13,7 @@ $retentionPath = Join-Path $toolRoot 'retain-evidence.ps1'
 $sanitizedContractPath = Join-Path $toolRoot 'contracts/sanitized-ledger.v1.json'
 $builderPath = Join-Path $toolRoot 'build-candidate-extension.ps1'
 $dossierPath = Join-Path $toolRoot 'contracts/dossier.v1.json'
+$matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -36,6 +37,13 @@ function ConvertTo-CanonicalValue($Value) {
         $Value -is [byte] -or $Value -is [int16] -or $Value -is [int32] -or
         $Value -is [int64] -or $Value -is [decimal] -or $Value -is [double]) {
         return $Value
+    }
+    if ($Value -is [System.Collections.IDictionary]) {
+        $dictionary = [ordered]@{}
+        foreach ($key in @($Value.Keys | Sort-Object)) {
+            $dictionary[$key] = ConvertTo-CanonicalValue $Value[$key]
+        }
+        return $dictionary
     }
     if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [pscustomobject]) {
         return @($Value | ForEach-Object { ConvertTo-CanonicalValue $_ })
@@ -124,15 +132,8 @@ function Assert-Rejected([string]$EvidencePath, [string]$ManifestPath, [string]$
 
 function Add-BroadReadPermission([string]$Path) {
     if ($IsWindows) {
-        $acl = Get-Acl -LiteralPath $Path
-        $sid = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
-        $rule = [Security.AccessControl.FileSystemAccessRule]::new(
-            $sid,
-            [Security.AccessControl.FileSystemRights]::Read,
-            [Security.AccessControl.AccessControlType]::Allow
-        )
-        $acl.AddAccessRule($rule)
-        Set-Acl -LiteralPath $Path -AclObject $acl
+        $null = & icacls.exe $Path /grant '*S-1-5-32-545:(R)'
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to broaden the retained-file ACL for the negative case.' }
     }
     else {
         [System.IO.File]::SetUnixFileMode(
@@ -153,7 +154,7 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-retention-contract
 $buildRoot = Join-Path $scratch 'builds'
 $null = New-Item -ItemType Directory -Path $scratch
 try {
-    $builderOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot 2>&1)
+    $builderOutput = @(& pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1)
     Assert-True ($LASTEXITCODE -eq 0) "Candidate builder failed: $builderOutput"
     $groupRoot = Join-Path $buildRoot 'p051-build-read-only-shared'
     $manifestPath = Join-Path $groupRoot 'manifest/build-manifest.v1.json'
@@ -164,7 +165,7 @@ try {
     Write-Utf8NoBom $evidencePath $validStream
 
     $retentionRoot = Join-Path $scratch 'retained'
-    $output = Invoke-Retention $evidencePath $manifestPath $retentionRoot 0
+    $output = @(Invoke-Retention $evidencePath $manifestPath $retentionRoot 0)
     Assert-True ($output.Count -eq 1) 'Successful retention emitted diagnostics besides the sanitized object.'
     $sanitized = $output[0] | ConvertFrom-Json
     $contract = Get-Content -LiteralPath $sanitizedContractPath -Raw | ConvertFrom-Json
@@ -195,7 +196,7 @@ try {
     }
     Assert-True ((Get-Digest $retainedEvidencePath) -eq (Get-Digest $evidencePath)) 'Retained evidence digest changed.'
     Assert-True ((Get-Digest $retainedManifestPath) -eq (Get-Digest $manifestPath)) 'Retained build manifest digest changed.'
-    $verified = Invoke-Verification $locatorPath 0
+    $verified = @(Invoke-Verification $locatorPath 0)
     Assert-True ($verified.Count -eq 1) 'Verification emitted diagnostics besides the sanitized object.'
     Assert-True (($verified[0] | ConvertFrom-Json).identity_digests.locator_digest -eq $sanitized.identity_digests.locator_digest) 'Locator reread digest changed.'
 
