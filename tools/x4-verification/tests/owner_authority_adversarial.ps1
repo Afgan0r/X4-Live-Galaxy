@@ -77,12 +77,45 @@ Assert-Code (Test-TestOnlyDelegatedCertificateObject -Fixture $epoch) 'OWNER_DEL
 $stalePolicy = $fixture | ConvertTo-Json -Depth 16 | ConvertFrom-Json
 $stalePolicy.delegated_certificate.policy_digest = '0' * 64
 Assert-Code (Test-TestOnlyDelegatedCertificateObject -Fixture $stalePolicy) 'OWNER_DELEGATION_POLICY_MISMATCH' 'stale delegation policy'
+$substituted = $fixture | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+$substituted.delegated_certificate.delegated_spki_sha256 = '0' * 64
+Assert-Code (Test-TestOnlyDelegatedCertificateObject -Fixture $substituted) 'OWNER_DELEGATED_KEY_MISMATCH' 'delegated key substitution'
 
 foreach ($productionCommand in @((Get-Command $admissionPath), (Get-Command $signerPath))) {
     foreach ($forbidden in @('AnchorPath', 'RootPath', 'CertificatePath', 'PublicKeyPath', 'KeyName', 'TestRootPath', 'TestMode')) {
         Assert-True ($productionCommand.Parameters.Keys -notcontains $forbidden) "Production CLI exposes forbidden $forbidden input."
     }
 }
+
+function Invoke-CopiedAnchorProbe($Anchor) {
+    $copyRoot = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-anchor-probe-{0}" -f [guid]::NewGuid().ToString('N'))
+    [void](New-Item -ItemType Directory -Path (Join-Path $copyRoot 'contracts') -Force)
+    try {
+        Copy-Item -LiteralPath $modulePath -Destination (Join-Path $copyRoot 'local-attestation.psm1')
+        $Anchor | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $copyRoot 'contracts/owner-root-anchor.v1.json') -Encoding utf8NoBOM
+        Copy-Item -LiteralPath $certificatePath -Destination (Join-Path $copyRoot 'contracts/delegated-purpose-certificate.v1.json')
+        $probe = "Import-Module '$($copyRoot.Replace("'", "''"))\local-attestation.psm1' -Force; Get-OwnerAuthorityStatus | ConvertTo-Json -Compress"
+        $output = & pwsh -NoProfile -Command $probe
+        Assert-True ($LASTEXITCODE -eq 0) 'Copied-anchor probe did not complete.'
+        return $output | ConvertFrom-Json
+    }
+    finally { Remove-Item -LiteralPath $copyRoot -Recurse -Force }
+}
+
+$testRootSwap = $fixture.root_anchor | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+$testRootSwap.root_id = 'live-galaxy-owner-root-v1'
+$testRootSwap | Add-Member -NotePropertyName policy_digest -NotePropertyValue '6497cd18a4ee0286f0d566978c9225eaa168ba5d71f8fd7042a78507e1462854'
+Assert-Code (Invoke-CopiedAnchorProbe $testRootSwap) 'OWNER_ROOT_PIN_MISMATCH' 'TEST-ONLY repository root swap'
+
+$freshKey = [Security.Cryptography.ECDsa]::Create()
+try {
+    [byte[]]$freshSpki = $freshKey.ExportSubjectPublicKeyInfo()
+    $freshRoot = $testRootSwap | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $freshRoot.root_spki_der_base64 = [Convert]::ToBase64String($freshSpki)
+    $freshRoot.root_spki_sha256 = ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($freshSpki))).ToLowerInvariant()
+    Assert-Code (Invoke-CopiedAnchorProbe $freshRoot) 'OWNER_ROOT_PIN_MISMATCH' 'fresh self-created production root'
+}
+finally { $freshKey.Dispose() }
 
 $junctionRoot = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-authority-junction-{0}" -f [guid]::NewGuid().ToString('N'))
 $targetRoot = Join-Path $junctionRoot 'swapped'

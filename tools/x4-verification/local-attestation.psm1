@@ -33,15 +33,33 @@ function Get-Sha256Hex([byte[]]$Bytes) {
     return ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes))).ToLowerInvariant()
 }
 
+function Assert-NoReparsePath([string]$Path) {
+    $current = [IO.Path]::GetFullPath($Path)
+    while (-not [string]::IsNullOrWhiteSpace($current)) {
+        if (Test-Path -LiteralPath $current) {
+            $segment = Get-Item -LiteralPath $current -Force
+            if (($segment.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw [IO.IOException]::new('OWNER_ROOT_PATH_REJECTED')
+            }
+        }
+        $parent = Split-Path -Parent $current
+        if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $current) { break }
+        $current = $parent
+    }
+}
+
 function Read-AuthorityJson([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw [IO.FileNotFoundException]::new('authority contract missing')
     }
+    Assert-NoReparsePath $Path
     $item = Get-Item -LiteralPath $Path -Force
     if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -gt 32768) {
         throw [IO.InvalidDataException]::new('authority contract path rejected')
     }
-    return Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
+    $value = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-NoReparsePath $Path
+    return $value
 }
 
 function Test-ExactAnchorPolicy($Anchor) {
@@ -96,6 +114,9 @@ function Get-OwnerAuthorityStatus {
         return New-AuthorityResult 'OWNER_ROOT_VERIFIED' $true
     }
     catch {
+        if ($_.Exception.Message -eq 'OWNER_ROOT_PATH_REJECTED') {
+            return New-AuthorityResult 'OWNER_ROOT_PATH_REJECTED'
+        }
         return New-AuthorityResult 'OWNER_ROOT_CONTRACT_INVALID'
     }
 }
