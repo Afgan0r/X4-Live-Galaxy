@@ -41,7 +41,7 @@ function Copy-Json($Value) {
     return ($Value | ConvertTo-Json -Depth 32 | ConvertFrom-Json)
 }
 
-function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null, $Override = $null, $Ledger = $null, $Matrix = $null) {
+function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null, $Override = $null, $Ledger = $null, $Matrix = $null, $PendingLedger = $null) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("live-galaxy-admission-{0}" -f [guid]::NewGuid().ToString('N'))
     [void](New-Item -ItemType Directory -Path $tempRoot)
     try {
@@ -71,15 +71,36 @@ function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $n
             $resolvedOverride | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempOverride -Encoding utf8NoBOM
             $arguments += @('-OverridePath', $tempOverride)
         }
-        if ($null -ne $Ledger) {
-            $tempLedger = Join-Path $tempRoot 'ledger.json'
-            $Ledger | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempLedger -Encoding utf8NoBOM
-            $arguments += @('-SanitizedLedgerPath', $tempLedger)
-        }
         if ($null -ne $Matrix) {
             $tempMatrix = Join-Path $tempRoot 'matrix.json'
             $Matrix | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempMatrix -Encoding utf8NoBOM
             $arguments += @('-CandidateMatrixPath', $tempMatrix)
+        }
+        if ($null -ne $Ledger -and $null -ne $PendingLedger) {
+            $resolvedLedger = Copy-Json $Ledger
+            $resolvedPending = Copy-Json $PendingLedger
+            $sourceDigests = @{
+                dossier_digest = (Get-FileHash -LiteralPath $tempDossier -Algorithm SHA256).Hash.ToLowerInvariant()
+                registry_digest = (Get-FileHash -LiteralPath $tempRegistry -Algorithm SHA256).Hash.ToLowerInvariant()
+                coverage_digest = (Get-FileHash -LiteralPath $tempCoverage -Algorithm SHA256).Hash.ToLowerInvariant()
+                matrix_digest = (Get-FileHash -LiteralPath $tempMatrix -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+            foreach ($candidate in @($resolvedLedger.candidates)) {
+                $pending = @($resolvedPending.candidates | Where-Object { $_.id -eq $candidate.id })[0]
+                foreach ($digestName in $sourceDigests.Keys) {
+                    $original = $pending.identity_digests.$digestName
+                    $pending.identity_digests.$digestName = $sourceDigests[$digestName]
+                    if ($candidate.identity_digests.$digestName -eq $original) {
+                        $candidate.identity_digests.$digestName = $sourceDigests[$digestName]
+                    }
+                }
+            }
+            $tempPending = Join-Path $tempRoot 'pending-ledger.json'
+            $resolvedPending | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempPending -Encoding utf8NoBOM
+            $arguments += @('-PendingLedgerPath', $tempPending)
+            $tempLedger = Join-Path $tempRoot 'ledger.json'
+            $resolvedLedger | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempLedger -Encoding utf8NoBOM
+            $arguments += @('-SanitizedLedgerPath', $tempLedger)
         }
         $output = & pwsh @arguments 2>&1
         $exitCode = $LASTEXITCODE
@@ -131,6 +152,7 @@ if ($Case -eq 'evidence-chain') {
     $matrix = Get-Content -LiteralPath $matrixPath -Raw -Encoding utf8 | ConvertFrom-Json
     $completeLedger = Copy-Json $pendingLedger
     $completeLedger.status = 'runtime-complete'
+    $completeLedger.evidence_classification = 'retained-runtime-evidence'
     foreach ($candidate in @($completeLedger.candidates)) {
         $candidate.status = 'retained'
         $candidate.disposition = 'production'
@@ -147,36 +169,40 @@ if ($Case -eq 'evidence-chain') {
         $candidate.identity_digests | Add-Member -NotePropertyName run_digest -NotePropertyValue $runDigest
     }
 
-    $accepted = Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $completeLedger $matrix
+    $accepted = Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $completeLedger $matrix $pendingLedger
     Assert-True ($accepted.ExitCode -eq 0) "Complete retained evidence chain failed: $($accepted.Output -join ' | ')"
     Assert-True ($accepted.Result.verdict -eq 'admissible') 'Complete retained evidence chain was not admitted.'
 
     $missingEvidence = Copy-Json $completeLedger
     $missingEvidence.candidates[0].identity_digests.PSObject.Properties.Remove('evidence_digest')
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $missingEvidence $matrix) 'EVIDENCE_CHAIN_INCOMPLETE' 'missing retained evidence digest'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $missingEvidence $matrix $pendingLedger) 'EVIDENCE_CHAIN_INCOMPLETE' 'missing retained evidence digest'
 
     $incomplete = Copy-Json $completeLedger
     $incomplete.candidates[0].status = 'runtime-pending'
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $incomplete $matrix) 'RETENTION_INCOMPLETE' 'incomplete retention'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $incomplete $matrix $pendingLedger) 'RETENTION_INCOMPLETE' 'incomplete retention'
 
     $sourceAction = Copy-Json $matrix
     $sourceAction.candidates[0].source_action_only = $true
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $completeLedger $sourceAction) 'SOURCE_ACTION_DEFECT' 'source-action candidate'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $completeLedger $sourceAction $pendingLedger) 'SOURCE_ACTION_DEFECT' 'source-action candidate'
 
     foreach ($axis in @('execution', 'contract', 'effect')) {
         $failed = Copy-Json $completeLedger
         $failed.candidates[0]."${axis}_verdict" = 'fail'
-        Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $failed $matrix) 'FAILED_RUNTIME_VERDICT' "failed $axis verdict"
+        Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $failed $matrix $pendingLedger) 'FAILED_RUNTIME_VERDICT' "failed $axis verdict"
     }
 
     $unexpected = Copy-Json $completeLedger
     $unexpected.candidates[0].actual_effect_id = 'valid-unexpected-result'
     $unexpected.candidates[0].effect_verdict = 'pass'
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $unexpected $matrix) 'UNEXPECTED_EFFECT' 'valid unexpected effect marked pass'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $unexpected $matrix $pendingLedger) 'UNEXPECTED_EFFECT' 'valid unexpected effect marked pass'
 
     $identityMismatch = Copy-Json $completeLedger
     $identityMismatch.candidates[0].identity_digests.dossier_digest = '0' * 64
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $identityMismatch $matrix) 'IDENTITY_CHAIN_MISMATCH' 'dossier identity mismatch'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $identityMismatch $matrix $pendingLedger) 'IDENTITY_CHAIN_MISMATCH' 'dossier identity mismatch'
+
+    $unsanitized = Copy-Json $completeLedger
+    $unsanitized.candidates[0] | Add-Member -NotePropertyName raw_path -NotePropertyValue 'private-value'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $unsanitized $matrix $pendingLedger) 'UNSANITIZED_LEDGER_FIELD' 'unsanitized ledger field'
 
     Write-Output 'PASS: sanitized evidence-chain admission contract'
     exit 0

@@ -8,7 +8,10 @@ param(
     [string]$RegistryPath,
     [string]$CoveragePath,
     [string]$FixturePath,
-    [string]$OverridePath
+    [string]$OverridePath,
+    [string]$SanitizedLedgerPath,
+    [string]$PendingLedgerPath,
+    [string]$CandidateMatrixPath
 )
 
 Set-StrictMode -Version Latest
@@ -76,6 +79,12 @@ function Require-Bool($Value) {
     }
 }
 
+function Require-Digest($Value) {
+    if ($Value -isnot [string] -or $Value -notmatch '^[a-f0-9]{64}$') {
+        Fail 'EVIDENCE_CHAIN_INCOMPLETE'
+    }
+}
+
 function Require-Array($Value, [int]$Maximum) {
     if ($null -eq $Value -or $Value -is [string]) {
         Fail 'INVALID_FIELD_VALUE'
@@ -91,6 +100,17 @@ function Assert-UniqueIds($Items) {
     $ids = @($Items | ForEach-Object { [string](Require-Property $_ 'id') })
     if (@($ids | Sort-Object -Unique).Count -ne $ids.Count) {
         Fail 'DUPLICATE_ID'
+    }
+}
+
+function Require-ExactProperties($Value, [string[]]$Names) {
+    $actual = @($Value.PSObject.Properties.Name | Sort-Object)
+    $expected = @($Names | Sort-Object)
+    if (($actual -join '|') -ne ($expected -join '|')) {
+        if (@($expected | Where-Object { $actual -notcontains $_ }).Count -gt 0) {
+            Fail 'EVIDENCE_CHAIN_INCOMPLETE'
+        }
+        Fail 'UNSANITIZED_LEDGER_FIELD'
     }
 }
 
@@ -432,6 +452,137 @@ function Test-OwnerOverride($Override, $KnownFindings) {
     return @($Override.finding_id)
 }
 
+function Test-EvidenceChain($Ledger, $PendingLedger, $Matrix, $ExpectedDigests) {
+    $script:validationContext = 'evidence-chain-structure'
+    $ledgerFields = @('schema_version', 'ledger_id', 'status', 'evidence_classification', 'candidates')
+    Require-ExactProperties $Ledger $ledgerFields
+    Require-ExactProperties $PendingLedger $ledgerFields
+    Require-Id (Require-Property $Ledger 'ledger_id')
+    Require-Id (Require-Property $PendingLedger 'ledger_id')
+    if ((Require-Property $PendingLedger 'status') -ne 'runtime-pending') {
+        Fail 'INVALID_FIELD_VALUE'
+    }
+    if ((Require-Property $Ledger 'status') -ne 'runtime-complete') {
+        Fail 'RETENTION_INCOMPLETE'
+    }
+    if ((Require-Property $PendingLedger 'evidence_classification') -ne 'prepared-not-executed' -or
+        (Require-Property $Ledger 'evidence_classification') -ne 'retained-runtime-evidence') {
+        Fail 'RETENTION_INCOMPLETE'
+    }
+    Require-Id (Require-Property $Matrix 'matrix_id')
+    $matrixCandidates = Require-Array (Require-Property $Matrix 'candidates') 7
+    $pendingCandidates = Require-Array (Require-Property $PendingLedger 'candidates') 7
+    $ledgerCandidates = Require-Array (Require-Property $Ledger 'candidates') 7
+    if ($matrixCandidates.Count -ne 7 -or $pendingCandidates.Count -ne 7 -or $ledgerCandidates.Count -ne 7) {
+        Fail 'EVIDENCE_CHAIN_INCOMPLETE'
+    }
+    Assert-UniqueIds $matrixCandidates
+    Assert-UniqueIds $pendingCandidates
+    Assert-UniqueIds $ledgerCandidates
+
+    foreach ($matrixCandidate in $matrixCandidates) {
+        if ((Require-Property $matrixCandidate 'source_action_only') -isnot [bool] -or $matrixCandidate.source_action_only) {
+            Fail 'SOURCE_ACTION_DEFECT'
+        }
+    }
+
+    $staticDigestNames = @(
+        'dossier_digest',
+        'registry_digest',
+        'coverage_digest',
+        'matrix_digest',
+        'build_profile_digest',
+        'package_conformance_digest',
+        'runtime_evidence_schema_digest',
+        'build_manifest_digest'
+    )
+    foreach ($matrixCandidate in $matrixCandidates) {
+        $id = Require-Property $matrixCandidate 'id'
+        Require-Id $id
+        $pending = @($pendingCandidates | Where-Object { $_.id -eq $id })
+        $candidate = @($ledgerCandidates | Where-Object { $_.id -eq $id })
+        if ($pending.Count -ne 1 -or $candidate.Count -ne 1) {
+            Fail 'EVIDENCE_CHAIN_INCOMPLETE'
+        }
+        $pending = $pending[0]
+        $candidate = $candidate[0]
+        $candidateFields = @(
+            'id', 'status', 'disposition', 'execution_verdict',
+            'contract_verdict', 'effect_verdict', 'expected_effect_id',
+            'actual_effect_id', 'run_id', 'evidence_requirement_ids',
+            'stop_condition_ids', 'identity_digests'
+        )
+        Require-ExactProperties $pending $candidateFields
+        Require-ExactProperties $candidate $candidateFields
+        if ((Require-Property $pending 'status') -ne 'runtime-pending' -or
+            (Require-Property $pending 'disposition') -ne 'runtime-pending') {
+            Fail 'INVALID_FIELD_VALUE'
+        }
+        if ((Require-Property $candidate 'status') -ne 'retained' -or
+            (Require-Property $candidate 'disposition') -ne 'production') {
+            Fail 'RETENTION_INCOMPLETE'
+        }
+        foreach ($axis in @('execution', 'contract', 'effect')) {
+            if ((Require-Property $candidate "${axis}_verdict") -ne 'pass') {
+                Fail 'FAILED_RUNTIME_VERDICT'
+            }
+        }
+        $expectedEffect = Require-Property $candidate 'expected_effect_id'
+        $actualEffect = Require-Property $candidate 'actual_effect_id'
+        Require-Id $expectedEffect
+        Require-Id $actualEffect
+        if ($expectedEffect -ne (Require-Property $pending 'expected_effect_id')) {
+            Fail 'IDENTITY_CHAIN_MISMATCH'
+        }
+        if ($actualEffect -ne $expectedEffect) {
+            Fail 'UNEXPECTED_EFFECT'
+        }
+        foreach ($idArrayName in @('evidence_requirement_ids', 'stop_condition_ids')) {
+            $pendingIds = Require-Array (Require-Property $pending $idArrayName) 8
+            $candidateIds = Require-Array (Require-Property $candidate $idArrayName) 8
+            if ($pendingIds.Count -lt 1 -or ($pendingIds -join '|') -ne ($candidateIds -join '|')) {
+                Fail 'IDENTITY_CHAIN_MISMATCH'
+            }
+            foreach ($logicalId in $candidateIds) {
+                Require-Id $logicalId
+            }
+        }
+        $runId = Require-Property $candidate 'run_id'
+        Require-Id $runId
+        $pendingDigests = Require-Property $pending 'identity_digests'
+        $candidateDigests = Require-Property $candidate 'identity_digests'
+        Require-ExactProperties $pendingDigests $staticDigestNames
+        Require-ExactProperties $candidateDigests (@($staticDigestNames) + @('evidence_digest', 'run_digest', 'locator_digest'))
+        foreach ($digestName in $staticDigestNames) {
+            $expected = Require-Property $pendingDigests $digestName
+            $actual = Require-Property $candidateDigests $digestName
+            Require-Digest $expected
+            Require-Digest $actual
+            if ($actual -ne $expected) {
+                Fail 'IDENTITY_CHAIN_MISMATCH'
+            }
+        }
+        if ($candidateDigests.dossier_digest -ne $ExpectedDigests.dossier_digest -or
+            $candidateDigests.registry_digest -ne $ExpectedDigests.registry_digest -or
+            $candidateDigests.coverage_digest -ne $ExpectedDigests.coverage_digest -or
+            $candidateDigests.matrix_digest -ne $ExpectedDigests.matrix_digest -or
+            $candidateDigests.build_profile_digest -ne $matrixCandidate.build_profile_digest) {
+            Fail 'IDENTITY_CHAIN_MISMATCH'
+        }
+        foreach ($digestName in @('evidence_digest', 'run_digest', 'locator_digest')) {
+            if ($candidateDigests.PSObject.Properties.Name -notcontains $digestName) {
+                Fail 'EVIDENCE_CHAIN_INCOMPLETE'
+            }
+            Require-Digest $candidateDigests.$digestName
+        }
+        $runText = "$runId|$($candidateDigests.evidence_digest)|$($candidateDigests.build_manifest_digest)"
+        $runDigest = Get-Sha256Hex ([Text.Encoding]::UTF8.GetBytes($runText))
+        if ($candidateDigests.run_digest -ne $runDigest) {
+            Fail 'IDENTITY_CHAIN_MISMATCH'
+        }
+    }
+}
+
 function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
     $result = [ordered]@{
         schema_version = 'x4-admission-result.v1'
@@ -484,6 +635,27 @@ try {
     }
     if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
         Fail 'OVERRIDE_SCOPE_MISMATCH'
+    }
+    $evidenceInputs = @($SanitizedLedgerPath, $PendingLedgerPath, $CandidateMatrixPath)
+    if (@($evidenceInputs | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
+        if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
+            [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
+            Fail 'MISSING_INPUT'
+        }
+        $script:validationContext = 'candidate-matrix-read'
+        $matrixRead = Read-BoundedJson $CandidateMatrixPath 'phase-05.1-candidates.v1' 'UNSUPPORTED_MATRIX_SCHEMA'
+        $script:validationContext = 'pending-ledger-read'
+        $pendingLedgerRead = Read-BoundedJson $PendingLedgerPath 'phase-05.1-candidate-ledger.v1' 'UNSUPPORTED_LEDGER_SCHEMA'
+        $script:validationContext = 'sanitized-ledger-read'
+        $ledgerRead = Read-BoundedJson $SanitizedLedgerPath 'phase-05.1-candidate-ledger.v1' 'UNSUPPORTED_LEDGER_SCHEMA'
+        $expectedDigests = [pscustomobject]@{
+            dossier_digest = $script:dossierDigest
+            registry_digest = Get-Sha256Hex $registryRead.Bytes
+            coverage_digest = Get-Sha256Hex $coverageRead.Bytes
+            matrix_digest = Get-Sha256Hex $matrixRead.Bytes
+        }
+        $script:validationContext = 'evidence-chain-validation'
+        Test-EvidenceChain $ledgerRead.Value $pendingLedgerRead.Value $matrixRead.Value $expectedDigests
     }
     Write-Result 'admissible' @('ADMISSIBLE')
     exit 0
