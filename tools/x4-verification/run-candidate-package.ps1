@@ -16,6 +16,13 @@ $attestationModulePath = Join-Path $repositoryRoot 'tools/x4-verification/produc
 $protocolPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $schemaPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json'
 $anchorPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
+$manifestContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-build-manifest.v1.json'
+$packageContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/package-conformance.v1.json'
+$matrixPath = Join-Path $repositoryRoot 'tests/x4-candidates/phase-05.1-candidates.v1.json'
+$runnerSourcePath = Join-Path $repositoryRoot 'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
+$contentTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-content.xml'
+$uiTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-ui.xml'
+$entrypointTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-entry.lua'
 $trustedComponentBindings = [ordered]@{
     dispatcher_digest = $dispatcherPath
     adapter_digest = $adapterPath
@@ -124,6 +131,104 @@ function New-VerifiedSnapshot([string]$SourceRoot, $Manifest, [string]$WorkRoot)
         }
     }
     return $snapshot
+}
+function Assert-ExactText([string]$Path, [string]$Expected) {
+    [byte[]]$actual = [IO.File]::ReadAllBytes($Path)
+    [byte[]]$expectedBytes = [Text.UTF8Encoding]::new($false).GetBytes($Expected)
+    if ($actual.Length -ne $expectedBytes.Length -or (Get-Sha256 $actual) -ne (Get-Sha256 $expectedBytes)) {
+        Fail 'COMPONENT_DIGEST_MISMATCH'
+    }
+}
+function Assert-ExactJson($Actual, $Expected) {
+    $actualJson = $Actual | ConvertTo-Json -Compress -Depth 64
+    $expectedJson = $Expected | ConvertTo-Json -Compress -Depth 64
+    if ($actualJson -cne $expectedJson) { Fail 'COMPONENT_DIGEST_MISMATCH' }
+}
+function Assert-TrustedGeneratedPackage([string]$SnapshotRoot, $Manifest) {
+    $contract = Get-Content -LiteralPath $manifestContractPath -Raw |
+        ConvertFrom-Json -Depth 32 -DateKind String
+    $declaredPaths = @($Manifest.generated_files.path)
+    $requiredPaths = @($contract.required_generated_files)
+    if (($declaredPaths -join '|') -cne ($requiredPaths -join '|')) {
+        Fail 'COMPONENT_DIGEST_MISMATCH'
+    }
+
+    $matrix = Get-Content -LiteralPath $matrixPath -Raw |
+        ConvertFrom-Json -Depth 64 -DateKind String
+    if ([string]$Manifest.matrix_digest -cne (Get-FileDigest $matrixPath)) {
+        Fail 'COMPONENT_DIGEST_MISMATCH'
+    }
+    $groups = @($matrix.build_groups | Where-Object { $_.id -ceq [string]$Manifest.group_id })
+    if ($groups.Count -ne 1) { Fail 'COMPONENT_DIGEST_MISMATCH' }
+    $group = $groups[0]
+    $members = @($matrix.candidates |
+        Where-Object { @($group.candidate_ids) -ccontains $_.id } |
+        Sort-Object id)
+    if ($members.Count -ne @($group.candidate_ids).Count -or
+        [string]$Manifest.build_profile_digest -cne [string]$group.build_profile_digest -or
+        (@($Manifest.candidate_ids) -join '|') -cne (@($group.candidate_ids) -join '|')) {
+        Fail 'COMPONENT_DIGEST_MISMATCH'
+    }
+
+    $packageId = 'live_galaxy_candidate_' + ([string]$group.id -replace '[^a-z0-9_]', '_')
+    $buildId = "candidate-$($group.id)-$($group.build_profile_digest.Substring(0, 12))"
+    if ([string]$Manifest.build_id -cne $buildId) { Fail 'COMPONENT_DIGEST_MISMATCH' }
+    $escapedPackageId = [Security.SecurityElement]::Escape($packageId)
+    $escapedPackageName = [Security.SecurityElement]::Escape("Live Galaxy Candidate $($group.id)")
+    $escapedEntrypoint = [Security.SecurityElement]::Escape([string]$members[0].build_profile.entrypoint)
+    $content = (Get-Content -LiteralPath $contentTemplatePath -Raw).
+        Replace('{{PACKAGE_ID}}', $escapedPackageId).
+        Replace('{{PACKAGE_NAME}}', $escapedPackageName)
+    $ui = (Get-Content -LiteralPath $uiTemplatePath -Raw).
+        Replace('{{PACKAGE_ID}}', $escapedPackageId).
+        Replace('{{ENTRYPOINT}}', $escapedEntrypoint)
+    $safeGroup = [string]$group.id -replace '[^a-z0-9_]', '_'
+    $entrypoint = (Get-Content -LiteralPath $entrypointTemplatePath -Raw).
+        Replace('{{BUILD_ID}}', $buildId).
+        Replace('{{GROUP_ID}}', [string]$group.id).
+        Replace('{{SAFE_GROUP_ID}}', $safeGroup)
+    Assert-ExactText (Join-Path $SnapshotRoot 'content.xml') $content
+    Assert-ExactText (Join-Path $SnapshotRoot 'ui.xml') $ui
+    Assert-ExactText (Join-Path $SnapshotRoot 'lua/live_galaxy_candidate_entry.lua') $entrypoint
+    if ((Get-FileDigest (Join-Path $SnapshotRoot 'lua/live_galaxy_candidate_runner.lua')) -cne
+        (Get-FileDigest $runnerSourcePath)) {
+        Fail 'COMPONENT_DIGEST_MISMATCH'
+    }
+
+    $actualSubset = Get-Content -LiteralPath (Join-Path $SnapshotRoot 'manifest/candidate-matrix-subset.v1.json') -Raw |
+        ConvertFrom-Json -Depth 64 -DateKind String
+    $expectedSubset = [ordered]@{
+        schema_version = $matrix.schema_version
+        matrix_id = $matrix.matrix_id
+        status = $matrix.status
+        evidence_classification = $matrix.evidence_classification
+        group = $group
+        candidates = $members
+    }
+    Assert-ExactJson $actualSubset $expectedSubset
+
+    $baseContract = Get-Content -LiteralPath $packageContractPath -Raw |
+        ConvertFrom-Json -Depth 32 -DateKind String
+    $actualContract = Get-Content -LiteralPath (Join-Path $SnapshotRoot 'manifest/package-conformance.v1.json') -Raw |
+        ConvertFrom-Json -Depth 32 -DateKind String
+    $expectedContract = [ordered]@{
+        schema_version = $baseContract.schema_version
+        contract_id = "candidate-$($group.id)"
+        package_id = $packageId
+        required_content_dependency = $baseContract.required_content_dependency
+        required_ui_dependency = $baseContract.required_ui_dependency
+        required_environment = $baseContract.required_environment
+        required_entrypoint = $members[0].build_profile.entrypoint
+        internal_module_prefix = $members[0].build_profile.import_root
+        external_modules = @($baseContract.external_modules)
+        test_only_prefixes = @($baseContract.test_only_prefixes)
+        native_binding = $baseContract.native_binding
+        bounds = $baseContract.bounds
+        admission_dimensions = @($baseContract.admission_dimensions)
+        admission_failure_classes = @($baseContract.admission_failure_classes)
+    }
+    Assert-ExactJson $actualContract $expectedContract
+    return $expectedSubset
 }
 function Write-Result([string]$Verdict, [bool]$Ready, [string]$Attestation, [string]$Digest = '', [bool]$Retainable = $false) {
     [ordered]@{
@@ -311,13 +416,6 @@ try {
     $protocolPath = Join-Path $groupFull 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
     $schemaPath = Join-Path $groupFull 'tools/x4-verification/contracts/runtime-evidence.v1.json'
     $anchorPath = Join-Path $groupFull 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
-    Import-Module $attestationModulePath -Force
-    $subsetPath = Join-Path $groupFull 'manifest/candidate-matrix-subset.v1.json'
-    $subset = Get-Content -LiteralPath $subsetPath -Raw | ConvertFrom-Json -Depth 64 -DateKind String
-    $candidateIds = @($subset.candidates.id | Sort-Object)
-    if ($candidateIds.Count -lt 1 -or $candidateIds.Count -gt 7 -or
-        @($candidateIds | Sort-Object -Unique).Count -ne $candidateIds.Count -or
-        ($candidateIds -join '|') -ne (@($manifest.candidate_ids | Sort-Object) -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
     $script:ReasonCode = 'COMPONENT_BINDING_VALIDATION_FAILED'
     $componentBindings = [ordered]@{
         dispatcher_digest = (Join-Path $groupFull 'tools/x4-verification/run-candidate-package.ps1')
@@ -340,6 +438,12 @@ try {
             Fail 'COMPONENT_DIGEST_MISMATCH'
         }
     }
+    $subset = Assert-TrustedGeneratedPackage $groupFull $manifest
+    $candidateIds = @($subset.candidates.id | Sort-Object)
+    if ($candidateIds.Count -lt 1 -or $candidateIds.Count -gt 7 -or
+        @($candidateIds | Sort-Object -Unique).Count -ne $candidateIds.Count -or
+        ($candidateIds -join '|') -ne (@($manifest.candidate_ids | Sort-Object) -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
+    Import-Module $attestationModulePath -Force
     $script:ReasonCode = 'PACKAGE_CONFORMANCE_VALIDATION_FAILED'
     $contentPath = Join-Path $groupFull 'content.xml'
     $uiPath = Join-Path $groupFull 'ui.xml'

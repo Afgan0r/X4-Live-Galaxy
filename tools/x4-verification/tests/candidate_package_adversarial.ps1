@@ -11,6 +11,12 @@ function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Get-Digest([string]$Path) {
+    [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Path))
+    ).ToLowerInvariant()
+}
+
 function Invoke-Dispatcher([string]$GroupRoot, [string]$OutputPath, [int]$ExpectedExit) {
     $text = & pwsh -NoProfile -File $dispatcherPath -GroupRoot $GroupRoot -OutputPath $OutputPath 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq $ExpectedExit) "Dispatcher exit $LASTEXITCODE, expected $ExpectedExit`: $text"
@@ -164,6 +170,58 @@ try {
     finally {
         [IO.File]::WriteAllText($adapterPath, $adapterText, [Text.UTF8Encoding]::new($false))
         [IO.File]::WriteAllText($manifestPath, $manifestText, [Text.UTF8Encoding]::new($false))
+    }
+
+    $loadedByteCases = @(
+        @{ Name = 'content'; Path = 'content.xml'; Mutation = "`n<!-- coordinated forgery -->`n" },
+        @{ Name = 'ui'; Path = 'ui.xml'; Mutation = "`n<!-- coordinated forgery -->`n" },
+        @{ Name = 'entrypoint'; Path = 'lua/live_galaxy_candidate_entry.lua'; Mutation = "`nlocal forged_entry = true`n" },
+        @{ Name = 'runner'; Path = 'lua/live_galaxy_candidate_runner.lua'; Mutation = "`nlocal forged_runner = true`n" }
+    )
+    foreach ($case in $loadedByteCases) {
+        $loadedPath = Join-Path $groupRoot $case.Path
+        $loadedText = Get-Content -LiteralPath $loadedPath -Raw
+        $forgedOutput = Join-Path $outputRoot "coordinated-$($case.Name)-forgery.jsonl"
+        try {
+            [IO.File]::WriteAllText(
+                $loadedPath,
+                $loadedText + $case.Mutation,
+                [Text.UTF8Encoding]::new($false)
+            )
+            $manifest = $manifestText | ConvertFrom-Json -Depth 64 -DateKind String
+            $loadedRow = @($manifest.generated_files | Where-Object { $_.path -ceq $case.Path })[0]
+            $loadedRow.bytes = (Get-Item -LiteralPath $loadedPath).Length
+            $loadedRow.sha256 = Get-Digest $loadedPath
+            $graphMaterial =
+                (Get-Digest (Join-Path $groupRoot 'content.xml')) +
+                (Get-Digest (Join-Path $groupRoot 'ui.xml')) +
+                (Get-Digest (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua'))
+            $manifest.package_conformance.graph_digest = [Convert]::ToHexString(
+                [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($graphMaterial))
+            ).ToLowerInvariant()
+            $packageBytes = [Text.Encoding]::UTF8.GetBytes(
+                ($manifest.package_conformance | ConvertTo-Json -Compress -Depth 8)
+            )
+            $manifest.package_conformance_digest = [Convert]::ToHexString(
+                [Security.Cryptography.SHA256]::HashData($packageBytes)
+            ).ToLowerInvariant()
+            [IO.File]::WriteAllText(
+                $manifestPath,
+                ($manifest | ConvertTo-Json -Depth 64),
+                [Text.UTF8Encoding]::new($false)
+            )
+            $forged = Invoke-Dispatcher $groupRoot $forgedOutput 1
+            Assert-True ($forged.reason_code -eq 'COMPONENT_DIGEST_MISMATCH') `
+                "Coordinated $($case.Name) and manifest forgery was not rejected."
+            Assert-True (-not (Test-Path -LiteralPath $forgedOutput)) `
+                "Coordinated $($case.Name) forgery published evidence."
+            Assert-True (-not (Test-Path -LiteralPath "$forgedOutput.attestation.json")) `
+                "Coordinated $($case.Name) forgery published attestation."
+        }
+        finally {
+            [IO.File]::WriteAllText($loadedPath, $loadedText, [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText($manifestPath, $manifestText, [Text.UTF8Encoding]::new($false))
+        }
     }
 
     $anchorPath = Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
