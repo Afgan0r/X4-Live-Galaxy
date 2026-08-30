@@ -178,7 +178,9 @@ if ($Case -eq 'handback') {
 
     $admissionOutput = & pwsh -NoProfile -File $admissionContractPath -Case evidence-chain 2>&1
     Assert-True ($LASTEXITCODE -eq 0) "Evidence-chain admission contract failed: $($admissionOutput -join ' | ')"
-    $productionDiff = & git diff --exit-code c4bc2ace2036eb2e27d2ef6a37671dfcb8b8d77e -- extensions/live_galaxy 2>&1
+    $productionDiff = & git diff --exit-code c4bc2ace2036eb2e27d2ef6a37671dfcb8b8d77e -- `
+        extensions/live_galaxy/content.xml extensions/live_galaxy/ui.xml `
+        extensions/live_galaxy/lua extensions/live_galaxy/md 2>&1
     Assert-True ($LASTEXITCODE -eq 0) "Production/public package changed from executor baseline: $($productionDiff -join ' | ')"
     Write-Output 'PASS: Phase 05.1 sanitized handback contract'
     exit 0

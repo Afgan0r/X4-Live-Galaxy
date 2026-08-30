@@ -8,6 +8,8 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $admissionContract = Join-Path $root 'tools/x4-verification/tests/admission_contract.ps1'
 $packageConformanceContract = Join-Path $root 'tools/x4-verification/tests/package_conformance_contract.ps1'
+$candidateBuildContract = Join-Path $root 'tools/x4-verification/tests/candidate_build_contract.ps1'
+$evidenceRetentionContract = Join-Path $root 'tools/x4-verification/tests/evidence_retention_contract.ps1'
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission')) {
@@ -16,6 +18,17 @@ if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     }
     if ($Suite -eq 'x4-admission') {
         exit 0
+    }
+}
+
+if ($Suite -eq 'x4-verification') {
+    & pwsh -NoProfile -File $admissionContract -Case evidence-chain
+    if ($LASTEXITCODE -ne 0) { throw 'X4 admission evidence-chain contract failed.' }
+    & pwsh -NoProfile -File $candidateBuildContract -Case all
+    if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
+    foreach ($retentionCase in @('retention', 'handback')) {
+        & pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase
+        if ($LASTEXITCODE -ne 0) { throw "X4 evidence-retention contract failed: $retentionCase" }
     }
 }
 
