@@ -296,6 +296,27 @@ function runner.run(manifest, context)
     return jsonl, { candidate_count = #candidates, output_rows = #lines, total_bytes = #jsonl }
 end
 
+function runner.verify_digest_adapter(adapter, vectors)
+    if type(adapter) ~= "table" or type(adapter.hash) ~= "function"
+        or type(adapter.verify) ~= "function" or type(vectors) ~= "table" or #vectors == 0 then
+        return nil, "digest_adapter_missing"
+    end
+    for _, vector in ipairs(vectors) do
+        if type(vector) ~= "table" or type(vector.payload) ~= "string" or not valid_digest(vector.sha256) then
+            return nil, "digest_vector_invalid"
+        end
+        local ok, algorithm, digest = pcall(adapter.hash, vector.payload)
+        if not ok or algorithm ~= "sha256" or digest ~= vector.sha256 then return nil, "digest_vector_mismatch" end
+        local verified, matches = pcall(adapter.verify, vector.payload, algorithm, digest)
+        if not verified or matches ~= true then return nil, "digest_vector_mismatch" end
+        if type(vector.same_length_tamper) == "string" and #vector.same_length_tamper == #vector.payload then
+            local tampered, accepted = pcall(adapter.verify, vector.same_length_tamper, algorithm, digest)
+            if tampered and accepted == true then return nil, "digest_tamper_accepted" end
+        end
+    end
+    return true
+end
+
 runner.canonical_json = canonical_json
 
 return runner

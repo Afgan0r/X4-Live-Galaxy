@@ -19,6 +19,20 @@ local function digest_adapter()
     }
 end
 
+local function fixed_vector_adapter()
+    local vectors = {
+        [""] = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        ["abc"] = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        ["hello world"] = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+    }
+    return {
+        hash = function(payload) return "sha256", vectors[payload] end,
+        verify = function(payload, algorithm, digest)
+            return algorithm == "sha256" and vectors[payload] ~= nil and vectors[payload] == digest
+        end,
+    }
+end
+
 local function execution_context()
     return {
         adapters = {
@@ -229,6 +243,24 @@ local function successful_candidate(id, actual_result)
         end,
         validate = function(result) return type(result) == "table" and result.completeness == "complete" end,
     }
+end
+
+
+function cases.fixed_sha256_vectors_reject_same_length_tampering()
+    local ok, err = runner.verify_digest_adapter(fixed_vector_adapter(), {
+        { payload = "", sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+        { payload = "abc", same_length_tamper = "abd", sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" },
+        { payload = "hello world", same_length_tamper = "hello worle", sha256 = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9" },
+    })
+    assert(ok == true and err == nil)
+
+    local accepted, reason = runner.verify_digest_adapter({
+        hash = function(payload) return "sha256", string.rep("0", 56) .. string.format("%08x", #payload) end,
+        verify = function(payload, _, digest) return digest:sub(-8) == string.format("%08x", #payload) end,
+    }, {
+        { payload = "abc", same_length_tamper = "abd", sha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" },
+    })
+    assert(accepted == nil and reason == "digest_vector_mismatch")
 end
 
 local function multi_manifest(first)
