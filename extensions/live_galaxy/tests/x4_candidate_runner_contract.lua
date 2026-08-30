@@ -36,7 +36,7 @@ end
 local function execution_context()
     return {
         adapters = {
-            count_fill = function()
+            ["count-fill-local-contract"] = function()
                 return {
                     actual_result = "count-fill-contract-valid",
                     completeness = "complete",
@@ -241,14 +241,18 @@ end
 local function successful_candidate(id, actual_result)
     return {
         id = id,
+        adapter_id = id,
         source = "05.2-RESEARCH.md#phase-05.1-candidate-matrix",
         expected_result = "expected-result",
-        execute = function()
-            return { actual_result = actual_result or "expected-result", completeness = "complete",
-                work_units = 2, observations = { "observation" } }
-        end,
-        validate = function(result) return type(result) == "table" and result.completeness == "complete" end,
+        bounds = { max_work_units = 8 },
     }
+end
+
+local function add_adapter(context, candidate, callback)
+    context.adapters[candidate.adapter_id] = callback or function()
+        return { actual_result = "expected-result", completeness = "complete",
+            work_units = 2, observations = { "observation" } }
+    end
 end
 
 
@@ -306,8 +310,10 @@ function cases.isolates_exceptions_malformed_results_and_work_unit_exhaustion()
     }
     for _, failure in ipairs(failures) do
         local first = successful_candidate("candidate-a-first")
-        first.execute = failure.execute
-        local jsonl, result = runner.run(multi_manifest(first), execution_context())
+        local context = execution_context()
+        add_adapter(context, first, failure.execute)
+        add_adapter(context, successful_candidate("candidate-z-later"))
+        local jsonl, result = runner.run(multi_manifest(first), context)
         assert(type(jsonl) == "string", tostring(result))
         local _, rows = validate_jsonl(jsonl)
         assert(rows[1].candidate_id == "candidate-a-first")
@@ -323,11 +329,13 @@ end
 function cases.lua_instruction_watchdog_preempts_cooperative_execution_and_continues()
     local calls = 0
     local first = successful_candidate("candidate-a-timeout")
-    first.execute = function()
+    local blocking_adapter = function()
         calls = calls + 1
         while true do end
     end
     local context = execution_context()
+    add_adapter(context, first, blocking_adapter)
+    add_adapter(context, successful_candidate("candidate-z-later"))
     context.watchdog.invoke = function(candidate_id, _, _, callback)
         local timed_out = false
         if candidate_id == first.id then
@@ -353,7 +361,12 @@ end
 function cases.never_passes_a_valid_but_unexpected_effect()
     local manifest = phase_051.single_success()
     manifest.candidates = { successful_candidate("candidate-unexpected", "valid-unexpected-result") }
-    local jsonl, result = runner.run(manifest, execution_context())
+    manifest.candidates[1].expected_result = "expected-result"
+    local context = execution_context()
+    add_adapter(context, manifest.candidates[1], function()
+        return { actual_result = "valid-unexpected-result", completeness = "complete", work_units = 2 }
+    end)
+    local jsonl, result = runner.run(manifest, context)
     assert(type(jsonl) == "string", tostring(result))
     local _, rows = validate_jsonl(jsonl)
     assert(rows[3].execution_verdict == "pass")
@@ -365,19 +378,27 @@ end
 
 function cases.records_protected_contract_and_effect_failure_reasons_then_continues()
     local contract_failure = successful_candidate("candidate-a-contract")
-    contract_failure.validate = function() error("private contract detail") end
-    local jsonl = assert(runner.run(multi_manifest(contract_failure), execution_context()))
+    local context = execution_context()
+    add_adapter(context, contract_failure, function()
+        return { actual_result = "expected-result", completeness = "partial", work_units = 2 }
+    end)
+    add_adapter(context, successful_candidate("candidate-z-later"))
+    local jsonl = assert(runner.run(multi_manifest(contract_failure), context))
     local _, rows = validate_jsonl(jsonl)
     assert(rows[2].contract_verdict == "fail")
-    assert(rows[2].failure_reason == "contract_exception")
+    assert(rows[2].failure_reason == "contract_rejected")
     assert(rows[6].effect_verdict == "pass")
 
     local effect_failure = successful_candidate("candidate-a-effect")
-    effect_failure.assess = function() error("private effect detail") end
-    jsonl = assert(runner.run(multi_manifest(effect_failure), execution_context()))
+    context = execution_context()
+    add_adapter(context, effect_failure, function()
+        return { actual_result = "valid-unexpected-result", completeness = "complete", work_units = 2 }
+    end)
+    add_adapter(context, successful_candidate("candidate-z-later"))
+    jsonl = assert(runner.run(multi_manifest(effect_failure), context))
     _, rows = validate_jsonl(jsonl)
-    assert(rows[3].effect_verdict == "fail")
-    assert(rows[3].failure_reason == "effect_exception")
+    assert(rows[3].effect_verdict == "mismatch")
+    assert(rows[3].failure_reason == "effect_mismatch")
     assert(rows[6].effect_verdict == "pass")
 end
 
@@ -436,21 +457,18 @@ function cases.independent_contract_rejects_collapsed_verdicts_and_noncanonical_
     assert(not pcall(validate_jsonl, table.concat(lines, "\n")))
 end
 
-for name in pairs(cases) do cases[name] = nil end
-
-function cases.keeps_untrusted_runtime_callbacks_unreachable()
+function cases.rejects_candidate_owned_authority_and_unattested_native_dispatch()
     local manifest = phase_051.single_success()
     local context = execution_context()
     local called = false
-    manifest.candidates[1].execute = function()
-        called = true
-        return { actual_result = "forged", completeness = "complete" }
+    for _, field in ipairs({ "execute", "validate", "assess", "digest", "watchdog", "registry", "verdict" }) do
+        local injected = phase_051.single_success()
+        injected.candidates[1][field] = function() called = true end
+        local output, reason = runner.run(injected, context)
+        assert(output == nil)
+        assert(reason == "candidate_schema_invalid")
     end
-    context.digest.hash = function()
-        called = true
-        return "sha256", string.rep("a", 64)
-    end
-    local output, reason = runner.run(manifest, context)
+    local output, reason = runner.run_native(manifest, context)
     assert(output == nil)
     assert(reason == "trusted_runtime_attestation_missing")
     assert(called == false)

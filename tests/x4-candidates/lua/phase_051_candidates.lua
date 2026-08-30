@@ -21,16 +21,10 @@ function candidates.single_success()
         candidates = {
             {
                 id = "p051-native-count-fill-runtime",
+                adapter_id = "count-fill-local-contract",
                 source = "05.2-RESEARCH.md#phase-05.1-candidate-matrix",
                 expected_result = "count-fill-contract-valid",
-                execute = function(context)
-                    return context.adapters.count_fill()
-                end,
-                validate = function(result)
-                    return type(result) == "table"
-                        and result.actual_result == "count-fill-contract-valid"
-                        and result.completeness == "complete"
-                end,
+                bounds = { max_work_units = 8 },
             },
         },
     }
