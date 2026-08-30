@@ -228,6 +228,9 @@ try {
     Assert-Rejected $scaffoldEvidencePath $manifestPath (Join-Path $scratch 'reject-scaffold') 'scaffold-only manifest'
     $manifest.execution_status = 'execution-ready'
     Write-Utf8NoBom $manifestPath ($manifest | ConvertTo-Json -Depth 32)
+    Assert-Rejected $scaffoldEvidencePath $manifestPath (Join-Path $scratch 'reject-native-pending') 'unproven blocking native boundary'
+    $manifest.native_execution_status = 'execution-ready-isolated'
+    Write-Utf8NoBom $manifestPath ($manifest | ConvertTo-Json -Depth 32)
     $runId = 'p051-retention-contract-run'
     $evidencePath = Join-Path $scratch 'runtime-evidence.jsonl'
     $validStream = New-EvidenceStream $manifest $runId

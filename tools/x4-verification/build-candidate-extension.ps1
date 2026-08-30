@@ -263,7 +263,7 @@ local function initialize()
         scaffold_only = true,
         implementation_gates = {
             "seven_candidate_adapters",
-            "external_watchdog",
+            "terminable_native_isolation",
             "sha256_adapter",
             "private_jsonl_sink",
             "human_triggered_dispatcher",
@@ -347,6 +347,7 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         candidate_ids = @($Group.candidate_ids)
         developer_only = $true
         execution_status = 'scaffold-only'
+        native_execution_status = 'runtime-pending'
         dossier_digest = Get-FileDigest $dossierPath
         registry_digest = Get-FileDigest $registryPath
         coverage_digest = Get-FileDigest $coveragePath

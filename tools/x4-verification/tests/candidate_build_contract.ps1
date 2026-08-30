@@ -229,10 +229,11 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     Assert-True ($manifest.matrix_digest -eq (Get-FileDigest $matrixPath)) 'Generated manifest matrix linkage is stale.'
     Assert-True ($manifest.runtime_evidence_schema_digest -eq (Get-FileDigest $runtimeEvidencePath)) 'Generated manifest evidence-schema linkage is stale.'
     Assert-True ($manifest.developer_only -eq $true -and $manifest.execution_status -eq 'scaffold-only') 'Generated manifest overstates execution or public scope.'
+    Assert-True ($manifest.native_execution_status -eq 'runtime-pending') 'Generated manifest overstates blocking-native readiness.'
     $entrypoint = Get-Content -LiteralPath (Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua') -Raw
     Assert-True ($entrypoint -match 'scaffold_only = true') 'Generated entrypoint is not explicitly scaffold-only.'
     Assert-True ($entrypoint -notmatch '(?m)^\s*runner = runner,') 'Generated entrypoint exposes a callable runner without runtime adapters.'
-    foreach ($gate in @('seven_candidate_adapters', 'external_watchdog', 'sha256_adapter', 'private_jsonl_sink', 'human_triggered_dispatcher')) {
+    foreach ($gate in @('seven_candidate_adapters', 'terminable_native_isolation', 'sha256_adapter', 'private_jsonl_sink', 'human_triggered_dispatcher')) {
         Assert-True ($entrypoint -match [regex]::Escape($gate)) "Generated scaffold omits implementation gate '$gate'."
     }
     $generatedPaths = @($manifest.generated_files.path)

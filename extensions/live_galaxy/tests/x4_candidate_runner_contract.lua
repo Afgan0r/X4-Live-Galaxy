@@ -320,7 +320,7 @@ function cases.isolates_exceptions_malformed_results_and_work_unit_exhaustion()
     end
 end
 
-function cases.external_watchdog_preempts_over_budget_execution_and_continues()
+function cases.lua_instruction_watchdog_preempts_cooperative_execution_and_continues()
     local calls = 0
     local first = successful_candidate("candidate-a-timeout")
     first.execute = function()

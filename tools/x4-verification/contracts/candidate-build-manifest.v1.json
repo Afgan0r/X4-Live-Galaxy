@@ -10,6 +10,7 @@
     "candidate_ids",
     "developer_only",
     "execution_status",
+    "native_execution_status",
     "dossier_digest",
     "registry_digest",
     "coverage_digest",
@@ -37,6 +38,7 @@
     "manifest/package-conformance.v1.json"
   ],
   "execution_statuses": ["scaffold-only", "execution-ready"],
+  "native_execution_statuses": ["runtime-pending", "execution-ready-isolated"],
   "bounds": {
     "max_candidates": 7,
     "max_generated_files": 8,

@@ -194,9 +194,10 @@ local function ordered_candidates(candidates)
 end
 
 local function invoke_bounded_stage(candidate, stage, context, bounds, callback)
-    -- Reserve the stage's unit before crossing the callback/native boundary. The
-    -- injected watchdog owns the external deadline and must return control even
-    -- when the callback exceeds its instruction or wall-clock allowance.
+    -- Reserve the stage's unit before invoking cooperative local-contract work.
+    -- This synchronous hook cannot preempt a blocking ffi.C/native call; build
+    -- retention keeps that boundary runtime-pending until terminable isolation
+    -- has X4-faithful evidence.
     local reserved_work_units = 1
     if reserved_work_units > bounds.max_work_units_per_step then return nil, "timeout_marker" end
     local invoked, status, value = pcall(context.watchdog.invoke, candidate.id, stage,
