@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('retention')]
+    [ValidateSet('retention', 'handback')]
     [string]$Case = 'retention'
 )
 
@@ -142,6 +142,46 @@ function Add-BroadReadPermission([string]$Path) {
                 [System.IO.UnixFileMode]::GroupRead
         )
     }
+}
+
+if ($Case -eq 'handback') {
+    $ledgerPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidate-ledger.v1.json'
+    $procedurePath = Join-Path $root 'tests/x4-candidates/05.1-candidate-run-procedure.md'
+    $admissionContractPath = Join-Path $toolRoot 'tests/admission_contract.ps1'
+    foreach ($requiredPath in @($ledgerPath, $procedurePath, $admissionContractPath)) {
+        Assert-True (Test-Path -LiteralPath $requiredPath -PathType Leaf) "Handback artifact is missing: $requiredPath"
+    }
+
+    $ledger = Get-Content -LiteralPath $ledgerPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $matrix = Get-Content -LiteralPath $matrixPath -Raw -Encoding utf8 | ConvertFrom-Json
+    Assert-True ($ledger.schema_version -eq 'phase-05.1-candidate-ledger.v1') 'Pending ledger schema is not versioned.'
+    Assert-True ($ledger.status -eq 'runtime-pending') 'Committed ledger must remain runtime-pending.'
+    Assert-True (@($ledger.candidates).Count -eq 7) 'Pending ledger must contain exactly seven rows.'
+    $ledgerIds = @($ledger.candidates | ForEach-Object id | Sort-Object)
+    $matrixIds = @($matrix.candidates | ForEach-Object id | Sort-Object)
+    Assert-True (($ledgerIds -join '|') -eq ($matrixIds -join '|')) 'Pending ledger candidates do not match the matrix exactly.'
+    foreach ($candidate in @($ledger.candidates)) {
+        Assert-True ($candidate.status -eq 'runtime-pending') "Candidate $($candidate.id) is not pending."
+        Assert-True ($candidate.disposition -eq 'runtime-pending') "Candidate $($candidate.id) claims a disposition."
+        foreach ($axis in @('execution', 'contract', 'effect')) {
+            Assert-True ($candidate."${axis}_verdict" -eq 'not_run') "Candidate $($candidate.id) claims a $axis verdict."
+        }
+        Assert-True (@($candidate.evidence_requirement_ids).Count -gt 0) "Candidate $($candidate.id) lacks evidence requirements."
+        Assert-True (@($candidate.stop_condition_ids).Count -gt 0) "Candidate $($candidate.id) lacks stop conditions."
+    }
+
+    $procedure = Get-Content -LiteralPath $procedurePath -Raw -Encoding utf8
+    foreach ($requiredPhrase in @('human-only', 'disposable', 'stop condition', 'retain-evidence.ps1', 'runtime-pending')) {
+        Assert-True ($procedure -match [regex]::Escape($requiredPhrase)) "Run procedure omits required boundary: $requiredPhrase"
+    }
+    Assert-True ($procedure -notmatch '(?i)[A-Z]:\\|/Users/|\\Users\\|savegame|successful X4 execution') 'Run procedure leaked a private path or claimed execution.'
+
+    $admissionOutput = & pwsh -NoProfile -File $admissionContractPath -Case evidence-chain 2>&1
+    Assert-True ($LASTEXITCODE -eq 0) "Evidence-chain admission contract failed: $($admissionOutput -join ' | ')"
+    $productionDiff = & git diff --exit-code c4bc2ace2036eb2e27d2ef6a37671dfcb8b8d77e -- extensions/live_galaxy 2>&1
+    Assert-True ($LASTEXITCODE -eq 0) "Production/public package changed from executor baseline: $($productionDiff -join ' | ')"
+    Write-Output 'PASS: Phase 05.1 sanitized handback contract'
+    exit 0
 }
 
 if ($Case -ne 'retention') { throw "Unhandled case: $Case" }
