@@ -345,6 +345,27 @@ try {
     Write-Utf8NoBom $tamperedManifestPath ($tamperedManifest | ConvertTo-Json -Depth 32)
     $digestOutput = Invoke-Retention $pendingEvidencePath $tamperedManifestPath (Join-Path $scratch 'reject-package-digest') 1
     Assert-True (($digestOutput -join "`n") -match 'PACKAGE_CONFORMANCE_DIGEST_MISMATCH') 'Package conformance digest was not independently recomputed.'
+
+    $forgedGroupRoot = Join-Path $scratch 'forged-embedded-conformance'
+    Copy-Item -LiteralPath $pendingGroupRoot -Destination $forgedGroupRoot -Recurse
+    $forgedManifestPath = Join-Path $forgedGroupRoot 'manifest/build-manifest.v1.json'
+    $forgedManifest = Get-Content -LiteralPath $forgedManifestPath -Raw | ConvertFrom-Json -Depth 32
+    $forgedEntrypointPath = Join-Path $forgedGroupRoot 'lua/live_galaxy_candidate_entry.lua'
+    Add-Content -LiteralPath $forgedEntrypointPath -Value "`nrequire('live_galaxy/lua/missing_transitive')" -Encoding utf8NoBOM
+    $entryRow = @($forgedManifest.generated_files | Where-Object { $_.path -eq 'lua/live_galaxy_candidate_entry.lua' })
+    Assert-True ($entryRow.Count -eq 1) 'Generated entrypoint row is missing from the forgery fixture.'
+    $entryRow[0].bytes = (Get-Item -LiteralPath $forgedEntrypointPath).Length
+    $entryRow[0].sha256 = Get-Digest $forgedEntrypointPath
+    $graphText = (Get-Digest (Join-Path $forgedGroupRoot 'content.xml')) +
+        (Get-Digest (Join-Path $forgedGroupRoot 'ui.xml')) + $entryRow[0].sha256
+    $forgedManifest.package_conformance.graph_digest = Get-TextDigest $graphText
+    $forgedPackageText = $forgedManifest.package_conformance | ConvertTo-Json -Compress -Depth 32
+    $forgedManifest.package_conformance_digest = Get-TextDigest $forgedPackageText
+    Write-Utf8NoBom $forgedManifestPath ($forgedManifest | ConvertTo-Json -Depth 32)
+    $forgedOutput = Invoke-Retention $pendingEvidencePath $forgedManifestPath `
+        (Join-Path $scratch 'reject-embedded-forgery') 1
+    Assert-True (($forgedOutput -join "`n") -match 'PACKAGE_CONFORMANCE_LIVE_MISMATCH') `
+        'A self-consistent embedded conformance forgery was not rejected by a live graph rerun.'
     if ($Case -eq 'retention-platform') {
         $platformScript = Join-Path $scratch 'retain-evidence-non-windows.ps1'
         $platformSource = (Get-Content -LiteralPath $retentionPath -Raw).Replace('$script:SimulateUnsupportedPlatform = $false', '$script:SimulateUnsupportedPlatform = $true')
