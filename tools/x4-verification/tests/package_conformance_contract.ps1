@@ -173,6 +173,31 @@ local dependency = require(PREFIX .. "dependency")
                 "Inert native-binding decoy '$($decoy.Key)' satisfied package conformance."
         }
 
+        $renamedBindingPackage = Join-Path $scratch 'renamed-binding'
+        New-SyntaxPackage $renamedBindingPackage 'local ffi = require("ffi"); local native = ffi.C'
+        $renamedBindingResult = Invoke-Conformance $renamedBindingPackage 0
+        Assert-True ($renamedBindingResult.native_binding_path -eq 'lua/live_galaxy_runtime.lua') `
+            'A renamed executable native binding was not recognized.'
+
+        $multipleBindingPackage = Join-Path $scratch 'multiple-renamed-bindings'
+        New-SyntaxPackage $multipleBindingPackage `
+            'local ffi = require("ffi"); local native = ffi.C; local alternate = ffi.C'
+        $multipleBindingResult = Invoke-Conformance $multipleBindingPackage 1
+        Assert-True (@($multipleBindingResult.reason_codes) -contains 'ALTERNATE_BINDING_SOURCE') `
+            'Multiple differently named executable native bindings were accepted.'
+
+        $renamedWithInertPackage = Join-Path $scratch 'renamed-binding-with-inert-text'
+        New-SyntaxPackage $renamedWithInertPackage @'
+local ffi = require("ffi")
+-- local comment_binding = ffi.C
+local quoted = "local quoted_binding = ffi.C"
+local long_text = [===[ local bracket_binding = ffi.C ]===]
+local native = ffi.C
+'@
+        $renamedWithInertResult = Invoke-Conformance $renamedWithInertPackage 0
+        Assert-True ($renamedWithInertResult.native_binding_path -eq 'lua/live_galaxy_runtime.lua') `
+            'Inert text changed the renamed executable native-binding count.'
+
         $staticHelperPackage = Join-Path $scratch 'lexer-static-helper'
         New-SyntaxPackage $staticHelperPackage @'
 local PREFIX = "live_galaxy/lua/"

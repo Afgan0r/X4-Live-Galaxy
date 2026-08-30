@@ -197,12 +197,20 @@ function Get-LuaTokens([string]$Source) {
     return @($tokens)
 }
 
-function Test-ExecutableLocalFfiCBinding([object[]]$Tokens) {
+function Get-ExecutableLocalFfiCBindingCount([object[]]$Tokens) {
+    $count = 0
     for ($index = 0; $index + 5 -lt $Tokens.Count; $index++) {
-        $values = @($Tokens[$index..($index + 5)] | ForEach-Object Value)
-        if (($values -join '|') -ceq 'local|C|=|ffi|.|C') { return $true }
+        $candidate = @($Tokens[$index..($index + 5)])
+        if ($candidate[0].Value -ceq 'local' -and
+            $candidate[1].Kind -ceq 'identifier' -and
+            $candidate[2].Value -ceq '=' -and
+            $candidate[3].Value -ceq 'ffi' -and
+            $candidate[4].Value -ceq '.' -and
+            $candidate[5].Value -ceq 'C') {
+            $count += 1
+        }
     }
-    return $false
+    return $count
 }
 
 function Test-ExecutableAlternateBinding([object[]]$Tokens) {
@@ -434,14 +442,16 @@ try {
     Visit-Module $script:entrypoint 0
     $script:importGraph = @($script:visited.Keys | Sort-Object)
     $bindingPaths = @()
+    $bindingCount = 0
     $alternateBinding = $false
     foreach ($logicalPath in $script:importGraph) {
         $source = $script:sources[$logicalPath].Source
-        $imports = @(Get-Imports $source)
         $tokens = @(Get-LuaTokens $source)
-        $hasFfi = $imports -ccontains $script:contract.native_binding.module
-        $hasBinding = Test-ExecutableLocalFfiCBinding $tokens
-        if ($hasFfi -and $hasBinding) { $bindingPaths += $logicalPath }
+        $moduleBindingCount = Get-ExecutableLocalFfiCBindingCount $tokens
+        if ($moduleBindingCount -gt 0) {
+            $bindingCount += $moduleBindingCount
+            $bindingPaths += $logicalPath
+        }
         elseif (Test-ExecutableAlternateBinding $tokens) { $alternateBinding = $true }
     }
     $bindingPolicy = if ($null -eq $script:contract.native_binding.PSObject.Properties['policy']) {
@@ -449,13 +459,13 @@ try {
     } else { [string]$script:contract.native_binding.policy }
     if ($bindingPolicy -notin @('required', 'forbidden')) { Fail 'NATIVE_BINDING_POLICY_INVALID' }
     if ($bindingPolicy -eq 'required') {
-        if ($bindingPaths.Count -gt 1 -or ($bindingPaths.Count -eq 0 -and $alternateBinding)) {
+        if ($bindingCount -gt 1 -or ($bindingCount -eq 0 -and $alternateBinding)) {
             Fail 'ALTERNATE_BINDING_SOURCE' 'local-only'
         }
-        if ($bindingPaths.Count -ne 1) { Fail 'NATIVE_BINDING_NOT_FOUND' }
+        if ($bindingCount -ne 1) { Fail 'NATIVE_BINDING_NOT_FOUND' }
         $script:nativeBindingPath = $bindingPaths[0]
     }
-    elseif ($bindingPaths.Count -ne 0 -or $alternateBinding) {
+    elseif ($bindingCount -ne 0 -or $alternateBinding) {
         Fail 'NATIVE_BINDING_FORBIDDEN' 'non-conformant'
     }
 
