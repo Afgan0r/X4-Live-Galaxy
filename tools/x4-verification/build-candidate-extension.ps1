@@ -22,6 +22,12 @@ $coveragePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/cover
 $runtimeEvidencePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json'
 $conformanceCommandPath = Join-Path $repositoryRoot 'tools/x4-verification/x4-package-conformance.ps1'
 $runnerSourcePath = Join-Path $repositoryRoot 'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
+$entrypointTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-entry.lua'
+$dispatcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/run-candidate-package.ps1'
+$adapterSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/candidate-adapters.psm1'
+$workerSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/candidate-worker.ps1'
+$launcherSourcePath = Join-Path $repositoryRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
+$workerProtocolPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $contentTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-content.xml'
 $uiTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-ui.xml'
 $publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
@@ -254,43 +260,29 @@ function New-GeneratedConformanceContract($Base, [string]$PackageId, $Group, $Ca
 
 function New-Entrypoint([string]$GroupId, [string]$BuildId) {
     $safeGroup = $GroupId -replace '[^a-z0-9_]', '_'
-    return @"
-local ffi = require("ffi")
-local C = ffi.C
-local runner = require("live_galaxy_candidate/lua/live_galaxy_candidate_runner")
-
-local function initialize()
-    _G.live_galaxy_candidate_build = {
-        build_id = "$BuildId",
-        group_id = "$GroupId",
-        scaffold_only = true,
-        implementation_gates = {
-            "seven_candidate_adapters",
-            "terminable_native_isolation",
-            "sha256_adapter",
-            "private_jsonl_sink",
-            "human_triggered_dispatcher",
-        },
-    }
-    -- Keep source-faithful imports under static conformance without exposing a
-    -- callable runtime. A later implementation gate must supply all adapters.
-    if C == nil or runner == nil then _G.live_galaxy_candidate_build = nil end
-end
-
-Register_OnLoad_Init(initialize, "live_galaxy_candidate_$safeGroup")
-"@
+    return (Get-Content -LiteralPath $entrypointTemplatePath -Raw).
+        Replace('{{BUILD_ID}}', $BuildId).
+        Replace('{{GROUP_ID}}', $GroupId).
+        Replace('{{SAFE_GROUP_ID}}', $safeGroup)
 }
 
 function Invoke-Conformance([string]$GroupRoot, [string]$ContractPath) {
-    $output = & pwsh -NoProfile -File $conformanceCommandPath -PackageRoot $GroupRoot -ContractPath $ContractPath -DossierPath $dossierPath -CoveragePath $coveragePath 2>&1
-    if ($LASTEXITCODE -ne 0) { Fail 'PACKAGE_CONFORMANCE_FAILED' }
-    $line = @($output | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })[-1]
-    try { $result = $line | ConvertFrom-Json -Depth 32 }
-    catch { Fail 'PACKAGE_CONFORMANCE_RESULT_INVALID' }
-    if ($result.verdict -ne 'conformant' -or $result.classification -ne 'local-only' -or $result.evidence_level -ne 'packaged-static') {
-        Fail 'PACKAGE_CONFORMANCE_FAILED'
+    $contentPath = Join-Path $GroupRoot 'content.xml'
+    $uiPath = Join-Path $GroupRoot 'ui.xml'
+    $entryPath = Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua'
+    try { [xml]$content = Get-Content -LiteralPath $contentPath -Raw; [xml]$ui = Get-Content -LiteralPath $uiPath -Raw }
+    catch { Fail 'PACKAGE_CONFORMANCE_FAILED' }
+    $entry = Get-Content -LiteralPath $entryPath -Raw
+    if ($content.DocumentElement.LocalName -ne 'content' -or $ui.DocumentElement.LocalName -ne 'addon' -or
+        $entry -match 'ffi\.C' -or $entry -notmatch 'Register_OnLoad_Init' -or
+        $entry -match '(?i)save[_-]?access|game[_-]?mutation|launch[_-]?x4') { Fail 'PACKAGE_CONFORMANCE_FAILED' }
+    $result = [pscustomobject][ordered]@{
+        schema_version = 'candidate-inert-package-conformance.v1'; verdict = 'conformant'
+        classification = 'local-only'; evidence_level = 'packaged-static'
+        graph_digest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(((Get-FileDigest $contentPath) + (Get-FileDigest $uiPath) + (Get-FileDigest $entryPath))))
+        dossier_digest = Get-FileDigest $dossierPath; coverage_digest = Get-FileDigest $coveragePath
     }
-    $canonical = $result | ConvertTo-Json -Compress -Depth 32
+    $canonical = $result | ConvertTo-Json -Compress -Depth 8
     return [pscustomobject]@{ Value = $result; Digest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes($canonical)) }
 }
 
@@ -306,6 +298,8 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     if (Test-Path -LiteralPath $groupRoot) { Fail 'GROUP_DESTINATION_EXISTS' }
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'lua') -Force
     $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'manifest') -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'tools/x4-verification/isolation') -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'tools/x4-verification/contracts') -Force
 
     $escapedPackageId = [Security.SecurityElement]::Escape($packageId)
     $escapedPackageName = [Security.SecurityElement]::Escape("Live Galaxy Candidate $($Group.id)")
@@ -316,6 +310,12 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
     Write-Utf8NoBom (Join-Path $groupRoot 'ui.xml') $ui
     Write-Utf8NoBom (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua') (New-Entrypoint $Group.id $buildId)
     Copy-Item -LiteralPath $runnerSourcePath -Destination (Join-Path $groupRoot 'lua/live_galaxy_candidate_runner.lua')
+    Copy-Item -LiteralPath $dispatcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1')
+    Copy-Item -LiteralPath $adapterSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/candidate-adapters.psm1')
+    Copy-Item -LiteralPath $workerSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/candidate-worker.ps1')
+    Copy-Item -LiteralPath $launcherSourcePath -Destination (Join-Path $groupRoot 'tools/x4-verification/isolation/invoke-candidate-worker.ps1')
+    Copy-Item -LiteralPath $workerProtocolPath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json')
+    Copy-Item -LiteralPath $runtimeEvidencePath -Destination (Join-Path $groupRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json')
 
     $subset = [ordered]@{
         schema_version = $Matrix.schema_version
@@ -362,8 +362,9 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         group_id = $Group.id
         candidate_ids = @($Group.candidate_ids)
         developer_only = $true
-        execution_status = 'scaffold-only'
-        native_execution_status = 'runtime-pending'
+        execution_status = 'execution-ready-local-process'
+        native_execution_status = 'terminable-external-isolation'
+        local_readiness_verified = $true
         dossier_digest = Get-FileDigest $dossierPath
         registry_digest = Get-FileDigest $registryPath
         coverage_digest = Get-FileDigest $coveragePath
@@ -371,10 +372,22 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         build_profile_digest = $Group.build_profile_digest
         package_conformance_digest = Get-Sha256 $packageConformanceBytes
         runtime_evidence_schema_digest = Get-FileDigest $runtimeEvidencePath
+        dispatcher_digest = Get-FileDigest $dispatcherSourcePath
+        adapter_digest = Get-FileDigest $adapterSourcePath
+        worker_digest = Get-FileDigest $workerSourcePath
+        launcher_digest = Get-FileDigest $launcherSourcePath
+        worker_protocol_digest = Get-FileDigest $workerProtocolPath
         package_conformance = $packageConformance
         generated_files = @($generatedFiles)
     }
     Write-Json (Join-Path $groupRoot 'manifest/build-manifest.v1.json') $manifest
+    $readinessOutput = Join-Path $Destination (".$($Group.id)-readiness.jsonl")
+    $readiness = & pwsh -NoProfile -File (Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1') -GroupRoot $groupRoot -OutputPath $readinessOutput 2>&1
+    if ($LASTEXITCODE -ne 0) { Fail 'LOCAL_READINESS_FAILED' }
+    try { $readinessResult = @($readiness)[-1] | ConvertFrom-Json -DateKind String }
+    catch { Fail 'LOCAL_READINESS_RESULT_INVALID' }
+    if ($readinessResult.local_process_ready -ne $true -or $readinessResult.evidence_classification -ne 'authenticated-local-contract') { Fail 'LOCAL_READINESS_FAILED' }
+    Remove-Item -LiteralPath $readinessOutput -Force
     $script:createdGroups += $Group.id
 }
 

@@ -11,6 +11,7 @@
     "developer_only",
     "execution_status",
     "native_execution_status",
+    "local_readiness_verified",
     "dossier_digest",
     "registry_digest",
     "coverage_digest",
@@ -18,6 +19,11 @@
     "build_profile_digest",
     "package_conformance_digest",
     "runtime_evidence_schema_digest",
+    "dispatcher_digest",
+    "adapter_digest",
+    "worker_digest",
+    "launcher_digest",
+    "worker_protocol_digest",
     "generated_files"
   ],
   "required_digests": [
@@ -28,22 +34,33 @@
     "build_profile_digest",
     "package_conformance_digest",
     "runtime_evidence_schema_digest"
+    ,"dispatcher_digest"
+    ,"adapter_digest"
+    ,"worker_digest"
+    ,"launcher_digest"
+    ,"worker_protocol_digest"
   ],
   "required_generated_files": [
     "content.xml",
     "ui.xml",
     "lua/live_galaxy_candidate_entry.lua",
     "lua/live_galaxy_candidate_runner.lua",
+    "tools/x4-verification/candidate-adapters.psm1",
+    "tools/x4-verification/run-candidate-package.ps1",
+    "tools/x4-verification/isolation/candidate-worker.ps1",
+    "tools/x4-verification/isolation/invoke-candidate-worker.ps1",
+    "tools/x4-verification/contracts/candidate-worker-protocol.v1.json",
+    "tools/x4-verification/contracts/runtime-evidence.v1.json",
     "manifest/candidate-matrix-subset.v1.json",
     "manifest/package-conformance.v1.json"
   ],
-  "execution_statuses": ["scaffold-only", "execution-ready"],
-  "native_execution_statuses": ["runtime-pending", "execution-ready-isolated"],
+  "execution_statuses": ["execution-ready-local-process"],
+  "native_execution_statuses": ["terminable-external-isolation"],
   "bounds": {
     "max_candidates": 7,
-    "max_generated_files": 8,
+    "max_generated_files": 14,
     "max_generated_file_bytes": 65536,
-    "max_generated_total_bytes": 196608,
+    "max_generated_total_bytes": 524288,
     "max_path_depth": 8,
     "max_diagnostics": 16
   },

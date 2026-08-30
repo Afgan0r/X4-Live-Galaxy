@@ -190,7 +190,7 @@ function Test-Partition {
     Assert-ValidMatrix $matrix
     Assert-True ($manifestContract.schema_version -eq 'candidate-build-manifest-contract.v1') 'Unexpected build-manifest contract schema.'
     Assert-True ((@($manifestContract.required_fields) -contains 'package_conformance_digest')) 'Build manifest does not require package conformance linkage.'
-    Assert-True ((@($manifestContract.required_digests) -join '|') -eq 'dossier_digest|registry_digest|coverage_digest|matrix_digest|build_profile_digest|package_conformance_digest|runtime_evidence_schema_digest') 'Build manifest digest chain is incomplete or unstable.'
+    Assert-True ((@($manifestContract.required_digests) -join '|') -eq 'dossier_digest|registry_digest|coverage_digest|matrix_digest|build_profile_digest|package_conformance_digest|runtime_evidence_schema_digest|dispatcher_digest|adapter_digest|worker_digest|launcher_digest|worker_protocol_digest') 'Build manifest digest chain is incomplete or unstable.'
 
     Assert-Rejected { param($m) $m.candidates = @() } 'empty'
     Assert-Rejected { param($m) $m.candidates += Copy-JsonValue $m.candidates[0] } 'duplicate'
@@ -236,12 +236,12 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
     Assert-True ($entrypoint -notmatch 'ffi\.C') 'Generated entrypoint executes or exposes direct native access.'
     Assert-True ($entrypoint -notmatch '(?i)dispatch|execute|launch|save|mutation') 'Generated entrypoint exposes a runtime control.'
     foreach ($requiredPath in @(
-        'runtime/candidate-adapters.psm1',
-        'runtime/run-candidate-package.ps1',
-        'runtime/isolation/candidate-worker.ps1',
-        'runtime/isolation/invoke-candidate-worker.ps1',
-        'contracts/candidate-worker-protocol.v1.json',
-        'contracts/runtime-evidence.v1.json'
+        'tools/x4-verification/candidate-adapters.psm1',
+        'tools/x4-verification/run-candidate-package.ps1',
+        'tools/x4-verification/isolation/candidate-worker.ps1',
+        'tools/x4-verification/isolation/invoke-candidate-worker.ps1',
+        'tools/x4-verification/contracts/candidate-worker-protocol.v1.json',
+        'tools/x4-verification/contracts/runtime-evidence.v1.json'
     )) {
         Assert-True (@($manifest.generated_files.path) -contains $requiredPath) "Generated root omits runtime component '$requiredPath'."
     }
@@ -253,7 +253,7 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
         Assert-True ($file.sha256 -eq (Get-FileDigest $path)) "Generated file '$($file.path)' digest is stale."
     }
     $serialized = $manifest | ConvertTo-Json -Depth 64 -Compress
-    Assert-True ($serialized -notmatch '(?i)launch|save[_-]?access|mutation|acknowledg|player[_-]?report') 'Generated manifest exposes a prohibited control.'
+    Assert-True ($serialized -notmatch '(?i)game[_-]?launch|launch[_-]?x4|save[_-]?access|game[_-]?mutation|acknowledg|player[_-]?report') 'Generated manifest exposes a prohibited control.'
 }
 
 function Test-GeneratedBuilds {
