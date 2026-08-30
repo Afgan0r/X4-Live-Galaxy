@@ -1,0 +1,57 @@
+{
+  "schema_version": "candidate-worker.v1",
+  "request_fields": [
+    "schema_version",
+    "request_id",
+    "run_id",
+    "candidate_id",
+    "adapter_id",
+    "issued_at_utc",
+    "input"
+  ],
+  "input_fields": ["expected_result", "max_work_units"],
+  "response_fields": [
+    "schema_version",
+    "request_id",
+    "run_id",
+    "candidate_id",
+    "adapter_id",
+    "produced_at_utc",
+    "status",
+    "actual_result",
+    "completeness",
+    "work_units",
+    "observations",
+    "elapsed_real_ms",
+    "elapsed_game_ms",
+    "seta_state",
+    "diagnostic_code"
+  ],
+  "adapter_allowlist": [
+    "local-contract-success",
+    "local-contract-endless",
+    "local-contract-child-endless",
+    "local-contract-malformed",
+    "local-contract-identity-swap",
+    "local-contract-adapter-swap",
+    "local-contract-oversized",
+    "local-contract-partial",
+    "local-contract-stale",
+    "local-contract-extra-field",
+    "local-contract-duplicate",
+    "local-contract-late-success"
+  ],
+  "bounds": {
+    "max_request_bytes": 4096,
+    "max_response_bytes": 8192,
+    "max_identity_bytes": 128,
+    "max_result_bytes": 256,
+    "max_observations": 16,
+    "max_work_units": 64,
+    "min_deadline_ms": 100,
+    "max_deadline_ms": 5000,
+    "kill_wait_ms": 1000
+  },
+  "native_modes": ["forbidden"],
+  "evidence_classification": "local-contract-only"
+}
