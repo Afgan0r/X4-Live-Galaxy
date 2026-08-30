@@ -48,6 +48,18 @@ function New-FixturePackage($Fixture, [string]$Destination) {
     }
 }
 
+function New-SyntaxPackage([string]$Destination, [string]$EntrypointSource, [hashtable]$AdditionalFiles = @{}) {
+    $fixture = [pscustomobject]@{ files = [pscustomobject]@{
+        'content.xml' = '<content id="live_galaxy"><dependency id="ws_2042901274" /></content>'
+        'ui.xml' = '<addon name="live_galaxy"><environment type="menus"><dependency name="sn_mod_support_apis" /><file name="lua/live_galaxy_runtime.lua" /></environment></addon>'
+        'lua/live_galaxy_runtime.lua' = $EntrypointSource
+    } }
+    foreach ($entry in $AdditionalFiles.GetEnumerator()) {
+        $fixture.files | Add-Member -NotePropertyName $entry.Key -NotePropertyValue $entry.Value
+    }
+    New-FixturePackage $fixture $Destination
+}
+
 function Assert-NoAbsolutePath($Value) {
     $json = $Value | ConvertTo-Json -Compress -Depth 32
     Assert-True ($json -notmatch '[A-Za-z]:[\\/]') 'Result leaked a Windows absolute path.'
@@ -119,6 +131,41 @@ function Test-PackagedPath {
             Assert-True ($negative.classification -eq $fixture.expected_classification) "Fixture '$($fixture.id)' returned the wrong classification."
             Assert-NoAbsolutePath $negative
         }
+
+        $staticPackage = Join-Path $scratch 'lexer-static-forms'
+        New-SyntaxPackage $staticPackage @'
+-- require("test/ignored_comment")
+local ignored = [[require("test/ignored_long_string")]]
+local PREFIX = "live_galaxy/lua/"
+local ffi = require(
+    "ffi"
+)
+local C = ffi.C
+local dependency = require(PREFIX .. "dependency")
+'@ @{ 'lua/dependency.lua' = 'return {}' }
+        $staticResult = Invoke-Conformance $staticPackage 0
+        Assert-True ($staticResult.verdict -eq 'conformant') 'Lexer rejected supported multiline/concatenated imports or scanned comments/long strings.'
+
+        $aliasPackage = Join-Path $scratch 'lexer-alias'
+        New-SyntaxPackage $aliasPackage 'local r = require; local ffi = r("ffi"); local C = ffi.C'
+        $aliasResult = Invoke-Conformance $aliasPackage 1
+        Assert-True (@($aliasResult.reason_codes) -contains 'REQUIRE_ALIAS_UNSUPPORTED') 'Require alias did not fail closed.'
+
+        $dynamicPackage = Join-Path $scratch 'lexer-dynamic'
+        New-SyntaxPackage $dynamicPackage 'local name = get_name(); local ffi = require(name); local C = ffi.C'
+        $dynamicResult = Invoke-Conformance $dynamicPackage 1
+        Assert-True (@($dynamicResult.reason_codes) -contains 'DYNAMIC_REQUIRE') 'Dynamic require did not fail closed.'
+
+        $outside = Join-Path $scratch 'outside-target'
+        $null = New-Item -ItemType Directory -Path $outside -Force
+        Set-Content -LiteralPath (Join-Path $outside 'payload.lua') -Value 'return {}' -NoNewline -Encoding utf8
+        $reparsePackage = Join-Path $scratch 'reparse-escape'
+        New-SyntaxPackage $reparsePackage 'local ffi = require("ffi"); local C = ffi.C; local escaped = require("live_galaxy/lua/escape/payload")'
+        $linkPath = Join-Path $reparsePackage 'lua/escape'
+        $linkType = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
+        $null = New-Item -ItemType $linkType -Path $linkPath -Target $outside
+        $reparseResult = Invoke-Conformance $reparsePackage 1
+        Assert-True (@($reparseResult.reason_codes) -contains 'REPARSE_POINT_ESCAPE') 'Reparse-point package escape was not rejected.'
     }
     finally {
         if (Test-Path -LiteralPath $scratch) {

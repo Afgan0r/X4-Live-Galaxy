@@ -81,10 +81,17 @@ function Resolve-PackagePath([string]$LogicalPath, [string]$MissingCode = 'UNRES
     }
     $normalized = ($LogicalPath -replace '\\', '/').TrimStart('/')
     $current = $script:packageRoot
+    $rootItem = Get-Item -LiteralPath $current -Force
+    if (($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $rootItem.LinkType) {
+        Fail 'PACKAGE_ROOT_REPARSE_POINT' 'non-conformant'
+    }
     foreach ($segment in @($normalized -split '/')) {
         if ([string]::IsNullOrWhiteSpace($segment) -or $segment -eq '.') { Fail 'ROOT_ESCAPE' 'non-conformant' $normalized }
         $match = @(Get-ChildItem -LiteralPath $current -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name -ceq $segment })
         if ($match.Count -ne 1) { Fail $MissingCode 'non-conformant' $normalized }
+        if (($match[0].Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $null -ne $match[0].LinkType) {
+            Fail 'REPARSE_POINT_ESCAPE' 'non-conformant' $normalized
+        }
         $current = $match[0].FullName
     }
     $full = [IO.Path]::GetFullPath($current)
@@ -93,28 +100,160 @@ function Resolve-PackagePath([string]$LogicalPath, [string]$MissingCode = 'UNRES
     return [pscustomobject]@{ FullPath = $full; LogicalPath = $normalized }
 }
 
+function Get-LuaTokens([string]$Source) {
+    $tokens = [Collections.Generic.List[object]]::new()
+    $index = 0
+    while ($index -lt $Source.Length) {
+        $character = $Source[$index]
+        if ([char]::IsWhiteSpace($character)) { $index++; continue }
+        if ($character -eq '-' -and $index + 1 -lt $Source.Length -and $Source[$index + 1] -eq '-') {
+            if ($index + 3 -lt $Source.Length -and $Source.Substring($index, 4) -eq '--[[') {
+                $end = $Source.IndexOf(']]', $index + 4, [StringComparison]::Ordinal)
+                if ($end -lt 0) { Fail 'INVALID_LUA_SOURCE' }
+                $index = $end + 2
+            }
+            else {
+                $end = $Source.IndexOf("`n", $index + 2, [StringComparison]::Ordinal)
+                $index = if ($end -lt 0) { $Source.Length } else { $end + 1 }
+            }
+            continue
+        }
+        if ($character -eq '[' -and $index + 1 -lt $Source.Length -and $Source[$index + 1] -eq '[') {
+            $end = $Source.IndexOf(']]', $index + 2, [StringComparison]::Ordinal)
+            if ($end -lt 0) { Fail 'INVALID_LUA_SOURCE' }
+            $tokens.Add([pscustomobject]@{ Kind = 'string'; Value = $Source.Substring($index + 2, $end - $index - 2) })
+            $index = $end + 2
+            continue
+        }
+        if ($character -eq '"' -or $character -eq "'") {
+            $quote = $character
+            $builder = [Text.StringBuilder]::new()
+            $index++
+            $closed = $false
+            while ($index -lt $Source.Length) {
+                $next = $Source[$index]
+                if ($next -eq '\\') {
+                    if ($index + 1 -ge $Source.Length) { Fail 'INVALID_LUA_SOURCE' }
+                    [void]$builder.Append($Source[$index + 1]); $index += 2; continue
+                }
+                if ($next -eq $quote) { $closed = $true; $index++; break }
+                [void]$builder.Append($next); $index++
+            }
+            if (-not $closed) { Fail 'INVALID_LUA_SOURCE' }
+            $tokens.Add([pscustomobject]@{ Kind = 'string'; Value = $builder.ToString() })
+            continue
+        }
+        if ([char]::IsLetter($character) -or $character -eq '_') {
+            $start = $index; $index++
+            while ($index -lt $Source.Length -and ([char]::IsLetterOrDigit($Source[$index]) -or $Source[$index] -eq '_')) { $index++ }
+            $tokens.Add([pscustomobject]@{ Kind = 'identifier'; Value = $Source.Substring($start, $index - $start) })
+            continue
+        }
+        if ($character -eq '.' -and $index + 1 -lt $Source.Length -and $Source[$index + 1] -eq '.') {
+            $tokens.Add([pscustomobject]@{ Kind = 'symbol'; Value = '..' }); $index += 2; continue
+        }
+        $tokens.Add([pscustomobject]@{ Kind = 'symbol'; Value = [string]$character }); $index++
+    }
+    return @($tokens)
+}
+
+function Resolve-StaticExpression($Tokens, [int]$Start, [int]$End, $Constants) {
+    $parts = [Collections.Generic.List[string]]::new()
+    $expectValue = $true
+    for ($i = $Start; $i -lt $End; $i++) {
+        $token = $Tokens[$i]
+        if ($expectValue) {
+            if ($token.Kind -eq 'string') { $parts.Add($token.Value) }
+            elseif ($token.Kind -eq 'identifier' -and $Constants.ContainsKey($token.Value)) { $parts.Add($Constants[$token.Value]) }
+            else { return $null }
+        }
+        elseif ($token.Value -ne '..') { return $null }
+        $expectValue = -not $expectValue
+    }
+    if ($expectValue) { return $null }
+    return ($parts -join '')
+}
+
 function Get-Imports([string]$Source) {
-    $imports = [System.Collections.Generic.List[string]]::new()
+    $tokens = @(Get-LuaTokens $Source)
+    $imports = [Collections.Generic.List[string]]::new()
     $constants = @{}
-    foreach ($match in [regex]::Matches($Source, '(?m)^\s*local\s+([A-Z][A-Z0-9_]*)\s*=\s*["'']([^"'']+)["'']')) {
-        $constants[$match.Groups[1].Value] = $match.Groups[2].Value
-    }
-    foreach ($match in [regex]::Matches($Source, 'require\s*\(\s*["'']([^"'']+)["'']\s*\)')) {
-        $imports.Add($match.Groups[1].Value)
-    }
-    foreach ($match in [regex]::Matches($Source, 'pcall\s*\(\s*require\s*,\s*["'']([^"'']+)["'']\s*\)')) {
-        $imports.Add($match.Groups[1].Value)
-    }
-    foreach ($match in [regex]::Matches($Source, 'pcall\s*\(\s*require\s*,\s*([A-Z][A-Z0-9_]*)\s*\)')) {
-        if ($constants.ContainsKey($match.Groups[1].Value)) { $imports.Add($constants[$match.Groups[1].Value]) }
-    }
     $helpers = @{}
-    foreach ($match in [regex]::Matches($Source, '(?s)local\s+function\s+([a-z_][a-z0-9_]*)\s*\(\s*([a-z_][a-z0-9_]*)\s*\).*?return\s+require\s*\(\s*([A-Z][A-Z0-9_]*)\s*\.\.\s*\2\s*\).*?end')) {
-        if ($constants.ContainsKey($match.Groups[3].Value)) { $helpers[$match.Groups[1].Value] = $constants[$match.Groups[3].Value] }
+    $helperRequireIndexes = @{}
+    for ($i = 0; $i + 3 -lt $tokens.Count; $i++) {
+        if ($tokens[$i].Value -eq 'local' -and $tokens[$i + 1].Kind -eq 'identifier' -and $tokens[$i + 2].Value -eq '=') {
+            $end = $i + 3
+            while ($end -lt $tokens.Count -and $tokens[$end].Value -notin @('local', 'return', 'if', 'function', 'end')) { $end++ }
+            $resolved = Resolve-StaticExpression $tokens ($i + 3) $end $constants
+            if ($null -ne $resolved) { $constants[$tokens[$i + 1].Value] = $resolved }
+        }
     }
-    foreach ($helper in $helpers.GetEnumerator()) {
-        $pattern = [regex]::Escape($helper.Key) + '\s*\(\s*["'']([^"'']+)["'']\s*\)'
-        foreach ($match in [regex]::Matches($Source, $pattern)) { $imports.Add($helper.Value + $match.Groups[1].Value) }
+    for ($i = 0; $i + 8 -lt $tokens.Count; $i++) {
+        if ($tokens[$i].Value -ne 'local' -or $tokens[$i + 1].Value -ne 'function' -or
+            $tokens[$i + 2].Kind -ne 'identifier' -or $tokens[$i + 3].Value -ne '(' -or
+            $tokens[$i + 4].Kind -ne 'identifier' -or $tokens[$i + 5].Value -ne ')') { continue }
+        $helperName = $tokens[$i + 2].Value
+        $parameterName = $tokens[$i + 4].Value
+        for ($j = $i + 6; $j + 3 -lt $tokens.Count -and $tokens[$j].Value -ne 'end'; $j++) {
+            if ($tokens[$j].Value -ne 'require' -or $tokens[$j + 1].Value -ne '(') { continue }
+            $end = $j + 2
+            while ($end -lt $tokens.Count -and $tokens[$end].Value -ne ')') { $end++ }
+            if ($end -ge $tokens.Count) { Fail 'INVALID_LUA_SOURCE' }
+            $parameterIndex = -1
+            for ($k = $j + 2; $k -lt $end; $k++) {
+                if ($tokens[$k].Value -eq $parameterName) {
+                    if ($parameterIndex -ge 0) { Fail 'DYNAMIC_REQUIRE' 'local-only' }
+                    $parameterIndex = $k
+                }
+            }
+            if ($parameterIndex -lt 0) { continue }
+            $prefixEnd = $parameterIndex
+            if ($parameterIndex -gt $j + 2 -and $tokens[$parameterIndex - 1].Value -eq '..') { $prefixEnd-- }
+            $suffixStart = $parameterIndex + 1
+            if ($suffixStart -lt $end -and $tokens[$suffixStart].Value -eq '..') { $suffixStart++ }
+            $prefix = if ($prefixEnd -eq $j + 2) { '' } else { Resolve-StaticExpression $tokens ($j + 2) $prefixEnd $constants }
+            $suffix = if ($suffixStart -eq $end) { '' } else { Resolve-StaticExpression $tokens $suffixStart $end $constants }
+            if ($null -eq $prefix -or $null -eq $suffix) { Fail 'DYNAMIC_REQUIRE' 'local-only' }
+            $helpers[$helperName] = [pscustomobject]@{ Prefix = $prefix; Suffix = $suffix }
+            $helperRequireIndexes[$j] = $true
+        }
+    }
+    for ($i = 0; $i -lt $tokens.Count; $i++) {
+        if ($tokens[$i].Kind -eq 'identifier' -and $helpers.ContainsKey($tokens[$i].Value) -and
+            $i + 3 -lt $tokens.Count -and $tokens[$i + 1].Value -eq '(' -and
+            $tokens[$i + 2].Kind -eq 'string' -and $tokens[$i + 3].Value -eq ')') {
+            $helper = $helpers[$tokens[$i].Value]
+            $imports.Add($helper.Prefix + $tokens[$i + 2].Value + $helper.Suffix)
+            $i += 3
+            continue
+        }
+        if ($tokens[$i].Value -eq 'require') {
+            if ($helperRequireIndexes.ContainsKey($i)) { continue }
+            if ($i -gt 0 -and $tokens[$i - 1].Value -eq 'local') { continue }
+            $start = $i + 1
+            if ($start -lt $tokens.Count -and $tokens[$start].Value -eq '(') {
+                $end = $start + 1; $depth = 1
+                while ($end -lt $tokens.Count -and $depth -gt 0) {
+                    if ($tokens[$end].Value -eq '(') { $depth++ }
+                    elseif ($tokens[$end].Value -eq ')') { $depth-- }
+                    $end++
+                }
+                if ($depth -ne 0) { Fail 'INVALID_LUA_SOURCE' }
+                $module = Resolve-StaticExpression $tokens ($start + 1) ($end - 1) $constants
+                if ($null -eq $module) { Fail 'DYNAMIC_REQUIRE' 'local-only' }
+                $imports.Add($module); $i = $end - 1
+            }
+            elseif ($i -gt 1 -and $tokens[$i - 1].Value -eq '(' -and $tokens[$i - 2].Value -eq 'pcall') { continue }
+            else { Fail 'REQUIRE_ALIAS_UNSUPPORTED' 'local-only' }
+        }
+        elseif ($tokens[$i].Value -eq 'pcall' -and $i + 4 -lt $tokens.Count -and $tokens[$i + 1].Value -eq '(' -and $tokens[$i + 2].Value -eq 'require' -and $tokens[$i + 3].Value -eq ',') {
+            $end = $i + 4
+            while ($end -lt $tokens.Count -and $tokens[$end].Value -ne ')') { $end++ }
+            if ($end -ge $tokens.Count) { Fail 'INVALID_LUA_SOURCE' }
+            $module = Resolve-StaticExpression $tokens ($i + 4) $end $constants
+            if ($null -eq $module) { Fail 'DYNAMIC_REQUIRE' 'local-only' }
+            $imports.Add($module); $i = $end
+        }
     }
     return @($imports)
 }
