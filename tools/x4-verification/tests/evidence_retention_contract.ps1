@@ -320,6 +320,7 @@ $scratch = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-retention-contract
 $buildRoot = Join-Path $scratch 'builds'
 $reparseRoot = Join-Path $scratch 'reparse-root'
 $testHarnessPath = $null
+$admissionHarnessPath = $null
 $authority = $null
 $null = New-Item -ItemType Directory -Path $scratch
 try {
@@ -423,6 +424,29 @@ try {
     Assert-True ($verified.Count -eq 1) 'Verification emitted diagnostics besides the sanitized object.'
     Assert-True (($verified[0] | ConvertFrom-Json).identity_digests.locator_digest -eq $sanitized.identity_digests.locator_digest) 'Locator reread digest changed.'
 
+    if ($Case -eq 'retention-admission') {
+        $admissionHarnessPath = Join-Path (Split-Path -Parent $admissionPath) ('.x4-admission-test-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        $admissionSource = (Get-Content -LiteralPath $admissionPath -Raw).Replace(
+            "`$retentionVerifierPath = Join-Path `$PSScriptRoot 'retain-evidence.ps1'",
+            "`$retentionVerifierPath = '$($testHarnessPath.Replace("'", "''"))'"
+        )
+        Write-Utf8NoBom $admissionHarnessPath $admissionSource
+        $admissionOutput = @(& pwsh -NoProfile -File $admissionHarnessPath `
+            -DossierPath $dossierPath -RegistryPath $registryPath -CoveragePath $coveragePath `
+            -FixturePath $fixturePath -VerifiedLocatorPath $locatorPath `
+            -PendingLedgerPath $pendingLedgerPath -CandidateMatrixPath $matrixPath 2>&1)
+        Assert-True ($LASTEXITCODE -eq 0) "Verified local chain did not reach the pending decision: $($admissionOutput -join ' | ')"
+        $admissionResult = @($admissionOutput)[-1] | ConvertFrom-Json -Depth 16
+        Assert-True ($admissionResult.verdict -eq 'chain-verified-x4-pending') 'Authenticated local evidence was not kept X4-pending.'
+
+        $productionOutput = @(& pwsh -NoProfile -File $admissionPath `
+            -DossierPath $dossierPath -RegistryPath $registryPath -CoveragePath $coveragePath `
+            -FixturePath $fixturePath -VerifiedLocatorPath $locatorPath `
+            -PendingLedgerPath $pendingLedgerPath -CandidateMatrixPath $matrixPath 2>&1)
+        Assert-True ($LASTEXITCODE -ne 0) 'Production admission accepted the TEST-ONLY locator root.'
+        Assert-True (($productionOutput -join "`n") -match 'RETENTION_ATTESTATION_UNCONFIGURED') 'Production TEST-root rejection was not stable.'
+    }
+
     [byte[]]$retainedEvidenceBytes = [IO.File]::ReadAllBytes($retainedEvidencePath)
     [byte[]]$tamperedEvidenceBytes = [byte[]]$retainedEvidenceBytes.Clone()
     $tamperedEvidenceBytes[0] = $tamperedEvidenceBytes[0] -bxor 1
@@ -443,6 +467,7 @@ try {
     else { Write-Output 'PASS: evidence retention contract' }
 }
 finally {
+    if ($null -ne $admissionHarnessPath -and (Test-Path -LiteralPath $admissionHarnessPath)) { Remove-Item -LiteralPath $admissionHarnessPath -Force }
     if ($null -ne $testHarnessPath -and (Test-Path -LiteralPath $testHarnessPath)) { Remove-Item -LiteralPath $testHarnessPath -Force }
     if ($null -ne $authority) {
         $authority.ProducerSigner.Dispose()
