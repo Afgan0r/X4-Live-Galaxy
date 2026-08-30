@@ -40,8 +40,12 @@ function Test-Integer($Value) {
         $Value -is [int64] -or $Value -is [uint64]
 }
 
-function Test-Array($Value) {
-    return $Value -is [Array]
+function Test-BoundedIdentityArray($Value, [int]$ExpectedCount) {
+    if ($Value -isnot [Array] -or $Value.Count -ne $ExpectedCount) { return $false }
+    foreach ($element in $Value) {
+        if (-not (Test-BoundedIdentity $element)) { return $false }
+    }
+    return $true
 }
 
 function New-Rejection([string]$Code) {
@@ -96,9 +100,9 @@ function Invoke-CandidateAdapter {
         }
         'p051-lifecycle-reload' {
             if (-not (Test-ExactFields $Fixture @('registration_ids', 'reload_count')) -or
-                -not (Test-Array $Fixture.registration_ids) -or
+                -not (Test-BoundedIdentityArray $Fixture.registration_ids 1) -or
                 -not (Test-Integer $Fixture.reload_count) -or
-                $Fixture.reload_count -ne 1 -or $Fixture.registration_ids.Count -ne 1 -or
+                $Fixture.reload_count -ne 1 -or
                 @($Fixture.registration_ids | Sort-Object -Unique).Count -ne 1) {
                 return New-Rejection 'adapter-lifecycle-semantic-invalid'
             }
@@ -106,8 +110,8 @@ function Invoke-CandidateAdapter {
         }
         'p051-mod-stack-compatibility' {
             if (-not (Test-ExactFields $Fixture @('enabled_mod_ids', 'excluded_mod_ids')) -or
-                -not (Test-Array $Fixture.enabled_mod_ids) -or
-                -not (Test-Array $Fixture.excluded_mod_ids)) {
+                -not (Test-BoundedIdentityArray $Fixture.enabled_mod_ids 3) -or
+                -not (Test-BoundedIdentityArray $Fixture.excluded_mod_ids 1)) {
                 return New-Rejection 'adapter-mod-stack-semantic-invalid'
             }
             $enabled = @($Fixture.enabled_mod_ids | Sort-Object)
@@ -121,8 +125,8 @@ function Invoke-CandidateAdapter {
         'p051-native-count-fill-runtime' {
             if (-not (Test-ExactFields $Fixture @('reported_count', 'records')) -or
                 -not (Test-Integer $Fixture.reported_count) -or
-                -not (Test-Array $Fixture.records) -or
-                $Fixture.reported_count -ne 3 -or $Fixture.records.Count -ne 3) {
+                -not (Test-BoundedIdentityArray $Fixture.records 3) -or
+                $Fixture.reported_count -ne 3) {
                 return New-Rejection 'adapter-count-fill-semantic-invalid'
             }
             return New-Completion 'count-fill:3-of-3' @('reported=3', 'filled=3') 3 $MaxWorkUnits
@@ -131,9 +135,8 @@ function Invoke-CandidateAdapter {
             if (-not (Test-ExactFields $Fixture @('requested_count', 'returned_count', 'records')) -or
                 -not (Test-Integer $Fixture.requested_count) -or
                 -not (Test-Integer $Fixture.returned_count) -or
-                -not (Test-Array $Fixture.records) -or
-                $Fixture.requested_count -ne 3 -or $Fixture.returned_count -ne 3 -or
-                $Fixture.records.Count -ne 3) {
+                -not (Test-BoundedIdentityArray $Fixture.records 3) -or
+                $Fixture.requested_count -ne 3 -or $Fixture.returned_count -ne 3) {
                 return New-Rejection 'adapter-fill-incomplete'
             }
             return New-Completion 'fill:complete=3' @('requested=3', 'returned=3') 3 $MaxWorkUnits

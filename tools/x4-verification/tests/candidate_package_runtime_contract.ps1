@@ -286,6 +286,62 @@ function Test-Adapters {
         }
     }
 
+    $arrayElementCases = @(
+        @{ id = 'p051-lifecycle-reload'; field = 'registration_ids'
+            good = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate'); reload_count = 1 }
+            invalid = @(
+                [pscustomobject]@{ registration_ids = @(42); reload_count = 1 },
+                [pscustomobject]@{ registration_ids = @($null); reload_count = 1 },
+                [pscustomobject]@{ registration_ids = @([pscustomobject]@{ id = 'live-galaxy-candidate' }); reload_count = 1 }
+            )
+        },
+        @{ id = 'p051-mod-stack-compatibility'; field = 'enabled_mod_ids'
+            good = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') }
+            invalid = @(
+                [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 42); excluded_mod_ids = @('faction-enhancer') },
+                [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', $null); excluded_mod_ids = @('faction-enhancer') },
+                [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', [pscustomobject]@{ id = 'add-more-sectors' }); excluded_mod_ids = @('faction-enhancer') }
+            )
+        },
+        @{ id = 'p051-mod-stack-compatibility'; field = 'excluded_mod_ids'
+            good = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') }
+            invalid = @(
+                [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @(42) },
+                [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @($null) },
+                [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @([pscustomobject]@{ id = 'faction-enhancer' }) }
+            )
+        },
+        @{ id = 'p051-native-count-fill-runtime'; field = 'records'
+            good = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta', 'gamma') }
+            invalid = @(
+                [pscustomobject]@{ reported_count = 3; records = @(1, 2, 3) },
+                [pscustomobject]@{ reported_count = 3; records = @('alpha', $null, 'gamma') },
+                [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta', [pscustomobject]@{ id = 'gamma' }) }
+            )
+        },
+        @{ id = 'p051-native-fill-completeness'; field = 'records'
+            good = [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', 'gamma') }
+            invalid = @(
+                [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @(1, 2, 3) },
+                [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', $null, 'gamma') },
+                [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', [pscustomobject]@{ id = 'gamma' }) }
+            )
+        }
+    )
+    foreach ($arrayCase in $arrayElementCases) {
+        $definition = @($definitions | Where-Object id -CEQ $arrayCase.id)[0]
+        $green = Invoke-CandidateAdapter -CandidateId $arrayCase.id `
+            -Fixture $arrayCase.good -MaxWorkUnits $definition.max_work_units
+        Assert-True ($green.status -eq 'completed' -and $green.completeness -eq 'complete') `
+            "Adapter '$($arrayCase.id)' rejected valid strings in '$($arrayCase.field)'."
+        foreach ($fixture in $arrayCase.invalid) {
+            $result = Invoke-CandidateAdapter -CandidateId $arrayCase.id -Fixture $fixture `
+                -MaxWorkUnits $definition.max_work_units
+            Assert-True ($result.status -eq 'rejected' -and $result.completeness -eq 'incomplete') `
+                "Adapter '$($arrayCase.id)' accepted a non-string element in '$($arrayCase.field)'."
+        }
+    }
+
     $alternateIdentity = [pscustomobject]@{
         native_id = 'ship-99'; canonical_id = 'ship-99'
         owner_id = 'boron'; canonical_owner_id = 'boron'
