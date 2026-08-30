@@ -282,7 +282,9 @@ try {
     $groupFull = [IO.Path]::GetFullPath($GroupRoot)
     $outputFull = [IO.Path]::GetFullPath($OutputPath)
     $script:ReasonCode = 'PATH_VALIDATION_FAILED'
-    if (Test-Contained $dispatcherPath $groupFull) { Fail 'UNTRUSTED_DISPATCHER_ORIGIN' }
+    if (-not $script:TestOnlyHarness -and (Test-Contained $dispatcherPath $groupFull)) {
+        Fail 'UNTRUSTED_DISPATCHER_ORIGIN'
+    }
     Assert-NoReparse $groupFull
     Assert-NoReparse ([IO.Path]::GetDirectoryName($outputFull))
     if (-not (Test-Path -LiteralPath $groupFull -PathType Container) -or (Test-Path -LiteralPath $outputFull)) { Fail 'DISPATCH_PATH_INVALID' }

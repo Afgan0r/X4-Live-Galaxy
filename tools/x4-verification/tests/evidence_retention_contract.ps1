@@ -331,7 +331,7 @@ try {
     $pendingManifestPath = Join-Path $pendingGroupRoot 'manifest/build-manifest.v1.json'
     $pendingManifest = Get-Content -LiteralPath $pendingManifestPath -Raw | ConvertFrom-Json -Depth 32
     $pendingEvidencePath = Join-Path $scratch 'pending-runtime.jsonl'
-    $dispatcherPath = Join-Path $pendingGroupRoot 'tools/x4-verification/run-candidate-package.ps1'
+    $dispatcherPath = Join-Path $root 'tools/x4-verification/run-candidate-package.ps1'
     $dispatcherOutput = @(& pwsh -NoProfile -File $dispatcherPath -GroupRoot $pendingGroupRoot -OutputPath $pendingEvidencePath 2>&1)
     Assert-True ($LASTEXITCODE -eq 0) "Candidate dispatcher failed: $($dispatcherOutput -join ' | ')"
     Assert-True (Test-Path -LiteralPath $pendingEvidencePath -PathType Leaf) 'Candidate dispatcher did not create evidence.'
