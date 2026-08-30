@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: paused
-stopped_at: CLEAN review obtained; Nyquist PARTIAL and security OPEN_THREATS
-last_updated: "2026-08-30T12:44:22.234Z"
+stopped_at: Completed 05.2-10 implementation; closure audits pending after user-requested pause
+last_updated: "2026-08-30T14:55:13.493Z"
 last_activity: 2026-08-30
-last_activity_desc: Paused after post-CLEAN Nyquist and security audits found isolation and retention blockers
-state_head: 8e23f19d7e4bd2d772b9a018e75c73c787f35b7e
+last_activity_desc: Completed Plan 10 implementation and aggregate verification; closure audits pending
+state_head: 0c7b79c0e69ae6bce18431eec2007021f202ebad
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 40
+  total_plans: 41
   completed_plans: 34
   percent: 40
 ---
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — PAUSED
-Plan: 9 of 9
-Status: CLEAN review; Nyquist PARTIAL and security blocked by one high threat
-Last activity: 2026-08-30 — Completed final review/fix convergence and post-review audits
+Plan: 10 of 10 implementation plans
+Status: Plan 10 complete; code review, Nyquist, security, and phase verification pending
+Last activity: 2026-08-30 — Completed Plan 10 implementation and aggregate verification
 
 Progress: [████░░░░░░] 40%
 
@@ -84,6 +84,7 @@ Progress: [████░░░░░░] 40%
 | Phase 05.2 P05 | 31min | 2 tasks | 7 files |
 | Phase 05.2 P06 | 27min | 3 tasks | 10 files |
 | Phase 05.2 P07 | 49 min | 3 tasks | 9 files |
+| Phase 05.2 P10 | 1h | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,9 @@ Recent decisions affecting current work:
 - [Phase 05.2]: Candidate declarations are exact inert data; callbacks, metatables, digests, watchdogs, and verdict authority are rejected.
 - [Phase 05.2]: The pure runner owns completeness and expected-effect verdicts; only the trusted registry supplies local-contract adapters.
 - [Phase 05.2]: Blocking candidate work uses one fixed no-shell worker with canonical bounded files, deadlines, and process-tree termination.
+- [Phase 05.2]: Arm the descendant execution timeout only after a separate bounded readiness handshake succeeds.
+- [Phase 05.2]: Use one canonical full-graph verifier for public and inert candidate packages with explicit native-binding policy.
+- [Phase 05.2]: Gate every full-file read and digest from metadata before allocation, then revalidate identity after reading.
 
 ### Pending Todos
 
@@ -183,6 +187,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-30T12:44:22.234Z
-Stopped at: CLEAN review obtained; fix Nyquist isolation race and security retention conformance gap next
-Resume file: .planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted/.continue-here.md
+Last session: 2026-08-30T14:55:12.804Z
+Stopped at: Completed 05.2-10 implementation; closure audits pending after user-requested pause
+Resume file: .planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted/05.2-10-SUMMARY.md

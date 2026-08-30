@@ -204,7 +204,7 @@ Plans:
 - [x] 05.2-07-PLAN.md
 - [x] 05.2-08-PLAN.md
 - [x] 05.2-09-PLAN.md
-- [ ] 05.2-10-PLAN.md — Close deterministic isolation readiness, canonical retained-root conformance, and pre-allocation file bounds before final audits.
+- [x] 05.2-10-PLAN.md — Close deterministic isolation readiness, canonical retained-root conformance, and pre-allocation file bounds before final audits.
 - [x] 05.2-PLAN-CHECK.md
 
 - [x] 05.2-01-PLAN.md
