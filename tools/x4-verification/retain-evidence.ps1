@@ -648,10 +648,10 @@ function Test-ProducerAttestation([string]$EvidencePath, $Build, $Evidence, [str
     [byte[]]$delegatedSpki = Test-DelegatedCertificate $RootContext $certificate $script:ProducerPurpose $script:ProducerScope
     $payload = $envelope.payload
     try {
-        $null = producer-attestation\Test-CandidateProducerPayload -Payload $payload `
+        $producerCandidateIds = @(producer-attestation\Test-CandidateProducerPayload -Payload $payload `
             -CertificateId ([string]$certificate.certificate_id) `
             -Epoch ([int]$RootContext.Anchor.accepted_epochs.'candidate-producer') `
-            -Scope $script:ProducerScope -Now ([DateTimeOffset]::UtcNow)
+            -Scope $script:ProducerScope -Now ([DateTimeOffset]::UtcNow))
     }
     catch { Fail ([string]$_.Exception.Message) }
     $payloadBytes = [Text.UTF8Encoding]::new($false).GetBytes(
@@ -661,7 +661,7 @@ function Test-ProducerAttestation([string]$EvidencePath, $Build, $Evidence, [str
         $payload.classification -ne 'authenticated-local-contract' -or
         $payload.build_id -ne $Build.Value.build_id -or $payload.run_id -ne $Evidence.RunId -or
         $payload.evidence_digest -ne $EvidenceDigest -or
-        (@($payload.candidate_ids) -join '|') -ne (@($Evidence.CandidateIds) -join '|')) {
+        ($producerCandidateIds -join '|') -ne (@($Evidence.CandidateIds) -join '|')) {
         Fail 'RETENTION_PRODUCER_IDENTITY_MISMATCH'
     }
     foreach ($binding in @(

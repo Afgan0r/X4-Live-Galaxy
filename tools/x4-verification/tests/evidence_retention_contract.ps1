@@ -576,6 +576,35 @@ try {
     $harnessSource = $harnessSource.Replace("`$ownerRootAnchorPath = Join-Path `$PSScriptRoot 'contracts/owner-root-anchor.v1.json'", "`$ownerRootAnchorPath = '$($anchorPath.Replace("'", "''"))'")
     Write-Utf8NoBom $testHarnessPath $harnessSource
 
+    $lifecycleGroupRoot = Join-Path $buildRoot 'p051-build-lifecycle'
+    $lifecycleManifestPath = Join-Path $lifecycleGroupRoot 'manifest/build-manifest.v1.json'
+    $lifecycleEvidencePath = Join-Path $scratch 'trusted-lifecycle-runtime.jsonl'
+    $lifecycleDispatch = @(& pwsh -NoProfile -File $dispatcherHarnessPath `
+        -GroupRoot $lifecycleGroupRoot -OutputPath $lifecycleEvidencePath 2>&1)
+    Assert-True ($LASTEXITCODE -eq 0) `
+        "Single-candidate lifecycle dispatch failed: $($lifecycleDispatch -join ' | ')"
+    $lifecycleProducerPath = "$lifecycleEvidencePath.attestation.json"
+    [byte[]]$lifecycleProducerBytes = [IO.File]::ReadAllBytes($lifecycleProducerPath)
+    $lifecycleEnvelope = [Text.Encoding]::UTF8.GetString($lifecycleProducerBytes) |
+        ConvertFrom-Json -Depth 32 -DateKind String
+    Assert-True ($lifecycleEnvelope.payload.candidate_ids -is [Array] -and
+        $lifecycleEnvelope.payload.candidate_ids.Count -eq 1) `
+        'Lifecycle producer baseline is not a one-element JSON array.'
+    Write-ResignedProducerMutation $lifecycleProducerPath $lifecycleProducerBytes $authority {
+        param($value)
+        $value.payload.candidate_ids = [string]$value.payload.candidate_ids[0]
+    }
+    $scalarDestination = Join-Path $scratch 'reject-scalar-candidate-ids'
+    $scalarOutput = @(& pwsh -NoProfile -File $testHarnessPath `
+        -EvidencePath $lifecycleEvidencePath -BuildManifestPath $lifecycleManifestPath `
+        -DestinationRoot $scalarDestination 2>&1)
+    Assert-True ($LASTEXITCODE -ne 0 -and
+        ($scalarOutput -join ' | ') -match 'PRODUCER_CANDIDATES_INVALID') `
+        'A validly signed scalar candidate_ids payload passed retention.'
+    Assert-True (-not (Test-Path -LiteralPath $scalarDestination)) `
+        'Rejected scalar candidate_ids payload left retained output.'
+    [IO.File]::WriteAllBytes($lifecycleProducerPath, $lifecycleProducerBytes)
+
     foreach ($forbiddenDestination in @(
         (Join-Path $scratch 'steamapps/common/X4 Foundations/extensions/live_galaxy/retained'),
         (Join-Path $scratch 'staging/extensions/live_galaxy/retained'),

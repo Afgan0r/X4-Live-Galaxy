@@ -49,7 +49,7 @@ function ConvertTo-CanonicalValue($Value) {
         return $result
     }
     if ($Value -is [Collections.IEnumerable] -and $Value -isnot [pscustomobject]) {
-        return @($Value | ForEach-Object { ConvertTo-CanonicalValue $_ })
+        return ,@($Value | ForEach-Object { ConvertTo-CanonicalValue $_ })
     }
     $result = [ordered]@{}
     foreach ($property in @($Value.PSObject.Properties | Sort-Object Name)) {
@@ -105,10 +105,19 @@ function Test-CandidateProducerPayload {
     if ([string]$Payload.nonce -notmatch '^[a-f0-9]{32}$') {
         throw [IO.InvalidDataException]::new('PRODUCER_NONCE_INVALID')
     }
+    if ($Payload.candidate_ids -isnot [Array]) {
+        throw [IO.InvalidDataException]::new('PRODUCER_CANDIDATES_INVALID')
+    }
     $candidateIds = @($Payload.candidate_ids)
     if ($candidateIds.Count -lt 1 -or $candidateIds.Count -gt 7 -or
         ($candidateIds -join '|') -ne (@($candidateIds | Sort-Object -Unique) -join '|')) {
         throw [IO.InvalidDataException]::new('PRODUCER_CANDIDATES_INVALID')
+    }
+    foreach ($candidateId in $candidateIds) {
+        if ($candidateId -isnot [string] -or
+            $candidateId -cnotmatch '^[a-z0-9][a-z0-9-]{0,63}$') {
+            throw [IO.InvalidDataException]::new('PRODUCER_CANDIDATES_INVALID')
+        }
     }
     try {
         $started = [DateTimeOffset]::ParseExact(
@@ -132,7 +141,7 @@ function Test-CandidateProducerPayload {
         $started -gt $verificationCeiling) {
         throw [IO.InvalidDataException]::new('PRODUCER_CHRONOLOGY_INVALID')
     }
-    return $true
+    return $candidateIds
 }
 
 function New-CandidateProducerAttestation {
