@@ -147,6 +147,41 @@ local dependency = require(PREFIX .. "dependency")
         $staticResult = Invoke-Conformance $staticPackage 0
         Assert-True ($staticResult.verdict -eq 'conformant') 'Lexer rejected supported multiline/concatenated imports or scanned comments/long strings.'
 
+        $staticHelperPackage = Join-Path $scratch 'lexer-static-helper'
+        New-SyntaxPackage $staticHelperPackage @'
+local PREFIX = "live_galaxy/lua/"
+local function load_module(name)
+    return require(PREFIX .. name)
+end
+local ffi = require("ffi")
+local C = ffi.C
+local dependency = load_module("dependency")
+'@ @{ 'lua/dependency.lua' = 'return {}' }
+        $staticHelperResult = Invoke-Conformance $staticHelperPackage 0
+        Assert-True (@($staticHelperResult.import_graph) -contains 'lua/dependency.lua') 'Static helper import was not included in the graph.'
+
+        $dynamicHelperCalls = @(
+            'local module_name = get_name(); local dependency = load_module(module_name)',
+            'local suffix = get_name(); local dependency = load_module("dependency" .. suffix)',
+            'local dependency = load_module(get_name())',
+            "local module_name = get_name(); local dependency = load_module(`n module_name`n)"
+        )
+        for ($helperIndex = 0; $helperIndex -lt $dynamicHelperCalls.Count; $helperIndex += 1) {
+            $dynamicHelperPackage = Join-Path $scratch "lexer-dynamic-helper-$helperIndex"
+            $helperSource = @"
+local PREFIX = "live_galaxy/lua/"
+local function load_module(name)
+    return require(PREFIX .. name)
+end
+local ffi = require("ffi")
+local C = ffi.C
+$($dynamicHelperCalls[$helperIndex])
+"@
+            New-SyntaxPackage $dynamicHelperPackage $helperSource
+            $dynamicHelperResult = Invoke-Conformance $dynamicHelperPackage 1
+            Assert-True (@($dynamicHelperResult.reason_codes) -contains 'DYNAMIC_REQUIRE') "Dynamic helper call $helperIndex did not fail closed."
+        }
+
         $aliasPackage = Join-Path $scratch 'lexer-alias'
         New-SyntaxPackage $aliasPackage 'local r = require; local ffi = r("ffi"); local C = ffi.C'
         $aliasResult = Invoke-Conformance $aliasPackage 1

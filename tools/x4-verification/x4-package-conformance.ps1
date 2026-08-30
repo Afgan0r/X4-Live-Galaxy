@@ -220,11 +220,21 @@ function Get-Imports([string]$Source) {
     }
     for ($i = 0; $i -lt $tokens.Count; $i++) {
         if ($tokens[$i].Kind -eq 'identifier' -and $helpers.ContainsKey($tokens[$i].Value) -and
-            $i + 3 -lt $tokens.Count -and $tokens[$i + 1].Value -eq '(' -and
-            $tokens[$i + 2].Kind -eq 'string' -and $tokens[$i + 3].Value -eq ')') {
+            $i + 1 -lt $tokens.Count -and $tokens[$i + 1].Value -eq '(' -and
+            -not ($i -gt 0 -and $tokens[$i - 1].Value -eq 'function')) {
+            $end = $i + 2
+            $depth = 1
+            while ($end -lt $tokens.Count -and $depth -gt 0) {
+                if ($tokens[$end].Value -eq '(') { $depth++ }
+                elseif ($tokens[$end].Value -eq ')') { $depth-- }
+                $end++
+            }
+            if ($depth -ne 0) { Fail 'INVALID_LUA_SOURCE' }
+            $argument = Resolve-StaticExpression $tokens ($i + 2) ($end - 1) $constants
+            if ($null -eq $argument) { Fail 'DYNAMIC_REQUIRE' 'local-only' }
             $helper = $helpers[$tokens[$i].Value]
-            $imports.Add($helper.Prefix + $tokens[$i + 2].Value + $helper.Suffix)
-            $i += 3
+            $imports.Add($helper.Prefix + $argument + $helper.Suffix)
+            $i = $end - 1
             continue
         }
         if ($tokens[$i].Value -eq 'require') {
