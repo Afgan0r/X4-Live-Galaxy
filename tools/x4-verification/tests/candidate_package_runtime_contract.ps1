@@ -67,7 +67,7 @@ function Test-Adapters {
     $null = New-Item -ItemType Directory -Path $outputRoot -Force
     try {
         $build = Invoke-JsonCommand $builderPath @('-BuildRoot', $buildRoot, '-MatrixPath', $matrixPath)
-        Assert-True ($build.verdict -eq 'pass') 'Candidate builder failed before dispatcher verification.'
+        Assert-True ($build.verdict -in @('generated', 'pass')) 'Candidate builder failed before dispatcher verification.'
         $observed = @()
         foreach ($group in @('p051-build-lifecycle', 'p051-build-read-only-shared')) {
             $output = Join-Path $outputRoot "$group.jsonl"

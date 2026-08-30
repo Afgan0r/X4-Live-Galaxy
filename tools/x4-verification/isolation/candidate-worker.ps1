@@ -10,6 +10,7 @@ Set-StrictMode -Version Latest
 
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 $protocolPath = Join-Path $root 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
+$adapterModulePath = Join-Path $root 'tools/x4-verification/candidate-adapters.psm1'
 $protocol = Get-Content -LiteralPath $protocolPath -Raw | ConvertFrom-Json
 
 function Test-ExactFields([psobject]$Value, [string[]]$Expected) {
@@ -84,6 +85,30 @@ $response = [ordered]@{
     elapsed_game_ms = 0
     seta_state = 'not_applicable'
     diagnostic_code = 'none'
+}
+
+$candidateAdapterIds = @(
+    'p051-cadence-seta',
+    'p051-lifecycle-reload',
+    'p051-mod-stack-compatibility',
+    'p051-native-count-fill-runtime',
+    'p051-native-fill-completeness',
+    'p051-native-identity-closure',
+    'p051-native-volume-envelope'
+)
+if ($candidateAdapterIds -ccontains [string]$request.candidate_id) {
+    if ($request.adapter_id -ne 'local-contract-success') { exit 25 }
+    Import-Module $adapterModulePath -Force
+    $adapterResult = Invoke-CandidateAdapter `
+        -CandidateId $request.candidate_id `
+        -ExpectedResult $request.input.expected_result `
+        -MaxWorkUnits $request.input.max_work_units
+    $response.status = $adapterResult.status
+    $response.actual_result = $adapterResult.actual_result
+    $response.completeness = $adapterResult.completeness
+    $response.work_units = $adapterResult.work_units
+    $response.observations = @($adapterResult.observations)
+    $response.diagnostic_code = $adapterResult.diagnostic_code
 }
 
 switch ($request.adapter_id) {
