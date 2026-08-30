@@ -11,6 +11,8 @@ $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 $manifestContractPath = Join-Path $root 'tools/x4-verification/contracts/candidate-build-manifest.v1.json'
 $builderPath = Join-Path $root 'tools/x4-verification/build-candidate-extension.ps1'
+$contentTemplatePath = Join-Path $root 'tools/x4-verification/templates/candidate-content.xml'
+$uiTemplatePath = Join-Path $root 'tools/x4-verification/templates/candidate-ui.xml'
 $runtimeEvidencePath = Join-Path $root 'tools/x4-verification/contracts/runtime-evidence.v1.json'
 $dossierPath = Join-Path $root 'tools/x4-verification/contracts/dossier.v1.json'
 $registryPath = Join-Path $root 'tools/x4-verification/contracts/known-failures.v1.json'
@@ -191,8 +193,8 @@ function Test-Partition {
     Assert-Rejected { param($m) $m.candidates[0].build_group = 'p051-build-lifecycle' } 'conflicting-same-group'
 }
 
-function Invoke-Builder([string]$BuildRoot, [int]$ExpectedExitCode) {
-    $output = & pwsh -NoProfile -File $builderPath -BuildRoot $BuildRoot -MatrixPath $matrixPath 2>&1
+function Invoke-Builder([string]$BuildRoot, [int]$ExpectedExitCode, [string]$CandidateMatrixPath = $matrixPath) {
+    $output = & pwsh -NoProfile -File $builderPath -BuildRoot $BuildRoot -MatrixPath $CandidateMatrixPath 2>&1
     $exitCode = $LASTEXITCODE
     Assert-True ($exitCode -eq $ExpectedExitCode) "Builder exit $exitCode, expected ${ExpectedExitCode}: $($output -join [Environment]::NewLine)"
     return @($output)
@@ -227,7 +229,7 @@ function Assert-Manifest([string]$GroupRoot, $Matrix, $Group) {
 }
 
 function Test-GeneratedBuilds {
-    foreach ($required in @($builderPath, $matrixPath, $manifestContractPath)) {
+    foreach ($required in @($builderPath, $contentTemplatePath, $uiTemplatePath, $matrixPath, $manifestContractPath)) {
         Assert-True (Test-Path -LiteralPath $required -PathType Leaf) "Missing build artifact: $required"
     }
     $matrix = Read-Json $matrixPath
@@ -249,11 +251,40 @@ function Test-GeneratedBuilds {
         }
         Assert-True ($seen.Count -eq 7) 'Generated roots do not cover exactly seven candidates.'
 
+        $firstGroup = @($matrix.build_groups)[0]
+        $firstRoot = Join-Path $scratch $firstGroup.id
+        $manifestPath = Join-Path $firstRoot 'manifest/build-manifest.v1.json'
+        $originalManifest = Get-Content -LiteralPath $manifestPath -Raw
+        try {
+            $tamperedManifest = $originalManifest | ConvertFrom-Json -Depth 64
+            $tamperedManifest.matrix_digest = ('0' * 64)
+            Set-Content -LiteralPath $manifestPath -Value ($tamperedManifest | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
+            $rejected = $false
+            try { Assert-Manifest $firstRoot $matrix $firstGroup }
+            catch { $rejected = $true }
+            Assert-True $rejected 'Tampered generated manifest did not fail closed.'
+        }
+        finally {
+            Set-Content -LiteralPath $manifestPath -Value $originalManifest -NoNewline -Encoding utf8
+        }
+
+        $tamperedMatrixPath = Join-Path $scratch 'tampered-matrix.json'
+        $tamperedMatrix = Copy-JsonValue $matrix
+        $tamperedMatrix.candidates[0].build_profile_digest = ('0' * 64)
+        Set-Content -LiteralPath $tamperedMatrixPath -Value ($tamperedMatrix | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
+        $tamperedRoot = Join-Path $scratch 'tampered-output'
+        $null = Invoke-Builder $tamperedRoot 1 $tamperedMatrixPath
+        Assert-True (-not (Test-Path -LiteralPath $tamperedRoot)) 'Builder wrote output for a stale profile digest.'
+
         $before = Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')
         $null = Invoke-Builder $publicPackageRoot 1
         Assert-True ((Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')) -eq $before) 'Builder changed the public package after rejecting it.'
         $null = Invoke-Builder $root 1
         $null = Invoke-Builder ([IO.Path]::GetPathRoot($root)) 1
+        $gameRoot = 'F:\SteamLibrary\steamapps\common\X4 Foundations'
+        if (Test-Path -LiteralPath $gameRoot -PathType Container) {
+            $null = Invoke-Builder $gameRoot 1
+        }
     }
     finally {
         if (Test-Path -LiteralPath $scratch) {
