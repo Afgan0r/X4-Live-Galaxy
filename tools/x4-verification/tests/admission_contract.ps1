@@ -41,7 +41,7 @@ function Copy-Json($Value) {
     return ($Value | ConvertTo-Json -Depth 32 | ConvertFrom-Json)
 }
 
-function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null, $Override = $null, $Ledger = $null, $Matrix = $null, $PendingLedger = $null) {
+function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $null, $Override = $null, $Ledger = $null, $Matrix = $null, $PendingLedger = $null, [bool]$ValidationOnly = $true) {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("live-galaxy-admission-{0}" -f [guid]::NewGuid().ToString('N'))
     [void](New-Item -ItemType Directory -Path $tempRoot)
     try {
@@ -51,6 +51,7 @@ function Invoke-Admission($Dossier, $Registry, $Coverage = $null, $Fixtures = $n
         $inputDigestBefore = (Get-FileHash -LiteralPath $tempDossier -Algorithm SHA256).Hash.ToLowerInvariant()
         $Registry | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempRegistry -Encoding utf8NoBOM
         $arguments = @('-NoProfile', '-File', $admissionPath, '-DossierPath', $tempDossier, '-RegistryPath', $tempRegistry)
+        if ($ValidationOnly) { $arguments += '-ValidateFixture' }
         if ($null -ne $Coverage) {
             $tempCoverage = Join-Path $tempRoot 'coverage.json'
             $Coverage | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $tempCoverage -Encoding utf8NoBOM
@@ -169,40 +170,42 @@ if ($Case -eq 'evidence-chain') {
         $candidate.identity_digests | Add-Member -NotePropertyName run_digest -NotePropertyValue $runDigest
     }
 
-    $accepted = Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $completeLedger $matrix $pendingLedger
+    $admissionDossier = Copy-Json $baseDossier
+    $admissionDossier.seam_id = 'phase-05.1-runtime-discovery'
+    $accepted = Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $completeLedger $matrix $pendingLedger $false
     Assert-True ($accepted.ExitCode -eq 0) "Complete retained evidence chain failed: $($accepted.Output -join ' | ')"
     Assert-True ($accepted.Result.verdict -eq 'admissible') 'Complete retained evidence chain was not admitted.'
 
     $missingEvidence = Copy-Json $completeLedger
     $missingEvidence.candidates[0].identity_digests.PSObject.Properties.Remove('evidence_digest')
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $missingEvidence $matrix $pendingLedger) 'EVIDENCE_CHAIN_INCOMPLETE' 'missing retained evidence digest'
+    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $missingEvidence $matrix $pendingLedger $false) 'EVIDENCE_CHAIN_INCOMPLETE' 'missing retained evidence digest'
 
     $incomplete = Copy-Json $completeLedger
     $incomplete.candidates[0].status = 'runtime-pending'
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $incomplete $matrix $pendingLedger) 'RETENTION_INCOMPLETE' 'incomplete retention'
+    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $incomplete $matrix $pendingLedger $false) 'RETENTION_INCOMPLETE' 'incomplete retention'
 
     $sourceAction = Copy-Json $matrix
     $sourceAction.candidates[0].source_action_only = $true
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $completeLedger $sourceAction $pendingLedger) 'SOURCE_ACTION_DEFECT' 'source-action candidate'
+    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $completeLedger $sourceAction $pendingLedger $false) 'SOURCE_ACTION_DEFECT' 'source-action candidate'
 
     foreach ($axis in @('execution', 'contract', 'effect')) {
         $failed = Copy-Json $completeLedger
         $failed.candidates[0]."${axis}_verdict" = 'fail'
-        Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $failed $matrix $pendingLedger) 'FAILED_RUNTIME_VERDICT' "failed $axis verdict"
+        Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $failed $matrix $pendingLedger $false) 'FAILED_RUNTIME_VERDICT' "failed $axis verdict"
     }
 
     $unexpected = Copy-Json $completeLedger
     $unexpected.candidates[0].actual_effect_id = 'valid-unexpected-result'
     $unexpected.candidates[0].effect_verdict = 'pass'
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $unexpected $matrix $pendingLedger) 'UNEXPECTED_EFFECT' 'valid unexpected effect marked pass'
+    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $unexpected $matrix $pendingLedger $false) 'UNEXPECTED_EFFECT' 'valid unexpected effect marked pass'
 
     $identityMismatch = Copy-Json $completeLedger
     $identityMismatch.candidates[0].identity_digests.dossier_digest = '0' * 64
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $identityMismatch $matrix $pendingLedger) 'IDENTITY_CHAIN_MISMATCH' 'dossier identity mismatch'
+    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $identityMismatch $matrix $pendingLedger $false) 'IDENTITY_CHAIN_MISMATCH' 'dossier identity mismatch'
 
     $unsanitized = Copy-Json $completeLedger
     $unsanitized.candidates[0] | Add-Member -NotePropertyName raw_path -NotePropertyValue 'private-value'
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures $null $unsanitized $matrix $pendingLedger) 'UNSANITIZED_LEDGER_FIELD' 'unsanitized ledger field'
+    Assert-Rejected (Invoke-Admission $admissionDossier $baseRegistry $coverage $fixtures $null $unsanitized $matrix $pendingLedger $false) 'UNSANITIZED_LEDGER_FIELD' 'unsanitized ledger field'
 
     Write-Output 'PASS: sanitized evidence-chain admission contract'
     exit 0
@@ -231,7 +234,7 @@ if ($Case -eq 'admission') {
     $override.expires_at = [DateTimeOffset]::UtcNow.AddDays(30).ToString('yyyy-MM-ddTHH:mm:ssZ')
     $accepted = Invoke-Admission $knownFailure $baseRegistry $coverage $fixtures $override
     Assert-True ($accepted.ExitCode -eq 0) "Exact override failed: $($accepted.Output -join ' | ')"
-    Assert-True ($accepted.Result.verdict -eq 'admissible-with-owner-override') 'Exact override returned the wrong verdict.'
+    Assert-True ($accepted.Result.verdict -eq 'validation-passed-with-owner-override') 'Exact override returned the wrong verdict.'
     Assert-True (@($accepted.Result.reason_codes) -contains 'OWNER_OVERRIDE_APPLIED') 'Exact override returned the wrong reason.'
     Assert-True (@($accepted.Result.overridden_finding_ids) -join '|' -eq 'finding-small-loader-exception') 'Override did not report the exact finding.'
     Assert-True ($accepted.InputDigestBefore -eq $accepted.InputDigestAfter) 'Exact override mutated the source dossier.'
@@ -278,20 +281,18 @@ if ($Case -eq 'negative-fixtures') {
     $orderedIds = @($fixtures.fixtures | Sort-Object id | ForEach-Object id)
     Assert-True (($orderedIds -join '|') -eq (@($fixtures.fixtures | ForEach-Object id) -join '|')) 'Negative fixtures must use deterministic ID order.'
 
+    $fixtureValidation = Invoke-Admission $baseDossier $baseRegistry $coverage $fixtures
+    Assert-True ($fixtureValidation.ExitCode -eq 0) 'Executable negative fixture bundle did not validate.'
+    $resultMap = @{}
+    foreach ($result in @($fixtureValidation.Result.negative_fixture_results)) { $resultMap[$result.id] = $result.reason_code }
     foreach ($fixture in @($fixtures.fixtures)) {
         Assert-True ($fixture.enabled -is [bool] -and $fixture.enabled) "Fixture $($fixture.id) is skipped."
-        $dossier = Copy-Json $baseDossier
-        $dimension = @($dossier.dimensions | Where-Object { $_.id -eq $fixture.dimension_id })
-        Assert-True ($dimension.Count -eq 1) "Fixture $($fixture.id) names an unknown dimension."
-        $dimension[0] | Add-Member -NotePropertyName finding_ids -NotePropertyValue @($fixture.finding_id)
-        $dossier.findings = @([pscustomobject]@{
-            id = $fixture.finding_id
-            failure_class_id = $fixture.failure_class_id
-            dimension_id = $fixture.dimension_id
-            disposition = 'known-failure'
-        })
-        Assert-Rejected (Invoke-Admission $dossier $baseRegistry $coverage $fixtures) $fixture.expected_reason_code "fixture $($fixture.id)"
+        Assert-True ($resultMap[$fixture.id] -eq $fixture.expected_reason_code) "Fixture $($fixture.id) did not execute its class-specific detector."
     }
+
+    $passingMutation = Copy-Json $fixtures
+    $passingMutation.fixtures[0].detector_input.packaged_entrypoint = $passingMutation.fixtures[0].detector_input.registered_entrypoint
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $passingMutation) 'NEGATIVE_FIXTURE_DID_NOT_FAIL' 'loader fixture without loader defect'
 
     $missingRow = Copy-Json $coverage
     $missingRow.rows = @($missingRow.rows | Select-Object -Skip 1)
@@ -314,8 +315,8 @@ if ($Case -eq 'negative-fixtures') {
     Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $duplicateFixture) 'DUPLICATE_ID' 'duplicate fixture'
 
     $passingFixture = Copy-Json $fixtures
-    $passingFixture.fixtures[0].expected_reason_code = 'ADMISSIBLE'
-    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $passingFixture) 'PASSING_NEGATIVE_FIXTURE' 'passing negative fixture'
+    $passingFixture.fixtures[0].expected_reason_code = 'loader-mismatch-wrong-code'
+    Assert-Rejected (Invoke-Admission $baseDossier $baseRegistry $coverage $passingFixture) 'NEGATIVE_FIXTURE_REASON_MISMATCH' 'mismatched detector reason'
 
     $newRegistry = Copy-Json $baseRegistry
     $newClass = Copy-Json $newRegistry.failure_classes[0]
@@ -330,8 +331,11 @@ if ($Case -eq 'negative-fixtures') {
 
 $complete = Invoke-Admission $baseDossier $baseRegistry
 Assert-True ($complete.ExitCode -eq 0) "Complete dossier failed: $($complete.Output -join ' | ')"
-Assert-True ($complete.Result.verdict -eq 'admissible') 'Complete dossier did not reach the admissible verdict.'
-Assert-True (@($complete.Result.reason_codes).Count -eq 1 -and $complete.Result.reason_codes[0] -eq 'ADMISSIBLE') 'Complete dossier reason code is unstable.'
+Assert-True ($complete.Result.verdict -eq 'validation-passed') 'Complete dossier fixture did not reach validation-passed.'
+Assert-True (@($complete.Result.reason_codes).Count -eq 1 -and $complete.Result.reason_codes[0] -eq 'VALIDATION_PASSED') 'Complete dossier validation reason code is unstable.'
+
+$directAdmission = Invoke-Admission $baseDossier $baseRegistry $null $null $null $null $null $null $false
+Assert-Rejected $directAdmission 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' 'validation fixture in admission mode'
 
 $unknownVersion = Copy-Json $baseDossier
 $unknownVersion.schema_version = 'x4-integration-dossier.v999'

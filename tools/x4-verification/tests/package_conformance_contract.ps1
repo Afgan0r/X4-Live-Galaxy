@@ -99,9 +99,10 @@ function Test-PackagedPath {
         '-DossierPath', $dossierPath,
         '-RegistryPath', $registryPath,
         '-CoveragePath', $coveragePath,
-        '-FixturePath', $admissionFixturePath
+        '-FixturePath', $admissionFixturePath,
+        '-ValidateFixture'
     ) 0
-    Assert-True ($admission.verdict -eq 'admissible') 'Independent Plan 01 admission did not accept its complete fixture.'
+    Assert-True ($admission.verdict -eq 'validation-passed') 'Independent Plan 01 fixture validation did not pass.'
 
     $bundle = Get-Content -LiteralPath $fixturePath -Raw | ConvertFrom-Json -Depth 64
     Assert-True ($bundle.schema_version -eq 'x4-package-negative-fixtures.v1') 'Unexpected fixture schema.'

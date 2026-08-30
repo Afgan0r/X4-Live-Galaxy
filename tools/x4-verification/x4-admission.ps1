@@ -11,7 +11,8 @@ param(
     [string]$OverridePath,
     [string]$SanitizedLedgerPath,
     [string]$PendingLedgerPath,
-    [string]$CandidateMatrixPath
+    [string]$CandidateMatrixPath,
+    [switch]$ValidateFixture
 )
 
 Set-StrictMode -Version Latest
@@ -47,6 +48,7 @@ $script:dossierId = 'unparsed'
 $script:dossierDigest = $null
 $script:validationContext = 'startup'
 $script:overriddenFindingIds = @()
+$script:negativeFixtureResults = @()
 
 function Fail([string]$Code) {
     $script:failureCode = $Code
@@ -231,17 +233,52 @@ function Test-FixtureBundle($Bundle, [string[]]$FailureClassIds) {
         if ($requiredDimensions -notcontains $dimensionId) {
             Fail 'INVALID_EVIDENCE_REFERENCE'
         }
-        Require-Id (Require-Property $fixture 'finding_id')
         Require-Bool (Require-Property $fixture 'enabled')
         if (-not $fixture.enabled) {
             Fail 'SKIPPED_NEGATIVE_FIXTURE'
         }
-        if ((Require-Property $fixture 'expected_reason_code') -ne 'KNOWN_FAILURE_BLOCKED') {
-            Fail 'PASSING_NEGATIVE_FIXTURE'
-        }
+        $expectedReason = Require-Property $fixture 'expected_reason_code'
+        Require-Id $expectedReason
+        $detectedReason = Invoke-NegativeFixtureDetector $fixture
+        if ($detectedReason -ne $expectedReason) { Fail 'NEGATIVE_FIXTURE_REASON_MISMATCH' }
+        $script:negativeFixtureResults += [ordered]@{ id = $id; reason_code = $detectedReason }
         $map[$id] = $fixture
     }
     return $map
+}
+
+function Invoke-NegativeFixtureDetector($Fixture) {
+    $detector = Require-Property $Fixture 'detector'
+    $input = Require-Property $Fixture 'detector_input'
+    switch ($detector) {
+        'package-registration' {
+            if ($input.registered_entrypoint -cne $input.packaged_entrypoint) { return 'loader-mismatch-detected' }
+        }
+        'native-binding' {
+            if ($input.binding_acquired -ne $true -or $input.call_verified -ne $true) { return 'native-binding-unverified' }
+        }
+        'identity-closure' {
+            if ($input.native_id -ne $input.canonical_id -or $input.owner_matches -ne $true) { return 'identity-mismatch-detected' }
+        }
+        'bound-provenance' {
+            if ([string]::IsNullOrWhiteSpace([string]$input.evidence_id) -or $input.measured -ne $true) { return 'bound-provenance-missing' }
+        }
+        'atomic-completeness' {
+            if ($input.completion_claimed -eq $true -and $input.valid_count -ne $input.expected_count) { return 'partial-completion-detected' }
+        }
+        'package-resolution' {
+            if ($input.test_resolves -eq $true -and $input.production_resolves -ne $true) { return 'permissive-harness-dependency' }
+        }
+        'integration-context' {
+            $required = @('loader-registration', 'module-resolution', 'lifecycle-thread', 'native-canonical-identity', 'failure-partial-completeness', 'volume-performance')
+            $present = @($input.context_dimensions)
+            if ($input.call_shape_present -eq $true -and @($required | Where-Object { $present -notcontains $_ }).Count -gt 0) {
+                return 'isolated-call-context-incomplete'
+            }
+        }
+        default { Fail 'INVALID_FIXTURE_DETECTOR' }
+    }
+    Fail 'NEGATIVE_FIXTURE_DID_NOT_FAIL'
 }
 
 function Test-Coverage($Coverage, $RegistryInfo, $FixtureMap) {
@@ -592,6 +629,7 @@ function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
         dossier_digest = $script:dossierDigest
         diagnostic_id = $script:validationContext
         overridden_finding_ids = @($script:overriddenFindingIds)
+        negative_fixture_results = @($script:negativeFixtureResults)
     }
     Write-Output ($result | ConvertTo-Json -Compress -Depth 8)
 }
@@ -630,17 +668,26 @@ try {
         if ($script:overriddenFindingIds.Count -ne $knownFindings.Count) {
             Fail 'KNOWN_FAILURE_BLOCKED'
         }
-        Write-Result 'admissible-with-owner-override' @('OWNER_OVERRIDE_APPLIED')
-        exit 0
     }
-    if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
+    if ($knownFindings.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($OverridePath)) {
         Fail 'OVERRIDE_SCOPE_MISMATCH'
     }
+    if ($ValidateFixture) {
+        $fixtureVerdict = if ($script:overriddenFindingIds.Count -gt 0) { 'validation-passed-with-owner-override' } else { 'validation-passed' }
+        $fixtureReason = if ($script:overriddenFindingIds.Count -gt 0) { 'OWNER_OVERRIDE_APPLIED' } else { 'VALIDATION_PASSED' }
+        Write-Result $fixtureVerdict @($fixtureReason)
+        exit 0
+    }
+    if ($dossierRead.Value.seam_id -eq 'validation-fixture-only') { Fail 'VALIDATION_FIXTURE_NOT_ADMISSIBLE' }
     $evidenceInputs = @($SanitizedLedgerPath, $PendingLedgerPath, $CandidateMatrixPath)
+    if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
+        [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
+        Fail 'MISSING_ADMISSION_EVIDENCE'
+    }
     if (@($evidenceInputs | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
         if (@($evidenceInputs | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0 -or
             [string]::IsNullOrWhiteSpace($CoveragePath) -or [string]::IsNullOrWhiteSpace($FixturePath)) {
-            Fail 'MISSING_INPUT'
+            Fail 'MISSING_ADMISSION_EVIDENCE'
         }
         $script:validationContext = 'candidate-matrix-read'
         $matrixRead = Read-BoundedJson $CandidateMatrixPath 'phase-05.1-candidates.v1' 'UNSUPPORTED_MATRIX_SCHEMA'

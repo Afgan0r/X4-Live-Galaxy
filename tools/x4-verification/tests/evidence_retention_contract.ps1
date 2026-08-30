@@ -12,7 +12,7 @@ $root = Split-Path -Parent (Split-Path -Parent $toolRoot)
 $retentionPath = Join-Path $toolRoot 'retain-evidence.ps1'
 $sanitizedContractPath = Join-Path $toolRoot 'contracts/sanitized-ledger.v1.json'
 $builderPath = Join-Path $toolRoot 'build-candidate-extension.ps1'
-$dossierPath = Join-Path $toolRoot 'contracts/dossier.v1.json'
+$dossierPath = Join-Path $toolRoot 'contracts/phase-05.1-dossier.v1.json'
 $matrixPath = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
 
 function Assert-True([bool]$Condition, [string]$Message) {

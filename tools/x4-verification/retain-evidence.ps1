@@ -22,7 +22,7 @@ $runtimeContractPath = Join-Path $PSScriptRoot 'contracts/runtime-evidence.v1.js
 $manifestContractPath = Join-Path $PSScriptRoot 'contracts/candidate-build-manifest.v1.json'
 $sanitizedContractPath = Join-Path $PSScriptRoot 'contracts/sanitized-ledger.v1.json'
 $matrixPath = Join-Path $repositoryRoot 'tests/x4-candidates/phase-05.1-candidates.v1.json'
-$dossierPath = Join-Path $PSScriptRoot 'contracts/dossier.v1.json'
+$dossierPath = Join-Path $PSScriptRoot 'contracts/phase-05.1-dossier.v1.json'
 $registryPath = Join-Path $PSScriptRoot 'contracts/known-failures.v1.json'
 $coveragePath = Join-Path $PSScriptRoot 'contracts/coverage.v1.json'
 

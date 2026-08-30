@@ -5,7 +5,7 @@
   "evidence_classification": "prepared-not-executed",
   "source_inputs": [
     { "id": "coverage", "reference": "tools/x4-verification/contracts/coverage.v1.json", "sha256": "3f2d74a8aba91e390aecf38650f1866ac64fc093f5878a4f2e4e07e5c34ba715" },
-    { "id": "dossier", "reference": "tools/x4-verification/contracts/dossier.v1.json", "sha256": "4eb006d235e903497b43d55417e6e771096b5a6ae1ccc9891b9ea176f8222eb0" },
+    { "id": "dossier", "reference": "tools/x4-verification/contracts/phase-05.1-dossier.v1.json", "sha256": "8a7761e27ea700a5683776c9796b16d91e42a20d44acf98f6703c5033bc432da" },
     { "id": "package_conformance", "reference": "tools/x4-verification/contracts/package-conformance.v1.json", "sha256": "31dae75a465d59e5835df14a258f6f0f4197c53169ac85e576ae519adf2b7b0a" },
     { "id": "registry", "reference": "tools/x4-verification/contracts/known-failures.v1.json", "sha256": "6d797176715a7af020f1e16f2b7eee843897f26a86776d0aa5ca5e7d791e6c3b" },
     { "id": "runtime_evidence", "reference": "tools/x4-verification/contracts/runtime-evidence.v1.json", "sha256": "ae47614e5cb616f8ff38cd8ead636cda15619087f700f21190476db65a6000a0" }
