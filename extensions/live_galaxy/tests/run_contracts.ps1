@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-candidate-runner', 'x4-verification')]
+    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-candidate-runner', 'x4-verification-fast', 'x4-verification')]
     [string]$Suite = 'all',
     [string]$LuaPath
 )
@@ -17,15 +17,108 @@ $ownerAuthorityContract = Join-Path $root 'tools/x4-verification/tests/owner_aut
 $ownerAuthorityAdversarial = Join-Path $root 'tools/x4-verification/tests/owner_authority_adversarial.ps1'
 $evidenceChainAdversarial = Join-Path $root 'tools/x4-verification/tests/evidence_chain_adversarial.ps1'
 
+function Invoke-TimedStage {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Gate,
+        [Parameter(Mandatory)]
+        [string]$StageId,
+        [Parameter(Mandatory)]
+        [string]$Executable,
+        [Parameter(Mandatory)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory)]
+        [string]$FailureMessage,
+        [string[]]$ExpectedMarkers = @(),
+        [string[]]$MissingMarkerMessages = @(),
+        [string]$CaptureVariableName,
+        [bool]$RequireOutput = $false,
+        [string]$EmptyOutputMessage,
+        [bool]$EmitTiming = $true
+    )
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $status = 'fail'
+    try {
+        $stageOutput = @(& $Executable @Arguments)
+        $exitCode = $LASTEXITCODE
+        $stageOutput | Write-Output
+        if ($exitCode -ne 0) {
+            throw $FailureMessage
+        }
+        if ($RequireOutput -and $stageOutput.Count -eq 0) {
+            throw $EmptyOutputMessage
+        }
+        for ($index = 0; $index -lt $ExpectedMarkers.Count; $index++) {
+            if ($stageOutput -notcontains $ExpectedMarkers[$index]) {
+                $markerMessage = if ($index -lt $MissingMarkerMessages.Count) {
+                    $MissingMarkerMessages[$index]
+                }
+                else {
+                    $FailureMessage
+                }
+                throw $markerMessage
+            }
+        }
+        if (-not [string]::IsNullOrWhiteSpace($CaptureVariableName)) {
+            Set-Variable -Scope 1 -Name $CaptureVariableName -Value $stageOutput
+        }
+        $status = 'pass'
+    }
+    finally {
+        $stopwatch.Stop()
+        if ($EmitTiming) {
+            [ordered]@{
+                schema = 'x4-verification-stage-timing.v1'
+                gate = $Gate
+                stage_id = $StageId
+                elapsed_ms = [long]$stopwatch.ElapsedMilliseconds
+                status = $status
+            } | ConvertTo-Json -Compress | Write-Output
+        }
+    }
+}
+
+if ($Suite -eq 'x4-verification-fast') {
+    Invoke-TimedStage -Gate $Suite -StageId 'package-conformance-packaged-path' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $packageConformanceContract, '-Case', 'packaged-path', '-SkipAggregateRegistration') `
+        -FailureMessage 'X4 package conformance contract failed.' `
+        -ExpectedMarkers @('package conformance contract passed: packaged-path') `
+        -MissingMarkerMessages @('X4 package conformance PASS marker is missing: packaged-path')
+    Invoke-TimedStage -Gate $Suite -StageId 'candidate-isolation-all' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidateIsolationContract, '-Case', 'all') `
+        -FailureMessage 'X4 candidate isolation contract failed.'
+    Invoke-TimedStage -Gate $Suite -StageId 'candidate-runtime-adapters' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'adapters') `
+        -FailureMessage 'X4 candidate-package runtime contract failed.' `
+        -ExpectedMarkers @('candidate-package-runtime: adapters PASS')
+    Invoke-TimedStage -Gate $Suite -StageId 'evidence-retention-retention' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceRetentionContract, '-Case', 'retention') `
+        -FailureMessage 'X4 evidence-retention contract failed: retention'
+    Invoke-TimedStage -Gate $Suite -StageId 'evidence-retention-preallocation-bounds' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceRetentionContract, '-Case', 'preallocation-bounds') `
+        -FailureMessage 'X4 evidence-retention contract failed: preallocation-bounds' `
+        -ExpectedMarkers @('PASS: shared open-handle race contract') `
+        -MissingMarkerMessages @('X4 open-handle race marker was not reached.')
+    Write-Output 'PASS: x4-verification-fast'
+    exit 0
+}
+
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission', 'evidence-chain')) {
-        $admissionOutput = @(& pwsh -NoProfile -File $admissionContract -Case $admissionCase)
-        if ($LASTEXITCODE -ne 0) { throw "X4 admission contract failed: $admissionCase" }
-        $admissionOutput | Write-Output
-        if ($admissionCase -eq 'admission' -and
-            $admissionOutput -notcontains 'PASS: owner override admission contract') {
-            throw 'X4 owner override admission marker was not reached.'
+        $expectedMarkers = if ($admissionCase -eq 'admission') {
+            @('PASS: owner override admission contract')
         }
+        else { @() }
+        $missingMarkerMessages = if ($admissionCase -eq 'admission') {
+            @('X4 owner override admission marker was not reached.')
+        }
+        else { @() }
+        Invoke-TimedStage -Gate $Suite -StageId "admission-$admissionCase" `
+            -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $admissionContract, '-Case', $admissionCase) `
+            -FailureMessage "X4 admission contract failed: $admissionCase" `
+            -ExpectedMarkers $expectedMarkers -MissingMarkerMessages $missingMarkerMessages `
+            -EmitTiming ($Suite -eq 'x4-verification')
     }
     if ($Suite -eq 'x4-admission') {
         exit 0
@@ -33,55 +126,69 @@ if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
 }
 
 if ($Suite -in @('all', 'x4-verification')) {
-    & pwsh -NoProfile -File $ownerAuthorityContract -Case root-delegation
-    if ($LASTEXITCODE -ne 0) { throw 'X4 owner authority root-delegation contract failed.' }
-    & pwsh -NoProfile -File $ownerAuthorityAdversarial
-    if ($LASTEXITCODE -ne 0) { throw 'X4 owner authority adversarial contract failed.' }
-    & pwsh -NoProfile -File $candidateBuildContract -Case all
-    if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
+    Invoke-TimedStage -Gate $Suite -StageId 'owner-authority-root-delegation' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $ownerAuthorityContract, '-Case', 'root-delegation') `
+        -FailureMessage 'X4 owner authority root-delegation contract failed.' `
+        -EmitTiming ($Suite -eq 'x4-verification')
+    Invoke-TimedStage -Gate $Suite -StageId 'owner-authority-adversarial' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $ownerAuthorityAdversarial) `
+        -FailureMessage 'X4 owner authority adversarial contract failed.' `
+        -EmitTiming ($Suite -eq 'x4-verification')
+    Invoke-TimedStage -Gate $Suite -StageId 'candidate-build-all' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidateBuildContract, '-Case', 'all') `
+        -FailureMessage 'X4 candidate-build aggregate contract failed.' `
+        -EmitTiming ($Suite -eq 'x4-verification')
     foreach ($retentionCase in @('retention', 'retention-platform', 'handback', 'retention-admission', 'preallocation-bounds')) {
-        $retentionOutput = @(& pwsh -NoProfile -File $evidenceRetentionContract -Case $retentionCase)
-        if ($LASTEXITCODE -ne 0) { throw "X4 evidence-retention contract failed: $retentionCase" }
-        $retentionOutput | Write-Output
-        if ($retentionCase -eq 'preallocation-bounds' -and
-            $retentionOutput -notcontains 'PASS: shared open-handle race contract') {
-            throw 'X4 open-handle race marker was not reached.'
+        $expectedMarkers = if ($retentionCase -eq 'preallocation-bounds') {
+            @('PASS: shared open-handle race contract')
         }
+        else { @() }
+        $missingMarkerMessages = if ($retentionCase -eq 'preallocation-bounds') {
+            @('X4 open-handle race marker was not reached.')
+        }
+        else { @() }
+        Invoke-TimedStage -Gate $Suite -StageId "evidence-retention-$retentionCase" `
+            -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceRetentionContract, '-Case', $retentionCase) `
+            -FailureMessage "X4 evidence-retention contract failed: $retentionCase" `
+            -ExpectedMarkers $expectedMarkers -MissingMarkerMessages $missingMarkerMessages `
+            -EmitTiming ($Suite -eq 'x4-verification')
     }
-    & pwsh -NoProfile -File $evidenceChainAdversarial
-    if ($LASTEXITCODE -ne 0) { throw 'X4 held-out evidence-chain adversarial contract failed.' }
+    Invoke-TimedStage -Gate $Suite -StageId 'evidence-chain-adversarial' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceChainAdversarial) `
+        -FailureMessage 'X4 held-out evidence-chain adversarial contract failed.' `
+        -EmitTiming ($Suite -eq 'x4-verification')
 }
 
 if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
-    & pwsh -NoProfile -File $candidateIsolationContract -Case all
-    if ($LASTEXITCODE -ne 0) { throw 'X4 candidate isolation contract failed.' }
+    Invoke-TimedStage -Gate $Suite -StageId 'candidate-isolation-all' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidateIsolationContract, '-Case', 'all') `
+        -FailureMessage 'X4 candidate isolation contract failed.' `
+        -EmitTiming ($Suite -eq 'x4-verification')
 }
 
 if ($Suite -in @('all', 'x4-verification')) {
-    $runtimeOutput = @(& pwsh -NoProfile -File $candidatePackageRuntimeContract -Case all)
-    if ($LASTEXITCODE -ne 0 -or
-        $runtimeOutput -notcontains 'candidate-package-runtime: adapters PASS') {
-        throw 'X4 candidate-package runtime contract failed.'
-    }
-    $runtimeOutput | Write-Output
-    $adversarialOutput = @(& pwsh -NoProfile -File $candidatePackageAdversarial -Case all)
-    if ($LASTEXITCODE -ne 0 -or
-        $adversarialOutput -notcontains 'candidate-package-adversarial: PASS') {
-        throw 'X4 candidate-package adversarial contract failed.'
-    }
-    $adversarialOutput | Write-Output
+    Invoke-TimedStage -Gate $Suite -StageId 'candidate-runtime-all' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'all') `
+        -FailureMessage 'X4 candidate-package runtime contract failed.' `
+        -ExpectedMarkers @('candidate-package-runtime: adapters PASS') `
+        -EmitTiming ($Suite -eq 'x4-verification')
+    Invoke-TimedStage -Gate $Suite -StageId 'candidate-adversarial-all' `
+        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidatePackageAdversarial, '-Case', 'all') `
+        -FailureMessage 'X4 candidate-package adversarial contract failed.' `
+        -ExpectedMarkers @('candidate-package-adversarial: PASS') `
+        -EmitTiming ($Suite -eq 'x4-verification')
 }
 
 if ($Suite -in @('all', 'x4-package-conformance', 'x4-verification')) {
     $packageCase = if ($Suite -eq 'x4-package-conformance') { 'packaged-path' } else { 'all' }
     $packageArguments = @('-NoProfile', '-File', $packageConformanceContract, '-Case', $packageCase)
     if ($packageCase -eq 'all') { $packageArguments += '-SkipAggregateRegistration' }
-    $packageOutput = @(& pwsh @packageArguments)
-    if ($LASTEXITCODE -ne 0) { throw 'X4 package conformance contract failed.' }
-    $packageOutput | Write-Output
-    if ($packageOutput -notcontains "package conformance contract passed: $packageCase") {
-        throw "X4 package conformance PASS marker is missing: $packageCase"
-    }
+    Invoke-TimedStage -Gate $Suite -StageId "package-conformance-$packageCase" `
+        -Executable 'pwsh' -Arguments $packageArguments `
+        -FailureMessage 'X4 package conformance contract failed.' `
+        -ExpectedMarkers @("package conformance contract passed: $packageCase") `
+        -MissingMarkerMessages @("X4 package conformance PASS marker is missing: $packageCase") `
+        -EmitTiming ($Suite -eq 'x4-verification')
     if ($Suite -eq 'x4-package-conformance') {
         exit 0
     }
@@ -182,10 +289,13 @@ foreach ($test in $tests) {
     $modulePath = Join-Path $root 'extensions\?.lua'
     $moduleInitPath = Join-Path $root 'extensions\?\init.lua'
     $extensionLuaPath = Join-Path $root 'extensions\live_galaxy\lua\?.lua'
-    $caseOutput = @(& $lua -e "package.path = [[${modulePath};${moduleInitPath};${extensionLuaPath};]] .. package.path local cases = dofile([[${path}]]) for name, case in pairs(cases) do case() print('PASS x4-candidate-runner:' .. name) end")
-    if ($LASTEXITCODE -ne 0) { throw "Lua contract failed: $test" }
-    if ($caseOutput.Count -eq 0) { throw "Lua contract produced no behavior markers: $test" }
-    $caseOutput | ForEach-Object { Write-Output $_ }
+    $luaCommand = "package.path = [[${modulePath};${moduleInitPath};${extensionLuaPath};]] .. package.path local cases = dofile([[${path}]]) for name, case in pairs(cases) do case() print('PASS x4-candidate-runner:' .. name) end"
+    Invoke-TimedStage -Gate $Suite -StageId "lua-$([IO.Path]::GetFileNameWithoutExtension($test))" `
+        -Executable $lua -Arguments @('-e', $luaCommand) `
+        -FailureMessage "Lua contract failed: $test" `
+        -CaptureVariableName 'caseOutput' -RequireOutput $true `
+        -EmptyOutputMessage "Lua contract produced no behavior markers: $test" `
+        -EmitTiming ($Suite -eq 'x4-verification')
     if ($test -in @('x4_candidate_runner_contract.lua', 'x4_candidate_runner_adversarial.lua')) {
         $candidateMarkers += $caseOutput
     }
@@ -212,4 +322,8 @@ if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
             throw "Required candidate behavior marker is missing: $marker"
         }
     }
+}
+
+if ($Suite -eq 'x4-verification') {
+    Write-Output 'PASS: x4-verification'
 }
