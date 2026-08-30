@@ -133,6 +133,8 @@ function Assert-ValidMatrix($Matrix) {
     }
 
     $groupById = @{}
+    $membershipCounts = @{}
+    foreach ($candidateId in $expectedCandidateIds) { $membershipCounts[$candidateId] = 0 }
     foreach ($group in @($Matrix.build_groups)) {
         Assert-True (-not $groupById.ContainsKey($group.id)) "Duplicate group '$($group.id)'."
         $groupById[$group.id] = $group
@@ -142,6 +144,7 @@ function Assert-ValidMatrix($Matrix) {
         Assert-True ($group.build_profile_digest -match '^[a-f0-9]{64}$') "Group '$($group.id)' digest is invalid."
         foreach ($memberId in $members) {
             Assert-True ($byId.ContainsKey($memberId)) "Group '$($group.id)' contains an undeclared candidate."
+            $membershipCounts[$memberId] = [int]$membershipCounts[$memberId] + 1
             $candidate = $byId[$memberId]
             Assert-True ($candidate.build_group -eq $group.id) "Candidate '$memberId' group linkage is invalid."
             Assert-True ($candidate.build_profile_digest -eq $group.build_profile_digest) "Group '$($group.id)' mixes profiles."
@@ -151,6 +154,7 @@ function Assert-ValidMatrix($Matrix) {
     foreach ($candidate in @($Matrix.candidates)) {
         Assert-True ($groupById.ContainsKey($candidate.build_group)) "Candidate '$($candidate.id)' references a missing group."
         $groupMembers = @($groupById[$candidate.build_group].candidate_ids)
+        Assert-True ($membershipCounts[$candidate.id] -eq 1 -and $groupMembers -contains $candidate.id) "Candidate '$($candidate.id)' must occur exactly once in its declared group."
         if ($candidate.exclusive_build -eq $true) {
             Assert-True ($groupMembers.Count -eq 1) "Exclusive candidate '$($candidate.id)' shares a group."
             foreach ($other in @($Matrix.candidates | Where-Object { $_.id -ne $candidate.id })) {
@@ -196,6 +200,9 @@ function Test-Partition {
     Assert-Rejected { param($m) $m.candidates[0].conflicts_with = @() } 'asymmetric-conflict'
     Assert-Rejected { param($m) $m.candidates[0].build_profile.binding_profile = 'changed-binding' } 'profile-digest-mismatch'
     Assert-Rejected { param($m) $m.candidates[0].build_group = 'p051-build-lifecycle' } 'conflicting-same-group'
+    Assert-Rejected { param($m) $m.build_groups[1].candidate_ids = @($m.build_groups[1].candidate_ids | Select-Object -Skip 1) } 'candidate-missing-from-groups'
+    Assert-Rejected { param($m) $m.build_groups[1].candidate_ids = @($m.build_groups[1].candidate_ids[0]) + @($m.build_groups[1].candidate_ids) } 'candidate-duplicated-in-group'
+    Assert-Rejected { param($m) $m.build_groups[0].candidate_ids = @($m.build_groups[0].candidate_ids) + @($m.build_groups[1].candidate_ids[0]) } 'candidate-in-wrong-group'
 }
 
 function Invoke-Builder([string]$BuildRoot, [int]$ExpectedExitCode, [string]$CandidateMatrixPath = $matrixPath) {
@@ -309,6 +316,21 @@ function Test-GeneratedBuilds {
         $missingExclusionsPath = Join-Path $scratch 'missing-exclusions.json'
         Set-Content -LiteralPath $missingExclusionsPath -Value ($missingExclusions | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
         $null = Invoke-Builder (Join-Path $scratch 'reject-missing-exclusions') 1 $missingExclusionsPath
+
+        $membershipMutations = @(
+            @{ Name = 'missing-member'; Apply = { param($m) $m.build_groups[1].candidate_ids = @($m.build_groups[1].candidate_ids | Select-Object -Skip 1) } },
+            @{ Name = 'duplicate-member'; Apply = { param($m) $m.build_groups[1].candidate_ids = @($m.build_groups[1].candidate_ids[0]) + @($m.build_groups[1].candidate_ids) } },
+            @{ Name = 'wrong-group-member'; Apply = { param($m) $m.build_groups[0].candidate_ids = @($m.build_groups[0].candidate_ids) + @($m.build_groups[1].candidate_ids[0]) } }
+        )
+        foreach ($mutation in $membershipMutations) {
+            $invalidMembership = Copy-JsonValue $matrix
+            & $mutation.Apply $invalidMembership
+            $invalidMembershipPath = Join-Path $scratch "$($mutation.Name).json"
+            Set-Content -LiteralPath $invalidMembershipPath -Value ($invalidMembership | ConvertTo-Json -Depth 64) -NoNewline -Encoding utf8
+            $invalidMembershipRoot = Join-Path $scratch "reject-$($mutation.Name)"
+            $null = Invoke-Builder $invalidMembershipRoot 1 $invalidMembershipPath
+            Assert-True (-not (Test-Path -LiteralPath $invalidMembershipRoot)) "Builder wrote output for '$($mutation.Name)'."
+        }
 
         $before = Get-FileDigest (Join-Path $publicPackageRoot 'content.xml')
         $null = Invoke-Builder $publicPackageRoot 1

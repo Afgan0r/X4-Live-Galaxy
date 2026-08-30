@@ -189,6 +189,8 @@ function Assert-ValidMatrix($Matrix) {
     }
 
     $groups = @{}
+    $membershipCounts = @{}
+    foreach ($candidateId in $expectedCandidateIds) { $membershipCounts[$candidateId] = 0 }
     foreach ($group in @($Matrix.build_groups)) {
         if ($groups.ContainsKey($group.id)) { Fail 'DUPLICATE_GROUP' }
         $groups[$group.id] = $group
@@ -196,6 +198,7 @@ function Assert-ValidMatrix($Matrix) {
         if ($members.Count -eq 0 -or ($members -join '|') -ne (($members | Sort-Object) -join '|')) { Fail 'GROUP_MEMBERS_INVALID' }
         foreach ($memberId in $members) {
             if (-not $byId.ContainsKey($memberId)) { Fail 'UNDECLARED_GROUP_MEMBER' }
+            $membershipCounts[$memberId] = [int]$membershipCounts[$memberId] + 1
             $member = $byId[$memberId]
             if ($member.build_group -ne $group.id -or $member.build_profile_digest -ne $group.build_profile_digest) { Fail 'GROUP_PROFILE_MISMATCH' }
         }
@@ -203,6 +206,9 @@ function Assert-ValidMatrix($Matrix) {
     foreach ($candidate in @($Matrix.candidates)) {
         if (-not $groups.ContainsKey($candidate.build_group)) { Fail 'MISSING_GROUP' }
         $members = @($groups[$candidate.build_group].candidate_ids)
+        if ($membershipCounts[$candidate.id] -ne 1 -or $members -notcontains $candidate.id) {
+            Fail 'GROUP_MEMBERSHIP_INVALID'
+        }
         if ($candidate.exclusive_build -eq $true) {
             if ($members.Count -ne 1 -or @($candidate.conflicts_with).Count -ne 6) { Fail 'EXCLUSIVE_GROUP_INVALID' }
         }
