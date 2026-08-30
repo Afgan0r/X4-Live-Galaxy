@@ -127,6 +127,9 @@ function Invoke-CandidateAdapter {
                 $Fixture.native_id, $Fixture.canonical_id,
                 $Fixture.owner_id, $Fixture.canonical_owner_id
             ).Count
+            if ($identityWorkUnits -gt $MaxWorkUnits) {
+                return New-Rejection 'adapter-work-budget-exceeded'
+            }
             return New-Completion `
                 "identity:object=$($Fixture.native_id)/owner=$($Fixture.owner_id)" `
                 @("object=$($Fixture.native_id)", "owner=$($Fixture.owner_id)") `
@@ -144,13 +147,17 @@ function Invoke-CandidateAdapter {
                 $Fixture.max_payload_bytes -ne 4096) {
                 return New-Rejection 'adapter-volume-bound-exceeded'
             }
+            $volumeWorkUnits = [int]$Fixture.sample_count
+            if ($volumeWorkUnits -gt $MaxWorkUnits) {
+                return New-Rejection 'adapter-work-budget-exceeded'
+            }
             return New-Completion `
                 "volume:$($Fixture.sample_count)-samples/$($Fixture.payload_bytes)-bytes" `
                 @(
                     "samples=$($Fixture.sample_count)/$($Fixture.max_samples)",
                     "bytes=$($Fixture.payload_bytes)/$($Fixture.max_payload_bytes)"
                 ) `
-                ([int]$Fixture.sample_count)
+                $volumeWorkUnits
         }
     }
 }

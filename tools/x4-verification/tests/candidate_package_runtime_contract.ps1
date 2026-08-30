@@ -77,6 +77,13 @@ function Test-Adapters {
         'Alternate valid identity did not derive its observations from the fixture.'
     Assert-True ($identityResult.work_units -eq 4) `
         'Alternate valid identity reported unexpected work units.'
+    $identityBudgetRejected = Invoke-CandidateAdapter `
+        -CandidateId 'p051-native-identity-closure' `
+        -Fixture $alternateIdentity -MaxWorkUnits 3
+    Assert-True ($identityBudgetRejected.status -eq 'rejected' -and
+        $identityBudgetRejected.completeness -eq 'incomplete' -and
+        $identityBudgetRejected.diagnostic_code -eq 'adapter-work-budget-exceeded') `
+        'Identity adapter accepted a budget one unit below derived work.'
 
     $alternateVolume = [pscustomobject]@{
         sample_count = 7; max_samples = 16
@@ -91,6 +98,13 @@ function Test-Adapters {
         'Alternate valid volume did not derive its observations from the fixture.'
     Assert-True ($volumeResult.work_units -eq $alternateVolume.sample_count) `
         'Alternate valid volume did not derive work units from the fixture.'
+    $volumeBudgetRejected = Invoke-CandidateAdapter `
+        -CandidateId 'p051-native-volume-envelope' `
+        -Fixture $alternateVolume -MaxWorkUnits 6
+    Assert-True ($volumeBudgetRejected.status -eq 'rejected' -and
+        $volumeBudgetRejected.completeness -eq 'incomplete' -and
+        $volumeBudgetRejected.diagnostic_code -eq 'adapter-work-budget-exceeded') `
+        'Volume adapter accepted a budget one unit below derived work.'
 
     $temp = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-plan08-runtime-" + [guid]::NewGuid().ToString('N'))
     $buildRoot = Join-Path $temp 'builds'
