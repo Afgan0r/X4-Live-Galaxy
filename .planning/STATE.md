@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.2
 current_phase_name: Layered Lua and X4 Verification Foundation (INSERTED)
 status: executing
-stopped_at: Completed 05.2-04-PLAN.md
-last_updated: "2026-08-30T00:27:56.578Z"
+stopped_at: Completed 05.2-05-PLAN.md
+last_updated: "2026-08-30T01:10:15.134Z"
 last_activity: 2026-08-30
-last_activity_desc: Completed Phase 05.2 Plan 04 conflict-safe candidate builds
-state_head: 062f27d81b39568f4a36518dce83664d2d16d765
+last_activity_desc: Completed Phase 05.2 Plan 05 private evidence retention and sanitized handback
+state_head: ebef69934b491f1edf440a67b943ab8e18916eb6
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 36
-  completed_plans: 28
+  completed_plans: 29
   percent: 40
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.2 (Layered Lua and X4 Verification Foundation (INSERTED)) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute
-Last activity: 2026-08-30 — Completed Phase 05.2 Plan 04 conflict-safe candidate builds
+Plan: 5 of 5
+Status: Ready to verify
+Last activity: 2026-08-30 — Completed Phase 05.2 Plan 05 private evidence retention and sanitized handback
 
 Progress: [████░░░░░░] 40%
 
@@ -81,6 +81,7 @@ Progress: [████░░░░░░] 40%
 | Phase 05.2 P02 | 14min | 2 tasks | 5 files |
 | Phase 05.2 P03 | 15min | 2 tasks | 5 files |
 | Phase 05.2 P04 | 14min | 2 tasks | 6 files |
+| Phase 05.2 P05 | 31min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,9 @@ Recent decisions affecting current work:
 - [Phase 05.2]: Phase 05.2 Plan 04 partitions six identical read-only profiles together and isolates lifecycle registration instrumentation in one exclusive build.
 - [Phase 05.2]: Generated candidate roots remain developer-only and prepared-not-executed, with per-group package conformance bound into each manifest.
 - [Phase 05.2]: Source-resolvable Phase 05.1 design defects remain explicit exclusions rather than X4 runtime candidates.
+- [Phase 05.2]: Retained runtime evidence remains private; Git receives only sanitized logical identities, verdicts, dispositions, and digests.
+- [Phase 05.2]: Admission compares a completed sanitized ledger with the committed pending ledger and candidate matrix, never raw JSONL or private locator paths.
+- [Phase 05.2]: Phase 05.1 runtime execution remains a later human-only disposable-campaign gate; Phase 05.2 makes no execution or admission claim.
 
 ### Pending Todos
 
@@ -171,6 +175,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-30T00:27:56.040Z
-Stopped at: Completed 05.2-04-PLAN.md
+Last session: 2026-08-30T01:10:14.584Z
+Stopped at: Completed 05.2-05-PLAN.md
 Resume file: None
