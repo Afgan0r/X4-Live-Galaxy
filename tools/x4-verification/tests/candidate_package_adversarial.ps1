@@ -1,3 +1,11 @@
+param(
+    [Alias('Case')]
+    [ValidateSet('all', 'reuse-contract')]
+    [string]$ContractCase = 'all',
+    [string]$PreparedBuildRoot,
+    [string]$PreparedBuildKey
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -16,6 +24,177 @@ function Get-Digest([string]$Path) {
         [Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Path))
     ).ToLowerInvariant()
 }
+
+function Assert-OwnerOnly([string]$Path) {
+    if ($IsWindows) {
+        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $acl = Get-Acl -LiteralPath $Path
+        Assert-True ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -eq $sid) `
+            'PREPARED_BUILD_OWNER_MISMATCH'
+        foreach ($rule in @($acl.Access | Where-Object AccessControlType -eq 'Allow')) {
+            $ruleSid = $rule.IdentityReference.Translate(
+                [Security.Principal.SecurityIdentifier]
+            ).Value
+            Assert-True ($ruleSid -eq $sid) 'PREPARED_BUILD_NOT_OWNER_ONLY'
+        }
+        return
+    }
+    $mode = [IO.File]::GetUnixFileMode($Path)
+    $forbidden = [IO.UnixFileMode]::GroupRead -bor [IO.UnixFileMode]::GroupWrite -bor `
+        [IO.UnixFileMode]::GroupExecute -bor [IO.UnixFileMode]::OtherRead -bor `
+        [IO.UnixFileMode]::OtherWrite -bor [IO.UnixFileMode]::OtherExecute
+    Assert-True (($mode -band $forbidden) -eq 0) 'PREPARED_BUILD_NOT_OWNER_ONLY'
+}
+
+function Get-PreparedKey([string]$BuildRoot) {
+    $matrixDigest = Get-Digest $matrixPath
+    $material = [Collections.Generic.List[string]]::new()
+    $material.Add("matrix=$matrixDigest")
+    foreach ($sourcePath in @(
+        'tools/x4-verification/build-candidate-extension.ps1',
+        'tools/x4-verification/contracts/candidate-build-manifest.v1.json',
+        'tools/x4-verification/templates/candidate-content.xml',
+        'tools/x4-verification/templates/candidate-entry.lua',
+        'tools/x4-verification/templates/candidate-ui.xml',
+        'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
+    )) {
+        $material.Add("source/$sourcePath=$(Get-Digest (Join-Path $root $sourcePath))")
+    }
+    $componentBindings = [ordered]@{
+        dossier_digest = 'tools/x4-verification/contracts/phase-05.1-dossier.v1.json'
+        registry_digest = 'tools/x4-verification/contracts/known-failures.v1.json'
+        coverage_digest = 'tools/x4-verification/contracts/coverage.v1.json'
+        runtime_evidence_schema_digest = 'tools/x4-verification/contracts/runtime-evidence.v1.json'
+        owner_root_anchor_digest = 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
+        dispatcher_digest = 'tools/x4-verification/run-candidate-package.ps1'
+        adapter_digest = 'tools/x4-verification/candidate-adapters.psm1'
+        attestation_module_digest = 'tools/x4-verification/producer-attestation.psm1'
+        bounded_reader_digest = 'tools/x4-verification/bounded-file.psm1'
+        worker_digest = 'tools/x4-verification/isolation/candidate-worker.ps1'
+        launcher_digest = 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
+        worker_protocol_digest = 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
+    }
+    $groups = @(Get-ChildItem -LiteralPath $BuildRoot -Directory | Sort-Object Name)
+    Assert-True ($groups.Count -gt 0 -and $groups.Count -le 16) 'PREPARED_BUILD_GROUPS_INVALID'
+    foreach ($group in $groups) {
+        Assert-True (($group.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) `
+            'PREPARED_BUILD_REPARSE_REJECTED'
+        $manifestPath = Join-Path $group.FullName 'manifest/build-manifest.v1.json'
+        Assert-True (Test-Path -LiteralPath $manifestPath -PathType Leaf) `
+            'PREPARED_BUILD_MANIFEST_MISSING'
+        $manifestItem = Get-Item -LiteralPath $manifestPath -Force
+        Assert-True ($manifestItem.Length -le 262144 -and
+            ($manifestItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) `
+            'PREPARED_BUILD_MANIFEST_INVALID'
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 64
+        Assert-True ($manifest.matrix_digest -eq $matrixDigest) 'PREPARED_BUILD_SOURCE_MISMATCH'
+        foreach ($binding in $componentBindings.GetEnumerator()) {
+            Assert-True ($manifest.($binding.Key) -eq (Get-Digest (Join-Path $root $binding.Value))) `
+                'PREPARED_BUILD_SOURCE_MISMATCH'
+        }
+        $material.Add("manifest/$($group.Name)=$(Get-Digest $manifestPath)")
+        $generatedFiles = @($manifest.generated_files | Sort-Object path)
+        Assert-True ($generatedFiles.Count -gt 0 -and $generatedFiles.Count -le 16) `
+            'PREPARED_BUILD_FILES_INVALID'
+        [long]$totalBytes = 0
+        foreach ($generated in $generatedFiles) {
+            $logicalPath = [string]$generated.path
+            Assert-True ($logicalPath -match '^[a-zA-Z0-9._/-]+$' -and
+                @($logicalPath -split '[\\/]+') -notcontains '..') `
+                'PREPARED_BUILD_PATH_INVALID'
+            $generatedPath = [IO.Path]::GetFullPath((Join-Path $group.FullName $logicalPath))
+            Assert-True ($generatedPath.StartsWith(
+                $group.FullName.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar,
+                [StringComparison]::OrdinalIgnoreCase
+            )) 'PREPARED_BUILD_PATH_INVALID'
+            Assert-True (Test-Path -LiteralPath $generatedPath -PathType Leaf) `
+                'PREPARED_BUILD_FILE_MISSING'
+            $item = Get-Item -LiteralPath $generatedPath
+            Assert-True ($item.Length -le 65536 -and
+                ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) `
+                'PREPARED_BUILD_FILE_INVALID'
+            $totalBytes += $item.Length
+            $digest = Get-Digest $generatedPath
+            Assert-True ($digest -eq $generated.sha256 -and $item.Length -eq $generated.bytes) `
+                'PREPARED_BUILD_DIGEST_MISMATCH'
+            $material.Add("$($group.Name)/$($generated.path)=$digest")
+        }
+        Assert-True ($totalBytes -le 524288) 'PREPARED_BUILD_FILES_INVALID'
+    }
+    return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
+        [Text.Encoding]::UTF8.GetBytes(($material -join "`n"))
+    )).ToLowerInvariant()
+}
+
+function Assert-PreparedBuild([string]$BuildRoot, [string]$BuildKey) {
+    Assert-True ($BuildKey -match '^[a-f0-9]{64}$') 'PREPARED_BUILD_KEY_INVALID'
+    Assert-True (Test-Path -LiteralPath $BuildRoot -PathType Container) `
+        'PREPARED_BUILD_MISSING'
+    $full = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $BuildRoot).Path)
+    $temp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+    Assert-True ($full.StartsWith($temp, [StringComparison]::OrdinalIgnoreCase)) `
+        'PREPARED_BUILD_OUTSIDE_TEMP'
+    $relative = [IO.Path]::GetRelativePath($temp, $full)
+    $current = $temp
+    foreach ($segment in @($relative -split '[\\/]+')) {
+        $current = Join-Path $current $segment
+        $item = Get-Item -LiteralPath $current -Force
+        Assert-True (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) `
+            'PREPARED_BUILD_REPARSE_REJECTED'
+    }
+    Assert-OwnerOnly $full
+    Assert-True ((Split-Path -Leaf $full) -eq $BuildKey) 'PREPARED_BUILD_IDENTITY_MISMATCH'
+    Assert-True ((Get-PreparedKey $full) -eq $BuildKey) 'PREPARED_BUILD_KEY_MISMATCH'
+}
+
+function Copy-PreparedBuild([string]$Destination) {
+    Assert-PreparedBuild $PreparedBuildRoot $PreparedBuildKey
+    Copy-Item -LiteralPath $PreparedBuildRoot -Destination $Destination -Recurse
+    if ($IsWindows) {
+        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $null = & icacls.exe $Destination /inheritance:r /grant:r "*$sid`:(OI)(CI)F"
+        Assert-True ($LASTEXITCODE -eq 0) 'PREPARED_BUILD_PERMISSION_FAILED'
+        foreach ($item in @(Get-ChildItem -LiteralPath $Destination -Recurse -Force)) {
+            $grant = if ($item.PSIsContainer) { "*$sid`:(OI)(CI)F" } else { "*$sid`:F" }
+            $null = & icacls.exe $item.FullName /inheritance:r /grant:r $grant
+            Assert-True ($LASTEXITCODE -eq 0) 'PREPARED_BUILD_PERMISSION_FAILED'
+        }
+    }
+    else {
+        [IO.File]::SetUnixFileMode(
+            $Destination,
+            [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite -bor
+                [IO.UnixFileMode]::UserExecute
+        )
+        foreach ($item in @(Get-ChildItem -LiteralPath $Destination -Recurse -Force)) {
+            [IO.File]::SetUnixFileMode(
+                $item.FullName,
+                $(if ($item.PSIsContainer) {
+                    [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite -bor
+                        [IO.UnixFileMode]::UserExecute
+                } else {
+                    [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite
+                })
+            )
+        }
+    }
+    Assert-PreparedBuild $Destination $PreparedBuildKey
+    Assert-True ((Get-PreparedKey $PreparedBuildRoot) -eq $PreparedBuildKey) `
+        'PREPARED_BUILD_SOURCE_CHANGED'
+}
+
+function Remove-PreparedClone([string]$Path) {
+    try { Remove-Item -LiteralPath $Path -Recurse -Force }
+    catch { throw 'PREPARED_BUILD_CLONE_CLEANUP_FAILED' }
+    if (Test-Path -LiteralPath $Path) { throw 'PREPARED_BUILD_CLONE_CLEANUP_FAILED' }
+}
+
+$hasPreparedBuild = -not [string]::IsNullOrWhiteSpace($PreparedBuildRoot) -or
+    -not [string]::IsNullOrWhiteSpace($PreparedBuildKey)
+Assert-True (-not $hasPreparedBuild -or (
+    -not [string]::IsNullOrWhiteSpace($PreparedBuildRoot) -and
+    -not [string]::IsNullOrWhiteSpace($PreparedBuildKey)
+)) 'PREPARED_BUILD_PARAMETERS_INCOMPLETE'
 
 function Update-CallerOwnedManifestDigests([string]$GroupRoot, $Manifest) {
     foreach ($row in @($Manifest.generated_files)) {
@@ -56,13 +235,57 @@ function Invoke-Dispatcher([string]$GroupRoot, [string]$OutputPath, [int]$Expect
     return $text.Trim() | ConvertFrom-Json -DateKind String
 }
 
+if ($ContractCase -eq 'reuse-contract') {
+    Assert-True $hasPreparedBuild 'PREPARED_BUILD_REQUIRED'
+    $probeRoot = Join-Path ([IO.Path]::GetTempPath()) `
+        ('live-galaxy-adversarial-reuse-' + [guid]::NewGuid().ToString('N'))
+    $null = New-Item -ItemType Directory -Path $probeRoot
+    if ($IsWindows) {
+        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $null = & icacls.exe $probeRoot /inheritance:r /grant:r "*$sid`:(OI)(CI)F"
+        Assert-True ($LASTEXITCODE -eq 0) 'PREPARED_BUILD_PERMISSION_FAILED'
+    }
+    $clone = Join-Path $probeRoot $PreparedBuildKey
+    try {
+        Copy-PreparedBuild $clone
+        $manifestPath = Get-ChildItem -LiteralPath $clone -Recurse -Filter 'build-manifest.v1.json' |
+            Select-Object -First 1 -ExpandProperty FullName
+        $cleanupRejected = $false
+        if ($IsWindows) {
+            $lock = [IO.File]::Open($manifestPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+            try { Remove-PreparedClone $clone }
+            catch { $cleanupRejected = $_.Exception.Message -eq 'PREPARED_BUILD_CLONE_CLEANUP_FAILED' }
+            finally { $lock.Dispose() }
+        }
+        else {
+            $originalMode = [IO.File]::GetUnixFileMode($probeRoot)
+            [IO.File]::SetUnixFileMode(
+                $probeRoot,
+                [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserExecute
+            )
+            try { Remove-PreparedClone $clone }
+            catch { $cleanupRejected = $_.Exception.Message -eq 'PREPARED_BUILD_CLONE_CLEANUP_FAILED' }
+            finally { [IO.File]::SetUnixFileMode($probeRoot, $originalMode) }
+        }
+        Assert-True $cleanupRejected 'PREPARED_BUILD_CLEANUP_FAILURE_NOT_REPORTED'
+        Remove-PreparedClone $clone
+        Assert-PreparedBuild $PreparedBuildRoot $PreparedBuildKey
+        Write-Output 'PASS: prepared-build adversarial reuse contract'
+    }
+    finally {
+        if (Test-Path -LiteralPath $clone) { Remove-Item -LiteralPath $clone -Recurse -Force }
+        if (Test-Path -LiteralPath $probeRoot) { Remove-Item -LiteralPath $probeRoot -Recurse -Force }
+    }
+    exit 0
+}
+
 $parameters = (Get-Command $dispatcherPath).Parameters.Keys
 foreach ($forbidden in @('RootPath', 'TrustRootPath', 'CertificatePath', 'KeyName', 'TestMode', 'Command', 'ModulePath', 'WorkerPath')) {
     Assert-True ($parameters -notcontains $forbidden) "Production dispatcher exposes forbidden selector '$forbidden'."
 }
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('live-galaxy-plan08-adversarial-' + [guid]::NewGuid().ToString('N'))
-$buildRoot = Join-Path $scratch 'builds'
+$buildRoot = Join-Path $scratch $(if ($hasPreparedBuild) { $PreparedBuildKey } else { 'builds' })
 $outputRoot = Join-Path $scratch 'output'
 $null = New-Item -ItemType Directory -Path $outputRoot -Force
 if ($IsWindows) {
@@ -73,8 +296,13 @@ if ($IsWindows) {
     Assert-True ($LASTEXITCODE -eq 0) 'Unable to protect package-adversarial output fixture.'
 }
 try {
-    $builderText = & pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1 | Out-String
-    Assert-True ($LASTEXITCODE -eq 0) "Builder failed: $builderText"
+    if ($hasPreparedBuild) {
+        Copy-PreparedBuild $buildRoot
+    }
+    else {
+        $builderText = & pwsh -NoProfile -File $builderPath -BuildRoot $buildRoot -MatrixPath $matrixPath 2>&1 | Out-String
+        Assert-True ($LASTEXITCODE -eq 0) "Builder failed: $builderText"
+    }
     $groupRoot = Join-Path $buildRoot 'p051-build-lifecycle'
 
     $baselinePath = Join-Path $outputRoot 'baseline.jsonl'
@@ -366,4 +594,5 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
+    if ($hasPreparedBuild) { Assert-PreparedBuild $PreparedBuildRoot $PreparedBuildKey }
 }

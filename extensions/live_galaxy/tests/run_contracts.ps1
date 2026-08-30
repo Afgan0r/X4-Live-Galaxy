@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-candidate-runner', 'x4-verification-fast', 'x4-verification')]
+    [ValidateSet('all', 'x4_discovery', 'component_discovery', 'component_discovery_guard', 'x4-admission', 'x4-package-conformance', 'x4-candidate-runner', 'x4-verification-reuse-contract', 'x4-verification-fast', 'x4-verification')]
     [string]$Suite = 'all',
     [string]$LuaPath
 )
@@ -16,6 +16,146 @@ $candidatePackageAdversarial = Join-Path $root 'tools/x4-verification/tests/cand
 $ownerAuthorityContract = Join-Path $root 'tools/x4-verification/tests/owner_authority_contract.ps1'
 $ownerAuthorityAdversarial = Join-Path $root 'tools/x4-verification/tests/owner_authority_adversarial.ps1'
 $evidenceChainAdversarial = Join-Path $root 'tools/x4-verification/tests/evidence_chain_adversarial.ps1'
+$candidateBuilder = Join-Path $root 'tools/x4-verification/build-candidate-extension.ps1'
+$candidateMatrix = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
+$script:preparedInvocationRoot = $null
+$script:preparedBuildRoot = $null
+$script:preparedBuildKey = $null
+
+function Get-FileSha256([string]$Path) {
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Set-OwnerOnlyDirectory([string]$Path) {
+    if ($IsWindows) {
+        $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $null = & icacls.exe $Path /inheritance:r /grant:r "*$sid`:(OI)(CI)F"
+        if ($LASTEXITCODE -ne 0) { throw 'PREPARED_BUILD_PERMISSION_FAILED' }
+        return
+    }
+    [IO.File]::SetUnixFileMode(
+        $Path,
+        [IO.UnixFileMode]::UserRead -bor [IO.UnixFileMode]::UserWrite -bor
+            [IO.UnixFileMode]::UserExecute
+    )
+}
+
+function Get-PreparedBuildKey([string]$BuildRoot) {
+    $material = [Collections.Generic.List[string]]::new()
+    $material.Add("matrix=$(Get-FileSha256 $candidateMatrix)")
+    foreach ($sourcePath in @(
+        'tools/x4-verification/build-candidate-extension.ps1',
+        'tools/x4-verification/contracts/candidate-build-manifest.v1.json',
+        'tools/x4-verification/templates/candidate-content.xml',
+        'tools/x4-verification/templates/candidate-entry.lua',
+        'tools/x4-verification/templates/candidate-ui.xml',
+        'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
+    )) {
+        $material.Add("source/$sourcePath=$(Get-FileSha256 (Join-Path $root $sourcePath))")
+    }
+    $groups = @(Get-ChildItem -LiteralPath $BuildRoot -Directory | Sort-Object Name)
+    if ($groups.Count -lt 1 -or $groups.Count -gt 16) { throw 'PREPARED_BUILD_GROUPS_INVALID' }
+    foreach ($group in $groups) {
+        if (($group.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'PREPARED_BUILD_REPARSE_REJECTED'
+        }
+        $manifestPath = Join-Path $group.FullName 'manifest/build-manifest.v1.json'
+        if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+            throw 'PREPARED_BUILD_MANIFEST_MISSING'
+        }
+        $manifestItem = Get-Item -LiteralPath $manifestPath -Force
+        if ($manifestItem.Length -gt 262144 -or
+            ($manifestItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'PREPARED_BUILD_MANIFEST_INVALID'
+        }
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -Depth 64
+        $material.Add("manifest/$($group.Name)=$(Get-FileSha256 $manifestPath)")
+        $generatedFiles = @($manifest.generated_files | Sort-Object path)
+        if ($generatedFiles.Count -lt 1 -or $generatedFiles.Count -gt 16) {
+            throw 'PREPARED_BUILD_FILES_INVALID'
+        }
+        [long]$totalBytes = 0
+        foreach ($generated in $generatedFiles) {
+            $logicalPath = [string]$generated.path
+            if ($logicalPath -notmatch '^[a-zA-Z0-9._/-]+$' -or
+                @($logicalPath -split '[\\/]+') -contains '..') {
+                throw 'PREPARED_BUILD_PATH_INVALID'
+            }
+            $generatedPath = [IO.Path]::GetFullPath((Join-Path $group.FullName $logicalPath))
+            if (-not $generatedPath.StartsWith(
+                $group.FullName.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar,
+                [StringComparison]::OrdinalIgnoreCase
+            )) { throw 'PREPARED_BUILD_PATH_INVALID' }
+            if (-not (Test-Path -LiteralPath $generatedPath -PathType Leaf)) {
+                throw 'PREPARED_BUILD_FILE_MISSING'
+            }
+            $generatedItem = Get-Item -LiteralPath $generatedPath -Force
+            if ($generatedItem.Length -gt 65536 -or
+                ($generatedItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw 'PREPARED_BUILD_FILE_INVALID'
+            }
+            $totalBytes += $generatedItem.Length
+            $material.Add("$($group.Name)/$($generated.path)=$(Get-FileSha256 $generatedPath)")
+        }
+        if ($totalBytes -gt 524288) { throw 'PREPARED_BUILD_FILES_INVALID' }
+    }
+    $bytes = [Text.Encoding]::UTF8.GetBytes(($material -join "`n"))
+    return [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($bytes)
+    ).ToLowerInvariant()
+}
+
+function New-PreparedBuild([string]$Gate) {
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $status = 'fail'
+    try {
+        $script:preparedInvocationRoot = Join-Path ([IO.Path]::GetTempPath()) `
+            ('live-galaxy-prepared-' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $script:preparedInvocationRoot
+        Set-OwnerOnlyDirectory $script:preparedInvocationRoot
+        $buildingRoot = Join-Path $script:preparedInvocationRoot 'building'
+        $builderOutput = @(& pwsh -NoProfile -File $candidateBuilder `
+            -BuildRoot $buildingRoot -MatrixPath $candidateMatrix)
+        $builderExit = $LASTEXITCODE
+        $builderOutput | Write-Output
+        if ($builderExit -ne 0) { throw 'PREPARED_BUILD_GENERATION_FAILED' }
+        $script:preparedBuildKey = Get-PreparedBuildKey $buildingRoot
+        $script:preparedBuildRoot = Join-Path $script:preparedInvocationRoot $script:preparedBuildKey
+        Move-Item -LiteralPath $buildingRoot -Destination $script:preparedBuildRoot
+        Set-OwnerOnlyDirectory $script:preparedBuildRoot
+        $status = 'pass'
+    }
+    finally {
+        $stopwatch.Stop()
+        [ordered]@{
+            schema = 'x4-verification-stage-timing.v1'
+            gate = $Gate
+            stage_id = 'prepared-build'
+            elapsed_ms = [long]$stopwatch.ElapsedMilliseconds
+            status = $status
+        } | ConvertTo-Json -Compress | Write-Output
+    }
+}
+
+function Remove-PreparedBuild {
+    if ($null -eq $script:preparedInvocationRoot) { return }
+    try {
+        Remove-Item -LiteralPath $script:preparedInvocationRoot -Recurse -Force
+    }
+    catch { throw 'PREPARED_BUILD_CLEANUP_FAILED' }
+    if (Test-Path -LiteralPath $script:preparedInvocationRoot) {
+        throw 'PREPARED_BUILD_CLEANUP_FAILED'
+    }
+    $script:preparedInvocationRoot = $null
+    $script:preparedBuildRoot = $null
+    $script:preparedBuildKey = $null
+}
+
+trap {
+    $failure = $_
+    Remove-PreparedBuild
+    throw $failure
+}
 
 function Invoke-TimedStage {
     param(
@@ -79,7 +219,32 @@ function Invoke-TimedStage {
     }
 }
 
+if ($Suite -eq 'x4-verification-reuse-contract') {
+    New-PreparedBuild $Suite
+    $preparedArguments = @(
+        '-PreparedBuildRoot', $script:preparedBuildRoot,
+        '-PreparedBuildKey', $script:preparedBuildKey
+    )
+    Invoke-TimedStage -Gate $Suite -StageId 'reuse-retention' `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $evidenceRetentionContract, '-Case', 'reuse-contract') + $preparedArguments) `
+        -FailureMessage 'X4 prepared-build retention reuse contract failed.'
+    Invoke-TimedStage -Gate $Suite -StageId 'reuse-runtime' `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'reuse-contract') + $preparedArguments) `
+        -FailureMessage 'X4 prepared-build runtime reuse contract failed.'
+    Invoke-TimedStage -Gate $Suite -StageId 'reuse-adversarial' `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $candidatePackageAdversarial, '-Case', 'reuse-contract') + $preparedArguments) `
+        -FailureMessage 'X4 prepared-build adversarial reuse contract failed.'
+    Remove-PreparedBuild
+    Write-Output 'PASS: x4-verification-reuse-contract'
+    exit 0
+}
+
 if ($Suite -eq 'x4-verification-fast') {
+    New-PreparedBuild $Suite
+    $preparedArguments = @(
+        '-PreparedBuildRoot', $script:preparedBuildRoot,
+        '-PreparedBuildKey', $script:preparedBuildKey
+    )
     Invoke-TimedStage -Gate $Suite -StageId 'package-conformance-packaged-path' `
         -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $packageConformanceContract, '-Case', 'packaged-path', '-SkipAggregateRegistration') `
         -FailureMessage 'X4 package conformance contract failed.' `
@@ -89,19 +254,28 @@ if ($Suite -eq 'x4-verification-fast') {
         -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidateIsolationContract, '-Case', 'all') `
         -FailureMessage 'X4 candidate isolation contract failed.'
     Invoke-TimedStage -Gate $Suite -StageId 'candidate-runtime-adapters' `
-        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'adapters') `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'adapters') + $preparedArguments) `
         -FailureMessage 'X4 candidate-package runtime contract failed.' `
         -ExpectedMarkers @('candidate-package-runtime: adapters PASS')
     Invoke-TimedStage -Gate $Suite -StageId 'evidence-retention-retention' `
-        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceRetentionContract, '-Case', 'retention') `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $evidenceRetentionContract, '-Case', 'retention') + $preparedArguments) `
         -FailureMessage 'X4 evidence-retention contract failed: retention'
     Invoke-TimedStage -Gate $Suite -StageId 'evidence-retention-preallocation-bounds' `
         -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceRetentionContract, '-Case', 'preallocation-bounds') `
         -FailureMessage 'X4 evidence-retention contract failed: preallocation-bounds' `
         -ExpectedMarkers @('PASS: shared open-handle race contract') `
         -MissingMarkerMessages @('X4 open-handle race marker was not reached.')
+    Remove-PreparedBuild
     Write-Output 'PASS: x4-verification-fast'
     exit 0
+}
+
+if ($Suite -eq 'x4-verification') {
+    New-PreparedBuild $Suite
+    $preparedArguments = @(
+        '-PreparedBuildRoot', $script:preparedBuildRoot,
+        '-PreparedBuildKey', $script:preparedBuildKey
+    )
 }
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
@@ -148,7 +322,8 @@ if ($Suite -in @('all', 'x4-verification')) {
         }
         else { @() }
         Invoke-TimedStage -Gate $Suite -StageId "evidence-retention-$retentionCase" `
-            -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $evidenceRetentionContract, '-Case', $retentionCase) `
+            -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $evidenceRetentionContract, '-Case', $retentionCase) + `
+                $(if ($Suite -eq 'x4-verification' -and $retentionCase -ne 'preallocation-bounds') { $preparedArguments } else { @() })) `
             -FailureMessage "X4 evidence-retention contract failed: $retentionCase" `
             -ExpectedMarkers $expectedMarkers -MissingMarkerMessages $missingMarkerMessages `
             -EmitTiming ($Suite -eq 'x4-verification')
@@ -168,12 +343,14 @@ if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
 
 if ($Suite -in @('all', 'x4-verification')) {
     Invoke-TimedStage -Gate $Suite -StageId 'candidate-runtime-all' `
-        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'all') `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $candidatePackageRuntimeContract, '-Case', 'all') + `
+            $(if ($Suite -eq 'x4-verification') { $preparedArguments } else { @() })) `
         -FailureMessage 'X4 candidate-package runtime contract failed.' `
         -ExpectedMarkers @('candidate-package-runtime: adapters PASS') `
         -EmitTiming ($Suite -eq 'x4-verification')
     Invoke-TimedStage -Gate $Suite -StageId 'candidate-adversarial-all' `
-        -Executable 'pwsh' -Arguments @('-NoProfile', '-File', $candidatePackageAdversarial, '-Case', 'all') `
+        -Executable 'pwsh' -Arguments (@('-NoProfile', '-File', $candidatePackageAdversarial, '-Case', 'all') + `
+            $(if ($Suite -eq 'x4-verification') { $preparedArguments } else { @() })) `
         -FailureMessage 'X4 candidate-package adversarial contract failed.' `
         -ExpectedMarkers @('candidate-package-adversarial: PASS') `
         -EmitTiming ($Suite -eq 'x4-verification')
@@ -325,5 +502,6 @@ if ($Suite -in @('all', 'x4-candidate-runner', 'x4-verification')) {
 }
 
 if ($Suite -eq 'x4-verification') {
+    Remove-PreparedBuild
     Write-Output 'PASS: x4-verification'
 }
