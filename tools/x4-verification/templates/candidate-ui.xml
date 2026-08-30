@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<addon name="{{PACKAGE_ID}}">
+  <environment type="menus">
+    <dependency name="sn_mod_support_apis" />
+    <file name="{{ENTRYPOINT}}" />
+  </environment>
+</addon>

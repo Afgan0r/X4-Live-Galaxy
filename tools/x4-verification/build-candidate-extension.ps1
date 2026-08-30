@@ -1,0 +1,329 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$BuildRoot,
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$MatrixPath
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$script:reasonCode = 'INTERNAL_BUILD_ERROR'
+$script:createdGroups = @()
+$repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$manifestContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-build-manifest.v1.json'
+$packageContractPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/package-conformance.v1.json'
+$dossierPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/dossier.v1.json'
+$registryPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/known-failures.v1.json'
+$coveragePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/coverage.v1.json'
+$runtimeEvidencePath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json'
+$conformanceCommandPath = Join-Path $repositoryRoot 'tools/x4-verification/x4-package-conformance.ps1'
+$runnerSourcePath = Join-Path $repositoryRoot 'tests/x4-candidates/lua/live_galaxy_candidate_runner.lua'
+$contentTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-content.xml'
+$uiTemplatePath = Join-Path $repositoryRoot 'tools/x4-verification/templates/candidate-ui.xml'
+$publicPackageRoot = Join-Path $repositoryRoot 'extensions/live_galaxy'
+$profileFields = @('content_profile', 'ui_registration_profile', 'entrypoint', 'import_root', 'binding_profile')
+$expectedCandidateIds = @(
+    'p051-cadence-seta',
+    'p051-lifecycle-reload',
+    'p051-mod-stack-compatibility',
+    'p051-native-count-fill-runtime',
+    'p051-native-fill-completeness',
+    'p051-native-identity-closure',
+    'p051-native-volume-envelope'
+)
+
+function Fail([string]$Code) {
+    $script:reasonCode = $Code
+    throw [InvalidOperationException]::new($Code)
+}
+
+function Get-Sha256([byte[]]$Bytes) {
+    return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($Bytes)).ToLowerInvariant()
+}
+
+function Get-FileDigest([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
+    return Get-Sha256 ([IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path))
+}
+
+function Read-Json([string]$Path, [string]$Schema) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { Fail 'MISSING_INPUT' }
+    $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path)
+    if ($bytes.Length -gt 262144) { Fail 'INPUT_BYTES_EXCEEDED' }
+    try { $value = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json -Depth 64 }
+    catch { Fail 'INVALID_JSON' }
+    if ($value.schema_version -ne $Schema) { Fail 'UNSUPPORTED_SCHEMA' }
+    return $value
+}
+
+function Get-ProfileDigest($Profile) {
+    $lines = foreach ($field in $profileFields) {
+        if ($null -eq $Profile.PSObject.Properties[$field]) { Fail 'PROFILE_FIELD_MISSING' }
+        $value = [string]$Profile.$field
+        if ([string]::IsNullOrWhiteSpace($value) -or $value.Length -gt 256) { Fail 'PROFILE_FIELD_INVALID' }
+        "$field=$value"
+    }
+    if (@($Profile.PSObject.Properties).Count -ne $profileFields.Count) { Fail 'PROFILE_FIELD_UNDECLARED' }
+    return Get-Sha256 ([Text.Encoding]::UTF8.GetBytes(($lines -join "`n")))
+}
+
+function Test-ContainedPath([string]$Candidate, [string]$Container) {
+    $candidateFull = [IO.Path]::GetFullPath($Candidate).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $containerFull = [IO.Path]::GetFullPath($Container).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    return $candidateFull.Equals($containerFull, [StringComparison]::OrdinalIgnoreCase) -or
+        $candidateFull.StartsWith($containerFull + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Resolve-SafeBuildRoot([string]$Path) {
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    $volumeRoot = [IO.Path]::GetPathRoot($full).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+    if ([string]::IsNullOrWhiteSpace($full) -or $full.Equals($volumeRoot, [StringComparison]::OrdinalIgnoreCase)) { Fail 'FILESYSTEM_ROOT_REJECTED' }
+    if (Test-ContainedPath $full $repositoryRoot) { Fail 'REPOSITORY_DESTINATION_REJECTED' }
+    if (Test-ContainedPath $full $publicPackageRoot) { Fail 'PUBLIC_PACKAGE_DESTINATION_REJECTED' }
+    if ($full -match '(?i)[\\/]steamapps[\\/]common[\\/]X4 Foundations(?:[\\/]|$)') { Fail 'GAME_INSTALLATION_DESTINATION_REJECTED' }
+    if ($full.Length -gt 240) { Fail 'DESTINATION_PATH_EXCEEDED' }
+    return $full
+}
+
+function Test-StringArray($Values, [int]$Minimum, [int]$Maximum, [string]$Code) {
+    $array = @($Values)
+    if ($array.Count -lt $Minimum -or $array.Count -gt $Maximum) { Fail $Code }
+    foreach ($value in $array) {
+        if ($value -isnot [string] -or [string]::IsNullOrWhiteSpace($value) -or $value.Length -gt 256) { Fail $Code }
+    }
+    if (@($array | Sort-Object -Unique).Count -ne $array.Count) { Fail $Code }
+}
+
+function Assert-ValidMatrix($Matrix) {
+    if ($Matrix.status -ne 'runtime-pending' -or $Matrix.evidence_classification -ne 'prepared-not-executed') { Fail 'MATRIX_STATUS_INVALID' }
+    if ($Matrix.bounds.max_candidates -ne 7 -or @($Matrix.candidates).Count -ne 7) { Fail 'CANDIDATE_SET_INVALID' }
+    if ((@($Matrix.candidates.id) -join '|') -ne ($expectedCandidateIds -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
+    if (@($Matrix.build_groups).Count -lt 1 -or @($Matrix.build_groups).Count -gt $Matrix.bounds.max_groups) { Fail 'GROUP_COUNT_INVALID' }
+    if ((@($Matrix.build_groups.id) -join '|') -ne ((@($Matrix.build_groups.id) | Sort-Object) -join '|')) { Fail 'GROUP_ORDER_INVALID' }
+
+    $inputs = @{
+        dossier = $dossierPath
+        registry = $registryPath
+        coverage = $coveragePath
+        runtime_evidence = $runtimeEvidencePath
+        package_conformance = $packageContractPath
+    }
+    foreach ($inputId in $inputs.Keys) {
+        $row = @($Matrix.source_inputs | Where-Object { $_.id -eq $inputId })
+        if ($row.Count -ne 1 -or $row[0].sha256 -ne (Get-FileDigest $inputs[$inputId])) { Fail 'SOURCE_DIGEST_MISMATCH' }
+    }
+
+    $byId = @{}
+    foreach ($candidate in @($Matrix.candidates)) {
+        if ($byId.ContainsKey($candidate.id)) { Fail 'DUPLICATE_CANDIDATE' }
+        $byId[$candidate.id] = $candidate
+        if ($candidate.status -ne 'runtime-pending' -or $candidate.source_action_only -ne $false) { Fail 'CANDIDATE_STATUS_INVALID' }
+        if ($candidate.build_profile_digest -ne (Get-ProfileDigest $candidate.build_profile)) { Fail 'PROFILE_DIGEST_MISMATCH' }
+        Test-StringArray $candidate.conflicts_with 0 6 'CONFLICT_SET_INVALID'
+        if (@($candidate.conflicts_with) -contains $candidate.id) { Fail 'CONFLICT_SET_INVALID' }
+    }
+    foreach ($candidate in @($Matrix.candidates)) {
+        foreach ($conflictId in @($candidate.conflicts_with)) {
+            if (-not $byId.ContainsKey($conflictId)) { Fail 'UNDECLARED_CONFLICT' }
+            if (-not (@($byId[$conflictId].conflicts_with) -contains $candidate.id)) { Fail 'ASYMMETRIC_CONFLICT' }
+        }
+    }
+
+    $groups = @{}
+    foreach ($group in @($Matrix.build_groups)) {
+        if ($groups.ContainsKey($group.id)) { Fail 'DUPLICATE_GROUP' }
+        $groups[$group.id] = $group
+        $members = @($group.candidate_ids)
+        if ($members.Count -eq 0 -or ($members -join '|') -ne (($members | Sort-Object) -join '|')) { Fail 'GROUP_MEMBERS_INVALID' }
+        foreach ($memberId in $members) {
+            if (-not $byId.ContainsKey($memberId)) { Fail 'UNDECLARED_GROUP_MEMBER' }
+            $member = $byId[$memberId]
+            if ($member.build_group -ne $group.id -or $member.build_profile_digest -ne $group.build_profile_digest) { Fail 'GROUP_PROFILE_MISMATCH' }
+        }
+    }
+    foreach ($candidate in @($Matrix.candidates)) {
+        if (-not $groups.ContainsKey($candidate.build_group)) { Fail 'MISSING_GROUP' }
+        $members = @($groups[$candidate.build_group].candidate_ids)
+        if ($candidate.exclusive_build -eq $true) {
+            if ($members.Count -ne 1 -or @($candidate.conflicts_with).Count -ne 6) { Fail 'EXCLUSIVE_GROUP_INVALID' }
+        }
+        foreach ($other in @($Matrix.candidates | Where-Object { $_.id -gt $candidate.id })) {
+            $conflict = @($candidate.conflicts_with) -contains $other.id
+            $shareable = $candidate.build_profile_digest -eq $other.build_profile_digest -and
+                $candidate.exclusive_build -ne $true -and $other.exclusive_build -ne $true -and -not $conflict
+            if ($shareable -and $candidate.build_group -ne $other.build_group) { Fail 'NONDETERMINISTIC_PARTITION' }
+            if ($candidate.build_group -eq $other.build_group -and -not $shareable) { Fail 'CONFLICTING_SAME_GROUP' }
+        }
+    }
+}
+
+function Write-Utf8NoBom([string]$Path, [string]$Value) {
+    [IO.File]::WriteAllText($Path, $Value, [Text.UTF8Encoding]::new($false))
+}
+
+function Write-Json([string]$Path, $Value) {
+    Write-Utf8NoBom $Path ($Value | ConvertTo-Json -Depth 64)
+}
+
+function New-GeneratedConformanceContract($Base, [string]$PackageId, $Group, $Candidate) {
+    return [ordered]@{
+        schema_version = $Base.schema_version
+        contract_id = "candidate-$($Group.id)"
+        package_id = $PackageId
+        required_content_dependency = $Base.required_content_dependency
+        required_ui_dependency = $Base.required_ui_dependency
+        required_environment = $Base.required_environment
+        required_entrypoint = $Candidate.build_profile.entrypoint
+        internal_module_prefix = $Candidate.build_profile.import_root
+        external_modules = @($Base.external_modules)
+        test_only_prefixes = @($Base.test_only_prefixes)
+        native_binding = $Base.native_binding
+        bounds = $Base.bounds
+        admission_dimensions = @($Base.admission_dimensions)
+        admission_failure_classes = @($Base.admission_failure_classes)
+    }
+}
+
+function New-Entrypoint([string]$GroupId, [string]$BuildId) {
+    $safeGroup = $GroupId -replace '[^a-z0-9_]', '_'
+    return @"
+local ffi = require("ffi")
+local C = ffi.C
+local runner = require("live_galaxy_candidate/lua/live_galaxy_candidate_runner")
+
+local function initialize()
+    _G.live_galaxy_candidate_build = {
+        build_id = "$BuildId",
+        group_id = "$GroupId",
+        native_binding = C,
+        runner = runner,
+        prepared_not_executed = true,
+    }
+end
+
+Register_OnLoad_Init(initialize, "live_galaxy_candidate_$safeGroup")
+"@
+}
+
+function Invoke-Conformance([string]$GroupRoot, [string]$ContractPath) {
+    $output = & pwsh -NoProfile -File $conformanceCommandPath -PackageRoot $GroupRoot -ContractPath $ContractPath -DossierPath $dossierPath -CoveragePath $coveragePath 2>&1
+    if ($LASTEXITCODE -ne 0) { Fail 'PACKAGE_CONFORMANCE_FAILED' }
+    $line = @($output | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] })[-1]
+    try { $result = $line | ConvertFrom-Json -Depth 32 }
+    catch { Fail 'PACKAGE_CONFORMANCE_RESULT_INVALID' }
+    if ($result.verdict -ne 'conformant' -or $result.classification -ne 'production-faithful' -or $result.evidence_level -ne 'packaged-static') {
+        Fail 'PACKAGE_CONFORMANCE_FAILED'
+    }
+    $canonical = $result | ConvertTo-Json -Compress -Depth 32
+    return [pscustomobject]@{ Value = $result; Digest = Get-Sha256 ([Text.Encoding]::UTF8.GetBytes($canonical)) }
+}
+
+function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract, $PackageContract, [string]$MatrixDigest) {
+    $members = @($Matrix.candidates | Where-Object { @($Group.candidate_ids) -contains $_.id } | Sort-Object id)
+    if ($members.Count -ne @($Group.candidate_ids).Count) { Fail 'GROUP_MEMBERS_INVALID' }
+    $packageId = 'live_galaxy_candidate_' + ($Group.id -replace '[^a-z0-9_]', '_')
+    $buildId = "candidate-$($Group.id)-$($Group.build_profile_digest.Substring(0, 12))"
+    $groupRoot = Join-Path $Destination $Group.id
+    if (-not (Test-ContainedPath $groupRoot $Destination)) { Fail 'GROUP_PATH_ESCAPE' }
+    if (Test-Path -LiteralPath $groupRoot) { Remove-Item -LiteralPath $groupRoot -Recurse -Force }
+    $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'lua') -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $groupRoot 'manifest') -Force
+
+    $content = (Get-Content -LiteralPath $contentTemplatePath -Raw).Replace('{{PACKAGE_ID}}', $packageId).Replace('{{PACKAGE_NAME}}', "Live Galaxy Candidate $($Group.id)")
+    $ui = (Get-Content -LiteralPath $uiTemplatePath -Raw).Replace('{{PACKAGE_ID}}', $packageId).Replace('{{ENTRYPOINT}}', [string]$members[0].build_profile.entrypoint)
+    Write-Utf8NoBom (Join-Path $groupRoot 'content.xml') $content
+    Write-Utf8NoBom (Join-Path $groupRoot 'ui.xml') $ui
+    Write-Utf8NoBom (Join-Path $groupRoot 'lua/live_galaxy_candidate_entry.lua') (New-Entrypoint $Group.id $buildId)
+    Copy-Item -LiteralPath $runnerSourcePath -Destination (Join-Path $groupRoot 'lua/live_galaxy_candidate_runner.lua')
+
+    $subset = [ordered]@{
+        schema_version = $Matrix.schema_version
+        matrix_id = $Matrix.matrix_id
+        status = $Matrix.status
+        evidence_classification = $Matrix.evidence_classification
+        group = $Group
+        candidates = $members
+    }
+    $subsetPath = Join-Path $groupRoot 'manifest/candidate-matrix-subset.v1.json'
+    Write-Json $subsetPath $subset
+    $generatedContract = New-GeneratedConformanceContract $PackageContract $packageId $Group $members[0]
+    $generatedContractPath = Join-Path $groupRoot 'manifest/package-conformance.v1.json'
+    Write-Json $generatedContractPath $generatedContract
+
+    $conformance = Invoke-Conformance $groupRoot $generatedContractPath
+    $requiredFiles = @($ManifestContract.required_generated_files)
+    $generatedFiles = foreach ($logicalPath in $requiredFiles) {
+        $physicalPath = Join-Path $groupRoot $logicalPath
+        if (-not (Test-Path -LiteralPath $physicalPath -PathType Leaf)) { Fail 'GENERATED_FILE_MISSING' }
+        $item = Get-Item -LiteralPath $physicalPath
+        if ($item.Length -gt $ManifestContract.bounds.max_generated_file_bytes) { Fail 'GENERATED_FILE_BYTES_EXCEEDED' }
+        [ordered]@{ path = $logicalPath; bytes = $item.Length; sha256 = Get-FileDigest $physicalPath }
+    }
+    [long]$generatedTotalBytes = 0
+    foreach ($generatedFile in @($generatedFiles)) { $generatedTotalBytes += [long]$generatedFile.bytes }
+    if (@($generatedFiles).Count -gt $ManifestContract.bounds.max_generated_files -or
+        $generatedTotalBytes -gt $ManifestContract.bounds.max_generated_total_bytes) {
+        Fail 'GENERATED_BOUNDS_EXCEEDED'
+    }
+    $manifest = [ordered]@{
+        schema_version = $ManifestContract.generated_schema_version
+        build_id = $buildId
+        group_id = $Group.id
+        candidate_ids = @($Group.candidate_ids)
+        developer_only = $true
+        execution_status = 'prepared-not-executed'
+        dossier_digest = Get-FileDigest $dossierPath
+        registry_digest = Get-FileDigest $registryPath
+        coverage_digest = Get-FileDigest $coveragePath
+        matrix_digest = $MatrixDigest
+        build_profile_digest = $Group.build_profile_digest
+        package_conformance_digest = $conformance.Digest
+        runtime_evidence_schema_digest = Get-FileDigest $runtimeEvidencePath
+        package_conformance = [ordered]@{
+            schema_version = $conformance.Value.schema_version
+            verdict = $conformance.Value.verdict
+            classification = $conformance.Value.classification
+            evidence_level = $conformance.Value.evidence_level
+            graph_digest = $conformance.Value.graph_digest
+            dossier_digest = $conformance.Value.dossier_digest
+            coverage_digest = $conformance.Value.coverage_digest
+        }
+        generated_files = @($generatedFiles)
+    }
+    Write-Json (Join-Path $groupRoot 'manifest/build-manifest.v1.json') $manifest
+    $script:createdGroups += $Group.id
+}
+
+function Write-Result([string]$Verdict, [string]$ReasonCode) {
+    [ordered]@{
+        schema_version = 'candidate-build-result.v1'
+        verdict = $Verdict
+        reason_code = $ReasonCode
+        evidence_classification = 'prepared-not-executed'
+        generated_group_ids = @($script:createdGroups | Sort-Object)
+    } | ConvertTo-Json -Compress -Depth 8 | Write-Output
+}
+
+try {
+    $destination = Resolve-SafeBuildRoot $BuildRoot
+    $matrix = Read-Json $MatrixPath 'phase-05.1-candidates.v1'
+    $manifestContract = Read-Json $manifestContractPath 'candidate-build-manifest-contract.v1'
+    $packageContract = Read-Json $packageContractPath 'x4-package-conformance.v1'
+    Assert-ValidMatrix $matrix
+    $matrixDigest = Get-FileDigest $MatrixPath
+    $null = New-Item -ItemType Directory -Path $destination -Force
+    foreach ($group in @($matrix.build_groups)) {
+        New-GroupBuild $matrix $group $destination $manifestContract $packageContract $matrixDigest
+    }
+    Write-Result 'generated' 'GENERATED'
+    exit 0
+}
+catch {
+    Write-Verbose "$script:reasonCode at line $($_.InvocationInfo.ScriptLineNumber)"
+    Write-Result 'rejected' $script:reasonCode
+    exit 1
+}

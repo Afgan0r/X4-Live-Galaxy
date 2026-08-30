@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<content id="{{PACKAGE_ID}}" name="{{PACKAGE_NAME}}" description="Developer-only read-only Live Galaxy candidate build" author="Live Galaxy" version="001" date="2026-08-30" save="false">
+  <dependency id="ws_2042901274" optional="false" />
+</content>
