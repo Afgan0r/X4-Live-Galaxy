@@ -11,6 +11,8 @@ $packageConformanceContract = Join-Path $root 'tools/x4-verification/tests/packa
 $candidateBuildContract = Join-Path $root 'tools/x4-verification/tests/candidate_build_contract.ps1'
 $evidenceRetentionContract = Join-Path $root 'tools/x4-verification/tests/evidence_retention_contract.ps1'
 $candidateIsolationContract = Join-Path $root 'tools/x4-verification/tests/candidate_isolation_contract.ps1'
+$ownerAuthorityContract = Join-Path $root 'tools/x4-verification/tests/owner_authority_contract.ps1'
+$ownerAuthorityAdversarial = Join-Path $root 'tools/x4-verification/tests/owner_authority_adversarial.ps1'
 
 if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
     foreach ($admissionCase in @('dossier', 'negative-fixtures', 'admission')) {
@@ -23,6 +25,10 @@ if ($Suite -in @('all', 'x4-admission', 'x4-verification')) {
 }
 
 if ($Suite -in @('all', 'x4-verification')) {
+    & pwsh -NoProfile -File $ownerAuthorityContract -Case root-delegation
+    if ($LASTEXITCODE -ne 0) { throw 'X4 owner authority root-delegation contract failed.' }
+    & pwsh -NoProfile -File $ownerAuthorityAdversarial
+    if ($LASTEXITCODE -ne 0) { throw 'X4 owner authority adversarial contract failed.' }
     & pwsh -NoProfile -File $candidateBuildContract -Case all
     if ($LASTEXITCODE -ne 0) { throw 'X4 candidate-build aggregate contract failed.' }
     foreach ($retentionCase in @('retention', 'handback', 'retention-admission')) {
