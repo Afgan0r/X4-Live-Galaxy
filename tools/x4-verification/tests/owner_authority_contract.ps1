@@ -30,6 +30,14 @@ $status = Get-OwnerAuthorityStatus
 Assert-Code $status 'OWNER_ROOT_UNCONFIGURED' 'production anchor'
 Assert-True ($status.authority_ready -eq $false) 'Unconfigured production authority reported ready.'
 Assert-True ($status.PSObject.Properties.Name -notcontains 'private_key') 'Production status exposed private key data.'
+Assert-Code (Get-OwnerOverrideDelegationStatus) 'OWNER_ROOT_UNCONFIGURED' 'production delegation'
+$signingStatus = Get-OwnerOverrideSigningStatus
+if ($IsWindows) {
+    Assert-Code $signingStatus 'OWNER_ROOT_UNCONFIGURED' 'production signing authority'
+}
+else {
+    Assert-Code $signingStatus 'OWNER_AUTHORITY_PLATFORM_UNSUPPORTED' 'non-Windows production signing authority'
+}
 
 $fixture = Get-Content -LiteralPath $fixturePath -Raw -Encoding utf8 | ConvertFrom-Json
 $positive = Test-TestOnlyDelegatedCertificate -FixturePath $fixturePath
@@ -51,5 +59,24 @@ $command = Get-Command Get-OwnerAuthorityStatus
 Assert-True ($command.Parameters.Keys -notcontains 'AnchorPath') 'Production status accepts caller anchor redirection.'
 Assert-True ($command.Parameters.Keys -notcontains 'RootPath') 'Production status accepts caller root redirection.'
 Assert-True ($fixture.root_anchor.root_spki_sha256 -ne 'unconfigured') 'Test fixture does not use a distinct root.'
+
+$tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-root-swap-{0}" -f [guid]::NewGuid().ToString('N'))
+[void](New-Item -ItemType Directory -Path (Join-Path $tempRoot 'contracts') -Force)
+try {
+    Copy-Item -LiteralPath $modulePath -Destination (Join-Path $tempRoot 'local-attestation.psm1')
+    $swapped = $fixture.root_anchor | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $swapped.root_id = 'live-galaxy-owner-root-v1'
+    $swapped | Add-Member -NotePropertyName policy_digest -NotePropertyValue '6497cd18a4ee0286f0d566978c9225eaa168ba5d71f8fd7042a78507e1462854'
+    $swapped | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $tempRoot 'contracts/owner-root-anchor.v1.json') -Encoding utf8NoBOM
+    Copy-Item -LiteralPath $certificatePath -Destination (Join-Path $tempRoot 'contracts/delegated-purpose-certificate.v1.json')
+    $probe = "Import-Module '$($tempRoot.Replace("'", "''"))\local-attestation.psm1' -Force; Get-OwnerAuthorityStatus | ConvertTo-Json -Compress"
+    $swapOutput = & pwsh -NoProfile -Command $probe
+    Assert-True ($LASTEXITCODE -eq 0) 'Root-swap probe did not complete.'
+    $swapStatus = $swapOutput | ConvertFrom-Json
+    Assert-Code $swapStatus 'OWNER_ROOT_PIN_MISMATCH' 'repository root swap'
+}
+finally {
+    Remove-Item -LiteralPath $tempRoot -Recurse -Force
+}
 
 Write-Output 'PASS: owner root delegation contract'
