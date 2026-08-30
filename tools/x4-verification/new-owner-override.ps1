@@ -46,7 +46,7 @@ try {
 
     $payload = [pscustomobject][ordered]@{
         schema_version = 'x4-owner-override.v1'
-        override_id = "owner-override-$OwnerDecisionId"
+        override_id = "owner-override-$(([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($OwnerDecisionId)))).ToLowerInvariant().Substring(0, 32))"
         authority_purpose = 'owner-override'
         delegation_certificate_id = 'owner-override-delegation-v1'
         dossier_id = [string]$dossier.dossier_id

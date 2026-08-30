@@ -206,6 +206,14 @@ function Test-ExactOwnerOverrideCore($Override, $Certificate, [string]$ExpectedD
                 return New-AuthorityResult 'INVALID_FIELD_VALUE'
             }
         }
+        foreach ($idField in @('override_id', 'dossier_id', 'finding_id', 'owner_decision_id')) {
+            if ([string]$Override.$idField -notmatch '^[a-z0-9][a-z0-9._-]{0,127}$') {
+                return New-AuthorityResult 'INVALID_FIELD_VALUE'
+            }
+        }
+        if ([string]$Override.nonce -notmatch '^[a-z0-9][a-z0-9._-]{0,127}$') {
+            return New-AuthorityResult 'INVALID_FIELD_VALUE'
+        }
         if ($Override.dossier_id -ne $ExpectedDossierId -or $KnownFindingIds -notcontains $Override.finding_id) {
             return New-AuthorityResult 'OVERRIDE_SCOPE_MISMATCH'
         }
