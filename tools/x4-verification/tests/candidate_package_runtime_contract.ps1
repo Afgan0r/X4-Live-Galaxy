@@ -36,13 +36,13 @@ function Invoke-JsonCommand([string]$File, [string[]]$Arguments, [int]$ExpectedE
 
 function Get-IndependentAdapterCases {
     return @(
-        @{ id = 'p051-cadence-seta'; expected = 'cadence:seta-ratio=6'; good = [pscustomobject]@{ real_ms = 1000; game_ms = 6000; seta_active = $true; sample_count = 4 }; bad = [pscustomobject]@{ real_ms = 1000; game_ms = 5000; seta_active = $true; sample_count = 4 } },
-        @{ id = 'p051-lifecycle-reload'; expected = 'lifecycle:single-registration'; good = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate'); reload_count = 1 }; bad = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate', 'live-galaxy-candidate'); reload_count = 1 } },
-        @{ id = 'p051-mod-stack-compatibility'; expected = 'mod-stack:declared-coexistence'; good = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') }; bad = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'faction-enhancer', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') } },
-        @{ id = 'p051-native-count-fill-runtime'; expected = 'count-fill:3-of-3'; good = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta') } },
-        @{ id = 'p051-native-fill-completeness'; expected = 'fill:complete=3'; good = [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ requested_count = 3; returned_count = 2; records = @('alpha', 'beta') } },
-        @{ id = 'p051-native-identity-closure'; expected = 'identity:object=station-01/owner=argon'; good = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' }; bad = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-02'; owner_id = 'argon'; canonical_owner_id = 'argon' } },
-        @{ id = 'p051-native-volume-envelope'; expected = 'volume:8-samples/2048-bytes'; good = [pscustomobject]@{ sample_count = 8; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 }; bad = [pscustomobject]@{ sample_count = 17; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 } }
+        @{ id = 'p051-cadence-seta'; expected = 'cadence:seta-ratio=6'; work_units = 4; good = [pscustomobject]@{ real_ms = 1000; game_ms = 6000; seta_active = $true; sample_count = 4 }; bad = [pscustomobject]@{ real_ms = 1000; game_ms = 5000; seta_active = $true; sample_count = 4 } },
+        @{ id = 'p051-lifecycle-reload'; expected = 'lifecycle:single-registration'; work_units = 3; good = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate'); reload_count = 1 }; bad = [pscustomobject]@{ registration_ids = @('live-galaxy-candidate', 'live-galaxy-candidate'); reload_count = 1 } },
+        @{ id = 'p051-mod-stack-compatibility'; expected = 'mod-stack:declared-coexistence'; work_units = 4; good = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'more-ai-economy-ships', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') }; bad = [pscustomobject]@{ enabled_mod_ids = @('kuda-ai-tweaks', 'faction-enhancer', 'add-more-sectors'); excluded_mod_ids = @('faction-enhancer') } },
+        @{ id = 'p051-native-count-fill-runtime'; expected = 'count-fill:3-of-3'; work_units = 3; good = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ reported_count = 3; records = @('alpha', 'beta') } },
+        @{ id = 'p051-native-fill-completeness'; expected = 'fill:complete=3'; work_units = 3; good = [pscustomobject]@{ requested_count = 3; returned_count = 3; records = @('alpha', 'beta', 'gamma') }; bad = [pscustomobject]@{ requested_count = 3; returned_count = 2; records = @('alpha', 'beta') } },
+        @{ id = 'p051-native-identity-closure'; expected = 'identity:object=station-01/owner=argon'; work_units = 4; good = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-01'; owner_id = 'argon'; canonical_owner_id = 'argon' }; bad = [pscustomobject]@{ native_id = 'station-01'; canonical_id = 'station-02'; owner_id = 'argon'; canonical_owner_id = 'argon' } },
+        @{ id = 'p051-native-volume-envelope'; expected = 'volume:8-samples/2048-bytes'; work_units = 8; good = [pscustomobject]@{ sample_count = 8; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 }; bad = [pscustomobject]@{ sample_count = 17; max_samples = 16; payload_bytes = 2048; max_payload_bytes = 4096 } }
     )
 }
 
@@ -62,6 +62,12 @@ function Test-Adapters {
         Assert-True ($result.actual_result -ceq $case.expected) "Adapter '$($case.id)' failed the independent result oracle."
         $closed = Invoke-CandidateAdapter -CandidateId $case.id -Fixture $case.bad -MaxWorkUnits $definition.max_work_units
         Assert-True ($closed.status -eq 'rejected' -and $closed.completeness -eq 'incomplete') "Adapter '$($case.id)' accepted a plausible semantic mismatch."
+        $underBudget = Invoke-CandidateAdapter -CandidateId $case.id -Fixture $case.good `
+            -MaxWorkUnits ($case.work_units - 1)
+        Assert-True ($underBudget.status -eq 'rejected' -and
+            $underBudget.completeness -eq 'incomplete' -and
+            $underBudget.diagnostic_code -eq 'adapter-work-budget-exceeded') `
+            "Adapter '$($case.id)' accepted a budget below its derived work."
     }
 
     $alternateIdentity = [pscustomobject]@{

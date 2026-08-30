@@ -47,7 +47,15 @@ function New-Rejection([string]$Code) {
     }
 }
 
-function New-Completion([string]$Result, [string[]]$Observations, [int]$WorkUnits) {
+function New-Completion(
+    [string]$Result,
+    [string[]]$Observations,
+    [int]$WorkUnits,
+    [int]$MaxWorkUnits
+) {
+    if ($WorkUnits -gt $MaxWorkUnits) {
+        return New-Rejection 'adapter-work-budget-exceeded'
+    }
     return [pscustomobject]@{
         status = 'completed'; actual_result = $Result; completeness = 'complete'
         work_units = $WorkUnits; observations = @($Observations); diagnostic_code = 'none'
@@ -76,7 +84,7 @@ function Invoke-CandidateAdapter {
                 $Fixture.seta_active -ne $true -or $Fixture.sample_count -ne 4) {
                 return New-Rejection 'adapter-cadence-semantic-invalid'
             }
-            return New-Completion 'cadence:seta-ratio=6' @('samples=4', 'seta=true') 4
+            return New-Completion 'cadence:seta-ratio=6' @('samples=4', 'seta=true') 4 $MaxWorkUnits
         }
         'p051-lifecycle-reload' {
             if (-not (Test-ExactFields $Fixture @('registration_ids', 'reload_count')) -or
@@ -84,7 +92,7 @@ function Invoke-CandidateAdapter {
                 @($Fixture.registration_ids | Sort-Object -Unique).Count -ne 1) {
                 return New-Rejection 'adapter-lifecycle-semantic-invalid'
             }
-            return New-Completion 'lifecycle:single-registration' @('reloads=1', 'registrations=1') 3
+            return New-Completion 'lifecycle:single-registration' @('reloads=1', 'registrations=1') 3 $MaxWorkUnits
         }
         'p051-mod-stack-compatibility' {
             if (-not (Test-ExactFields $Fixture @('enabled_mod_ids', 'excluded_mod_ids'))) {
@@ -96,14 +104,14 @@ function Invoke-CandidateAdapter {
                 ($excluded -join '|') -ne 'faction-enhancer') {
                 return New-Rejection 'adapter-mod-stack-semantic-invalid'
             }
-            return New-Completion 'mod-stack:declared-coexistence' @('enabled=3', 'excluded=1') 4
+            return New-Completion 'mod-stack:declared-coexistence' @('enabled=3', 'excluded=1') 4 $MaxWorkUnits
         }
         'p051-native-count-fill-runtime' {
             if (-not (Test-ExactFields $Fixture @('reported_count', 'records')) -or
                 $Fixture.reported_count -ne 3 -or @($Fixture.records).Count -ne 3) {
                 return New-Rejection 'adapter-count-fill-semantic-invalid'
             }
-            return New-Completion 'count-fill:3-of-3' @('reported=3', 'filled=3') 3
+            return New-Completion 'count-fill:3-of-3' @('reported=3', 'filled=3') 3 $MaxWorkUnits
         }
         'p051-native-fill-completeness' {
             if (-not (Test-ExactFields $Fixture @('requested_count', 'returned_count', 'records')) -or
@@ -111,7 +119,7 @@ function Invoke-CandidateAdapter {
                 @($Fixture.records).Count -ne 3) {
                 return New-Rejection 'adapter-fill-incomplete'
             }
-            return New-Completion 'fill:complete=3' @('requested=3', 'returned=3') 3
+            return New-Completion 'fill:complete=3' @('requested=3', 'returned=3') 3 $MaxWorkUnits
         }
         'p051-native-identity-closure' {
             if (-not (Test-ExactFields $Fixture @('native_id', 'canonical_id', 'owner_id', 'canonical_owner_id')) -or
@@ -127,13 +135,11 @@ function Invoke-CandidateAdapter {
                 $Fixture.native_id, $Fixture.canonical_id,
                 $Fixture.owner_id, $Fixture.canonical_owner_id
             ).Count
-            if ($identityWorkUnits -gt $MaxWorkUnits) {
-                return New-Rejection 'adapter-work-budget-exceeded'
-            }
             return New-Completion `
                 "identity:object=$($Fixture.native_id)/owner=$($Fixture.owner_id)" `
                 @("object=$($Fixture.native_id)", "owner=$($Fixture.owner_id)") `
-                $identityWorkUnits
+                $identityWorkUnits `
+                $MaxWorkUnits
         }
         'p051-native-volume-envelope' {
             if (-not (Test-ExactFields $Fixture @('sample_count', 'max_samples', 'payload_bytes', 'max_payload_bytes')) -or
@@ -148,16 +154,14 @@ function Invoke-CandidateAdapter {
                 return New-Rejection 'adapter-volume-bound-exceeded'
             }
             $volumeWorkUnits = [int]$Fixture.sample_count
-            if ($volumeWorkUnits -gt $MaxWorkUnits) {
-                return New-Rejection 'adapter-work-budget-exceeded'
-            }
             return New-Completion `
                 "volume:$($Fixture.sample_count)-samples/$($Fixture.payload_bytes)-bytes" `
                 @(
                     "samples=$($Fixture.sample_count)/$($Fixture.max_samples)",
                     "bytes=$($Fixture.payload_bytes)/$($Fixture.max_payload_bytes)"
                 ) `
-                $volumeWorkUnits
+                $volumeWorkUnits `
+                $MaxWorkUnits
         }
     }
 }
