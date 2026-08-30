@@ -56,6 +56,8 @@ $requiredCandidateFields = @(
     'build_profile_digest', 'exclusive_build', 'conflicts_with'
 )
 
+Import-Module $attestationModulePath -Force
+
 function Fail([string]$Code) {
     $script:reasonCode = $Code
     throw [InvalidOperationException]::new($Code)
@@ -263,6 +265,13 @@ function Write-Json([string]$Path, $Value) {
     Write-Utf8NoBom $Path ($Value | ConvertTo-Json -Depth 64)
 }
 
+function Write-CanonicalJson([string]$Path, $Value) {
+    [IO.File]::WriteAllBytes(
+        $Path,
+        (producer-attestation\ConvertTo-CanonicalJsonBytes $Value)
+    )
+}
+
 function New-GeneratedConformanceContract($Base, [string]$PackageId, $Group, $Candidate) {
     return [ordered]@{
         schema_version = $Base.schema_version
@@ -352,10 +361,10 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         candidates = $members
     }
     $subsetPath = Join-Path $groupRoot 'manifest/candidate-matrix-subset.v1.json'
-    Write-Json $subsetPath $subset
+    Write-CanonicalJson $subsetPath $subset
     $generatedContract = New-GeneratedConformanceContract $PackageContract $packageId $Group $members[0]
     $generatedContractPath = Join-Path $groupRoot 'manifest/package-conformance.v1.json'
-    Write-Json $generatedContractPath $generatedContract
+    Write-CanonicalJson $generatedContractPath $generatedContract
 
     $conformance = Invoke-Conformance $groupRoot
     $requiredFiles = @($ManifestContract.required_generated_files)

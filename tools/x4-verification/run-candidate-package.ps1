@@ -139,10 +139,13 @@ function Assert-ExactText([string]$Path, [string]$Expected) {
         Fail 'COMPONENT_DIGEST_MISMATCH'
     }
 }
-function Assert-ExactJson($Actual, $Expected) {
-    $actualJson = $Actual | ConvertTo-Json -Compress -Depth 64
-    $expectedJson = $Expected | ConvertTo-Json -Compress -Depth 64
-    if ($actualJson -cne $expectedJson) { Fail 'COMPONENT_DIGEST_MISMATCH' }
+function Assert-ExactCanonicalJson([string]$Path, $Expected) {
+    [byte[]]$actualBytes = [IO.File]::ReadAllBytes($Path)
+    [byte[]]$expectedBytes = producer-attestation\ConvertTo-CanonicalJsonBytes $Expected
+    if ($actualBytes.Length -ne $expectedBytes.Length -or
+        (Get-Sha256 $actualBytes) -cne (Get-Sha256 $expectedBytes)) {
+        Fail 'COMPONENT_DIGEST_MISMATCH'
+    }
 }
 function Assert-TrustedGeneratedPackage([string]$SnapshotRoot, $Manifest) {
     $contract = Get-Content -LiteralPath $manifestContractPath -Raw |
@@ -195,8 +198,6 @@ function Assert-TrustedGeneratedPackage([string]$SnapshotRoot, $Manifest) {
         Fail 'COMPONENT_DIGEST_MISMATCH'
     }
 
-    $actualSubset = Get-Content -LiteralPath (Join-Path $SnapshotRoot 'manifest/candidate-matrix-subset.v1.json') -Raw |
-        ConvertFrom-Json -Depth 64 -DateKind String
     $expectedSubset = [ordered]@{
         schema_version = $matrix.schema_version
         matrix_id = $matrix.matrix_id
@@ -205,11 +206,11 @@ function Assert-TrustedGeneratedPackage([string]$SnapshotRoot, $Manifest) {
         group = $group
         candidates = $members
     }
-    Assert-ExactJson $actualSubset $expectedSubset
+    Assert-ExactCanonicalJson `
+        (Join-Path $SnapshotRoot 'manifest/candidate-matrix-subset.v1.json') `
+        $expectedSubset
 
     $baseContract = Get-Content -LiteralPath $packageContractPath -Raw |
-        ConvertFrom-Json -Depth 32 -DateKind String
-    $actualContract = Get-Content -LiteralPath (Join-Path $SnapshotRoot 'manifest/package-conformance.v1.json') -Raw |
         ConvertFrom-Json -Depth 32 -DateKind String
     $expectedContract = [ordered]@{
         schema_version = $baseContract.schema_version
@@ -227,7 +228,9 @@ function Assert-TrustedGeneratedPackage([string]$SnapshotRoot, $Manifest) {
         admission_dimensions = @($baseContract.admission_dimensions)
         admission_failure_classes = @($baseContract.admission_failure_classes)
     }
-    Assert-ExactJson $actualContract $expectedContract
+    Assert-ExactCanonicalJson `
+        (Join-Path $SnapshotRoot 'manifest/package-conformance.v1.json') `
+        $expectedContract
     return $expectedSubset
 }
 function Write-Result([string]$Verdict, [bool]$Ready, [string]$Attestation, [string]$Digest = '', [bool]$Retainable = $false) {
@@ -438,12 +441,12 @@ try {
             Fail 'COMPONENT_DIGEST_MISMATCH'
         }
     }
+    Import-Module $attestationModulePath -Force
     $subset = Assert-TrustedGeneratedPackage $groupFull $manifest
     $candidateIds = @($subset.candidates.id | Sort-Object)
     if ($candidateIds.Count -lt 1 -or $candidateIds.Count -gt 7 -or
         @($candidateIds | Sort-Object -Unique).Count -ne $candidateIds.Count -or
         ($candidateIds -join '|') -ne (@($manifest.candidate_ids | Sort-Object) -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
-    Import-Module $attestationModulePath -Force
     $script:ReasonCode = 'PACKAGE_CONFORMANCE_VALIDATION_FAILED'
     $contentPath = Join-Path $groupFull 'content.xml'
     $uiPath = Join-Path $groupFull 'ui.xml'

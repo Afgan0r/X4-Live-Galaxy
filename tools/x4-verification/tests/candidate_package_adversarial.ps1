@@ -17,6 +17,39 @@ function Get-Digest([string]$Path) {
     ).ToLowerInvariant()
 }
 
+function Update-CallerOwnedManifestDigests([string]$GroupRoot, $Manifest) {
+    foreach ($row in @($Manifest.generated_files)) {
+        $path = Join-Path $GroupRoot ([string]$row.path)
+        $row.bytes = (Get-Item -LiteralPath $path).Length
+        $row.sha256 = Get-Digest $path
+    }
+    $componentPaths = [ordered]@{
+        adapter_digest = 'tools/x4-verification/candidate-adapters.psm1'
+        attestation_module_digest = 'tools/x4-verification/producer-attestation.psm1'
+        worker_digest = 'tools/x4-verification/isolation/candidate-worker.ps1'
+        launcher_digest = 'tools/x4-verification/isolation/invoke-candidate-worker.ps1'
+        worker_protocol_digest = 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
+        runtime_evidence_schema_digest = 'tools/x4-verification/contracts/runtime-evidence.v1.json'
+        owner_root_anchor_digest = 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
+    }
+    foreach ($binding in $componentPaths.GetEnumerator()) {
+        $Manifest.($binding.Key) = Get-Digest (Join-Path $GroupRoot $binding.Value)
+    }
+    $graphMaterial =
+        (Get-Digest (Join-Path $GroupRoot 'content.xml')) +
+        (Get-Digest (Join-Path $GroupRoot 'ui.xml')) +
+        (Get-Digest (Join-Path $GroupRoot 'lua/live_galaxy_candidate_entry.lua'))
+    $Manifest.package_conformance.graph_digest = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($graphMaterial))
+    ).ToLowerInvariant()
+    $packageBytes = [Text.Encoding]::UTF8.GetBytes(
+        ($Manifest.package_conformance | ConvertTo-Json -Compress -Depth 8)
+    )
+    $Manifest.package_conformance_digest = [Convert]::ToHexString(
+        [Security.Cryptography.SHA256]::HashData($packageBytes)
+    ).ToLowerInvariant()
+}
+
 function Invoke-Dispatcher([string]$GroupRoot, [string]$OutputPath, [int]$ExpectedExit) {
     $text = & pwsh -NoProfile -File $dispatcherPath -GroupRoot $GroupRoot -OutputPath $OutputPath 2>&1 | Out-String
     Assert-True ($LASTEXITCODE -eq $ExpectedExit) "Dispatcher exit $LASTEXITCODE, expected $ExpectedExit`: $text"
@@ -220,6 +253,64 @@ try {
         }
         finally {
             [IO.File]::WriteAllText($loadedPath, $loadedText, [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText($manifestPath, $manifestText, [Text.UTF8Encoding]::new($false))
+        }
+    }
+
+    $generatedJsonCases = @(
+        @{
+            Name = 'subset-whitespace'; Path = 'manifest/candidate-matrix-subset.v1.json'
+            Mutate = { param([string]$Text) $Text + "`n " }
+        },
+        @{
+            Name = 'contract-property-order-and-escape'; Path = 'manifest/package-conformance.v1.json'
+            Mutate = {
+                param([string]$Text)
+                $value = $Text | ConvertFrom-Json -Depth 64 -DateKind String
+                $reordered = [ordered]@{}
+                foreach ($property in @($value.PSObject.Properties) | Sort-Object Name -Descending) {
+                    $reordered[$property.Name] = $property.Value
+                }
+                ($reordered | ConvertTo-Json -Compress -Depth 64).
+                    Replace('"contract_id":"candidate-', '"contract_id":"\u0063andidate-')
+            }
+        },
+        @{
+            Name = 'contract-duplicate-key'; Path = 'manifest/package-conformance.v1.json'
+            Mutate = {
+                param([string]$Text)
+                $value = $Text | ConvertFrom-Json -Depth 64 -DateKind String
+                $Text.Insert(1, '"schema_version":"' + $value.schema_version + '",')
+            }
+        }
+    )
+    foreach ($case in $generatedJsonCases) {
+        $generatedPath = Join-Path $groupRoot $case.Path
+        $generatedText = Get-Content -LiteralPath $generatedPath -Raw
+        $forgedOutput = Join-Path $outputRoot "$($case.Name)-forgery.jsonl"
+        try {
+            [IO.File]::WriteAllText(
+                $generatedPath,
+                (& $case.Mutate $generatedText),
+                [Text.UTF8Encoding]::new($false)
+            )
+            $manifest = $manifestText | ConvertFrom-Json -Depth 64 -DateKind String
+            Update-CallerOwnedManifestDigests $groupRoot $manifest
+            [IO.File]::WriteAllText(
+                $manifestPath,
+                ($manifest | ConvertTo-Json -Depth 64),
+                [Text.UTF8Encoding]::new($false)
+            )
+            $forged = Invoke-Dispatcher $groupRoot $forgedOutput 1
+            Assert-True ($forged.reason_code -eq 'COMPONENT_DIGEST_MISMATCH') `
+                "Coordinated $($case.Name) and manifest forgery was not rejected."
+            Assert-True (-not (Test-Path -LiteralPath $forgedOutput)) `
+                "Coordinated $($case.Name) forgery published evidence."
+            Assert-True (-not (Test-Path -LiteralPath "$forgedOutput.attestation.json")) `
+                "Coordinated $($case.Name) forgery published attestation."
+        }
+        finally {
+            [IO.File]::WriteAllText($generatedPath, $generatedText, [Text.UTF8Encoding]::new($false))
             [IO.File]::WriteAllText($manifestPath, $manifestText, [Text.UTF8Encoding]::new($false))
         }
     }

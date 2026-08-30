@@ -62,6 +62,10 @@ function ConvertTo-CanonicalJson($Value) {
     return ConvertTo-CanonicalValue $Value | ConvertTo-Json -Compress -Depth 32
 }
 
+function ConvertTo-CanonicalJsonBytes($Value) {
+    return [Text.UTF8Encoding]::new($false).GetBytes((ConvertTo-CanonicalJson $Value))
+}
+
 function Assert-ExactFields($Value, [string[]]$Expected, [string]$Code) {
     $actual = if ($Value -is [Collections.IDictionary]) {
         @($Value.Keys | Sort-Object)
@@ -168,6 +172,7 @@ function Test-CandidateProducerEnvelopeFields($Envelope) {
 
 Export-ModuleMember -Function @(
     'ConvertTo-CanonicalJson',
+    'ConvertTo-CanonicalJsonBytes',
     'New-CandidateProducerAttestation',
     'Test-CandidateProducerEnvelopeFields',
     'Test-CandidateProducerPayload',
