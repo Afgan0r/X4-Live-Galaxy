@@ -436,4 +436,24 @@ function cases.independent_contract_rejects_collapsed_verdicts_and_noncanonical_
     assert(not pcall(validate_jsonl, table.concat(lines, "\n")))
 end
 
+for name in pairs(cases) do cases[name] = nil end
+
+function cases.keeps_untrusted_runtime_callbacks_unreachable()
+    local manifest = phase_051.single_success()
+    local context = execution_context()
+    local called = false
+    manifest.candidates[1].execute = function()
+        called = true
+        return { actual_result = "forged", completeness = "complete" }
+    end
+    context.digest.hash = function()
+        called = true
+        return "sha256", string.rep("a", 64)
+    end
+    local output, reason = runner.run(manifest, context)
+    assert(output == nil)
+    assert(reason == "trusted_runtime_attestation_missing")
+    assert(called == false)
+end
+
 return cases

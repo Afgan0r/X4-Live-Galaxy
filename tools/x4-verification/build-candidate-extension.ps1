@@ -346,6 +346,16 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         $generatedTotalBytes -gt $ManifestContract.bounds.max_generated_total_bytes) {
         Fail 'GENERATED_BOUNDS_EXCEEDED'
     }
+    $packageConformance = [ordered]@{
+        schema_version = $conformance.Value.schema_version
+        verdict = $conformance.Value.verdict
+        classification = $conformance.Value.classification
+        evidence_level = $conformance.Value.evidence_level
+        graph_digest = $conformance.Value.graph_digest
+        dossier_digest = $conformance.Value.dossier_digest
+        coverage_digest = $conformance.Value.coverage_digest
+    }
+    $packageConformanceBytes = [Text.Encoding]::UTF8.GetBytes(($packageConformance | ConvertTo-Json -Compress -Depth 32))
     $manifest = [ordered]@{
         schema_version = $ManifestContract.generated_schema_version
         build_id = $buildId
@@ -359,17 +369,9 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         coverage_digest = Get-FileDigest $coveragePath
         matrix_digest = $MatrixDigest
         build_profile_digest = $Group.build_profile_digest
-        package_conformance_digest = $conformance.Digest
+        package_conformance_digest = Get-Sha256 $packageConformanceBytes
         runtime_evidence_schema_digest = Get-FileDigest $runtimeEvidencePath
-        package_conformance = [ordered]@{
-            schema_version = $conformance.Value.schema_version
-            verdict = $conformance.Value.verdict
-            classification = $conformance.Value.classification
-            evidence_level = $conformance.Value.evidence_level
-            graph_digest = $conformance.Value.graph_digest
-            dossier_digest = $conformance.Value.dossier_digest
-            coverage_digest = $conformance.Value.coverage_digest
-        }
+        package_conformance = $packageConformance
         generated_files = @($generatedFiles)
     }
     Write-Json (Join-Path $groupRoot 'manifest/build-manifest.v1.json') $manifest

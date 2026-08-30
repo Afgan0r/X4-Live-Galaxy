@@ -325,6 +325,13 @@ function runner.verify_digest_adapter(adapter, vectors)
     return true
 end
 
+-- Phase 05.2 has no authenticated, terminable native producer. Keep the
+-- executable API unreachable: candidate callbacks, verdict callbacks, and
+-- digest callbacks are untrusted contract fixtures, not admission evidence.
+runner.run = function()
+    return nil, "trusted_runtime_attestation_missing"
+end
+
 runner.canonical_json = canonical_json
 
 return runner

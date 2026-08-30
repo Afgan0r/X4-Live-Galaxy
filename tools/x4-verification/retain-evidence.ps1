@@ -276,10 +276,7 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
     foreach ($field in @($Contracts.Manifest.required_digests)) { Require-Digest $manifest.$field }
     Require-Id $manifest.build_id
     Require-Id $manifest.group_id
-    if ($manifest.developer_only -ne $true -or $manifest.execution_status -ne 'execution-ready' -or
-        (Require-Property $manifest 'native_execution_status') -ne 'execution-ready-isolated') {
-        Fail 'INVALID_BUILD_STATUS'
-    }
+    if ($manifest.developer_only -ne $true) { Fail 'INVALID_BUILD_STATUS' }
     $candidateIds = Require-Array $manifest.candidate_ids $Contracts.Manifest.bounds.max_candidates 1
     foreach ($id in $candidateIds) { Require-Id $id }
     if ((@($candidateIds | Sort-Object -Unique) -join '|') -ne (@($candidateIds) -join '|')) {
@@ -295,11 +292,19 @@ function Test-BuildManifest([string]$Path, $Contracts, [bool]$CheckGeneratedFile
         if ($manifest.($source.Name) -ne (Get-Sha256File $source.Path)) { Fail 'STALE_IDENTITY_DIGEST' }
     }
     $package = Require-Property $manifest 'package_conformance'
-    if ($package.verdict -ne 'conformant' -or $package.classification -ne 'production-faithful' -or
+    $packageBytes = [Text.Encoding]::UTF8.GetBytes(($package | ConvertTo-Json -Compress -Depth 32))
+    if ((Get-Sha256Bytes $packageBytes) -ne $manifest.package_conformance_digest) {
+        Fail 'PACKAGE_CONFORMANCE_DIGEST_MISMATCH'
+    }
+    if ($package.verdict -ne 'conformant' -or $package.classification -ne 'local-only' -or
         $package.evidence_level -ne 'packaged-static' -or $package.dossier_digest -ne $manifest.dossier_digest -or
         $package.coverage_digest -ne $manifest.coverage_digest) {
         Fail 'INVALID_PACKAGE_CONFORMANCE'
     }
+    # Phase 05.2 has no authenticated producer for native isolation, verdicts,
+    # or digest attestations. Self-asserted execution-ready fields cannot cross
+    # the retention boundary.
+    Fail 'TRUSTED_RUNTIME_ATTESTATION_MISSING'
     $files = Require-Array $manifest.generated_files $Contracts.Manifest.bounds.max_generated_files 1
     $paths = @($files | ForEach-Object { [string](Require-Property $_ 'path') })
     if (($paths -join '|') -ne (@($Contracts.Manifest.required_generated_files) -join '|')) {
@@ -557,16 +562,9 @@ function Read-VerifiedLocator([string]$Path, $Contracts) {
 }
 
 function Remove-ExactCleanupTargets {
-    if ($null -ne $script:cleanupRoot -and $null -ne $script:cleanupDestination -and
-        (Test-ContainedPath $script:cleanupRoot $script:cleanupDestination) -and
-        (Test-Path -LiteralPath $script:cleanupRoot)) {
-        Remove-Item -LiteralPath $script:cleanupRoot -Recurse -Force
-    }
-    if ($script:createdDestination -and $null -ne $script:cleanupDestination -and
-        (Test-Path -LiteralPath $script:cleanupDestination)) {
-        $children = @(Get-ChildItem -LiteralPath $script:cleanupDestination -Force)
-        if ($children.Count -eq 0) { Remove-Item -LiteralPath $script:cleanupDestination -Force }
-    }
+    # Never recursively remove a path after a separate containment/reparse
+    # check. A failed private staging directory is retained for explicit,
+    # identity-aware owner cleanup rather than following a swapped junction.
 }
 
 function Write-Rejection {
