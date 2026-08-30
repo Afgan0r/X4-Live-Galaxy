@@ -256,7 +256,7 @@ function Test-AggregateRegistration {
     Assert-True (@($fullOutput) -contains 'candidate build contract passed: all') 'Full aggregate omitted the candidate-build gate.'
     Assert-True (@($fullOutput) -contains 'PASS: evidence retention contract') 'Full aggregate omitted the retention gate.'
     Assert-True (@($fullOutput) -contains 'PASS: Phase 05.1 sanitized handback contract') 'Full aggregate omitted the handback gate.'
-    Assert-True (@($fullOutput) -contains 'PASS: retention-to-admission integration contract') 'Full aggregate omitted the retained-admission gate.'
+    Assert-True (@($fullOutput) -contains 'PASS: retention-to-admission fail-closed contract') 'Full aggregate omitted the retained-admission gate.'
 }
 
 switch ($Case) {
