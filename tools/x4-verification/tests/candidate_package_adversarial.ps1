@@ -121,6 +121,51 @@ try {
     }
     finally { [IO.File]::WriteAllText($adapterPath, $adapterText, [Text.UTF8Encoding]::new($false)) }
 
+    $manifestPath = Join-Path $groupRoot 'manifest/build-manifest.v1.json'
+    $manifestText = Get-Content -LiteralPath $manifestPath -Raw
+    $coordinatedMarker = Join-Path $scratch 'coordinated-forgery-executed.marker'
+    $coordinatedOutput = Join-Path $outputRoot 'coordinated-forgery.jsonl'
+    try {
+        $forgedAdapter =
+            "[IO.File]::WriteAllText('$($coordinatedMarker.Replace("'", "''"))','executed')`n" +
+            $adapterText
+        [IO.File]::WriteAllText($adapterPath, $forgedAdapter, [Text.UTF8Encoding]::new($false))
+        [byte[]]$forgedBytes = [IO.File]::ReadAllBytes($adapterPath)
+        $forgedDigest = [Convert]::ToHexString(
+            [Security.Cryptography.SHA256]::HashData($forgedBytes)
+        ).ToLowerInvariant()
+        $manifest = $manifestText | ConvertFrom-Json -Depth 64 -DateKind String
+        $manifest.adapter_digest = $forgedDigest
+        $adapterRow = @($manifest.generated_files | Where-Object {
+            $_.path -ceq 'tools/x4-verification/candidate-adapters.psm1'
+        })[0]
+        $adapterRow.bytes = $forgedBytes.Length
+        $adapterRow.sha256 = $forgedDigest
+        [IO.File]::WriteAllText(
+            $manifestPath,
+            ($manifest | ConvertTo-Json -Depth 64),
+            [Text.UTF8Encoding]::new($false)
+        )
+        if ($IsWindows) {
+            $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+            $null = & icacls.exe $adapterPath /inheritance:r /grant:r "*$sid`:F"
+            Assert-True ($LASTEXITCODE -eq 0) 'Unable to protect forged adapter fixture.'
+            $null = & icacls.exe $manifestPath /inheritance:r /grant:r "*$sid`:F"
+            Assert-True ($LASTEXITCODE -eq 0) 'Unable to protect forged manifest fixture.'
+        }
+        $coordinated = Invoke-Dispatcher $groupRoot $coordinatedOutput 1
+        Assert-True ($coordinated.reason_code -eq 'COMPONENT_DIGEST_MISMATCH') `
+            'Coordinated component and manifest forgery was not rejected.'
+        Assert-True (-not (Test-Path -LiteralPath $coordinatedMarker)) `
+            'Coordinated forged component executed before rejection.'
+        Assert-True (-not (Test-Path -LiteralPath $coordinatedOutput)) `
+            'Coordinated forgery published an evidence artifact.'
+    }
+    finally {
+        [IO.File]::WriteAllText($adapterPath, $adapterText, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($manifestPath, $manifestText, [Text.UTF8Encoding]::new($false))
+    }
+
     $anchorPath = Join-Path $groupRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
     $anchorText = Get-Content -LiteralPath $anchorPath -Raw
     try {

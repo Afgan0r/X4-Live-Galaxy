@@ -414,7 +414,8 @@ function New-GroupBuild($Matrix, $Group, [string]$Destination, $ManifestContract
         Set-OwnerOnly $item.FullName $item.PSIsContainer
     }
     $readinessOutput = Join-Path $Destination (".$($Group.id)-readiness.jsonl")
-    $readiness = & pwsh -NoProfile -File (Join-Path $groupRoot 'tools/x4-verification/run-candidate-package.ps1') -GroupRoot $groupRoot -OutputPath $readinessOutput 2>&1
+    $readiness = & pwsh -NoProfile -File $dispatcherSourcePath `
+        -GroupRoot $groupRoot -OutputPath $readinessOutput 2>&1
     if ($LASTEXITCODE -ne 0) { Fail 'LOCAL_READINESS_FAILED' }
     try { $readinessResult = @($readiness)[-1] | ConvertFrom-Json -DateKind String }
     catch { Fail 'LOCAL_READINESS_RESULT_INVALID' }

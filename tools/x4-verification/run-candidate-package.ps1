@@ -16,6 +16,16 @@ $attestationModulePath = Join-Path $repositoryRoot 'tools/x4-verification/produc
 $protocolPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/candidate-worker-protocol.v1.json'
 $schemaPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/runtime-evidence.v1.json'
 $anchorPath = Join-Path $repositoryRoot 'tools/x4-verification/contracts/owner-root-anchor.v1.json'
+$trustedComponentBindings = [ordered]@{
+    dispatcher_digest = $dispatcherPath
+    adapter_digest = $adapterPath
+    attestation_module_digest = $attestationModulePath
+    worker_digest = $workerPath
+    launcher_digest = $launcherPath
+    worker_protocol_digest = $protocolPath
+    runtime_evidence_schema_digest = $schemaPath
+    owner_root_anchor_digest = $anchorPath
+}
 $script:ProductionRootSpkiSha256 = 'UNCONFIGURED'
 $script:ProducerPurpose = 'candidate-producer'
 $script:ProducerScope = 'candidate-evidence:exact-build'
@@ -272,6 +282,7 @@ try {
     $groupFull = [IO.Path]::GetFullPath($GroupRoot)
     $outputFull = [IO.Path]::GetFullPath($OutputPath)
     $script:ReasonCode = 'PATH_VALIDATION_FAILED'
+    if (Test-Contained $dispatcherPath $groupFull) { Fail 'UNTRUSTED_DISPATCHER_ORIGIN' }
     Assert-NoReparse $groupFull
     Assert-NoReparse ([IO.Path]::GetDirectoryName($outputFull))
     if (-not (Test-Path -LiteralPath $groupFull -PathType Container) -or (Test-Path -LiteralPath $outputFull)) { Fail 'DISPATCH_PATH_INVALID' }
@@ -307,7 +318,8 @@ try {
         ($candidateIds -join '|') -ne (@($manifest.candidate_ids | Sort-Object) -join '|')) { Fail 'CANDIDATE_SET_INVALID' }
     $script:ReasonCode = 'COMPONENT_BINDING_VALIDATION_FAILED'
     $componentBindings = [ordered]@{
-        dispatcher_digest = $dispatcherPath; adapter_digest = $adapterPath
+        dispatcher_digest = (Join-Path $groupFull 'tools/x4-verification/run-candidate-package.ps1')
+        adapter_digest = $adapterPath
         attestation_module_digest = $attestationModulePath
         worker_digest = $workerPath
         launcher_digest = $launcherPath
@@ -318,7 +330,13 @@ try {
         $bindingName = [string]$binding.Key
         $bindingPath = [string]$binding.Value
         $property = $manifest.PSObject.Properties[$bindingName]
-        if ($null -eq $property -or [string]$property.Value -ne (Get-FileDigest $bindingPath)) { Fail 'COMPONENT_DIGEST_MISMATCH' }
+        $trustedPath = [string]$trustedComponentBindings[$bindingName]
+        $componentDigest = Get-FileDigest $bindingPath
+        $trustedDigest = Get-FileDigest $trustedPath
+        if ($null -eq $property -or [string]$property.Value -ne $componentDigest -or
+            $componentDigest -ne $trustedDigest) {
+            Fail 'COMPONENT_DIGEST_MISMATCH'
+        }
     }
     $script:ReasonCode = 'PACKAGE_CONFORMANCE_VALIDATION_FAILED'
     $contentPath = Join-Path $groupFull 'content.xml'
