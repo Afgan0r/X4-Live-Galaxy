@@ -1,6 +1,8 @@
 {
   "schema_version": "x4-owner-override.v1",
   "override_id": "owner-override-template",
+  "authority_purpose": "owner-override",
+  "delegation_certificate_id": "owner-override-delegation-v1",
   "dossier_id": "replace-with-exact-dossier-id",
   "dossier_digest": "0000000000000000000000000000000000000000000000000000000000000000",
   "finding_id": "replace-with-exact-finding-id",
@@ -8,5 +10,10 @@
   "decision": "accept-risk",
   "rationale": "Replace with the bounded reason for accepting this exact finding.",
   "remaining_risk": "Replace with the risk that remains after this exact override.",
-  "expires_at": "1970-01-01T00:00:00Z"
+  "issued_at": "1970-01-01T00:00:00Z",
+  "expires_at": "1970-01-01T00:00:00Z",
+  "nonce": "replace-with-generated-nonce",
+  "signature_algorithm": "ECDSA_P256_SHA256",
+  "payload_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "signature_base64": ""
 }

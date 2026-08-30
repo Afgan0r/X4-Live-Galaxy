@@ -265,22 +265,60 @@ if ($Case -eq 'admission') {
     Assert-Rejected $productionAttempt 'OWNER_ROOT_UNCONFIGURED' 'TEST-ONLY root at production admission'
 
     foreach ($mutation in @(
-        @{ field = 'finding_id'; value = 'finding-stale'; code = 'OVERRIDE_SCOPE_MISMATCH' },
-        @{ field = 'dossier_digest'; value = ('0' * 64); code = 'OVERRIDE_DIGEST_MISMATCH' },
-        @{ field = 'decision'; value = 'auto-admit-small-change'; code = 'INVALID_OWNER_DECISION' },
-        @{ field = 'rationale'; value = 'altered rationale'; code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' },
-        @{ field = 'remaining_risk'; value = 'altered risk'; code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' },
-        @{ field = 'expires_at'; value = [DateTimeOffset]::UtcNow.AddDays(60).ToString('yyyy-MM-ddTHH:mm:ssZ'); code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' },
-        @{ field = 'nonce'; value = 'test-only-nonce-0002'; code = 'OWNER_OVERRIDE_SIGNATURE_INVALID' }
+        @{ field = 'finding_id'; value = 'finding-stale'; code = 'OVERRIDE_SCOPE_MISMATCH'; resign = $true },
+        @{ field = 'dossier_digest'; value = ('0' * 64); code = 'OVERRIDE_DIGEST_MISMATCH'; resign = $true },
+        @{ field = 'decision'; value = 'auto-admit-small-change'; code = 'INVALID_OWNER_DECISION'; resign = $true },
+        @{ field = 'rationale'; value = 'altered rationale'; code = 'OWNER_OVERRIDE_PAYLOAD_DIGEST_MISMATCH' },
+        @{ field = 'remaining_risk'; value = 'altered risk'; code = 'OWNER_OVERRIDE_PAYLOAD_DIGEST_MISMATCH' },
+        @{ field = 'expires_at'; value = [DateTimeOffset]::UtcNow.AddDays(60).ToString('yyyy-MM-ddTHH:mm:ssZ'); code = 'OWNER_OVERRIDE_PAYLOAD_DIGEST_MISMATCH' },
+        @{ field = 'nonce'; value = 'test-only-nonce-0002'; code = 'OWNER_OVERRIDE_PAYLOAD_DIGEST_MISMATCH' }
     )) {
         $altered = Copy-Json $signed
         $altered.($mutation.field) = $mutation.value
+        if ($mutation.ContainsKey('resign')) {
+            $resignedPayload = [ordered]@{}
+            foreach ($field in @('schema_version', 'override_id', 'authority_purpose', 'delegation_certificate_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'issued_at', 'expires_at', 'nonce', 'signature_algorithm')) {
+                $resignedPayload[$field] = $altered.$field
+            }
+            $altered = New-TestOnlyOwnerOverrideEnvelope -Payload ([pscustomobject]$resignedPayload) -FixturePath $testAuthorityFixturePath
+        }
         $result = Test-TestOnlyExactOwnerOverride -Override $altered -FixturePath $testAuthorityFixturePath -ExpectedDossierId $knownFailure.dossier_id -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
         Assert-True ($result.status -eq $mutation.code) "Altered $($mutation.field) returned $($result.status), expected $($mutation.code)."
     }
 
     $transplant = Test-TestOnlyExactOwnerOverride -Override $signed -FixturePath $testAuthorityFixturePath -ExpectedDossierId 'different-dossier' -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
     Assert-True ($transplant.status -eq 'OVERRIDE_SCOPE_MISMATCH') 'Signature transplant to another dossier was accepted.'
+
+    foreach ($missingField in @('schema_version', 'authority_purpose', 'dossier_id', 'finding_id', 'decision', 'rationale', 'remaining_risk', 'issued_at', 'expires_at', 'nonce', 'payload_digest', 'signature_base64')) {
+        $missing = Copy-Json $signed
+        $missing.PSObject.Properties.Remove($missingField)
+        $missingResult = Test-TestOnlyExactOwnerOverride -Override $missing -FixturePath $testAuthorityFixturePath -ExpectedDossierId $knownFailure.dossier_id -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
+        Assert-True ($missingResult.status -eq 'MISSING_REQUIRED_FIELD') "Missing $missingField did not fail closed."
+    }
+
+    $expiredPayload = [ordered]@{}
+    foreach ($field in @('schema_version', 'override_id', 'authority_purpose', 'delegation_certificate_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'issued_at', 'expires_at', 'nonce', 'signature_algorithm')) {
+        $expiredPayload[$field] = $signed.$field
+    }
+    $expiredPayload.issued_at = '1999-12-01T00:00:00Z'
+    $expiredPayload.expires_at = '2000-01-01T00:00:00Z'
+    $expiredSigned = New-TestOnlyOwnerOverrideEnvelope -Payload ([pscustomobject]$expiredPayload) -FixturePath $testAuthorityFixturePath
+    $expiredResult = Test-TestOnlyExactOwnerOverride -Override $expiredSigned -FixturePath $testAuthorityFixturePath -ExpectedDossierId $knownFailure.dossier_id -ExpectedDossierDigest $dossierDigest -KnownFindingIds @('finding-small-loader-exception')
+    Assert-True ($expiredResult.status -eq 'OVERRIDE_EXPIRED') 'Expired exact override was accepted.'
+
+    $signerTemp = Join-Path ([IO.Path]::GetTempPath()) ("live-galaxy-owner-cli-{0}" -f [guid]::NewGuid().ToString('N'))
+    [void](New-Item -ItemType Directory -Path $signerTemp)
+    try {
+        $dossierFile = Join-Path $signerTemp 'dossier.json'
+        $outputFile = Join-Path $signerTemp 'override.json'
+        $knownFailure | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $dossierFile -Encoding utf8NoBOM
+        $cliOutput = & pwsh -NoProfile -File $newOverridePath -DossierPath $dossierFile -FindingId 'finding-small-loader-exception' -OwnerDecisionId 'owner-decision-production-probe' -Rationale 'Bounded production authority availability probe.' -RemainingRisk 'Known loader mismatch remains bounded to this finding.' -ExpiresAt $expiresAt -OutputPath $outputFile 2>&1
+        Assert-True ($LASTEXITCODE -ne 0) 'Unconfigured production signer unexpectedly succeeded.'
+        $cliResult = @($cliOutput | ForEach-Object { $_.ToString() } | Where-Object { $_.StartsWith('{') })[-1] | ConvertFrom-Json
+        Assert-True ($cliResult.status -eq 'OWNER_ROOT_UNCONFIGURED') "Production signer returned $($cliResult.status)."
+        Assert-True (-not (Test-Path -LiteralPath $outputFile)) 'Unconfigured production signer wrote an override.'
+    }
+    finally { Remove-Item -LiteralPath $signerTemp -Recurse -Force }
 
     $newOverrideCommand = Get-Command $newOverridePath
     foreach ($forbiddenParameter in @('AnchorPath', 'RootPath', 'PublicKeyPath', 'KeyName', 'Sid', 'TestMode', 'VerifierPath')) {

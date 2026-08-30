@@ -13,6 +13,13 @@ $script:CertificateFields = @(
     'delegated_spki_sha256', 'windows_key_name', 'purpose', 'epoch',
     'scope', 'algorithm', 'not_before', 'not_after', 'policy_digest'
 )
+$script:OverridePayloadFields = @(
+    'schema_version', 'override_id', 'authority_purpose',
+    'delegation_certificate_id', 'dossier_id', 'dossier_digest',
+    'finding_id', 'owner_decision_id', 'decision', 'rationale',
+    'remaining_risk', 'issued_at', 'expires_at', 'nonce',
+    'signature_algorithm'
+)
 
 function New-AuthorityResult([string]$Status, [bool]$Ready = $false) {
     return [pscustomobject][ordered]@{
@@ -112,6 +119,112 @@ function ConvertTo-CertificateBytes($Certificate) {
         [void]$builder.Append($field).Append('=').Append($value.Length).Append(':').Append($value).Append("`n")
     }
     return [Text.Encoding]::UTF8.GetBytes($builder.ToString())
+}
+
+function ConvertTo-CanonicalFieldBytes($Value, [string[]]$Fields) {
+    $builder = [Text.StringBuilder]::new()
+    foreach ($field in $Fields) {
+        if ($Value.PSObject.Properties.Name -notcontains $field) {
+            throw [IO.InvalidDataException]::new('canonical field missing')
+        }
+        $rawValue = $Value.$field
+        if ($rawValue -is [DateTime]) {
+            $textValue = $rawValue.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
+        }
+        elseif ($rawValue -is [DateTimeOffset]) {
+            $textValue = $rawValue.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ', [Globalization.CultureInfo]::InvariantCulture)
+        }
+        else { $textValue = [string]$rawValue }
+        [void]$builder.Append($field).Append('=').Append($textValue.Length).Append(':').Append($textValue).Append("`n")
+    }
+    return [Text.Encoding]::UTF8.GetBytes($builder.ToString())
+}
+
+function ConvertTo-OwnerOverridePayloadBytes($Override) {
+    return ConvertTo-CanonicalFieldBytes $Override $script:OverridePayloadFields
+}
+
+function Test-ExactOwnerOverrideCore($Override, $Certificate, [string]$ExpectedDossierId, [string]$ExpectedDossierDigest, [string[]]$KnownFindingIds) {
+    try {
+        $expectedFields = @($script:OverridePayloadFields) + @('payload_digest', 'signature_base64')
+        $actualFields = @($Override.PSObject.Properties.Name | Sort-Object)
+        if (($actualFields -join '|') -ne (@($expectedFields | Sort-Object) -join '|')) {
+            return New-AuthorityResult 'MISSING_REQUIRED_FIELD'
+        }
+        if ($Override.schema_version -ne 'x4-owner-override.v1' -or
+            $Override.authority_purpose -ne $script:OwnerOverridePurpose -or
+            $Override.delegation_certificate_id -ne $Certificate.certificate_id -or
+            $Override.signature_algorithm -ne $script:Algorithm) {
+            return New-AuthorityResult 'OWNER_OVERRIDE_AUTHORITY_MISMATCH'
+        }
+        [byte[]]$payloadBytes = ConvertTo-OwnerOverridePayloadBytes $Override
+        $payloadDigest = Get-Sha256Hex $payloadBytes
+        if ($Override.payload_digest -ne $payloadDigest) {
+            return New-AuthorityResult 'OWNER_OVERRIDE_PAYLOAD_DIGEST_MISMATCH'
+        }
+        [byte[]]$delegatedSpki = [Convert]::FromBase64String([string]$Certificate.delegated_spki_der_base64)
+        [byte[]]$signature = [Convert]::FromBase64String([string]$Override.signature_base64)
+        $verifier = [Security.Cryptography.ECDsa]::Create()
+        try {
+            $read = 0
+            $verifier.ImportSubjectPublicKeyInfo($delegatedSpki, [ref]$read)
+            $signatureValid = $verifier.VerifyData(
+                $payloadBytes,
+                $signature,
+                [Security.Cryptography.HashAlgorithmName]::SHA256,
+                [Security.Cryptography.DSASignatureFormat]::IeeeP1363FixedFieldConcatenation
+            )
+        }
+        finally { $verifier.Dispose() }
+        if (-not $signatureValid) {
+            return New-AuthorityResult 'OWNER_OVERRIDE_SIGNATURE_INVALID'
+        }
+        foreach ($textField in @('override_id', 'dossier_id', 'finding_id', 'owner_decision_id', 'rationale', 'remaining_risk', 'nonce')) {
+            $text = [string]$Override.$textField
+            if ([string]::IsNullOrWhiteSpace($text) -or $text.Length -gt 256) {
+                return New-AuthorityResult 'INVALID_FIELD_VALUE'
+            }
+        }
+        if ($Override.dossier_id -ne $ExpectedDossierId -or $KnownFindingIds -notcontains $Override.finding_id) {
+            return New-AuthorityResult 'OVERRIDE_SCOPE_MISMATCH'
+        }
+        if ($Override.dossier_digest -ne $ExpectedDossierDigest) {
+            return New-AuthorityResult 'OVERRIDE_DIGEST_MISMATCH'
+        }
+        if ($Override.decision -ne 'accept-risk') {
+            return New-AuthorityResult 'INVALID_OWNER_DECISION'
+        }
+        $issued = [DateTimeOffset]::Parse([string]$Override.issued_at, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal)
+        $expiry = [DateTimeOffset]::Parse([string]$Override.expires_at, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal)
+        $now = [DateTimeOffset]::UtcNow
+        if ($issued -gt $now.AddMinutes(5)) { return New-AuthorityResult 'OVERRIDE_ISSUED_IN_FUTURE' }
+        if ($expiry -le $now) { return New-AuthorityResult 'OVERRIDE_EXPIRED' }
+        if ($expiry -gt $issued.AddDays(90)) { return New-AuthorityResult 'OVERRIDE_EXPIRY_OUT_OF_RANGE' }
+        $result = New-AuthorityResult 'OWNER_OVERRIDE_VERIFIED' $true
+        $result | Add-Member -NotePropertyName overridden_finding_ids -NotePropertyValue @([string]$Override.finding_id)
+        return $result
+    }
+    catch {
+        return New-AuthorityResult 'OWNER_OVERRIDE_INVALID'
+    }
+}
+
+function New-SignedOwnerOverrideEnvelope($Payload, [Security.Cryptography.ECDsa]$Signer) {
+    $actual = @($Payload.PSObject.Properties.Name | Sort-Object)
+    if (($actual -join '|') -ne (@($script:OverridePayloadFields | Sort-Object) -join '|')) {
+        throw [IO.InvalidDataException]::new('owner override payload fields invalid')
+    }
+    [byte[]]$bytes = ConvertTo-OwnerOverridePayloadBytes $Payload
+    [byte[]]$signature = $Signer.SignData(
+        $bytes,
+        [Security.Cryptography.HashAlgorithmName]::SHA256,
+        [Security.Cryptography.DSASignatureFormat]::IeeeP1363FixedFieldConcatenation
+    )
+    $envelope = [ordered]@{}
+    foreach ($field in $script:OverridePayloadFields) { $envelope[$field] = $Payload.$field }
+    $envelope.payload_digest = Get-Sha256Hex $bytes
+    $envelope.signature_base64 = [Convert]::ToBase64String($signature)
+    return [pscustomobject]$envelope
 }
 
 function Test-DelegatedCertificateCore($Anchor, $Certificate, [string]$ExpectedRootFingerprint) {
@@ -271,10 +384,82 @@ function Test-TestOnlyDelegatedCertificateObject {
     return Test-DelegatedCertificateCore $Fixture.root_anchor $Fixture.delegated_certificate $script:TestRootSpkiSha256
 }
 
+function New-TestOnlyOwnerOverrideEnvelope {
+    param(
+        [Parameter(Mandatory = $true)]$Payload,
+        [Parameter(Mandatory = $true)][string]$FixturePath
+    )
+    $delegation = Test-TestOnlyDelegatedCertificate -FixturePath $FixturePath
+    if (-not $delegation.authority_ready) { throw $delegation.status }
+    $fixture = Read-AuthorityJson $FixturePath
+    [byte[]]$privateKey = [Convert]::FromBase64String([string]$fixture.delegated_private_pkcs8_base64)
+    $signer = [Security.Cryptography.ECDsa]::Create()
+    try {
+        $read = 0
+        $signer.ImportPkcs8PrivateKey($privateKey, [ref]$read)
+        return New-SignedOwnerOverrideEnvelope $Payload $signer
+    }
+    finally { $signer.Dispose() }
+}
+
+function Test-TestOnlyExactOwnerOverride {
+    param(
+        [Parameter(Mandatory = $true)]$Override,
+        [Parameter(Mandatory = $true)][string]$FixturePath,
+        [Parameter(Mandatory = $true)][string]$ExpectedDossierId,
+        [Parameter(Mandatory = $true)][string]$ExpectedDossierDigest,
+        [Parameter(Mandatory = $true)][string[]]$KnownFindingIds
+    )
+    $delegation = Test-TestOnlyDelegatedCertificate -FixturePath $FixturePath
+    if (-not $delegation.authority_ready) { return $delegation }
+    $fixture = Read-AuthorityJson $FixturePath
+    return Test-ExactOwnerOverrideCore $Override $fixture.delegated_certificate $ExpectedDossierId $ExpectedDossierDigest $KnownFindingIds
+}
+
+function Test-ProductionExactOwnerOverride {
+    param(
+        [Parameter(Mandatory = $true)]$Override,
+        [Parameter(Mandatory = $true)][string]$ExpectedDossierId,
+        [Parameter(Mandatory = $true)][string]$ExpectedDossierDigest,
+        [Parameter(Mandatory = $true)][string[]]$KnownFindingIds
+    )
+    $delegation = Get-OwnerOverrideDelegationStatus
+    if (-not $delegation.authority_ready) { return $delegation }
+    $certificate = Read-AuthorityJson (Join-Path $PSScriptRoot 'contracts/delegated-purpose-certificate.v1.json')
+    return Test-ExactOwnerOverrideCore $Override $certificate $ExpectedDossierId $ExpectedDossierDigest $KnownFindingIds
+}
+
+function New-ProductionOwnerOverrideEnvelope {
+    param([Parameter(Mandatory = $true)]$Payload)
+    $status = Get-OwnerOverrideSigningStatus
+    if (-not $status.authority_ready) { return $status }
+    $certificate = Read-AuthorityJson (Join-Path $PSScriptRoot 'contracts/delegated-purpose-certificate.v1.json')
+    try {
+        $key = [Security.Cryptography.CngKey]::Open(
+            [string]$certificate.windows_key_name,
+            [Security.Cryptography.CngProvider]::MicrosoftSoftwareKeyStorageProvider,
+            [Security.Cryptography.CngKeyOpenOptions]::UserKey
+        )
+        try {
+            $signer = [Security.Cryptography.ECDsaCng]::new($key)
+            try { return New-SignedOwnerOverrideEnvelope $Payload $signer }
+            finally { $signer.Dispose() }
+        }
+        finally { $key.Dispose() }
+    }
+    catch [Security.Cryptography.CryptographicException] {
+        return New-AuthorityResult 'OWNER_DELEGATED_KEY_ACCESS_FAILED'
+    }
+}
+
 Export-ModuleMember -Function @(
     'Get-OwnerAuthorityStatus',
     'Get-OwnerOverrideDelegationStatus',
     'Get-OwnerOverrideSigningStatus',
     'Test-TestOnlyDelegatedCertificate',
-    'Test-TestOnlyDelegatedCertificateObject'
+    'Test-TestOnlyDelegatedCertificateObject',
+    'New-TestOnlyOwnerOverrideEnvelope',
+    'Test-TestOnlyExactOwnerOverride',
+    'Test-ProductionExactOwnerOverride',
+    'New-ProductionOwnerOverrideEnvelope'
 )

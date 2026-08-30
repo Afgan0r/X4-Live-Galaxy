@@ -17,6 +17,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'local-attestation.psm1') -Force
 
 $maxInputBytes = 65536
 $maxEvidenceSources = 64
@@ -436,7 +437,7 @@ function Test-Dossier($Dossier, [string[]]$FailureClassIds, [bool]$AllowRuntimeR
 
 function Test-OwnerOverride($Override, $KnownFindings) {
     $script:validationContext = 'override-required-fields'
-    foreach ($field in @('override_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'expires_at')) {
+    foreach ($field in @('override_id', 'authority_purpose', 'delegation_certificate_id', 'dossier_id', 'dossier_digest', 'finding_id', 'owner_decision_id', 'decision', 'rationale', 'remaining_risk', 'issued_at', 'expires_at', 'nonce', 'signature_algorithm', 'payload_digest', 'signature_base64')) {
         $null = Require-Property $Override $field
     }
     $script:validationContext = 'override-identifiers'
@@ -643,9 +644,6 @@ function Write-Result([string]$Verdict, [string[]]$ReasonCodes) {
 }
 
 try {
-    if (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
-        Fail 'OWNER_OVERRIDE_DISABLED'
-    }
     $script:validationContext = 'dossier-read'
     $dossierRead = Read-BoundedJson $DossierPath 'x4-integration-dossier.v1' 'UNSUPPORTED_DOSSIER_SCHEMA'
     $script:dossierDigest = Get-Sha256Hex $dossierRead.Bytes
@@ -673,7 +671,23 @@ try {
     $script:validationContext = 'dossier-validation'
     $knownFindings = @(Test-Dossier $dossierRead.Value $registryInfo.Ids $allowRuntimeResolution)
     if ($knownFindings.Count -gt 0) {
-        Fail 'KNOWN_FAILURE_BLOCKED'
+        if ([string]::IsNullOrWhiteSpace($OverridePath)) { Fail 'KNOWN_FAILURE_BLOCKED' }
+        $script:validationContext = 'owner-override-read'
+        $overrideRead = Read-BoundedJson $OverridePath 'x4-owner-override.v1' 'UNSUPPORTED_OVERRIDE_SCHEMA'
+        $script:validationContext = 'owner-override-authority'
+        $authority = Test-ProductionExactOwnerOverride `
+            -Override $overrideRead.Value `
+            -ExpectedDossierId $script:dossierId `
+            -ExpectedDossierDigest $script:dossierDigest `
+            -KnownFindingIds @($knownFindings | ForEach-Object id)
+        if (-not $authority.authority_ready) { Fail ([string]$authority.status) }
+        $script:validationContext = 'owner-override-evaluator'
+        $script:overriddenFindingIds = @(Test-OwnerOverride $overrideRead.Value $knownFindings)
+        $knownFindings = @($knownFindings | Where-Object { $script:overriddenFindingIds -notcontains $_.id })
+        if ($knownFindings.Count -gt 0) { Fail 'KNOWN_FAILURE_BLOCKED' }
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($OverridePath)) {
+        Fail 'OVERRIDE_SCOPE_MISMATCH'
     }
     if ($ValidateFixture) {
         Write-Result 'validation-passed' @('VALIDATION_PASSED')
