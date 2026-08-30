@@ -3,6 +3,13 @@ local runner = {}
 local SCHEMA_VERSION = "runtime-evidence.v1"
 local EVIDENCE_CLASSIFICATION = "local-contract-only"
 local STAGES = { "execution", "contract", "effect" }
+local CANDIDATE_FIELDS = {
+    adapter_id = true, bounds = true, expected_result = true, id = true, source = true,
+}
+local OUTCOME_FIELDS = {
+    actual_result = true, completeness = true, elapsed_game_ms = true,
+    elapsed_real_ms = true, observations = true, seta_state = true, work_units = true,
+}
 local HARD_BOUNDS = {
     max_candidates = 16, max_steps = 3, max_work_units_per_step = 64,
     max_candidate_rows = 3, max_observations_per_step = 32, max_mods = 64,
@@ -80,7 +87,21 @@ local function copy_sorted_strings(values, maximum)
     return result
 end
 
-local function validate_manifest(manifest, context)
+local function validate_services(context)
+    if type(context) ~= "table" or type(context.adapters) ~= "table" then
+        return nil, "adapter_registry_missing"
+    end
+    if type(context.digest) ~= "table" or type(context.digest.hash) ~= "function"
+        or type(context.digest.verify) ~= "function" then
+        return nil, "digest_adapter_missing"
+    end
+    if type(context.watchdog) ~= "table" or type(context.watchdog.invoke) ~= "function" then
+        return nil, "watchdog_adapter_missing"
+    end
+    return true
+end
+
+local function validate_manifest(manifest)
     if type(manifest) ~= "table" or manifest.schema_version ~= SCHEMA_VERSION then
         return nil, "schema_version_invalid"
     end
@@ -93,13 +114,6 @@ local function validate_manifest(manifest, context)
         or #manifest.candidates > HARD_BOUNDS.max_candidates then return nil, "candidate_count_invalid" end
     local mods = copy_sorted_strings(manifest.mod_list, HARD_BOUNDS.max_mods)
     if mods == nil then return nil, "mod_list_invalid" end
-    if type(context) ~= "table" or type(context.digest) ~= "table"
-        or type(context.digest.hash) ~= "function" or type(context.digest.verify) ~= "function" then
-        return nil, "digest_adapter_missing"
-    end
-    if type(context.watchdog) ~= "table" or type(context.watchdog.invoke) ~= "function" then
-        return nil, "watchdog_adapter_missing"
-    end
     return mods
 end
 
@@ -151,8 +165,11 @@ local function digest_row(payload, digest_adapter)
     return canonical_json(payload)
 end
 
-local function normalize_outcome(value, bounds)
+local function normalize_outcome(value, bounds, candidate_bounds)
     if type(value) ~= "table" or not valid_string(value.actual_result) then return nil, "malformed_result" end
+    for field in pairs(value) do
+        if not OUTCOME_FIELDS[field] then return nil, "malformed_result" end
+    end
     local completeness = value.completeness
     if completeness ~= "complete" and completeness ~= "partial" and completeness ~= "unknown"
         and completeness ~= "not_applicable" then return nil, "completeness_invalid" end
@@ -163,7 +180,8 @@ local function normalize_outcome(value, bounds)
         and seta_state ~= "not_applicable" then return nil, "seta_state_invalid" end
     local work_units = value.work_units or 0
     if type(work_units) ~= "number" or work_units % 1 ~= 0 or work_units < 0
-        or work_units > bounds.max_work_units_per_step then return nil, "work_units_exceeded" end
+        or work_units > bounds.max_work_units_per_step
+        or work_units > candidate_bounds.max_work_units then return nil, "work_units_exceeded" end
     for _, field in ipairs({ "elapsed_real_ms", "elapsed_game_ms" }) do
         local number = value[field] or 0
         if type(number) ~= "number" or number % 1 ~= 0 or number < 0
@@ -177,14 +195,33 @@ local function normalize_outcome(value, bounds)
     }
 end
 
-local function ordered_candidates(candidates)
+local function validate_candidate_bounds(value, hard_bounds)
+    if type(value) ~= "table" or type(value.max_work_units) ~= "number"
+        or value.max_work_units % 1 ~= 0 or value.max_work_units < 1
+        or value.max_work_units > hard_bounds.max_work_units_per_step then
+        return nil
+    end
+    for field in pairs(value) do
+        if field ~= "max_work_units" then return nil end
+    end
+    return { max_work_units = value.max_work_units }
+end
+
+local function ordered_candidates(candidates, context, bounds)
     local ordered, seen = {}, {}
     for _, candidate in ipairs(candidates) do
-        if type(candidate) ~= "table" or not valid_string(candidate.id) or seen[candidate.id]
-            or not valid_string(candidate.source) or not valid_string(candidate.expected_result)
-            or type(candidate.execute) ~= "function" or type(candidate.validate) ~= "function"
-            or (candidate.assess ~= nil and type(candidate.assess) ~= "function") then
-            return nil, "candidate_invalid"
+        if type(candidate) ~= "table" then return nil, "candidate_schema_invalid" end
+        for field in pairs(candidate) do
+            if not CANDIDATE_FIELDS[field] then return nil, "candidate_schema_invalid" end
+        end
+        if not valid_string(candidate.id) or seen[candidate.id]
+            or not valid_string(candidate.adapter_id) or not valid_string(candidate.source)
+            or not valid_string(candidate.expected_result)
+            or validate_candidate_bounds(candidate.bounds, bounds) == nil then
+            return nil, "candidate_schema_invalid"
+        end
+        if type(context.adapters[candidate.adapter_id]) ~= "function" then
+            return nil, "adapter_unregistered"
         end
         seen[candidate.id] = true
         ordered[#ordered + 1] = candidate
@@ -193,17 +230,18 @@ local function ordered_candidates(candidates)
     return ordered
 end
 
-local function invoke_bounded_stage(candidate, stage, context, bounds, callback)
+local function invoke_bounded_adapter(candidate, context, bounds)
     -- Reserve the stage's unit before invoking cooperative local-contract work.
     -- This synchronous hook cannot preempt a blocking ffi.C/native call; build
     -- retention keeps that boundary runtime-pending until terminable isolation
     -- has X4-faithful evidence.
     local reserved_work_units = 1
     if reserved_work_units > bounds.max_work_units_per_step then return nil, "timeout_marker" end
-    local invoked, status, value = pcall(context.watchdog.invoke, candidate.id, stage,
-        reserved_work_units, callback)
+    local adapter = context.adapters[candidate.adapter_id]
+    local invoked, status, value = pcall(context.watchdog.invoke, candidate.id, "execution",
+        reserved_work_units, adapter)
     if not invoked or status == "timeout" then return nil, "timeout_marker" end
-    if status == "callback-error" then return nil, stage .. "_exception" end
+    if status == "callback-error" then return nil, "execution_exception" end
     if status ~= "completed" then return nil, "timeout_marker" end
     return value
 end
@@ -212,8 +250,7 @@ local function execute_candidate(candidate, context, bounds)
     local state = { actual_result = "not_run", completeness = "unknown", failure_point = "none", failure_reason = "none",
         execution_verdict = "not_run", contract_verdict = "not_run", effect_verdict = "not_run" }
     local outcomes = {}
-    local raw, execution_error = invoke_bounded_stage(candidate, "execution", context, bounds,
-        function() return candidate.execute(context) end)
+    local raw, execution_error = invoke_bounded_adapter(candidate, context, bounds)
     if raw == nil then
         local reason = execution_error == "execution_exception" and execution_error or "timeout_marker"
         state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
@@ -221,7 +258,7 @@ local function execute_candidate(candidate, context, bounds)
         outcomes.execution = {}
         return state, outcomes
     end
-    local outcome, reason = normalize_outcome(raw, bounds)
+    local outcome, reason = normalize_outcome(raw, bounds, candidate.bounds)
     if outcome == nil then
         state.execution_verdict, state.failure_point, state.failure_reason, state.actual_result =
             "fail", "execution", reason, reason
@@ -232,34 +269,13 @@ local function execute_candidate(candidate, context, bounds)
     state.actual_result, state.completeness = outcome.actual_result, outcome.completeness
     outcomes.execution = outcome
     outcomes.contract = { work_units = 1 }
-    local valid, contract_error = invoke_bounded_stage(candidate, "contract", context, bounds,
-        function() return candidate.validate(raw) end)
-    if valid == nil then
-        local reason = contract_error == "contract_exception" and contract_error or "timeout_marker"
-        state.contract_verdict, state.failure_point, state.failure_reason = "fail", "contract", reason
-        if reason == "timeout_marker" then state.actual_result = reason end
-        return state, outcomes
-    end
-    if valid ~= true then
+    if outcome.completeness ~= "complete" then
         state.contract_verdict, state.failure_point, state.failure_reason = "fail", "contract", "contract_rejected"
         return state, outcomes
     end
     state.contract_verdict = "pass"
     outcomes.effect = { work_units = 1 }
-    local matches, effect_error
-    if candidate.assess ~= nil then
-        matches, effect_error = invoke_bounded_stage(candidate, "effect", context, bounds,
-            function() return candidate.assess(raw, candidate.expected_result) end)
-    else
-        matches, effect_error = invoke_bounded_stage(candidate, "effect", context, bounds,
-            function() return state.actual_result == candidate.expected_result end)
-    end
-    if matches == nil then
-        local reason = effect_error == "effect_exception" and effect_error or "timeout_marker"
-        state.effect_verdict, state.failure_point, state.failure_reason, state.actual_result =
-            "fail", "effect", reason, reason
-        return state, outcomes
-    end
+    local matches = state.actual_result == candidate.expected_result
     state.effect_verdict = matches == true and "pass" or "mismatch"
     if state.effect_verdict ~= "pass" then
         state.failure_point, state.failure_reason = "effect", "effect_mismatch"
@@ -268,11 +284,13 @@ local function execute_candidate(candidate, context, bounds)
 end
 
 function runner.run(manifest, context)
-    local mods, manifest_err = validate_manifest(manifest, context)
+    local services_ok, services_err = validate_services(context)
+    if services_ok == nil then return nil, services_err end
+    local mods, manifest_err = validate_manifest(manifest)
     if mods == nil then return nil, manifest_err end
     local bounds, bounds_err = effective_bounds(manifest.bounds)
     if bounds == nil then return nil, bounds_err end
-    local candidates, candidates_err = ordered_candidates(manifest.candidates)
+    local candidates, candidates_err = ordered_candidates(manifest.candidates, context, bounds)
     if candidates == nil then return nil, candidates_err end
     if #candidates * #STAGES > bounds.max_output_rows then return nil, "output_rows_exceeded" end
     local lines = {}
@@ -304,6 +322,10 @@ function runner.run(manifest, context)
     return jsonl, { candidate_count = #candidates, output_rows = #lines, total_bytes = #jsonl }
 end
 
+function runner.run_native()
+    return nil, "trusted_runtime_attestation_missing"
+end
+
 function runner.verify_digest_adapter(adapter, vectors)
     if type(adapter) ~= "table" or type(adapter.hash) ~= "function"
         or type(adapter.verify) ~= "function" or type(vectors) ~= "table" or #vectors == 0 then
@@ -323,13 +345,6 @@ function runner.verify_digest_adapter(adapter, vectors)
         end
     end
     return true
-end
-
--- Phase 05.2 has no authenticated, terminable native producer. Keep the
--- executable API unreachable: candidate callbacks, verdict callbacks, and
--- digest callbacks are untrusted contract fixtures, not admission evidence.
-runner.run = function()
-    return nil, "trusted_runtime_attestation_missing"
 end
 
 runner.canonical_json = canonical_json
