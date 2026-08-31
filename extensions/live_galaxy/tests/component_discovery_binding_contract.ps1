@@ -79,6 +79,11 @@ if ($runtimeSource -notmatch 'require\("live_galaxy/lua/live_galaxy_component_di
     $runtimeSource -match 'require\("live_galaxy_component_discovery"\)') {
     throw 'Component discovery must use the extension-relative X4 module path.'
 }
+foreach ($retiredPattern in @('legacy_new', 'read_one_sector', 'get_clusters', 'MAX_SECTOR_SCAN')) {
+    if ($runtimeSource -match $retiredPattern) {
+        throw "Retired synthetic-sector discovery returned: $retiredPattern"
+    }
+}
 if (-not (Test-Path -LiteralPath $entryModule -PathType Leaf)) {
     throw "Missing runtime entrypoint: $entryModule"
 }
@@ -88,7 +93,21 @@ if ($entrySource -notmatch 'if trace_enabled and err == "facts_unsupported"' -or
     $entrySource -notmatch 'DISCOVERY_DIAGNOSTIC_CLASSES\[diagnostic_class\]') {
     throw 'The component diagnostic must remain opt-in and allowlisted.'
 }
-if ($entrySource -notmatch 'discard_discovery_frames\(\)' -or
-    $entrySource -notmatch 'connected = false\s*\r?\n\s*discard_discovery_frames\(\)') {
-    throw 'A lost pipe connection must discard every pending discovery frame.'
+foreach ($pattern in @(
+    'FIFO_CAPACITY_MESSAGES = 16',
+    'FIFO_CAPACITY_BYTES = 28800',
+    'FIFO_HIGH_WATER_MESSAGES = 12',
+    'FIFO_LOW_WATER_MESSAGES = 4',
+    'ENQUEUE_QUOTA_MESSAGES = 4',
+    'MAX_HEAD_RETRIES = 3',
+    'local_handoff_bytes',
+    'head\.bytes',
+    'discard_discovery_generation\(\)'
+)) {
+    if ($entrySource -notmatch $pattern) {
+        throw "Missing bounded FIFO ownership: $pattern"
+    }
+}
+if ($entrySource -notmatch 'connected = false\s*\r?\n\s*discard_discovery_generation\(\)') {
+    throw 'A lost pipe connection must discard the complete FIFO generation.'
 }
