@@ -246,7 +246,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05.1-06-PLAN.md — Enforce checked native allocation/work bounds and the fixed four-file Lua package guard.
+- [x] 05.1-06-PLAN.md — Enforce checked native allocation/work bounds and the fixed four-file Lua package guard.
 - [ ] 05.1-08-PLAN.md — Add incremental Rust generation staging and isolate legacy slice bounds.
 
 **Wave 5** *(blocked on Wave 4 completion)*

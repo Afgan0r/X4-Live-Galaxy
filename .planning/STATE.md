@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.1
 current_phase_name: Bounded Real Component Discovery
 status: executing
-stopped_at: Completed 05.1-05-PLAN.md
-last_updated: "2026-08-31T20:06:23.161Z"
+stopped_at: Completed 05.1-06-PLAN.md
+last_updated: "2026-08-31T20:33:37.017Z"
 last_activity: 2026-09-01
 last_activity_desc: Completed Phase 05.1 Plan 05 bounded canonical-frame FIFO
-state_head: 455d36cf886fd5b03d43842d4e2ed93a7606b847
+state_head: d53a5960255b78f4a88df675500fa749c924e644
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 40
-  completed_plans: 35
+  completed_plans: 36
   percent: 50
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.1 (Bounded Real Component Discovery) — READY TO EXECUTE
-Plan: 6 of 09 — ready for automated execution
+Plan: 7 of 09 — ready for automated execution
 Status: Executing approved gap-closure plans
 Last activity: 2026-09-01 — Completed Plan 05 bounded canonical-frame FIFO
 
@@ -87,6 +87,7 @@ Progress: [█████░░░░░] 50%
 | Phase 05.2 P07 | 49 min | 3 tasks | 9 files |
 | Phase 05.2 P10 | 1h | 3 tasks | 9 files |
 | Phase 05.1 P05 | 25m | 2 tasks | 6 files |
+| Phase 05.1 P06 | 29m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -166,6 +167,8 @@ Recent decisions affecting current work:
 - [Phase 05.1]: The 1800-byte value is a canonical encoded frame ceiling only; a generation has no aggregate frame or byte cap.
 - [Phase 05.1]: The Lua FIFO owns 16-message and 28800-byte concurrent capacities with independent watermarks and quotas.
 - [Phase 05.1]: A successful named-pipe write is recorded only as local handoff, never as Rust acknowledgement or admission.
+- [Phase 05.1]: Native discovery derives finite allocation and exact work limits from 129 members and the actual UniverseID size. — This replaces the superseded product count cap with source-owned measurable resource admission.
+- [Phase 05.1]: The Lua package authority guard accepts exactly four named production files. — Fixed paths prevent unrelated production code from acquiring the phase telemetry vocabulary.
 
 ### Pending Todos
 
@@ -198,6 +201,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-31T20:06:22.337Z
-Stopped at: Completed 05.1-05-PLAN.md
+Last session: 2026-08-31T20:33:36.197Z
+Stopped at: Completed 05.1-06-PLAN.md
 Resume file: None
