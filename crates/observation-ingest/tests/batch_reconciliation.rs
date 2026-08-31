@@ -1,4 +1,7 @@
-use observation_ingest::{AcceptedProjection, AdmissionOutcome, admit_batch};
+use observation_ingest::{
+    AcceptedProjection, AdmissionOutcome, GenerationLimits, GenerationProgress,
+    GenerationStager, admit_batch,
+};
 
 fn observation(entity_id: &str, _game_time: u64, version: u64) -> String {
     let asset_id = format!("asset:ship:{version}:{entity_id}");
@@ -21,6 +24,23 @@ fn observation(entity_id: &str, _game_time: u64, version: u64) -> String {
     }}
 }}"#
     )
+}
+
+fn streamed_observation(entity_id: &str, version: u64, generation: u64, sequence: u64) -> String {
+    let asset_id = format!("asset:station:{entity_id}");
+    format!(
+        r#"{{"type":"observation","scope":"runtime:sectors","entity_id":"{entity_id}","version":{version},"quality":"fresh","runtime_facts":{{"r":"x4_runtime","g":42,"q":"fresh","a":"available","s":[{{"i":"{entity_id}"}}],"x":[{{"i":"{asset_id}","p":"{entity_id}"}}],"c":[{{"i":"capacity:station:{entity_id}","p":"{asset_id}","v":42}}],"o":[{{"i":"ownership:station:{entity_id}","p":"{asset_id}","n":"faction:argon"}}]}},"generation":{generation},"sequence":{sequence}}}"#
+    )
+}
+
+fn streamed_marker(version: u64, generation: u64, sequence: u64) -> String {
+    format!(
+        r#"{{"type":"complete_marker","scope":"runtime:sectors","version":{version},"generation":{generation},"sequence":{sequence}}}"#
+    )
+}
+
+fn roomy_limits() -> GenerationLimits {
+    GenerationLimits::new(1_000_000, 1_000).expect("test limits must be valid")
 }
 
 const COMPLETE_V1: &str = r#"{
@@ -141,4 +161,119 @@ fn equal_version_changed_membership_preserves_the_completed_snapshot() {
 
     assert!(matches!(outcome, AdmissionOutcome::Rejected { .. }));
     assert_eq!(outcome.snapshot(), &before);
+}
+
+#[test]
+fn streamed_generation_commits_129_members_only_at_its_terminal_marker() {
+    let initial = initially_accepted();
+    let before = initial.snapshot().clone();
+    let mut stager = GenerationStager::new(initial, roomy_limits());
+
+    for index in 0..129_u64 {
+        let frame = streamed_observation(
+            &format!("sector:streamed_{index:03}"),
+            2,
+            7,
+            index + 1,
+        );
+        assert_eq!(
+            stager.stage_frame_at(&frame, 1_725_000_000_200),
+            GenerationProgress::Staged
+        );
+        assert_eq!(stager.accepted().snapshot(), &before);
+    }
+
+    let marker = streamed_marker(2, 7, 130);
+    assert_eq!(
+        stager.stage_frame_at(&marker, 1_725_000_000_200),
+        GenerationProgress::Admitted
+    );
+    assert_eq!(stager.accepted().snapshot().entity_ids().len(), 129);
+    assert_eq!(stager.admitted_generation_count(), 1);
+}
+
+#[test]
+fn streamed_generation_replay_is_idempotent() {
+    let frame = streamed_observation("sector:streamed", 2, 7, 1);
+    let marker = streamed_marker(2, 7, 2);
+    let mut stager = GenerationStager::new(initially_accepted(), roomy_limits());
+
+    assert_eq!(
+        stager.stage_frame_at(&frame, 1_725_000_000_200),
+        GenerationProgress::Staged
+    );
+    assert_eq!(
+        stager.stage_frame_at(&marker, 1_725_000_000_200),
+        GenerationProgress::Admitted
+    );
+    let once = stager.accepted().snapshot().clone();
+
+    assert_eq!(
+        stager.stage_frame_at(&frame, 1_725_000_000_200),
+        GenerationProgress::Staged
+    );
+    assert_eq!(
+        stager.stage_frame_at(&marker, 1_725_000_000_200),
+        GenerationProgress::Replay
+    );
+    assert_eq!(stager.accepted().snapshot(), &once);
+    assert_eq!(stager.admitted_generation_count(), 1);
+}
+
+#[test]
+fn streamed_generation_drops_gaps_and_mixed_identity_without_partial_admission() {
+    let initial = initially_accepted();
+    let before = initial.snapshot().clone();
+    let mut stager = GenerationStager::new(initial, roomy_limits());
+    let first = streamed_observation("sector:streamed_a", 2, 7, 1);
+    let gap = streamed_observation("sector:streamed_b", 2, 7, 3);
+
+    assert_eq!(
+        stager.stage_frame_at(&first, 1_725_000_000_200),
+        GenerationProgress::Staged
+    );
+    assert!(matches!(
+        stager.stage_frame_at(&gap, 1_725_000_000_200),
+        GenerationProgress::Rejected(_)
+    ));
+    assert_eq!(stager.accepted().snapshot(), &before);
+
+    let restart = streamed_observation("sector:streamed_a", 2, 8, 1);
+    let mixed = streamed_marker(3, 8, 2);
+    assert_eq!(
+        stager.stage_frame_at(&restart, 1_725_000_000_200),
+        GenerationProgress::Staged
+    );
+    assert!(matches!(
+        stager.stage_frame_at(&mixed, 1_725_000_000_200),
+        GenerationProgress::Rejected(_)
+    ));
+    assert_eq!(stager.accepted().snapshot(), &before);
+    assert_eq!(stager.admitted_generation_count(), 0);
+}
+
+#[test]
+fn streamed_generation_drops_exhausted_candidate_and_can_restart() {
+    let initial = initially_accepted();
+    let before = initial.snapshot().clone();
+    let limits = GenerationLimits::new(2_048, 1).expect("test limits must be valid");
+    let mut stager = GenerationStager::new(initial, limits);
+    let first = streamed_observation("sector:streamed_a", 2, 7, 1);
+    let second = streamed_observation("sector:streamed_b", 2, 7, 2);
+
+    assert_eq!(
+        stager.stage_frame_at(&first, 1_725_000_000_200),
+        GenerationProgress::Staged
+    );
+    assert!(matches!(
+        stager.stage_frame_at(&second, 1_725_000_000_200),
+        GenerationProgress::Rejected(_)
+    ));
+    assert_eq!(stager.accepted().snapshot(), &before);
+
+    let restart = streamed_observation("sector:streamed_c", 2, 8, 1);
+    assert_eq!(
+        stager.stage_frame_at(&restart, 1_725_000_000_200),
+        GenerationProgress::Staged
+    );
 }
