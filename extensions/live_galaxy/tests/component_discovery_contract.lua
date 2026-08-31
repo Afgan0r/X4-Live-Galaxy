@@ -144,6 +144,59 @@ function cases.accepts_the_new_64_station_bound_without_aggregate_frames()
     for _, payload in ipairs(payloads) do assert(#payload <= 1800) end
 end
 
+local function station_observation(index)
+    local stable_id = string.format("%03d", index)
+    local sector_id = "sector:station_" .. stable_id
+    local asset_id = "asset:station:" .. stable_id
+    return {
+        entity_id = asset_id,
+        source = "x4_runtime",
+        version = 1,
+        quality = "fresh",
+        runtime_facts = {
+            source = "x4_runtime",
+            quality = "fresh",
+            availability = "available",
+            sectors = { { id = sector_id } },
+            assets = { { id = asset_id, sector_id = sector_id } },
+            capacity = { { id = "capacity:station:" .. stable_id, asset_id = asset_id, value = index } },
+            ownership = {
+                { id = "ownership:station:" .. stable_id, asset_id = asset_id, owner_id = "faction:argon" },
+            },
+        },
+    }
+end
+
+function cases.streams_129_station_frames_in_order_without_an_aggregate_ceiling()
+    local observations = {}
+    for index = 1, 129 do observations[index] = station_observation(index) end
+    local adapter = { read_observations = function() return observations end }
+
+    local source = assert(telemetry.produce_observation_source(adapter, 7))
+    local payloads = {}
+    while true do
+        local frame = source.next_frame()
+        if frame == nil then break end
+        payloads[#payloads + 1] = frame
+    end
+
+    assert(#payloads == 129)
+    assert(payloads[1]:match('"entity_id":"asset:station:001"'))
+    assert(payloads[129]:match('"entity_id":"asset:station:129"'))
+    local aggregate_bytes = 0
+    for _, payload in ipairs(payloads) do aggregate_bytes = aggregate_bytes + #payload end
+    assert(aggregate_bytes > telemetry.MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES)
+end
+
+function cases.enforces_the_canonical_encoded_frame_ceiling_per_frame()
+    local ceiling = telemetry.MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES
+    assert(ceiling == 1800)
+    assert(telemetry.canonical_encoded_frame_utf8_bytes(string.rep("x", ceiling)) == ceiling)
+    local bytes, err = telemetry.canonical_encoded_frame_utf8_bytes(string.rep("x", ceiling + 1))
+    assert(bytes == nil)
+    assert(err == "observation_oversized")
+end
+
 function cases.rejects_a_syntactically_valid_owner_outside_the_declared_scope()
     local api = fake_api()
     local original_get_component_data = api.get_component_data

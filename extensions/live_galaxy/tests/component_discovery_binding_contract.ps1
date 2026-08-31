@@ -48,12 +48,23 @@ if ($source -match 'globals\.C\.') {
     throw 'Native FFI calls must use the module-local ffi.C binding.'
 }
 $telemetrySource = Get-Content -LiteralPath $telemetryModule -Raw
+foreach ($retiredPattern in @(
+    'MAX_DISCOVERY_OBSERVATION_FRAMES',
+    '#observations\s*>',
+    'MAX_DISCOVERY_OBSERVATION_BYTES'
+)) {
+    if ($telemetrySource -match $retiredPattern) {
+        throw "Retired aggregate telemetry responsibility returned: $retiredPattern"
+    }
+}
 foreach ($pattern in @(
-    'MAX_DISCOVERY_OBSERVATION_FRAMES = 64',
-    'MAX_DISCOVERY_OBSERVATION_BYTES = 1800'
+    'MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES = 1800',
+    'function telemetry\.canonical_encoded_frame_utf8_bytes',
+    'function telemetry\.produce_observation_source',
+    'source\.next_frame'
 )) {
     if ($telemetrySource -notmatch $pattern) {
-        throw "Missing protected telemetry bound: $pattern"
+        throw "Missing protected per-frame telemetry contract: $pattern"
     }
 }
 
