@@ -26,6 +26,18 @@ local function station(sector_id, stable_id, capacity)
     }
 end
 
+local function station_generation(count)
+    local observations = {}
+    for index = 1, count do
+        observations[index] = station(
+            "sector:" .. string.format("%03d", index),
+            string.format("%03d", index),
+            index
+        )
+    end
+    return observations
+end
+
 function cases.sanitizes_embedded_version_without_exposing_unavailable_values()
     assert(runtime.sanitize_embedded_version(nil) == "unavailable")
     assert(runtime.sanitize_embedded_version(42) == "unavailable")
@@ -319,6 +331,121 @@ function cases.runtime_keeps_multiple_station_frames_atomic_before_the_marker()
     assert(second_kind == "observation" and second:match("asset:station:20"))
     assert(marker_kind == "complete_marker")
     isolated_runtime.set_discovery_adapter(nil)
+end
+
+function cases.runtime_drains_129_immutable_frames_through_bounded_fifo_resources()
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function() return station_generation(129) end,
+    })
+    local accepted = {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, frame)
+            accepted[#accepted + 1] = frame
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    local completed
+    for _ = 1, 400 do
+        assert(select(2, isolated_runtime.handle_tick()) == "sent")
+        local snapshot = isolated_runtime.fifo_snapshot()
+        if snapshot.completed_generations == 1 then
+            completed = snapshot
+            break
+        end
+    end
+
+    assert(completed ~= nil)
+    assert(completed.depth_messages == 0 and completed.depth_bytes == 0)
+    assert(completed.enqueued_messages == 129)
+    assert(completed.local_handoff_messages == 129)
+    assert(completed.enqueued_bytes == completed.local_handoff_bytes)
+    assert(completed.max_depth_messages < 129)
+    local observations, markers = 0, 0
+    for _, frame in ipairs(accepted) do
+        if frame:match('"type":"observation"') then observations = observations + 1 end
+        if frame:match('"type":"complete_marker"') then markers = markers + 1 end
+    end
+    assert(observations == 129 and markers == 1)
+end
+
+function cases.runtime_retries_the_same_fifo_head_without_double_accounting()
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function() return station_generation(3) end,
+    })
+    local deferred, attempted = false, {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, frame)
+            attempted[#attempted + 1] = frame
+            if frame:match('"type":"observation"') and not deferred then
+                deferred = true
+                return false
+            end
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    for _ = 1, 4 do isolated_runtime.handle_tick() end
+    local held = isolated_runtime.fifo_snapshot()
+    assert(held.depth_messages > 0)
+    assert(held.local_handoff_messages == 0)
+    assert(select(2, isolated_runtime.handle_tick()) == "sent")
+    local released = isolated_runtime.fifo_snapshot()
+    assert(released.enqueued_messages == held.enqueued_messages)
+    assert(released.enqueued_bytes == held.enqueued_bytes)
+    assert(released.local_handoff_messages == 1)
+    assert(attempted[#attempted] == attempted[#attempted - 1])
+end
+
+function cases.runtime_discards_fifo_generation_and_restarts_after_reconnect()
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function() return station_generation(3) end,
+    })
+    local failed = false
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, frame)
+            if frame:match('"type":"observation"') and not failed then
+                failed = true
+                error("connection lost")
+            end
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    for _ = 1, 4 do isolated_runtime.handle_tick() end
+    local discarded = isolated_runtime.fifo_snapshot()
+    assert(discarded.depth_messages == 0 and discarded.depth_bytes == 0)
+    local hello, hello_kind, generation = isolated_runtime.next_payload()
+    assert(hello_kind == "hello" and generation == 2)
+    assert(hello:match('"generation":2'))
+    local first, _, first_generation, first_sequence = isolated_runtime.next_payload()
+    assert(first ~= nil and first_generation == 2 and first_sequence == 1)
+end
+
+function cases.runtime_never_marks_an_incomplete_or_health_only_generation()
+    local isolated_runtime = fresh_runtime()
+    isolated_runtime.set_discovery_adapter({
+        read_observations = function() return nil, "facts_unsupported" end,
+    })
+    local accepted = {}
+    isolated_runtime.set_pipe_adapter({
+        write_raw = function(_, frame)
+            accepted[#accepted + 1] = frame
+            return true
+        end,
+        disconnect = function() end,
+    })
+
+    for _ = 1, 20 do assert(select(2, isolated_runtime.handle_tick()) == "sent") end
+    for _, frame in ipairs(accepted) do
+        assert(not frame:match('"type":"complete_marker"'))
+    end
 end
 
 function cases.runtime_discards_pending_station_frames_after_a_lost_connection()
