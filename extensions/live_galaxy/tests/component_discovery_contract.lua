@@ -28,7 +28,7 @@ local function fake_api(count)
     return {
         faction_id = "faction:argon",
         universe_id_bytes = UNIVERSE_ID_BYTES,
-        native_policy = native_policy(count or #stations),
+        native_policy = native_policy(129),
         count_stations = function()
             calls.count = calls.count + 1
             calls.order[#calls.order + 1] = "count"
@@ -158,9 +158,10 @@ function cases.emits_sorted_real_station_frames_only_after_all_members_validate(
     assert(first.assets[1].id == "asset:station:10")
     assert(second.assets[1].id == "asset:station:20")
     assert(calls.convert == 2 and calls.convert64 == 2 and calls.metadata == 2 and calls.capacity == 2)
-    assert(calls.order[1] == "convert" and calls.order[2] == "convert64")
+    assert(calls.order[1] == "count" and calls.order[2] == "fill")
     assert(calls.order[3] == "convert" and calls.order[4] == "convert64")
-    assert(calls.order[5] == "metadata" and calls.order[6] == "capacity")
+    assert(calls.order[5] == "convert" and calls.order[6] == "convert64")
+    assert(calls.order[7] == "metadata" and calls.order[8] == "capacity")
 end
 
 function cases.uses_a_native_faction_token_and_canonicalizes_owner_facts()
@@ -199,7 +200,7 @@ function cases.serializes_each_station_in_its_own_compact_envelope()
     assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"}%]'))
 end
 
-function cases.accepts_the_new_64_station_bound_without_aggregate_frames()
+function cases.accepts_64_stations_under_the_resource_derived_policy()
     local stations = {}
     for index = 1, 64 do stations[index] = string.format("station:%02d", index) end
     local api = {
