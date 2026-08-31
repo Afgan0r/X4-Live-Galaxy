@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.1
 current_phase_name: Bounded Real Component Discovery
 status: executing
-stopped_at: Completed 05.1-06-PLAN.md
-last_updated: "2026-08-31T20:33:37.017Z"
+stopped_at: Completed 05.1-08-PLAN.md
+last_updated: "2026-08-31T21:29:10.939Z"
 last_activity: 2026-09-01
-last_activity_desc: Completed Phase 05.1 Plan 05 bounded canonical-frame FIFO
-state_head: d53a5960255b78f4a88df675500fa749c924e644
+last_activity_desc: Completed Phase 05.1 Plan 08 incremental Rust generation staging
+state_head: 18682f5463b6c3d9b70a62b713e9cfe8531901c4
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 40
-  completed_plans: 36
+  completed_plans: 37
   percent: 50
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.1 (Bounded Real Component Discovery) — READY TO EXECUTE
-Plan: 7 of 09 — ready for automated execution
+Plan: 8 of 09 — ready for automated execution
 Status: Executing approved gap-closure plans
-Last activity: 2026-09-01 — Completed Plan 05 bounded canonical-frame FIFO
+Last activity: 2026-09-01 — Completed Plan 08 incremental Rust generation staging
 
 Progress: [█████░░░░░] 50%
 
@@ -88,6 +88,7 @@ Progress: [█████░░░░░] 50%
 | Phase 05.2 P10 | 1h | 3 tasks | 9 files |
 | Phase 05.1 P05 | 25m | 2 tasks | 6 files |
 | Phase 05.1 P06 | 29m | 2 tasks | 6 files |
+| Phase 05.1 P08 | 41m | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -169,6 +170,8 @@ Recent decisions affecting current work:
 - [Phase 05.1]: A successful named-pipe write is recorded only as local handoff, never as Rust acknowledgement or admission.
 - [Phase 05.1]: Native discovery derives finite allocation and exact work limits from 129 members and the actual UniverseID size. — This replaces the superseded product count cap with source-owned measurable resource admission.
 - [Phase 05.1]: The Lua package authority guard accepts exactly four named production files. — Fixed paths prevent unrelated production code from acquiring the phase telemetry vocabulary.
+- [Phase 05.1]: Incremental generation candidates reconcile from their exact staged canonical membership rather than legacy aggregate ceilings. — This preserves strict atomic admission while allowing 129-plus streamed frames.
+- [Phase 05.1]: Restart callers restore the last admitted generation explicitly. — Generation identity cannot be inferred safely from unrelated snapshot fields.
 
 ### Pending Todos
 
@@ -201,6 +204,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-31T20:33:36.197Z
-Stopped at: Completed 05.1-06-PLAN.md
+Last session: 2026-08-31T21:29:10.167Z
+Stopped at: Completed 05.1-08-PLAN.md
 Resume file: None

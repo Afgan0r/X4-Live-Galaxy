@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 11
 waived_count: 0
 fixed_count: 0
-total_count: 9
-last_updated: 2026-08-30T00:28:28.726Z
+total_count: 11
+last_updated: 2026-08-31T21:28:12.451Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,8 @@ last_updated: 2026-08-30T00:28:28.726Z
 | 7 | 05.2 | deviation | .planning/ROADMAP.md |  | Corrected roadmap progress after PLAN-CHECK was miscounted as an executable plan. | open |  | 2026-08-30T00:07:54.818Z |  |
 | 8 | 05.2 | deviation | tools/x4-verification/tests/candidate_build_contract.ps1 |  | Normalized one-item PowerShell validation collections before count comparisons. | open |  | 2026-08-30T00:28:28.330Z |  |
 | 9 | 05.2 | deviation | tools/x4-verification/build-candidate-extension.ps1 |  | Summed generated-file bytes explicitly for ordered dictionary entries. | open |  | 2026-08-30T00:28:28.726Z |  |
+| 10 | 05.1 | deviation | crates/observation-ingest/src/generation.rs |  | Explicit resume generation was added to preserve restart replay and stale-generation rejection. | open |  | 2026-08-31T21:28:12.067Z |  |
+| 11 | 05.1 | deviation | crates/observation-ingest/tests/batch_bounds.rs |  | Task 2 began green because the Task 1 tracer already supplied streamed legacy-bound isolation. | open |  | 2026-08-31T21:28:12.451Z |  |
 
 ````json
 [
@@ -133,6 +135,30 @@ last_updated: 2026-08-30T00:28:28.726Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-30T00:28:28.726Z",
+    "resolved_at": null
+  },
+  {
+    "id": 10,
+    "kind": "deviation",
+    "phase": "05.1",
+    "file": "crates/observation-ingest/src/generation.rs",
+    "line": null,
+    "description": "Explicit resume generation was added to preserve restart replay and stale-generation rejection.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-31T21:28:12.067Z",
+    "resolved_at": null
+  },
+  {
+    "id": 11,
+    "kind": "deviation",
+    "phase": "05.1",
+    "file": "crates/observation-ingest/tests/batch_bounds.rs",
+    "line": null,
+    "description": "Task 2 began green because the Task 1 tracer already supplied streamed legacy-bound isolation.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-08-31T21:28:12.451Z",
     "resolved_at": null
   }
 ]
