@@ -4,8 +4,19 @@ local discovery = require("live_galaxy_component_discovery")
 local telemetry = require("live_galaxy_telemetry")
 local cases = {}
 
+local UNIVERSE_ID_BYTES = 8
+
+local function native_policy(member_count, work_units)
+    return {
+        max_allocation_bytes = member_count * UNIVERSE_ID_BYTES,
+        max_work_units = work_units or (2 + 4 * member_count),
+    }
+end
+
 local function fake_api(count)
     local calls = {
+        count = 0,
+        fill = 0,
         convert = 0,
         convert64 = 0,
         metadata = 0,
@@ -16,12 +27,20 @@ local function fake_api(count)
     local stations = { "station:20", "station:10" }
     return {
         faction_id = "faction:argon",
-        count_stations = function() return count or #stations end,
+        universe_id_bytes = UNIVERSE_ID_BYTES,
+        native_policy = native_policy(count or #stations),
+        count_stations = function()
+            calls.count = calls.count + 1
+            calls.order[#calls.order + 1] = "count"
+            return count or #stations
+        end,
         new_buffer = function(_, size)
             calls.allocations = calls.allocations + 1
             return {}
         end,
         fill_stations = function(_, buffer, size)
+            calls.fill = calls.fill + 1
+            calls.order[#calls.order + 1] = "fill"
             for index = 0, size - 1 do buffer[index] = stations[index + 1] end
             return size
         end,
@@ -51,13 +70,82 @@ local function fake_api(count)
 end
 
 function cases.validates_the_complete_owner_scope_before_component_reads()
-    local api, calls = fake_api(65)
+    local api, calls = fake_api(130)
     local observation, err = discovery.new(api).read_observation(1)
 
     assert(observation == nil)
     assert(err == "enumeration_overflow")
     assert(calls.allocations == 0)
     assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
+end
+
+function cases.derives_the_pre_run_policy_from_129_members_and_universe_id_size()
+    local policy = assert(discovery.derive_pre_run_native_policy(UNIVERSE_ID_BYTES))
+
+    assert(policy.max_allocation_bytes == 129 * UNIVERSE_ID_BYTES)
+    assert(policy.max_work_units == 2 + 4 * 129)
+    assert(discovery.derive_pre_run_native_policy(0) == nil)
+    assert(discovery.derive_pre_run_native_policy(1.5) == nil)
+    assert(discovery.derive_pre_run_native_policy(math.huge) == nil)
+end
+
+function cases.accepts_the_exact_allocation_and_work_bound()
+    local api, calls = fake_api()
+    api.native_policy = native_policy(2, 10)
+
+    local observations = assert(discovery.new(api).read_observations(1))
+
+    assert(#observations == 2)
+    assert(calls.count == 1 and calls.fill == 1)
+    assert(#calls.order == 10)
+    assert(calls.order[1] == "count" and calls.order[2] == "fill")
+end
+
+function cases.rejects_one_byte_over_before_allocation_or_fill()
+    local api, calls = fake_api()
+    api.native_policy = {
+        max_allocation_bytes = 2 * UNIVERSE_ID_BYTES - 1,
+        max_work_units = 10,
+    }
+
+    local observations, err = discovery.new(api).read_observations(1)
+
+    assert(observations == nil and err == "enumeration_overflow")
+    assert(calls.count == 1)
+    assert(calls.allocations == 0 and calls.fill == 0)
+    assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
+end
+
+function cases.rejects_one_work_unit_over_before_allocation_or_fill()
+    local api, calls = fake_api()
+    api.native_policy = native_policy(2, 9)
+
+    local observations, err = discovery.new(api).read_observations(1)
+
+    assert(observations == nil and err == "enumeration_overflow")
+    assert(calls.count == 1)
+    assert(calls.allocations == 0 and calls.fill == 0)
+    assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
+end
+
+function cases.rejects_absent_or_invalid_policy_before_the_count_call()
+    local invalid_policies = {
+        nil,
+        {},
+        { max_allocation_bytes = 16, max_work_units = 10, fallback = true },
+        { max_allocation_bytes = 0, max_work_units = 10 },
+        { max_allocation_bytes = 16, max_work_units = 1.5 },
+    }
+
+    for index = 1, 5 do
+        local api, calls = fake_api()
+        api.native_policy = invalid_policies[index]
+        local observations, err = discovery.new(api).read_observations(1)
+
+        assert(observations == nil and err == "enumeration_unavailable")
+        assert(calls.count == 0 and calls.allocations == 0 and calls.fill == 0)
+        assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
+    end
 end
 
 function cases.emits_sorted_real_station_frames_only_after_all_members_validate()
@@ -116,6 +204,8 @@ function cases.accepts_the_new_64_station_bound_without_aggregate_frames()
     for index = 1, 64 do stations[index] = string.format("station:%02d", index) end
     local api = {
         faction_id = "faction:argon",
+        universe_id_bytes = UNIVERSE_ID_BYTES,
+        native_policy = native_policy(#stations),
         count_stations = function() return #stations end,
         new_buffer = function() return {} end,
         fill_stations = function(_, buffer)

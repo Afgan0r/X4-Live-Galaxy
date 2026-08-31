@@ -21,6 +21,11 @@ foreach ($pattern in @(
     'C\.GetNumAllFactionStations',
     'C\.GetAllFactionStations',
     'UniverseID\[\?\]',
+    'ffi\.sizeof\("UniverseID"\)',
+    'PRE_RUN_OWNER_MEMBER_EVIDENCE = 129',
+    'function discovery\.derive_pre_run_native_policy\(universe_id_bytes\)',
+    'max_allocation_bytes',
+    'max_work_units',
     'tonumber\(raw_count\)',
     'tonumber\(raw_filled\)',
     'for index = 0, count - 1 do',
@@ -33,7 +38,6 @@ foreach ($pattern in @(
     'C\.GetPeopleCapacity\(component64, "", false\)',
     'native_faction_id = "argon"',
     'canonical_owner_id = function',
-    'MAX_OWNER_STATIONS = 64',
     'function adapter\.read_observations\(_, version\)',
     'function adapter\.diagnostic_class\(\)',
     'metadata_unavailable',
@@ -43,6 +47,18 @@ foreach ($pattern in @(
     'pcall'
 )) {
     if ($source -notmatch $pattern) { throw "Missing protected binding: $pattern" }
+}
+foreach ($retiredPattern in @(
+    'MAX_OWNER_STATIONS',
+    'legacy_new',
+    'read_one_sector',
+    'get_clusters',
+    'MAX_SECTOR_SCAN',
+    'selection_fallback'
+)) {
+    if ($source -match $retiredPattern) {
+        throw "Retired unbounded or synthetic discovery path returned: $retiredPattern"
+    }
 }
 if ($source -match 'globals\.C\.') {
     throw 'Native FFI calls must use the module-local ffi.C binding.'
