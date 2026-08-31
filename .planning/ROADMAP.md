@@ -242,7 +242,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05.1-05-PLAN.md — Remove both Lua telemetry aggregate ceilings and prove the bounded immutable-frame FIFO.
+- [x] 05.1-05-PLAN.md — Remove both Lua telemetry aggregate ceilings and prove the bounded immutable-frame FIFO.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

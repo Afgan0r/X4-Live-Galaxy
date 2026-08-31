@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.1
 current_phase_name: Bounded Real Component Discovery
 status: executing
-stopped_at: Phase 05.1 plans 05-09 passed the independent plan checker; execution starts at Plan 05
-last_updated: "2026-08-31T19:25:11.875Z"
+stopped_at: Completed 05.1-05-PLAN.md
+last_updated: "2026-08-31T20:06:23.161Z"
 last_activity: 2026-09-01
-last_activity_desc: Revised Phase 05.1 gap plans through three checker iterations and obtained PASS
-state_head: daf02811ffb6606598a310a7f8b8aa9ac5477362
+last_activity_desc: Completed Phase 05.1 Plan 05 bounded canonical-frame FIFO
+state_head: 455d36cf886fd5b03d43842d4e2ed93a7606b847
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 40
-  completed_plans: 34
+  completed_plans: 35
   percent: 50
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.1 (Bounded Real Component Discovery) — READY TO EXECUTE
-Plan: 05 of 09 — ready for automated execution
+Plan: 6 of 09 — ready for automated execution
 Status: Executing approved gap-closure plans
-Last activity: 2026-09-01 — Revised Phase 05.1 gap plans through three checker iterations and obtained PASS
+Last activity: 2026-09-01 — Completed Plan 05 bounded canonical-frame FIFO
 
 Progress: [█████░░░░░] 50%
 
@@ -86,6 +86,7 @@ Progress: [█████░░░░░] 50%
 | Phase 05.2 P06 | 27min | 3 tasks | 10 files |
 | Phase 05.2 P07 | 49 min | 3 tasks | 9 files |
 | Phase 05.2 P10 | 1h | 3 tasks | 9 files |
+| Phase 05.1 P05 | 25m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,9 @@ Recent decisions affecting current work:
 - [Phase 05.2]: Arm the descendant execution timeout only after a separate bounded readiness handshake succeeds.
 - [Phase 05.2]: Use one canonical full-graph verifier for public and inert candidate packages with explicit native-binding policy.
 - [Phase 05.2]: Gate every full-file read and digest from metadata before allocation, then revalidate identity after reading.
+- [Phase 05.1]: The 1800-byte value is a canonical encoded frame ceiling only; a generation has no aggregate frame or byte cap.
+- [Phase 05.1]: The Lua FIFO owns 16-message and 28800-byte concurrent capacities with independent watermarks and quotas.
+- [Phase 05.1]: A successful named-pipe write is recorded only as local handoff, never as Rust acknowledgement or admission.
 
 ### Pending Todos
 
@@ -194,6 +198,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-31T15:17:48.230Z
-Stopped at: Phase 05.2 complete; Phase 05.1 Plan 05 requires revision after plan review
-Resume file: .planning/phases/05.1-bounded-real-component-discovery-inserted/.continue-here.md
+Last session: 2026-08-31T20:06:22.337Z
+Stopped at: Completed 05.1-05-PLAN.md
+Resume file: None
