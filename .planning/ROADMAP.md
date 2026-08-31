@@ -227,15 +227,35 @@ Plans:
 
 **Research**: Required — inspect installed vanilla X4 first, then the X4 Live reference call shapes and exact installed mod/version evidence; treat runtime semantics as unknown until the disposable probe.
 **Requirement mapping note**: This conditional evidence closure strengthens the existing OBS-06 / D-09 contract and introduces no new milestone requirement ID.
-**Plans:** 3 completed, 1 superseded, 1 queued
+**Plans:** 3 completed, 1 superseded, 5 queued
 
 Plans:
+**Wave 1**
 
 - [x] 05.1-01-PLAN.md
 - [x] 05.1-02-PLAN.md
-- [x] 05.1-03-PLAN.md
 - [ ] 05.1-04-PLAN.md — Superseded by 05.1-05; do not execute its 64-station cap.
-- [ ] 05.1-05-PLAN.md — Measure native/transport budgets and stream complete owner scopes incrementally.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 05.1-03-PLAN.md
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05.1-05-PLAN.md — Remove both Lua telemetry aggregate ceilings and prove the bounded immutable-frame FIFO.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05.1-06-PLAN.md — Enforce checked native allocation/work bounds and the fixed four-file Lua package guard.
+- [ ] 05.1-08-PLAN.md — Add incremental Rust generation staging and isolate legacy slice bounds.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 05.1-09-PLAN.md — Connect marker-owned bridge admission, listener overflow, and concurrent backpressure.
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 05.1-07-PLAN.md — Run the final owner X4 checkpoint, record durable budget decisions, and execute closure gates.
 
 ### Phase 6: Correlated Reports and Diagnostics
 

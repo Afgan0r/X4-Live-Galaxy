@@ -1,28 +1,26 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-31T15:17:48.230Z",
+  "timestamp": "2026-08-31T19:25:11.875Z",
   "phase": "05.1",
   "phase_name": "bounded-real-component-discovery-inserted",
   "phase_dir": ".planning/phases/05.1-bounded-real-component-discovery-inserted",
   "plan": 5,
   "task": 0,
-  "total_tasks": 3,
-  "status": "paused",
+  "total_tasks": 8,
+  "status": "executing",
   "completed_tasks": [
     {"id": 1, "name": "Complete Phase 05.1 Plan 01", "status": "done", "commit": "ac5b5d0"},
     {"id": 2, "name": "Complete Phase 05.1 Plan 02", "status": "done", "commit": "1e0b767"},
     {"id": 3, "name": "Complete Phase 05.1 Plan 03", "status": "done", "commit": "e245e7e"},
-    {"id": 4, "name": "Complete prerequisite Phase 05.2", "status": "done", "commit": "f7c618e"}
+    {"id": 4, "name": "Complete prerequisite Phase 05.2", "status": "done", "commit": "f7c618e"},
+    {"id": 5, "name": "Revise Phase 05.1 gap plans and obtain independent checker PASS", "status": "done", "commit": null}
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "Revise Phase 05.1 Plan 05 to resolve both plan-review blockers", "status": "not_started"},
-    {"id": 6, "name": "Re-run the GSD plan checker and require PASS", "status": "not_started"},
-    {"id": 7, "name": "Execute Phase 05.1 Plan 05 through GSD", "status": "not_started"},
-    {"id": 8, "name": "Run the owner-controlled disposable X4 normal-speed and SETA verification", "status": "not_started"}
+    {"id": 6, "name": "Execute automated Phase 05.1 Plans 05, 06, 08, and 09 through GSD", "status": "not_started"},
+    {"id": 7, "name": "Run the owner-controlled disposable X4 normal-speed and SETA verification in Plan 07", "status": "not_started"},
+    {"id": 8, "name": "Run final verification, review, security, Nyquist, and phase closure", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "Plan 05 does not yet own every production 64/128/2 KiB ceiling needed for a complete owner scope above 64 stations.", "type": "technical", "workaround": "Revise the plan file scope and executable contracts before implementation."},
-    {"description": "The enqueue/write byte oracle does not yet define one identical serialized-byte unit.", "type": "technical", "workaround": "Define framed-wire byte accounting in Plan 05 and its contracts before implementation."},
     {"description": "Generic GSD progress routing selects lower-numbered incomplete Phase 1 even though its remaining X4 proof depends on Phase 05.1.", "type": "technical", "workaround": "Use explicit `$gsd-plan-phase 05.1 --gaps`, then `$gsd-execute-phase 05.1`; return to Phase 1 after 05.1 closes."}
   ],
   "async_jobs": [],
@@ -32,10 +30,10 @@
   "decisions": [
     {"decision": "Phase 05.1 is the next prerequisite after Phase 05.2, before returning to Phase 1 Plan 09.", "rationale": "Phase 1's remaining X4 proof depends on the real component-discovery path owned by Phase 05.1.", "phase": "05.1"},
     {"decision": "Phase 05.1 Plan 04 is superseded by Plan 05; Phase 1 Plans 10 and 11 are superseded by the inserted Phase 05.1 work.", "rationale": "The roadmap already retired those designs, but their frontmatter did not expose machine-readable supersession.", "phase": "05.1"},
-    {"decision": "Do not execute Plan 05 until the plan checker passes.", "rationale": "The current review identifies two concrete blockers that make the promised >64 complete scope and byte-rate proof unsound.", "phase": "05.1"},
+    {"decision": "Execute only the independently approved Plans 05, 06, 08, and 09 before the human-only Plan 07 checkpoint.", "rationale": "The final checker passed the bounded native, telemetry, ingress, byte-accounting, marker, and verification contracts after three revision iterations.", "phase": "05.1"},
     {"decision": "Redesign the autonomous workflow after Phases 1, 5.1, and 5.2 are closed.", "rationale": "The current broad delegation, review-loop, and test-layer flow was materially inefficient.", "phase": "workflow"}
   ],
   "uncommitted_files": [],
-  "next_action": "Run `$gsd-plan-phase 05.1 --gaps`, resolve both blockers in 05.1-PLAN-REVIEW.md, and require a passing plan review before execution.",
-  "context_notes": "Phase 05.2 is fully complete at f7c618e. No code or tests were changed in this pause session. Metadata now excludes the three genuinely superseded plans and normalizes the Plan 05 review filename. The generic lowest-incomplete-phase router still points at Phase 1; this is not the executable priority because Phase 1 Plan 09 depends on Phase 05.1. No X4, bridge, watcher, async job, save, or private artifact was started or touched in this session."
+  "next_action": "Commit the independently approved Phase 05.1 planning checkpoint, then run `$gsd-execute-phase 05.1 --gaps-only --auto --no-transition` for Plans 05, 06, 08, and 09.",
+  "context_notes": "Phase 05.2 is fully complete at f7c618e. Phase 05.1 Plans 05-09 passed the final independent checker after three revision iterations. Plans 05, 06, 08, and 09 are automated; Plan 07 is the only human-controlled X4 normal-speed and SETA gate. Generic lowest-incomplete-phase routing still points at Phase 1, so use explicit Phase 05.1 routing. No X4, bridge, watcher, async job, save, or private artifact was started or touched during planning."
 }
