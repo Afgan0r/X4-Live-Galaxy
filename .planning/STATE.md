@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-current_phase: 1
-current_phase_name: Read-Only Observation Spine
-status: planning
-stopped_at: Phase 05.2 complete, ready to plan Phase 1
-last_updated: "2026-08-31T15:05:03.750Z"
+current_phase: 05.1
+current_phase_name: Bounded Real Component Discovery (INSERTED)
+status: paused
+stopped_at: Phase 05.2 complete; Phase 05.1 Plan 05 requires revision after plan review
+last_updated: "2026-08-31T15:17:48.230Z"
 last_activity: 2026-08-31
-last_activity_desc: Phase 05.2 complete, transitioned to Phase 1
-state_head: 1ae2cc43afbfeddfcf3fa50ea0afa34ba9da691f
+last_activity_desc: Corrected GSD routing metadata and prepared Phase 05.1 handoff
+state_head: f7c618e7bfb913399c2baf9b274cf2b927fe7a48
 progress:
   total_phases: 10
   completed_phases: 5
-  total_plans: 40
+  total_plans: 36
   completed_plans: 34
   percent: 50
 ---
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-28)
 
 **Core value:** Factions pursue coherent, distinct, long-lived strategies while X4 remains authoritative and every proposed effect stays observable, recoverable, and bounded by deterministic validation.
-**Current focus:** Phase 1 — Read-Only Observation Spine
+**Current focus:** Phase 05.1 — Bounded Real Component Discovery
 
 ## Current Position
 
-Phase: 1 — Read-Only Observation Spine
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-31 — Phase 05.2 complete, transitioned to Phase 1
+Phase: 05.1 — Bounded Real Component Discovery
+Plan: 05 — revision required before execution
+Status: Paused for handoff after plan review found two blockers
+Last activity: 2026-08-31 — Corrected GSD routing metadata and prepared Phase 05.1 handoff
 
 Progress: [█████░░░░░] 50%
 
@@ -194,6 +194,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-31T15:05:03.750Z
-Stopped at: Phase 05.2 complete, ready to plan Phase 1
-Resume file: none; Phase 05.2 is complete
+Last session: 2026-08-31T15:17:48.230Z
+Stopped at: Phase 05.2 complete; Phase 05.1 Plan 05 requires revision after plan review
+Resume file: .planning/phases/05.1-bounded-real-component-discovery-inserted/.continue-here.md
