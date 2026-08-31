@@ -3,8 +3,8 @@ local telemetry = {}
 local normalize = require("live_galaxy/lua/live_galaxy_normalize")
 
 local MAX_SECTIONS_PER_CYCLE = 1
-local MAX_DISCOVERY_OBSERVATION_FRAMES = 64
-local MAX_DISCOVERY_OBSERVATION_BYTES = 1800
+local MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES = 1800
+telemetry.MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES = MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES
 
 local function bounded_limit(limit)
     if type(limit) ~= "number" or limit < 1 then
@@ -56,26 +56,61 @@ function telemetry.produce_observation(adapter, version)
     return normalize.serialize_telemetry(observation)
 end
 
-function telemetry.produce_observations(adapter, version)
+function telemetry.canonical_encoded_frame_utf8_bytes(frame)
+    if type(frame) ~= "string" then return nil, "observation_invalid" end
+    local bytes = #frame
+    if bytes > MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES then
+        return nil, "observation_oversized"
+    end
+    return bytes
+end
+
+function telemetry.produce_observation_source(adapter, version)
     if type(adapter) == "table" and type(adapter.read_observations) == "function" then
         local observations, err = adapter.read_observations(adapter, version)
-        if type(observations) ~= "table" or #observations == 0
-            or #observations > MAX_DISCOVERY_OBSERVATION_FRAMES then
+        if type(observations) ~= "table" or #observations == 0 then
             return nil, err or "observation_unavailable"
         end
-        local serialized = {}
-        for _, observation in ipairs(observations) do
+        local index = 0
+        local source = {}
+        function source.next_frame()
+            index = index + 1
+            local observation = observations[index]
+            if observation == nil then return nil end
             local frame, normalize_err = normalize.serialize_telemetry(observation)
-            if frame == nil or #frame > MAX_DISCOVERY_OBSERVATION_BYTES then
-                return nil, normalize_err or "observation_oversized"
-            end
-            serialized[#serialized + 1] = frame
+            if frame == nil then return nil, normalize_err end
+            local bytes, bytes_err = telemetry.canonical_encoded_frame_utf8_bytes(frame)
+            if bytes == nil then return nil, bytes_err end
+            return frame, bytes
         end
-        return serialized
+        return source
     end
     local observation, err = telemetry.produce_observation(adapter, version)
     if observation == nil then return nil, err end
-    return { observation }
+    local emitted = false
+    local source = {}
+    function source.next_frame()
+        if emitted then return nil end
+        emitted = true
+        local bytes, bytes_err = telemetry.canonical_encoded_frame_utf8_bytes(observation)
+        if bytes == nil then return nil, bytes_err end
+        return observation, bytes
+    end
+    return source
+end
+
+function telemetry.produce_observations(adapter, version)
+    local source, err = telemetry.produce_observation_source(adapter, version)
+    if source == nil then return nil, err end
+    local serialized = {}
+    while true do
+        local frame, frame_err = source.next_frame()
+        if frame == nil then
+            if frame_err ~= nil then return nil, frame_err end
+            return serialized
+        end
+        serialized[#serialized + 1] = frame
+    end
 end
 
 return telemetry
