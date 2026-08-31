@@ -15,6 +15,13 @@ $candidatePackageRuntimeContract = Join-Path $root 'tools/x4-verification/tests/
 $candidatePackageAdversarial = Join-Path $root 'tools/x4-verification/tests/candidate_package_adversarial.ps1'
 $ownerAuthorityContract = Join-Path $root 'tools/x4-verification/tests/owner_authority_contract.ps1'
 $ownerAuthorityAdversarial = Join-Path $root 'tools/x4-verification/tests/owner_authority_adversarial.ps1'
+$componentDiscoveryGuard = Join-Path $root 'scripts/component_discovery_package_guard.ps1'
+$componentDiscoveryProductionPaths = @(
+    'extensions/live_galaxy/lua/live_galaxy_component_discovery.lua',
+    'extensions/live_galaxy/lua/live_galaxy_x4_discovery.lua',
+    'extensions/live_galaxy/lua/live_galaxy_runtime.lua',
+    'extensions/live_galaxy/lua/live_galaxy_telemetry.lua'
+)
 $evidenceChainAdversarial = Join-Path $root 'tools/x4-verification/tests/evidence_chain_adversarial.ps1'
 $candidateBuilder = Join-Path $root 'tools/x4-verification/build-candidate-extension.ps1'
 $candidateMatrix = Join-Path $root 'tests/x4-candidates/phase-05.1-candidates.v1.json'
@@ -372,22 +379,22 @@ if ($Suite -in @('all', 'x4-package-conformance', 'x4-verification')) {
 }
 
 if ($Suite -eq 'component_discovery_guard') {
-    & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -SelfTest
+    & powershell -NoProfile -File $componentDiscoveryGuard -SelfTest
     if ($LASTEXITCODE -ne 0) { throw 'Component discovery package guard failed.' }
+    foreach ($productionPath in $componentDiscoveryProductionPaths) {
+        & powershell -NoProfile -File $componentDiscoveryGuard -ProductionPath $productionPath
+        if ($LASTEXITCODE -ne 0) { throw "Component discovery package guard failed: $productionPath" }
+    }
     exit 0
 }
 
 if ($Suite -eq 'component_discovery') {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_binding_contract.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Component discovery binding contract failed.' }
-    $componentDiscoveryProductionPaths = @(
-        'extensions/live_galaxy/lua/live_galaxy_component_discovery.lua',
-        'extensions/live_galaxy/lua/live_galaxy_x4_discovery.lua'
-    )
-    & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -SelfTest
+    & powershell -NoProfile -File $componentDiscoveryGuard -SelfTest
     if ($LASTEXITCODE -ne 0) { throw 'Component discovery package guard self-test failed.' }
     foreach ($productionPath in $componentDiscoveryProductionPaths) {
-        & powershell -NoProfile -File (Join-Path $PSScriptRoot 'component_discovery_package_guard.ps1') -ProductionPath $productionPath
+        & powershell -NoProfile -File $componentDiscoveryGuard -ProductionPath $productionPath
         if ($LASTEXITCODE -ne 0) { throw "Component discovery package guard failed: $productionPath" }
     }
 }
