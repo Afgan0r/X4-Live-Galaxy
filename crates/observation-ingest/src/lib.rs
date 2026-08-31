@@ -1,25 +1,24 @@
 #![forbid(unsafe_code)]
-
 mod batch;
 mod batch_budget;
 mod completion;
+mod generation;
 mod model;
 mod runtime_facts;
 mod snapshot;
 mod wire;
-
-use observation_domain::{
-    EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
-    SectionQuality,
-};
-
 pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
-    ReceiptClock, SystemReceiptClock, admit_batch, admit_batch_with_receipt_clock, validate_batch,
+    admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
+pub use generation::GenerationStager;
 pub use model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, MAX_REJECTION_EVIDENCE,
     RejectionEvidence, RejectionReason,
+};
+use observation_domain::{
+    EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
+    SectionQuality,
 };
 pub use runtime_facts::{
     RuntimeAsset, RuntimeCapacity, RuntimeFactAvailability, RuntimeFactQuality, RuntimeFacts,
@@ -28,15 +27,59 @@ pub use runtime_facts::{
 pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;
 pub use wire::{FrameHeader, inspect_frame};
-
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
-
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GenerationLimits {
+    pub(crate) max_staged_bytes: usize,
+    pub(crate) max_work_units: usize,
+}
+impl GenerationLimits {
+    pub const fn new(max_staged_bytes: usize, max_work_units: usize) -> Self {
+        Self {
+            max_staged_bytes,
+            max_work_units,
+        }
+    }
+}
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GenerationProgress {
+    Staged,
+    Admitted,
+    Replay,
+    Rejected(RejectionReason),
+}
+pub trait ReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError>;
+}
+pub struct SystemReceiptClock;
+impl ReceiptClock for SystemReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+            .filter(|value| *value > 0)
+            .ok_or(AdmissionError::ReceiptClockUnavailable)
+    }
+}
+fn validate_telemetry(scope: String, version: u64) -> Result<(), AdmissionError> {
+    let _ = EntityId::new(scope).ok_or(AdmissionError::InvalidScope)?;
+    let _ = ObservationVersion::new(version).ok_or(AdmissionError::InvalidVersion)?;
+    Ok(())
+}
+fn validate_health(frame: wire::WireRuntimeHealth) -> Result<(), AdmissionError> {
+    validate_telemetry(frame.scope, frame.version)?;
+    (!frame.status.is_empty())
+        .then_some(())
+        .ok_or(AdmissionError::InvalidFixture)
+}
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AcceptedSnapshot {
     section: SectionDescriptor,
 }
-
 impl AcceptedSnapshot {
     pub fn from_tracer_payload(payload: &str) -> Result<Self, AdmissionError> {
         if payload.len() > MAX_TRACER_PAYLOAD_BYTES {
@@ -57,15 +100,12 @@ impl AcceptedSnapshot {
             ),
         })
     }
-
     pub const fn entity_id(&self) -> &EntityId {
         self.section.entity_id()
     }
-
     pub const fn version(&self) -> ObservationVersion {
         self.section.version()
     }
-
     #[must_use]
     pub const fn section_quality_name(&self) -> &'static str {
         match self.section.quality() {

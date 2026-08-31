@@ -1,11 +1,3 @@
-use std::collections::BTreeMap;
-
-use observation_domain::{
-    CanonicalObservationKey, CollectionLimit, CompleteMarker, DuplicateDecision, EntityId,
-    ObservationRecord, ObservationSource, ObservationTime, ObservationVersion,
-    ReconciliationDecision, SectionQuality, classify_duplicate, reconcile_membership,
-};
-
 use crate::batch_budget::BatchBudget;
 use crate::model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, RejectionEvidence, RejectionReason,
@@ -13,24 +5,13 @@ use crate::model::{
 use crate::runtime_facts::RuntimeFacts;
 use crate::snapshot::{ProjectionSnapshot, ScopedObservation};
 use crate::wire::{WireCompleteMarker, WireFrame, WireObservation};
-
-pub trait ReceiptClock {
-    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError>;
-}
-
-pub struct SystemReceiptClock;
-
-impl ReceiptClock for SystemReceiptClock {
-    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError> {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-            .filter(|value| *value > 0)
-            .ok_or(AdmissionError::ReceiptClockUnavailable)
-    }
-}
-
+use crate::{ReceiptClock, SystemReceiptClock, validate_health, validate_telemetry};
+use observation_domain::{
+    CanonicalObservationKey, CollectionLimit, CompleteMarker, DuplicateDecision, EntityId,
+    ObservationRecord, ObservationSource, ObservationTime, ObservationVersion,
+    ReconciliationDecision, SectionQuality, classify_duplicate, reconcile_membership,
+};
+use std::collections::BTreeMap;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 2_048;
 const MAX_SCOPE_MEMBERS: usize = 64;
 pub const MAX_BATCH_FRAMES: usize = 128;
@@ -38,14 +19,12 @@ pub const MAX_BATCH_BYTES: usize = MAX_BATCH_FRAMES * MAX_TRACER_PAYLOAD_BYTES;
 pub const MAX_BATCH_SCOPES: usize = 16;
 pub const MAX_BATCH_MARKERS: usize = MAX_BATCH_SCOPES;
 pub const MAX_BATCH_OBSERVATIONS: usize = MAX_BATCH_FRAMES;
-
 pub fn validate_batch(
     accepted: &AcceptedProjection,
     frames: &[&str],
 ) -> Result<ProjectionSnapshot, AdmissionError> {
     Ok(validate_runtime_batch(accepted, frames, 1)?.0)
 }
-
 fn validate_runtime_batch(
     accepted: &AcceptedProjection,
     frames: &[&str],
@@ -86,29 +65,20 @@ fn validate_runtime_batch(
             .get(marker.scope())
             .map(Vec::as_slice)
             .unwrap_or_default();
-        apply_reconciliation(&accepted.snapshot, &mut candidate, marker, observed)?;
+        apply_reconciliation_with_limit(
+            &accepted.snapshot,
+            &mut candidate,
+            marker,
+            observed,
+            MAX_SCOPE_MEMBERS,
+        )?;
     }
     runtime_facts.retain(|entity_id, _| candidate.observations.contains_key(entity_id));
     Ok((candidate, runtime_facts))
 }
-
-fn validate_telemetry(scope: String, version: u64) -> Result<(), AdmissionError> {
-    let _ = EntityId::new(scope).ok_or(AdmissionError::InvalidScope)?;
-    let _ = ObservationVersion::new(version).ok_or(AdmissionError::InvalidVersion)?;
-    Ok(())
-}
-
-fn validate_health(frame: crate::wire::WireRuntimeHealth) -> Result<(), AdmissionError> {
-    validate_telemetry(frame.scope, frame.version)?;
-    (!frame.status.is_empty())
-        .then_some(())
-        .ok_or(AdmissionError::InvalidFixture)
-}
-
 pub fn admit_batch(accepted: AcceptedProjection, frames: &[&str]) -> AdmissionOutcome {
     admit_batch_with_receipt_clock(accepted, frames, &SystemReceiptClock)
 }
-
 pub fn admit_batch_with_receipt_clock(
     accepted: AcceptedProjection,
     frames: &[&str],
@@ -134,8 +104,7 @@ pub fn admit_batch_with_receipt_clock(
         }
     }
 }
-
-fn apply_observation(
+pub fn apply_observation(
     candidate: &mut ProjectionSnapshot,
     frame: WireObservation,
     receipt_unix_millis: u64,
@@ -181,18 +150,17 @@ fn apply_observation(
     );
     Ok((scope, key, entity_id, facts))
 }
-
-fn complete_marker(frame: WireCompleteMarker) -> Result<CompleteMarker, AdmissionError> {
+pub fn complete_marker(frame: WireCompleteMarker) -> Result<CompleteMarker, AdmissionError> {
     let scope = EntityId::new(frame.scope).ok_or(AdmissionError::InvalidScope)?;
     let version = ObservationVersion::new(frame.version).ok_or(AdmissionError::InvalidVersion)?;
     Ok(CompleteMarker::successful(scope, version))
 }
-
-fn apply_reconciliation(
+pub fn apply_reconciliation_with_limit(
     accepted: &ProjectionSnapshot,
     candidate: &mut ProjectionSnapshot,
     marker: &CompleteMarker,
     observed: &[CanonicalObservationKey],
+    member_limit: usize,
 ) -> Result<(), AdmissionError> {
     let scope = marker.scope();
     if observed.iter().any(|key| key.version() != marker.version()) {
@@ -210,7 +178,7 @@ fn apply_reconciliation(
         }
     }
     let limit =
-        CollectionLimit::new(MAX_SCOPE_MEMBERS).ok_or(AdmissionError::CollectionLimitExceeded)?;
+        CollectionLimit::new(member_limit).ok_or(AdmissionError::CollectionLimitExceeded)?;
     match reconcile_membership(
         &accepted.keys_for_scope(scope),
         observed.to_vec(),
