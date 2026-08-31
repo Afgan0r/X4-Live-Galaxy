@@ -1,6 +1,6 @@
 use observation_ingest::{
-    AcceptedProjection, AdmissionOutcome, MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS,
-    MAX_BATCH_SCOPES, admit_batch,
+    AcceptedProjection, AdmissionOutcome, GenerationLimits, GenerationProgress, GenerationStager,
+    MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_SCOPES, admit_batch,
 };
 
 fn observation(scope: &str, entity: &str) -> String {
@@ -14,6 +14,13 @@ fn observation_with_exact_size(scope: &str, entity: &str, size: usize) -> String
     assert!(frame.len() <= size, "v2 fixture must fit the frame budget");
     let padding = " ".repeat(size - frame.len());
     format!("{}{}", &frame[..frame.len() - 1], padding) + "}"
+}
+
+fn streamed_observation(entity: &str, sequence: u64) -> String {
+    let asset = format!("asset:station:{entity}");
+    format!(
+        r#"{{"type":"observation","scope":"runtime:sectors","entity_id":"{entity}","version":2,"quality":"fresh","runtime_facts":{{"r":"x4_runtime","g":42,"q":"fresh","a":"available","s":[{{"i":"{entity}"}}],"x":[{{"i":"{asset}","p":"{entity}"}}],"c":[{{"i":"capacity:station:{entity}","p":"{asset}","v":42}}],"o":[{{"i":"ownership:station:{entity}","p":"{asset}","n":"faction:argon"}}]}},"generation":7,"sequence":{sequence}}}"#
+    )
 }
 
 #[test]
@@ -83,4 +90,27 @@ fn marker_and_scope_limits_are_atomic() {
         admit_batch(AcceptedProjection::empty(), &over_scopes),
         AdmissionOutcome::Rejected { .. }
     ));
+}
+
+#[test]
+fn streamed_generation_bypasses_legacy_aggregate_counters() {
+    let limits = GenerationLimits::new(MAX_BATCH_BYTES * 2, MAX_BATCH_FRAMES + 2);
+    let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits);
+    for index in 0..=MAX_BATCH_FRAMES {
+        let entity = format!("sector:streamed_{index:03}");
+        let frame = streamed_observation(&entity, index as u64 + 1);
+        assert_eq!(
+            stager.stage_frame_at(&frame, 1_725_000_000_200),
+            GenerationProgress::Staged
+        );
+    }
+    let marker = format!(
+        r#"{{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":7,"sequence":{}}}"#,
+        MAX_BATCH_FRAMES + 2
+    );
+    assert_eq!(
+        stager.stage_frame_at(&marker, 1_725_000_000_200),
+        GenerationProgress::Admitted
+    );
+    assert_eq!(stager.accepted().snapshot().entity_ids().len(), 129);
 }
