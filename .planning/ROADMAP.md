@@ -196,7 +196,7 @@ foundation for inherited OBS-X4 evidence and future X4 seams
    candidate matrix for one later human X4 run; Phase 05.2 itself performs no
    game mutation and requires no X4 execution.
 
-**Plans:** 10/11 plans executed; final gap closure and verification are pending
+**Plans:** 10/10 plans complete
 
 Plans:
 
@@ -205,7 +205,7 @@ Plans:
 - [x] 05.2-08-PLAN.md
 - [x] 05.2-09-PLAN.md
 - [x] 05.2-10-PLAN.md — Close deterministic isolation readiness, canonical retained-root conformance, and pre-allocation file bounds before final audits.
-- [x] 05.2-PLAN-CHECK.md
+- [x] 05.2-PLAN-REVIEW.md
 
 - [x] 05.2-01-PLAN.md
 - [x] 05.2-02-PLAN.md
