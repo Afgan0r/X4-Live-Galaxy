@@ -9,8 +9,6 @@ const MARKER: &str = r#"{"type":"complete_marker","scope":"runtime:sectors","ver
 const HEARTBEAT: &str =
     r#"{"type":"heartbeat","scope":"runtime:sectors","version":1,"generation":1,"sequence":1}"#;
 const HEALTH: &str = r#"{"type":"runtime_health","scope":"runtime:sectors","version":1,"status":"available","generation":1,"sequence":2}"#;
-const MARKER_CONFIRMATION: &str =
-    r#"{"type":"heartbeat","scope":"runtime:sectors","version":1,"generation":1,"sequence":5}"#;
 
 fn observation(version: u64, sequence: u64) -> String {
     format!(
@@ -29,14 +27,7 @@ fn project_pipe_identity_and_typed_batch_admission_are_aligned() {
     let mut server = PipeServer::new();
 
     assert_eq!(PIPE_ENDPOINT, r"\\.\pipe\live_galaxy");
-    for frame in [
-        HELLO,
-        HEARTBEAT,
-        HEALTH,
-        OBSERVATION,
-        MARKER,
-        MARKER_CONFIRMATION,
-    ] {
+    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
@@ -88,15 +79,25 @@ fn station_frames_remain_pending_until_one_matching_marker() {
     assert_eq!(server.admit_message(&second), PipeDisposition::Accepted);
     assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
     assert_eq!(server.admit_message(marker), PipeDisposition::Accepted);
-    assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
-    assert_eq!(
-        server.admit_message(MARKER_CONFIRMATION),
-        PipeDisposition::Accepted
-    );
     assert_eq!(
         server.snapshot().entity_ids(),
         vec!["asset:station:10", "asset:station:20"]
     );
+}
+
+#[test]
+fn marker_admits_129_contiguous_station_frames_without_an_aggregate_cap() {
+    let mut server = PipeServer::new();
+
+    assert_eq!(server.admit_message(HELLO), PipeDisposition::Accepted);
+    for offset in 0..129_u64 {
+        let station = 1_000 + offset;
+        let frame = station_observation(station, "sector:argon_prime", offset + 1);
+        assert_eq!(server.admit_message(&frame), PipeDisposition::Accepted);
+    }
+    let marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":130}"#;
+    assert_eq!(server.admit_message(marker), PipeDisposition::Accepted);
+    assert_eq!(server.snapshot().entity_ids().len(), 129);
 }
 
 #[test]
@@ -115,14 +116,7 @@ fn session_rejects_stale_generation_replay_and_terminal_hello() {
 #[test]
 fn higher_generation_reconnect_preserves_completed_projection() {
     let mut server = PipeServer::new();
-    for frame in [
-        HELLO,
-        HEARTBEAT,
-        HEALTH,
-        OBSERVATION,
-        MARKER,
-        MARKER_CONFIRMATION,
-    ] {
+    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.admit_message(r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":2}"#), PipeDisposition::Accepted);
@@ -134,20 +128,13 @@ fn higher_generation_reconnect_preserves_completed_projection() {
 #[test]
 fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
     let mut server = PipeServer::new();
-    let next_observation = station_observation(10, "sector:argon_prime", 6);
-    let ambiguous_marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":7}"#;
+    let next_observation = station_observation(10, "sector:argon_prime", 5);
+    let admitted_marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":6}"#;
     let reconnect = r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":2}"#;
     let post_reconnect_heartbeat =
         r#"{"type":"heartbeat","scope":"runtime:sectors","version":2,"generation":2,"sequence":1}"#;
 
-    for frame in [
-        HELLO,
-        HEARTBEAT,
-        HEALTH,
-        OBSERVATION,
-        MARKER,
-        MARKER_CONFIRMATION,
-    ] {
+    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
@@ -156,10 +143,10 @@ fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
         PipeDisposition::Accepted
     );
     assert_eq!(
-        server.admit_message(ambiguous_marker),
+        server.admit_message(admitted_marker),
         PipeDisposition::Accepted
     );
-    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
+    assert_eq!(server.snapshot().entity_ids(), vec!["asset:station:10"]);
 
     server.discard_pending();
     assert_eq!(server.admit_message(reconnect), PipeDisposition::Accepted);
@@ -167,7 +154,7 @@ fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
         server.admit_message(post_reconnect_heartbeat),
         PipeDisposition::Accepted
     );
-    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
+    assert_eq!(server.snapshot().entity_ids(), vec!["asset:station:10"]);
 }
 
 #[test]
