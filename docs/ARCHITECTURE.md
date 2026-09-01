@@ -1,33 +1,89 @@
 # Observation Data Flow Architecture
 
-## Status and purpose
+## Status and scope
 
-This document defines the Live Galaxy observation data-flow architecture from X4
-native reads to immutable decision inputs in Rust. It is intentionally broader
-than the current station-capacity proof: stations are the first real source,
-while faction ships, cargo, crew, loadout, economy, diplomacy, and later sources
-must use the same bounded flow.
+> **Target architecture — not yet fully implemented.**
 
-The architecture is only partially settled. It uses the following labels so that
-an agent cannot turn a recommendation or an unresolved question into an
-implemented contract:
+This document describes the target Live Galaxy observation data flow from X4
+native reads to immutable decision inputs in Rust. It is a system reference,
+not an implementation-status report, decision transcript, phase plan, or
+verification checklist.
 
-- **LOCKED**: an owner-approved product or architecture decision.
-- **INVARIANT**: a correctness or safety property required by the project.
-- **CURRENT**: observed behavior of the current implementation. It may be
-  defective.
-- **RECOMMENDED**: the preferred technical direction, but not yet an
-  owner-locked contract when it changes phase scope or protocol behavior.
-- **OPEN P0**: a load-bearing decision that must be resolved before the affected
-  architecture can be called normative or implemented autonomously.
-- **OPEN P1**: a threshold, policy, or implementation choice that needs evidence
-  or owner confirmation but does not invalidate the entire model.
-- **REJECTED**: a shortcut that must not be reintroduced.
+The architecture is source-agnostic. Stations, ships, cargo, crew, loadout,
+economy, diplomacy, and later sources conform to the same bounded lifecycle;
+none of them defines a special-case baseline for every future source.
 
-This is not a claim that X4 exposes a globally atomic galaxy snapshot. It is not
-a license to implement every target component in Phase 05.1. It is the durable
-model agents must use when discussing, planning, implementing, or reviewing
-observation flow.
+Decision status, rationale, rejected alternatives, and deferred promotion gates
+live in [architecture-decisions.md](architecture-decisions.md). Evidence,
+measurements, X4 unknowns, and disposable probes live in
+[architecture-verification.md](architecture-verification.md). Current
+implementation gaps and delivery scope remain under `.planning/**`.
+
+## Architecture family
+
+Live Galaxy uses **bounded per-section observation snapshot transfer with
+atomic install** ([ADR-LG-001](architecture-decisions.md#adr-lg-001-architecture-family)):
+
+```text
+authoritative mutable X4 source
+  -> bounded resumable section capture
+  -> immutable ordered batches
+  -> receiver-driven bounded transfer
+  -> private Rust candidate
+  -> content-bound completion certificate
+  -> dependency and coverage validation
+  -> durable revision commit
+  -> atomic current-pointer switch
+  -> immutable decision snapshot
+```
+
+The system is replication-shaped but observation-only. X4 remains the sole
+authority. Rust installs immutable observed projections; it does not become a
+writable game-state replica, participate in consensus, or gain a right to roll
+X4 back.
+
+```text
+NoSession
+  -> Handshake(source_epoch, transport_epoch)
+  -> Ready
+
+Ready
+  -> CaptureSection(private resumable collector)
+  -> SealImmutableBatch
+  -> AwaitReceived(exact identity and digest)
+  -> CaptureOrSendNextBatch
+  -> SendCompletionCertificate
+  -> Validate(candidate, source claim, frozen dependencies)
+  -> DurableCommit(accepted revision and idempotency receipt)
+  -> AtomicPublish(current section pointer)
+  -> Committed
+  -> Ready
+
+Malformed, gap, conflict, timeout, disconnect, or supersession
+  -> discard only the private candidate
+  -> retain the last accepted revision
+  -> recollect under a new identity after bounded cooldown
+```
+
+A future baseline-plus-delta mode is admitted only when X4 supplies a
+source-owned boundary and a contiguous ordered mutation stream:
+
+```text
+establish source boundary
+  -> capture full baseline privately
+  -> retain mutations after that boundary
+  -> apply ordered catch-up mutations
+  -> verify continuity
+  -> atomically publish
+  -> continue with deltas
+
+gap, expired history, overflow, or source-epoch change
+  -> invalidate delta completeness
+  -> perform a new full rebase
+```
+
+Without those source primitives, repeated scans are replacements rather than a
+synthetic mutation log.
 
 ## Plain-language model
 
@@ -122,17 +178,17 @@ candidate.
 
 ## Authority boundaries
 
-- **INVARIANT:** X4 owns authoritative game state.
-- **INVARIANT:** Lua observes X4 and constructs source records. It does not make
+- X4 owns authoritative game state.
+- Lua observes X4 and constructs source records. It does not make
   an incomplete scan authoritative.
-- **INVARIANT:** the named pipe transports messages. Pipe success is not
+- The named pipe transports messages. Pipe success is not
   semantic acceptance.
-- **INVARIANT:** Rust owns schema validation, semantic validation, private
+- Rust owns schema validation, semantic validation, private
   staging, persistence, reconciliation, recovery, and publication to decision
   readers.
-- **INVARIANT:** model-facing decision state is created only from accepted,
+- Model-facing decision state is created only from accepted,
   compatible section revisions frozen into an immutable decision snapshot.
-- **INVARIANT:** pending Lua work, kernel-buffered messages,
+- Pending Lua work, kernel-buffered messages,
   decoded-but-uncommitted Rust data, and failed candidates are never
   authoritative.
 
@@ -146,14 +202,14 @@ layers. The following units are distinct.
 A work step is one bounded, resumable transition in a collector or transport
 state machine. Examples include:
 
-- count one native collection;
-- allocate and fill one native array;
-- convert one object identity;
-- read one component-local field;
-- normalize one complete record;
-- seal one batch;
-- attempt one pipe write;
-- decode and validate one received batch.
+- Count one native collection;
+- Allocate and fill one native array;
+- Convert one object identity;
+- Read one component-local field;
+- Normalize one complete record;
+- Seal one batch;
+- Attempt one pipe write;
+- Decode and validate one received batch.
 
 A work step is not automatically cheap. Native calls are indivisible from Lua's
 point of view. A call may exceed a desired callback budget before Lua can
@@ -164,10 +220,10 @@ measure it.
 A semantic record is the smallest independently meaningful observation object,
 such as one station core record or one ship cargo record.
 
-- **LOCKED:** one record is never split across pipe messages.
-- **INVARIANT:** a record has stable identity, section identity, schema
+- One record is never split across pipe messages.
+- A record has stable identity, section identity, schema
   identity, and explicit quality or availability semantics.
-- **INVARIANT:** a missing optional field is not encoded as a deletion or as a
+- A missing optional field is not encoded as a deletion or as a
   known empty value.
 
 If one record is too large for the hard message ceiling, the record schema must
@@ -176,14 +232,14 @@ not a semantic design.
 
 ### Batch and pipe message
 
-A batch contains one or more complete records plus a shared envelope. In the
-preferred shape, one batch maps to one named-pipe message.
+A batch contains one or more complete records plus a shared envelope. One batch
+maps to one named-pipe message.
 
-- **LOCKED:** multiple complete records may be packed into one message.
-- **LOCKED:** a record is not split to make a message fit.
-- **INVARIANT:** the receiver validates the entire message boundary and never
+- Multiple complete records may be packed into one message.
+- A record is not split to make a message fit.
+- The receiver validates the entire message boundary and never
   parses an oversized prefix as a complete message.
-- **INVARIANT:** bytes and record count are bounded independently. Many tiny
+- Bytes and record count are bounded independently. Many tiny
   records can exhaust decode work without exhausting a byte limit.
 
 ### Scan attempt
@@ -197,10 +253,9 @@ Conceptually it carries:
 ```text
 scan_attempt
   source_epoch
-  producer_session
+  transport_epoch
   section_key
   section_revision
-  attempt_id
   capture_window
   coverage_intent
   schema_version
@@ -212,13 +267,13 @@ scan_attempt
 A section revision is one completed, accepted version of one bounded logical
 scope. Examples:
 
-- faction station core index;
-- faction ship core index;
-- cargo details for ships in a particular core revision;
-- crew details for ships in a particular core revision;
-- loadout details for ships in a particular core revision;
-- one point-in-time market measurement;
-- one contiguous event-stream interval.
+- Faction station core index;
+- Faction ship core index;
+- One deterministic bounded cargo group selected from a ship core revision;
+- One deterministic bounded crew group selected from a ship core revision;
+- One deterministic bounded loadout group selected from a ship core revision;
+- One point-in-time market measurement;
+- One contiguous event-stream interval.
 
 A section revision is not necessarily a complete set. Its coverage kind must
 state what it means.
@@ -251,8 +306,7 @@ referentially inconsistent combinations.
 
 ## Identity namespaces
 
-The current sequence model is not sufficient for multiple interleaved sections.
-Future protocol work must keep these namespaces separate:
+The protocol keeps these namespaces separate:
 
 <!-- markdownlint-disable MD013 -->
 
@@ -260,24 +314,34 @@ Future protocol work must keep these namespaces separate:
 | --- | --- |
 | Source or load epoch | Prevents data from one campaign/load state crossing into another |
 | Producer session or transport epoch | Separates reconnects and resets transport sequencing |
-| Global transport sequence | Detects duplicate, gap, and ordering errors on the pipe session |
+| Global transport sequence | Detects duplicate, gap, and ordering errors within one transport epoch |
 | Section key | Identifies data kind and logical scope |
-| Section revision | Identifies one replacement candidate and accepted revision |
-| Batch sequence | Orders batches inside one section revision |
-| Record identity and digest | Supports exact replay and conflict detection |
+| Section revision | Identifies one replacement attempt and its accepted revision |
+| Section-local batch ordinal | Proves contiguous batches inside one section revision |
+| Exact message digest | Distinguishes an idempotent retry from conflicting bytes under the same transport identity |
+| Record identity and canonical digest | Supports stable section content and completion proofs |
 | Decision snapshot identity | Identifies the exact accepted input to one decision |
 
 <!-- markdownlint-enable MD013 -->
 
-- **CURRENT DEFECT:** the Rust generation stager expects a new candidate
-  sequence to start at `1`, while Lua emits heartbeat and health messages before
-  observation data. Passing the global session sequence directly can therefore
-  reject the first real observation.
-- **OPEN P0:** select and specify the exact global-versus-section sequence
-  contract.
-- **RECOMMENDED:** use a global transport sequence for session continuity and a
-  section-local batch ordinal for completeness within a revision. Do not
-  overload one number with both meanings.
+- When X4 supplies an authoritative loaded-state identity, `source_epoch`
+  changes with that identity. When none is available, the protocol uses an
+  explicitly unknown status and a local
+  producer-incarnation fence for one uninterrupted, unambiguous runtime scope.
+- `transport_epoch` identifies one application connection/handshake.
+  Reconnect creates a new transport epoch and invalidates incomplete candidates.
+- Global transport sequence is contiguous within one transport epoch
+  and orders every application message, independent of section.
+- A known `source_epoch`, or the current producer incarnation while
+  the epoch is unknown, combines with `(section_key, section_revision)` to
+  identify one replacement attempt. A failed or ambiguous attempt never reuses
+  that identity with different content.
+- Section-local batch ordinal is contiguous within one section
+  revision and is not derived from global transport sequence.
+- `(transport_epoch, global_sequence, exact_message_digest)`
+  distinguishes an idempotent transport retry from a protocol conflict.
+- No counter is overloaded across these namespaces merely to
+  shorten the wire envelope.
 
 ## Section model
 
@@ -296,15 +360,47 @@ Suggested coverage vocabulary:
 - `unknown`: the collector could not establish coverage;
 - `unsupported`: the source cannot provide the requested section.
 
+Coverage is not one end-to-end boolean. Every revision records four independent
+claims:
+
+1. **source membership completeness**: what X4 proves about the declared source
+   scope;
+2. **producer assembly completeness**: whether Lua completed the records it
+   intended to emit;
+3. **transfer completeness**: whether Rust received exactly the certified
+   batches and ordinals;
+4. **publication completeness**: whether the validated revision was durably
+   installed and atomically made current.
+
+A stronger downstream claim cannot upgrade a weaker upstream claim. Exact
+transfer and atomic publication of a `partial_set` still produce a published
+`partial_set`, not a `complete_set`.
+
+Each collector also declares `source_consistency_evidence`:
+
+- `barrier`: an X4-owned snapshot or barrier token covers the observations;
+- `versioned_manifest`: one X4-owned membership version is usable for the
+  enumeration and all required reads;
+- `event_interval`: a contiguous ordered mutation interval has retention and
+  explicit gap detection;
+- `observed_count_fill_only`: Lua observed a count/fill or equivalent returned
+  table without a source snapshot guarantee;
+- `unknown`: no stronger source evidence is available.
+
+`observed_count_fill_only` and `unknown` may not certify `complete_set` or
+`known_empty`. Equal start/end counts or membership digests are useful mutation
+checks, but they do not exclude an ABA change in which membership changes and
+returns to the same visible value between checks.
+
 ### Availability
 
 Availability distinguishes:
 
-- available with a value;
-- available and known empty;
-- temporarily unavailable;
-- unsupported;
-- failed in the current attempt.
+- Available with a value;
+- Available and known empty;
+- Temporarily unavailable;
+- Unsupported;
+- Failed in the current attempt.
 
 Unknown and empty are not interchangeable.
 
@@ -320,6 +416,28 @@ Quality records source confidence and validation outcome. The capture window
 records when the first and last source observations used by a revision occurred.
 Rust receipt time cannot substitute for source capture time.
 
+## Candidate dependency lifecycle
+
+Any candidate may depend on exact accepted revisions of other sections. The
+baseline uses optimistic finish-then-validate rather than reactive cancellation
+or cross-revision merge:
+
+1. Candidate start freezes the exact dependency revision identities.
+2. A later dependency change does not interrupt the running candidate.
+3. Before commit, Rust compares every frozen dependency with the currently
+   required accepted revision.
+4. If they still match, normal completion validation may proceed.
+5. If any dependency changed, Rust discards the complete private candidate as
+   stale, publishes nothing, retains the last complete accepted revision, and
+   schedules a fresh attempt only after bounded cooldown.
+
+- Stale candidates are not committed merely for history and are not
+  exposed to decision snapshots.
+- The baseline does not carry records forward or merge candidates
+  across dependency revisions.
+- Dependency churn is measured as completion rejections, wasted
+  work, and freshness impact. It is not hidden by automatic complexity.
+
 ## Core indexes and detail dependencies
 
 Core identity sections and heavy detail sections must not be bundled into one
@@ -334,50 +452,55 @@ ship core index
   type or class
   location
 
-ship cargo details -> depends on exact ship core index revision
-ship crew details  -> depends on exact ship core index revision
-ship loadout       -> depends on exact ship core index revision
+bounded cargo group  -> records source core revision and exact member identities
+bounded crew group   -> records source core revision and exact member identities
+bounded loadout group -> records source core revision and exact member identities
 ```
 
-- **LOCKED:** identity, ownership, location, and core indexes receive reserved
+- Identity, ownership, location, and core indexes receive reserved
   service under load.
-- **LOCKED:** cargo, crew, loadout, and other details may be deferred first
+- Cargo, crew, loadout, and other details may be deferred first
   according to decision dependencies and freshness.
-- **INVARIANT:** a core revision change invalidates an unpublished dependent
-  detail candidate whose entity identity, owner, type, or location dependency no
-  longer matches.
-- **INVARIANT:** an optional-detail failure yields unknown or stale detail
+- Heavy detail data commits as deterministic bounded groups rather
+  than one faction-wide all-or-nothing revision or one section per ship. Every
+  group carries its exact member identities, source core revision, capture
+  window, coverage, and independent freshness.
+- The grouping policy is deterministic and versioned. A retry or
+  replay cannot move the same source identity between groups under the same
+  policy version.
+- The conformance proof demonstrates eventual coverage of every in-scope ship by
+  the required cargo, crew, and loadout groups without claiming simultaneous
+  capture of all groups.
+- A core revision change does not interrupt a running dependent
+  group. At completion, the generic dependency check discards the group if its
+  exact frozen source-core revision is no longer current.
+- An optional-detail failure yields unknown or stale detail
   state. It does not delete the core entity.
-- **CURRENT DEFECT:** the station adapter aborts the whole scan when capacity is
-  unavailable or invalid, and the current Rust `RuntimeFacts` shape requires all
-  four fact classes to be nonempty and available. The locked unknown-value
-  behavior therefore has no implemented wire/schema representation yet.
-- **RECOMMENDED:** represent optional detail availability independently from the
-  core entity and from other detail sections before treating this invariant as
-  implemented.
-- **INVARIANT:** only a complete core-index revision may drive membership
+- Optional detail availability is represented independently from the core
+  entity and from every other detail section.
+- Only a complete core-index revision may drive membership
   absence. Point measurements and detail sections cannot imply deletion.
 
 ## Scheduling model
 
+Decision references: [ADR-LG-003], [ADR-LG-004], and [ADR-LG-005].
+
 ### Frequent pulse, not periodic full scan
 
-- **LOCKED:** observation work is advanced as a small continuous stream from a
+- Observation work is advanced as a small continuous stream from a
   frequent frame, tick, or pulse source.
-- **REJECTED:** perform an entire galaxy or faction scan every `N` seconds and
-  then dump it through the pipe.
-- **CURRENT:** the production Mission Director cue requests
-  `checkinterval="30s"`. The current discovery path then materializes a complete
-  observation array before transport begins. This is not the target
-  architecture.
-- **CURRENT:** `live_galaxy_scheduler.lua` is a prototype referenced by tests
-  but is not wired as the production runtime scheduler.
-- **OPEN P0:** prove a safe frequent callback seam, its real cadence,
-  non-reentrancy, pause/save behavior, and normal/SETA behavior in X4.
+- One instantiated Mission Director cue raises one Lua event into the shared
+  scheduler; collectors do not register independent high-rate loops.
+- Delivered cadence is measured and treated as an input to admission. Requested
+  cadence is never interpreted as an exact scheduling guarantee.
 
-The X4 Live MCP precedent observed that a requested `50 ms` Mission Director
-cadence arrived around `100 ms`. Requested cadence is therefore not an exact
-scheduling guarantee.
+The scheduler entry must be idempotently registered and guarded by
+`in_callback`. It samples real time and game time once, applies the save gate,
+pumps pending transport, and only then admits collection work. High-churn
+`Schedule_Write` use is not part of the baseline.
+
+The exact normal, SETA, pause, menu, minimize, save, load, and `/reloadui`
+semantics determine whether the callback seam is admitted.
 
 ### Separate scheduler and pump
 
@@ -386,29 +509,26 @@ callback invokes both.
 
 The collection scheduler owns:
 
-- section urgency and fairness;
-- work permits and cost accounting;
-- collector state transitions;
-- native-call admission;
-- dependencies and staleness;
-- output-memory reservations before producing records.
+- Section urgency and fairness;
+- Work permits and cost accounting;
+- Collector state transitions;
+- Native-call admission;
+- Dependencies and staleness;
+- Output-memory reservations before producing records.
 
 The transport pump owns:
 
-- batch sealing;
-- immutable pending bytes;
-- named-pipe write attempts;
-- retry, cooldown, and reconnect policy;
-- any future receiver credit or acknowledgement;
-- aborting unpublished transport candidates.
+- Batch sealing;
+- Immutable pending bytes;
+- Named-pipe write attempts;
+- Retry, cooldown, and reconnect policy;
+- Any future receiver credit or acknowledgement;
+- Aborting unpublished transport candidates.
 
-- **INVARIANT:** the pump runs before new collection work so existing backlog
+- The pump runs before new collection work so existing backlog
   gets an opportunity to drain.
-- **INVARIANT:** collection never performs pipe writes inside collector logic.
-- **INVARIANT:** the pump never invokes native getters to refill itself.
-- **CURRENT DEFECT:** production Lua calls `fill_fifo()` before it attempts the
-  FIFO head. It may pull and serialize several more records while an older head
-  is already pending. The target pump-first ordering is not implemented.
+- Collection never performs pipe writes inside collector logic.
+- The pump never invokes native getters to refill itself.
 
 ### Collector state machines
 
@@ -463,10 +583,10 @@ is not silently treated as a partial set.
 
 <!-- markdownlint-enable MD013 -->
 
-- **LOCKED:** use one global scheduler and shared budget across all collectors.
-- **LOCKED:** at most one indivisible heavy native stage may start in one
+- Use one global scheduler and shared budget across all collectors.
+- At most one indivisible heavy native stage may start in one
   callback unless measurements prove a higher safe bound.
-- **INVARIANT:** this rule does not guarantee the stage is cheap. If one
+- This rule does not guarantee the stage is cheap. If one
   indivisible call visibly hitches or breaks the simulation budget, reject that
   collector from production until a safer source exists.
 
@@ -474,40 +594,47 @@ is not silently treated as a partial set.
 
 Game time and real time answer different questions:
 
-- game-time age determines how urgently X4 data needs refresh;
-- real time limits how much CPU, native, allocation, serialization, and
+- Game-time age determines how urgently X4 data needs refresh;
+- Real time limits how much CPU, native, allocation, serialization, and
   transport work may be attempted;
-- the observed approximately `6.2x` SETA factor is evidence about the current
-  environment, not a multiplier for permitted heavy work.
+- SETA changes game-time urgency but is not a multiplier for permitted
+  real-time work.
 
-`GetCurRealTime()` advances on active frames and stops while X4 is minimized.
-Its intra-frame resolution is not proven. The scheduler must therefore never use
-a loop whose only stop condition is "run until the real-time value changes."
+The real-time clock adapter may be coarse or temporarily frozen. The scheduler
+therefore never uses a loop whose only stop condition is "run until the
+real-time value changes."
 
-The recommended budget combines:
+The budget combines:
 
-- a real-time token bucket;
-- a capped burst after a long gap;
-- a nonzero declared cost for every step;
-- a hard number of steps per callback;
-- at most one heavy permit per callback;
-- token debt after a measured overrun.
+- A real-time token bucket;
+- A capped burst after a long gap;
+- A nonzero declared cost for every step;
+- A hard number of steps per callback;
+- At most one heavy permit per callback;
+- Token debt after a measured overrun.
 
 If the clock value does not change, the budget does not refill. If the clock
 jumps, the burst cap prevents catch-up work from becoming a new spike.
+
+This is an EDF/CBS-derived contract, not an attempt to reproduce Linux
+`SCHED_DEADLINE`. Freshness controls which eligible job is most urgent; a
+separate shared real-time reservation controls whether another step may start.
+Because Lua cannot preempt an indivisible native call, the scheduler provides
+soft deadlines, bounded admission, and fail-closed overload behavior rather
+than a hard completion guarantee.
 
 ### Selection and fairness
 
 The global selector considers section-specific:
 
-- measured cost;
-- game-time lateness and maximum allowed age;
-- decision-specific importance and active dependencies;
-- time already waiting;
-- failure backoff;
-- available output and candidate-memory reservations.
+- Measured cost;
+- Game-time lateness and maximum allowed age;
+- Decision-specific importance and active dependencies;
+- Time already waiting;
+- Failure backoff;
+- Available output and candidate-memory reservations.
 
-The preferred urgency bands are:
+The urgency bands are:
 
 1. core data already beyond a decision-blocking threshold;
 2. core data approaching its freshness deadline;
@@ -522,8 +649,11 @@ overload, lower bands may intentionally starve. That must be visible as stale
 data and blocked dependent decisions, not hidden as an apparently healthy
 scheduler.
 
-- **OPEN P1:** choose the exact fairness algorithm, core reservation, starvation
-  bound, token rate, burst, and per-callback step cap from measurements.
+Alternating complete batches or collector steps among section keys is
+application scheduling. It borrows SCTP interleaving's separation of transport
+order from per-stream identity, but it is not SCTP fragmentation or parallel
+wire transport. One global stop-and-wait slot still serializes application
+receipt until measurements justify a larger fixed window.
 
 ## Native collection constraints
 
@@ -544,48 +674,30 @@ module, order, and ownership reads.
 
 After a bulk result exists, the following work can often be sliced:
 
-- identity conversion;
-- per-object field reads;
-- validation and canonical ordering;
-- semantic record construction;
-- serialization;
-- batch packing and transport.
+- Identity conversion;
+- Per-object field reads;
+- Validation and canonical ordering;
+- Semantic record construction;
+- Serialization;
+- Batch packing and transport.
 
 The following work may remain indivisible:
 
-- a native count call;
-- one caller allocation;
-- a native fill call;
-- a native getter returning a complete Lua table;
-- one Lua allocation, copy, or garbage-collection pause triggered by that
+- A native count call;
+- One caller allocation;
+- A native fill call;
+- A native getter returning a complete Lua table;
+- One Lua allocation, copy, or garbage-collection pause triggered by that
   result.
 
 ### Large populations
 
-A large population must not be rejected forever merely because it is the 130th
-entity. It must also not be unbounded.
+A large population is admitted through measured allocation, work, memory, and
+age bounds rather than a fixture-derived entity count.
 
-- **CURRENT:** `PRE_RUN_OWNER_MEMBER_EVIDENCE = 129` derives the current native
-  allocation and work limits. A returned owner count above 129 consequently
-  fails with `enumeration_overflow`. This is a provisional source-owned native
-  admission ceiling, not a pipe-message or Rust-generation cardinality limit.
-- **REJECTED:** promote the current 129-member evidence value into the durable
-  architecture contract. It must be replaced by measured, deliberately chosen
-  native allocation and work bounds.
-- **REJECTED:** remove every aggregate generation bound. The project requires
-  bounded collections.
-- **CURRENT PLANNING CONFLICT:** `.planning/STATE.md` says a generation has no
-  aggregate frame or byte cap. That may reject the obsolete legacy ceilings, but
-  it cannot mean unbounded total state without contradicting the project
-  bounded-collection invariant. Replanning must replace it with independently
-  finite generation byte, work, memory, and age limits.
-- **INVARIANT:** bound native allocation bytes, canonical bytes, decoded-memory
+- Bound native allocation bytes, canonical bytes, decoded-memory
   estimate, records or work units, capture duration, real/game age, and total
   staged state independently.
-- **RECOMMENDED:** begin with a deliberately generous configurable bound, then
-  reduce it if normal/SETA measurements expose allocation, latency, or memory
-  problems. The initial value still needs an explicit safe envelope; it is not
-  infinity.
 
 If a single native allocation or fill for the supported workload exceeds the
 safe envelope, the collector needs a proven event/delta source or true paging
@@ -593,6 +705,8 @@ API. Repeated prefix calls are not paging unless the source explicitly
 guarantees continuation semantics.
 
 ## Record building, batching, and memory
+
+Decision references: [ADR-LG-006] and [ADR-LG-007].
 
 ### Why a message limit and a queue limit are different
 
@@ -641,14 +755,9 @@ A complete record between `T_batch` and `H_message` may be sent alone. A record
 above the available hard ceiling fails the generation before emission and
 requires a semantic redesign.
 
-- **LOCKED:** do not copy `256 KiB` from X4 Live MCP. That is an application
-  policy from a different architecture, not a Windows named-pipe limit.
-- **REJECTED:** treat `1,800 bytes`, `2,048 bytes`, `129 records`, `64 records`,
-  or any existing test fixture as the new production policy.
-- **OPEN P1:** derive `T_batch`, `H_message`, record count, generation bytes,
-  and generation work limits from Lua allocation/copy, pipe-write latency,
-  receiver quota, Rust decode/stage cost, retry amplification, and memory
-  measurements.
+`T_batch`, `H_message`, record count, generation bytes, and generation work
+limits are configuration policy derived from the verification registry. They
+are not Windows named-pipe limits.
 
 ### FIFO clarification
 
@@ -657,24 +766,90 @@ messages. It does not send new data first. Its useful properties are
 deterministic order and exact immutable-head retry. Its risks are stale backlog
 and head-of-line blocking.
 
-- **CURRENT:** Lua has a FIFO bounded at 16 messages and 28,800 bytes, with
-  high/low watermarks, enqueue quotas, and three head retries. These are
-  implementation artifacts, not approved architecture constants.
-- **CURRENT:** the queue starts after collection has already created a full
-  observations table, so it bounds only serialized transport backlog. It does
-  not bound native allocation, collected records, Lua tables, Rust candidate
-  memory, or accepted storage.
-- **RECOMMENDED FOR PHASE 05.1:** use one batch builder plus one immutable
-  pending or in-flight message. Stop new native reads and serialization while
-  that message is pending. This prevents a stale multi-message Lua backlog.
-- **OPEN P0:** confirm whether the final architecture remains stop-and-wait or
-  later permits a measured small window. A sliding window must not be introduced
-  without evidence that one in-flight message misses freshness goals.
+- Transport begins with one immutable
+  pending or in-flight application batch and implicit receiver credit `1`.
+  There is no multi-message Lua transport backlog in the baseline.
+- The single transport slot does not itself authorize unbounded
+  collection behind it. Builder, continuation, native candidate, and Rust
+  candidate state remain independently bounded, and expensive collection pauses
+  when the required output reservation is unavailable.
 
 Even with one Lua slot, the OS may buffer successful writes. Without
 application-level receiver feedback, Lua cannot know the true Rust backlog.
 
 ## Named-pipe transport
+
+Decision references: [ADR-LG-008], [ADR-LG-010], and [ADR-LG-013].
+
+### Carrier ownership and language boundary
+
+The application protocol requires a bounded duplex local IPC carrier that can
+be pumped without blocking the X4 callback. Carrier-specific behavior is
+isolated behind a Live Galaxy facade
+([ADR-LG-008](architecture-decisions.md#adr-lg-008-carrier-neutral-application-protocol)).
+
+```text
+X4 getters and bounded producer continuations
+  -> UI Lua
+  -> Live Galaxy carrier facade
+  -> local IPC carrier
+  -> external Rust ingestion, staging, persistence, publication, and LLM work
+```
+
+The initial carrier adapter targets `sn_mod_support_apis`. A future owned
+native carrier must implement the same complete-message, nonblocking,
+connection-status, and bounded-error contract without changing collector or
+Rust section state machines.
+
+- No external language independently invokes the inspected X4 getter surface.
+- Rust-to-X4 messages express bounded demand, disposition, collection intent,
+  health, or separately validated action commands; they do not turn getters
+  into remote RPC calls.
+- Lua owns the cooperative local scheduler and final native-step admission.
+- An owned DLL may retain only memory it owns after a synchronous copy. It
+  never retains LuaJIT or X4 pointers after return, calls X4 or Lua from a
+  background thread, or unwinds a panic or exception into X4.
+
+### Inbound control-plane size
+
+The observation architecture deliberately keeps Rust-to-Lua traffic small.
+Inbound messages carry bounded control, not collected game state:
+
+- Handshake, capability, and transport-epoch data;
+- Demand or implicit credit;
+- `received`, `committed`, rejection, abort, and retry-after dispositions;
+- Section collection intent, logical scope, policy identity, and urgency;
+- Bounded health and session-reset signals;
+- Later, one or a small bounded batch of already validated typed X4 action
+  primitives.
+
+Inbound does not carry full snapshots, raw LLM output, prompts, complete faction
+plans, large schemas, bulk diagnostics, or a list of every entity to read. Rust
+requests a logical section or bounded action; Lua resolves X4-local identities
+and executes a resumable local continuation.
+
+- Inbound control uses an independently bounded complete-message hard ceiling
+  with envelope headroom and explicit oversize handling.
+- A future feature that genuinely needs large Rust-to-X4 payloads
+  must open a separate bounded action/data-plane decision or promote carrier B.
+  It must not silently enlarge the observation control plane.
+
+The present inbound buffer is therefore an error-handling and future-extension
+risk, not an expected-volume bottleneck for stop-and-wait observation feedback.
+
+A Live Galaxy-owned DLL, if ever promoted, remains a transport/encoding shim:
+
+- It may synchronously copy a caller-owned buffer and perform bounded IPC;
+- A worker thread may use only memory the DLL owns after the copy;
+- It must not retain LuaJIT/X4 pointers after return;
+- It must not call X4 getters or Lua APIs from a background thread;
+- Every FFI boundary catches panics/exceptions and fails closed without unwinding
+  into X4.
+
+Moving JSON or binary encoding into native code is a measured optimization, not
+the admission reason for a custom DLL. First test whether a compact Lua-produced
+wire buffer and the existing carrier meet the callback, throughput, and
+freshness envelope.
 
 ### Message-boundary facts
 
@@ -683,27 +858,20 @@ preserved, but buffer sizes are advisory quota hints, not semantic acceptance
 limits. A successful write means the pipe operation completed at the OS
 boundary. It does not mean Rust:
 
-- read the message;
-- received the entire message under its quota;
-- decoded UTF-8 or JSON;
-- validated every record;
-- staged the batch;
-- committed the section marker;
-- persisted the accepted revision.
+- Read the message;
+- Received the entire message under its quota;
+- Decoded UTF-8 or JSON;
+- Validated every record;
+- Staged the batch;
+- Committed the section marker;
+- Persisted the accepted revision.
 
 ### Receiver oversize handling
 
-- **CURRENT DEFECT:** the Rust listener ignores the receive result variant. The
-  pinned receive library reports quota overflow explicitly, but the current
-  listener sees an empty filled buffer, labels it `client_eof`, and disconnects.
-  It loses the distinct oversize diagnostic.
-- **INVARIANT:** quota overflow discards the whole message and records an
+- Quota overflow discards the whole message and records an
   explicit bounded oversize reason. No received fragment reaches the protocol
   decoder.
-- **CURRENT DEFECT:** invalid UTF-8 is logged, but the listener does not discard
-  the pending candidate at that point. Later valid traffic can therefore retain
-  and potentially commit records that preceded the invalid message.
-- **INVARIANT:** invalid UTF-8, malformed framing, or other message-integrity
+- Invalid UTF-8, malformed framing, or other message-integrity
   failure invalidates the affected private candidate before any later completion
   proof can publish it.
 
@@ -711,42 +879,58 @@ boundary. It does not mean Rust:
 
 Exact retry means retaining the identical immutable bytes and identity.
 
-- **INVARIANT:** retry does not rebuild a record from newer game state under the
+- Retry does not rebuild a record from newer game state under the
   same sequence or revision.
-- **INVARIANT:** the same `(transport epoch, sequence, exact digest)` is an
+- The same `(transport epoch, sequence, exact digest)` is an
   idempotent replay.
-- **INVARIANT:** the same identity with different bytes is a protocol violation
+- The same identity with different bytes is a protocol violation
   and aborts the private candidate.
-- **INVARIANT:** a sequence advances only after the receiver has successfully
+- A sequence advances only after the receiver has successfully
   staged the message, not before a later validation failure.
-- **CURRENT DEFECT:** current Rust duplicate handling can reject an exact replay
-  and discard pending state.
-- **CURRENT:** a repeated raw-write failure can discard a generation and then
-  permit an expensive immediate rescan, creating a pressure -> discard -> rescan
-  loop.
-- **RECOMMENDED:** on retry exhaustion, suppress the marker, halt or enter a
-  bounded circuit breaker, retain the last complete accepted revision, and
-  require transport health recovery before another expensive scan.
 
-### Reconnect and save/load
+### Reconnect, save, load, and unknown source epoch
 
-- **INVARIANT:** disconnect or transport-epoch change discards every private
-  candidate but leaves accepted revisions unchanged.
-- **INVARIANT:** a new transport session uses a higher epoch and restarts a
-  complete scan rather than continuing ambiguous partial state.
-- **INVARIANT:** a campaign/load change must invalidate data from the previous
-  X4 state before it can be admitted into the new state.
-- **OPEN P0:** define and source an X4-owned load epoch, then carry it through
-  hello, records, completion proof, persisted accepted revisions, and decision
-  snapshots.
-- **OPEN P1:** choose whether already-built messages drain during save-sensitive
-  windows or transport pauses with collection.
+Disconnect or transport-epoch change discards every private candidate while
+accepted revisions remain intact. A new transport session starts a new
+transport epoch and recollects rather than continuing ambiguous partial state
+([ADR-LG-013](architecture-decisions.md#adr-lg-013-identity-exact-retry-and-reconnect)).
 
-Lua-side disconnect/close behavior has prior crash risk in the same named-pipe
-adapter. Do not assume hot disconnect is safe without new Live Galaxy X4
-evidence.
+When no authoritative X4 source epoch is available, the protocol operates only
+inside one uninterrupted, unambiguous producer lifetime
+([ADR-LG-014](architecture-decisions.md#adr-lg-014-unknown-source-epoch-baseline)):
+
+```text
+source_epoch = null
+source_epoch_status = unknown | boundary_uncertain
+source_boundary = new_campaign | game_loaded | lua_reload |
+                  transport_reconnect | unknown
+producer_incarnation = local opaque token per Lua initialization
+transport_epoch = local monotonic connection epoch
+```
+
+`producer_incarnation` distinguishes Lua lifetimes but is never relabeled as
+campaign identity. A bridge reconnect changes only `transport_epoch`. A game,
+load, or reload boundary aborts private work and starts a new producer
+incarnation.
+
+While source identity is unknown or boundary-uncertain:
+
+- Earlier accepted revisions remain history or diagnostics only and cannot
+  enter a new current decision snapshot;
+- Absence, deletion, and cross-boundary entity continuity are disabled;
+- Post-boundary runtime IDs are treated as new observations;
+- A fresh baseline is required before decisions resume;
+- Incomplete work is always discarded rather than resumed.
+
+An ordinary save window pauses the collection scheduler and transport pump
+together. Persistent cursors, bounded private candidates, and the one pending
+immutable transport frame may remain in RAM and resume only after the
+evidence-derived cooldown and revalidation policy. Load and reload use the
+stricter invalidation path.
 
 ## End-to-end flow control
+
+Decision references: [ADR-LG-011] and [ADR-LG-012].
 
 ### The condition to prove
 
@@ -779,47 +963,74 @@ p99(collection + batching + transport + staging + commit)
 
 Local pipe-write counters cannot provide `S(t)` or `C(t)`.
 
-### Current unidirectional boundary
+### Receiver feedback control plane
 
-- **CURRENT:** the pipe object is duplex-capable, but Live Galaxy and X4 Live
-  MCP use the application path only from Lua to the bridge. There is no
-  application ACK, NACK, or receiver credit.
-- **CURRENT:** Phase 05.1 context excludes acknowledgement and Rust-to-X4
-  vocabulary; the return path belongs to a later phase.
-- **CONSEQUENCE:** Phase 05.1 can bound Lua memory and measure Rust acceptance
-  from the Rust side, but Lua cannot guarantee end-to-end rate control or
-  distinguish semantic rejection from successful admission.
-
-### Recommended future control plane
-
-If the owner reopens the boundary, begin with stop-and-wait, implicit credit
-`1`:
+The control plane begins with stop-and-wait and implicit credit `1`:
 
 1. Lua retains one immutable message.
-2. Rust receives, fully validates, and stages it atomically.
-3. Rust returns a disposition for the exact epoch, revision, and sequence.
-4. Only an application ACK releases the Lua message and grants the next slot.
-5. A terminal ACK means the completion proof was atomically committed, not
-   merely decoded.
-6. Exact duplicate input returns the same disposition without reapplying it.
+2. Rust decodes it, validates the message-local contract, and places it in the
+   current volatile candidate in RAM.
+3. Rust returns `received` for the exact epoch, revision, and sequence.
+4. `received` allows Lua to release the immutable message and grants the next
+   slot. It is explicitly not durable acceptance or publication.
+5. Rust loss, disconnect, or transport-epoch change discards the incomplete
+   candidate. Lua starts a new complete collection under a new identity rather
+   than resuming the lost candidate.
+6. After every batch and the completion certificate validate, Rust atomically
+   persists and publishes the accepted section revision, then returns
+   `committed`.
+7. Exact duplicate input returns the same applicable disposition without
+   appending or publishing twice.
 
-Staging ACK and terminal commit ACK are semantically different. If staging state
-is not durable, an ACK followed by a Rust crash still creates ambiguity. The
-acceptance boundary must therefore state whether "staged" means in-memory or
-durably staged.
+The return/control plane keeps four meanings separate:
 
-- **LOCKED FOR PHASE 05.1:** remain unidirectional telemetry. Minimal
-  ACK/NACK/credit is rejected inside the current phase unless the owner
-  explicitly reopens its scope.
-- **OPEN P0:** if feedback is admitted, define the durable staging and terminal
-  commit boundaries.
-- **OPEN P0:** prove that the installed Lua named-pipe adapter exposes a safe
-  bounded nonblocking receive path. Duplex capability alone is not that proof.
-- **REJECTED:** start with a sliding window because Windows permits large pipe
-  buffers. Use a window larger than one only after measured round-trip limits
-  make stop-and-wait insufficient.
+- Capacity or demand permits a bounded amount of new input but says nothing was
+  received;
+- `received` confirms batch-local validation and volatile candidate placement;
+- `committed` confirms certificate validation, durable revision persistence,
+  and atomic publication;
+- `rejected` or `aborted` is a terminal negative disposition whose exact reason
+  determines whether the same immutable bytes may be retried or a new candidate
+  identity is required.
+
+Completion, negative disposition, and future credit traffic require bounded
+reserved control capacity so a full data path cannot prevent the message needed
+to release or terminate that data path.
+
+This deliberately accepts loss of incomplete collection progress after a Rust
+failure. It never permits partial section publication. Durable per-batch staging
+is not part of the baseline and requires a later evidence-backed decision if
+recollection proves materially harmful.
+
+- `received` means volatile RAM staging;
+  `committed` means durable atomic section publication.
+- Negative responses follow the semantic classes below. Exact wire
+  names and encoding may vary, but they must not collapse the classes.
+
+### Negative disposition and retry classes
+
+<!-- markdownlint-disable MD013 -->
+
+| Class | Receiver state | Sender action | Identity rule |
+| --- | --- | --- | --- |
+| Capacity unavailable | No input consumed; candidate unchanged | Retain the exact immutable head and retry only after bounded delay or new demand | Same transport identity and exact bytes |
+| Exact duplicate | Return the previously applicable `received` or `committed` disposition; make no second mutation | Release or continue exactly as for the original response | Same identity and digest is idempotent |
+| Batch rejected permanently | Discard the affected private candidate; accepted revision unchanged | Stop the attempt; suppress completion; recollect only under a new section revision | Old identity is terminal and cannot carry rebuilt bytes |
+| Candidate timed out or superseded | Discard the private candidate; accepted revision unchanged | Stop late emission; start only after bounded cooldown and a new revision identity | Late frames for the old identity remain terminally rejected |
+| Source or transport epoch stale | Reject admission and discard affected incomplete state | Re-handshake or recollect under the current epoch | No private candidate crosses the epoch boundary |
+| Commit outcome unknown after disconnect | Recover the durable terminal receipt and accepted pointer if present; otherwise retain the old accepted state | Query/reconcile when the protocol supports it, or recollect under a new identity; never replay changed bytes under the old identity | Durable receipt makes exact terminal replay idempotent |
+
+<!-- markdownlint-enable MD013 -->
+
+Retryable means the receiver proved that it did not consume the frame and left
+the candidate unchanged. An arbitrary exception, timeout, broken connection, or
+missing response is ambiguous, not automatically retryable. Reconnect discards
+volatile candidates; Kafka-style continuation across restart is prohibited
+without durable per-batch receipt state.
 
 ## Rust receive, staging, and publication
+
+Decision references: [ADR-LG-015], [ADR-LG-016], and [ADR-LG-018].
 
 ### Target state machine
 
@@ -836,113 +1047,106 @@ AwaitHello
   -> Ready
 ```
 
-- **INVARIANT:** decode and validate a complete batch before mutating candidate
+This lifecycle runs independently for each entry in a bounded map keyed by
+`section_key`. The one-batch stop-and-wait transport may alternate batches among
+those entries; it does not create more than one unacknowledged transport batch.
+
+- Decode and validate a complete batch before mutating candidate
   state.
-- **INVARIANT:** one invalid record invalidates the whole batch and current
+- One invalid record invalidates the whole batch and current
   section attempt. No prefix of a malformed batch becomes authoritative.
-- **INVARIANT:** a completion proof commits while that terminal message is
+- A completion proof commits while that terminal message is
   handled. It must not wait for an unrelated later data frame.
-- **INVARIANT:** validate -> durably commit accepted revision and receipt ->
+- Validate -> durably commit accepted revision and receipt ->
   publish the accepted pointer to decision readers as one recoverable
   transaction/order.
-- **INVARIANT:** restart restores the accepted revision and last admitted source
+- Restart restores the accepted revision and last admitted source
   identity without duplicating a previously accepted publication.
-
-### Current contradictions
-
-- **CURRENT:** `PipeServer` uses a legacy pending snapshot path with a
-  64-observation limit and separate 64-member reconciliation bound.
-- **CURRENT:** `GenerationStager` has staged byte/work bounds, contiguous
-  sequencing, private candidate state, and atomic marker concepts, but it is not
-  wired into `PipeServer`.
-- **CURRENT:** a complete marker is deferred and committed only when a later
-  valid data frame confirms it.
-- **CURRENT:** the working-tree contract test expects immediate marker commit
-  and 129 streamed station records. The current `PipeServer` path cannot satisfy
-  that contract even though the Lua producer and standalone `GenerationStager`
-  cover different parts of it.
-- **CURRENT:** the active stager holds one candidate identified by scope,
-  version, and generation. It cannot stage independent interleaved sections.
-- **CURRENT:** direct batch-admission callers can bypass marker-gated pipe
-  behavior.
-- **CURRENT:** accepted projection and runtime-fact storage clone or retain
-  structures whose total long-run memory is not yet governed by one complete
-  retention policy.
-- **CURRENT:** `GenerationLimits` covers staged canonical bytes and work, but not
-  candidate duration, inactivity, decoded-memory expansion, or retained accepted
-  history.
-
-The repair must replace the legacy path with a single production admission path.
-A test named for `129` must prove only that the obsolete observed cardinality is
-no longer the limit; it must not erase bounded generation bytes, work, age, or
-memory.
 
 ### One or several candidates
 
-Collection should interleave several section state machines. Transport and Rust
-staging have a separate topology choice:
+Collection interleaves several section state machines, and Rust mirrors that
+independence with bounded keyed candidates:
 
-- one serialized in-flight section candidate is simpler and avoids receiver
-  head-of-line complexity in the first implementation;
-- keyed per-section candidates prevent one slow detail section from blocking
-  urgent core publication, but multiply retained state and recovery
-  combinations.
-
-- **OPEN P0:** choose serialized single-section transport or bounded keyed
-  per-section staging.
-- **RECOMMENDED FOR FIRST IMPLEMENTATION:** allow collection to interleave, but
-  permit only one in-flight transport generation and one Rust candidate. Do not
-  start a long detail transport generation when an urgent core revision is near
-  its deadline.
+- Rust may retain at most one incomplete revision for each active
+  `section_key`. Batches for different section keys may alternate through the
+  single global stop-and-wait transport slot.
+- Each candidate owns its revision identity, expected next ordinal,
+  staged bytes and work, inactivity and age state, failure disposition, and
+  completion state.
+- Per-candidate bounds do not replace a global bound. Active
+  candidate count, total candidate memory, and total retained work are bounded
+  independently.
+- Failure or timeout of one candidate does not publish it and does
+  not discard an unrelated valid candidate.
+- Dependency supersession follows the source-agnostic
+  finish-then-validate lifecycle. It does not abort candidates reactively or
+  merge them across revisions.
 
 ## Completion and publication
 
-### A marker is not proof by itself
+Decision references: [ADR-LG-017] and [ADR-LG-018].
 
-The current marker carries identity and sequence but no count, digest, capture
-window, source epoch, or coverage certificate. Receiving it only proves that a
-marker-shaped message arrived.
+### Content-bound completion certificate
 
-A completion proof should at least bind:
+A lightweight start envelope freezes attempt identity, logical scope, source
+epoch status, schema and policy versions, exact dependencies, coverage intent,
+and resource reservation. Every data batch carries a section-local ordinal,
+exact byte length, and exact digest.
+
+The terminal certificate binds at least
+([ADR-LG-017](architecture-decisions.md#adr-lg-017-content-bound-completion)):
 
 ```text
-source_epoch
+source_epoch and status
 transport_epoch
 section_key
 section_revision
 coverage_kind
+source_consistency_evidence
 expected_source_count when meaningful
 emitted_record_count
 batch_count and final section ordinal
-canonical membership or content digest
+ordered batch-manifest digest
+canonical membership and/or content digest
 capture_window
 schema_version
 policy_version
+canonicalization_version
+digest_algorithm_version
+frozen dependency revision identities
 quality result
 ```
 
-This proves internal and transport consistency only to the strength of the
-source contract. If X4 does not guarantee snapshot isolation across count, fill,
-and later field reads, a digest cannot magically prove a simultaneous world
-state.
+Rust recomputes the certificate inputs from the private candidate and rejects
+missing ordinals, count or digest mismatches, stale dependencies, incompatible
+versions, and invalid quality or coverage before publication.
 
-- **OPEN P0:** define the completion certificate and what source evidence makes
-  `complete_set` truthful for each collector.
-- **OPEN P0:** determine count/fill mutation, ordering, and stable-identity
-  behavior from source evidence or a minimal disposable X4 probe when source
-  evidence is unavailable.
+`transport_epoch` binds the terminal message to its volatile candidate; it does
+not prove that the semantic section belongs to one globally atomic X4 instant.
+The certificate proves transfer and assembly only to the strength of the
+collector's source contract. Sorting and deduplication make content
+deterministic but do not prove X4 membership completeness or snapshot
+isolation.
+
+Partial sets and point measurements may publish with their weaker claims
+preserved. `complete_set`, `known_empty`, omission-as-deletion, and
+authoritative absence require the source evidence defined in the verification
+registry.
 
 ### Last-complete publication
 
-- **LOCKED:** the last complete accepted section remains authoritative while a
+- The last complete accepted section remains authoritative while a
   new attempt is collecting, waiting, failing, retrying, or being staged.
-- **LOCKED:** scan progress and failure are exposed separately from
+- Scan progress and failure are exposed separately from
   authoritative data.
-- **LOCKED:** only a completed replacement publishes.
-- **LOCKED:** after an evidence-derived staleness threshold, new dependent
+- Only a completed replacement publishes.
+- After an evidence-derived staleness threshold, new dependent
   decisions block. The old revision is not deleted merely because it is stale.
 
 ## Absence, deletion, and unknown values
+
+Decision reference: [ADR-LG-019](architecture-decisions.md#adr-lg-019-coverage-absence-and-future-deltas).
 
 ### General lifecycle
 
@@ -957,37 +1161,37 @@ Present or MissingOnce
   -> explicit authoritative deletion -> Removed immediately
 ```
 
-- **LOCKED:** one complete-set absence becomes `missing_once`.
-- **LOCKED:** the second consecutive complete-set absence removes the entity.
-- **LOCKED:** an explicit authoritative deletion removes it immediately.
-- **LOCKED:** absence from a failed, incomplete, partial, wrong-epoch, or
+- One complete-set absence becomes `missing_once`.
+- The second consecutive complete-set absence removes the entity.
+- An explicit authoritative deletion removes it immediately.
+- Absence from a failed, incomplete, partial, wrong-epoch, or
   incompatible-policy scan has no deletion meaning.
-- **LOCKED:** an unavailable optional field becomes unknown or stale, not
+- An unavailable optional field becomes unknown or stale, not
   deletion.
 
 Both absences must belong to the same authoritative scope, visibility policy,
 and source epoch. ID reuse or ownership transfer can invalidate naive
-consecutive-absence logic.
-
-- **CURRENT DEFECT:** current reconciliation tombstones after one absence and
-  can apply that result after an insufficient completion marker.
-- **OPEN P0:** establish stable native identity and possible incarnation/reuse
-  rules across deletion and load.
+consecutive-absence logic. The lifecycle remains disabled until the source and
+identity requirements in the verification registry pass.
 
 ## Events and delta maintenance
 
-A one-time complete enumeration followed by events is allowed only when event
-coverage is proven for additions and removals.
+Decision reference: [ADR-LG-019](architecture-decisions.md#adr-lg-019-coverage-absence-and-future-deltas).
 
-- **INVARIANT:** event identity or sequence is monotonic within a declared
+Baseline-plus-delta operation is enabled only when event coverage is proven for
+additions and removals. Repeated scans without an ordered source cursor remain
+replacement observations and cannot prove that intermediate changes were
+observed.
+
+- Event identity or sequence is monotonic within a declared
   epoch.
-- **INVARIANT:** the event queue is bounded and reports overflow or gaps
+- The event queue is bounded and reports overflow or gaps
   explicitly.
-- **INVARIANT:** a gap invalidates delta-derived completeness immediately and
+- A gap invalidates delta-derived completeness immediately and
   triggers a complete rebase before absence semantics resume.
-- **INVARIANT:** events may update or invalidate accepted sections; they do not
+- Events may update or invalidate accepted sections; they do not
   fabricate proof that an initial or replacement complete set existed.
-- **LOCKED:** if native full enumeration hitches, event maintenance is
+- If native full enumeration hitches, event maintenance is
   acceptable only after this coverage proof. "Probably enough events" is not an
   admission criterion.
 
@@ -1015,7 +1219,7 @@ coverage is proven for additions and removals.
 | Disconnect mid-generation | New epoch; restart whole scan | Discard candidate | Last complete retained |
 | Rust restart after local write | Without ACK, Lua cannot know admission | Recover durable accepted state; discard non-durable candidate | Last durable complete retained |
 | Save/load during scan | Abort old source epoch | Reject pre-epoch candidate | New campaign state remains isolated |
-| Dependency revision changes | Abort unpublished dependent detail | Reject incompatible dependency | Last compatible detail remains until stale |
+| Dependency revision changes | Continue private candidate, then compare frozen dependencies at completion | Discard stale candidate; schedule a fresh attempt after cooldown | Last complete accepted revision remains until stale |
 | Event gap or overflow | Invalidate event-derived freshness; request rebase | Mark coverage invalid | Absence disabled until rebase |
 | Explicit complete empty set | Send zero-record completion proof | Validate scope and publish empty revision | Valid known-empty state |
 | Failed or partial empty result | Suppress completion | Reject as non-authoritative | Never becomes known-empty |
@@ -1027,26 +1231,45 @@ coverage is proven for additions and removals.
 Bounded transport is insufficient if accepted history grows forever or every
 candidate clones the full galaxy.
 
-The storage model should distinguish:
+The storage model distinguishes:
 
-- current accepted section pointers;
-- immutable section chunks or records shared across revisions when unchanged;
-- decision-pinned revisions needed for replay;
-- bounded diagnostic and receipt history;
-- private candidates with strict byte/work/age bounds;
-- durable generation receipts needed for idempotent recovery.
+- Current accepted section pointers;
+- Immutable section chunks or records shared across revisions when unchanged;
+- Decision-pinned revisions needed for replay;
+- Bounded diagnostic and receipt history;
+- Private candidates with strict byte/work/age bounds;
+- Durable generation receipts needed for idempotent recovery.
 
-- **INVARIANT:** garbage collection never deletes the current accepted revision
+- Garbage collection never deletes the current accepted revision
   or a revision pinned by a retained decision snapshot.
-- **INVARIANT:** accepted-state persistence and idempotency receipts have one
+- Accepted-state persistence and idempotency receipts have one
   defined transaction/recovery order.
-- **RECOMMENDED:** avoid cloning a whole accepted galaxy for every private
-  candidate. Stage changed chunks or section-local state, then atomically switch
-  the accepted section pointer.
-- **OPEN P0:** decide the durable staging and accepted-projection persistence
-  boundary.
-- **OPEN P1:** define retention, compaction, decision-pin lifetime, and history
-  limits.
+- Incomplete candidates are volatile and are never resumed across Rust loss.
+- One storage transaction covers immutable accepted revision
+  content, the terminal idempotency receipt/disposition, and the conditional
+  current-section pointer update. `committed` is emitted only after that
+  transaction commits.
+
+The commit path is:
+
+```text
+look up terminal receipt by exact candidate identity and digest
+  -> committed match: return the recorded committed disposition
+  -> conflicting identity: reject
+  -> absent: begin storage transaction
+       revalidate frozen dependencies and expected current pointer
+       insert immutable revision header and content
+       insert terminal committed receipt/disposition
+       conditionally update the current-section pointer
+       commit storage transaction
+     emit committed
+```
+
+Any error before storage commit rolls back the entire transaction and preserves
+the old current pointer. A restart loses the volatile candidate and recollects
+it, but an exact retry of an already committed terminal identity reads the
+durable receipt and does not publish twice. This is local atomic install only;
+it does not claim an atomic transaction with X4 game state.
 
 ## Worked examples
 
@@ -1077,7 +1300,9 @@ of how smoothly steps 4 through 8 stream.
 ### Example: faction ships with heavy details
 
 The developer proof first builds a complete faction ship core index. Cargo,
-crew, and loadout are separate sections bound to that exact core revision.
+crew, and loadout then advance as deterministic bounded group sections. Each
+group records its source core revision and exact member identities, while the
+full proof tracks eventual coverage across every required group.
 
 The scheduler may interleave:
 
@@ -1106,19 +1331,19 @@ freshness under the fixed real-time budget, dependent decisions block.
 
 ### Example: 20 MiB total detail data
 
-Twenty MiB may be a valid total section size only if all of the following are
+Twenty MiB may be a valid total detail dataset only if all of the following are
 true:
 
-- no native API creates an unsafe indivisible 20 MiB result;
-- records are independently meaningful and individually below the hard record
+- No native API creates an unsafe indivisible 20 MiB result;
+- Records are independently meaningful and individually below the hard record
   limit;
-- the collector retains only bounded continuation state;
-- one bounded batch is built at a time;
-- pending transport remains bounded;
+- The collector retains only bounded continuation state;
+- One bounded batch is built at a time;
+- Pending transport remains bounded;
 - Rust candidate bytes, decoded expansion, work, and age are bounded;
-- accepted storage is incremental or otherwise measured safe;
-- sustained staged throughput prevents backlog growth;
-- section freshness still meets the decision contract.
+- Accepted storage is incremental or otherwise measured safe;
+- Sustained staged throughput prevents backlog growth;
+- Section freshness still meets the decision contract.
 
 It must never become one 20 MiB Lua string, one 20 MiB pipe message, or an
 unbounded list of prepared messages merely because the Windows pipe can be
@@ -1130,335 +1355,82 @@ configured with a large buffer.
 
 Record bounded sanitized metrics for:
 
-- requested and actual callback cadence;
-- real/game deltas and observed SETA ratio;
-- steps attempted, permitted, skipped, and failed by class;
-- heavy permit use and per-native-stage duration;
-- token balance, burst, and debt;
-- section due, overdue, stale, and blocked counts;
-- maximum capture and accepted-section age;
-- dependency invalidation and decision-block reasons;
+- Requested and actual callback cadence;
+- Real/game deltas and observed SETA ratio;
+- Steps attempted, permitted, skipped, and failed by class;
+- Heavy permit use and per-native-stage duration;
+- Token balance, burst, and debt;
+- Section due, overdue, stale, and blocked counts;
+- Maximum capture and accepted-section age;
+- Dependency invalidation and decision-block reasons;
 - Lua memory estimate and garbage-collection pause evidence.
 
 ### Batch and transport
 
 Record:
 
-- records and UTF-8 bytes produced;
-- batch target and hard-ceiling configuration identities;
-- batch record count, bytes, held age, and seal reason;
-- pending message identity, bytes, age, and retry count;
-- raw attempts, local pipe handoffs, failures, cooldowns, and halts;
-- queue or slot high water;
-- reconnect and abandoned-generation counts.
+- Records and UTF-8 bytes produced;
+- Batch target and hard-ceiling configuration identities;
+- Batch record count, bytes, held age, and seal reason;
+- Pending message identity, bytes, age, and retry count;
+- Raw attempts, local pipe handoffs, failures, cooldowns, and halts;
+- Queue or slot high water;
+- Reconnect and abandoned-generation counts.
+- Save-pause entries, duration, retained candidate size, and post-save resume or
+  invalidation outcome.
 
 "Offered to pipe" must never be labeled "accepted by Rust."
+
+Flink-style rate and backpressure summaries are useful only when the underlying
+boundaries remain visible. Preserve counters and latency histograms for:
+
+1. native collection;
+2. Lua normalization;
+3. serialization, allocation, and concatenation;
+4. local pipe handoff;
+5. Rust whole-message receive;
+6. decode and semantic validation;
+7. private candidate staging;
+8. durable persistence;
+9. atomic publication.
+
+Rolling averages do not replace burst, longest-consecutive-backpressure, tail
+latency, backlog-slope, retry-amplification, and capture-to-commit freshness
+evidence. The first stage whose latency or retained work rises identifies the
+candidate bottleneck; one queue-depth snapshot does not.
 
 ### Rust
 
 Record:
 
-- receive result: full message, quota overflow, EOF, or error;
-- decode, validation, stage, persistence, and commit latency;
-- private candidate section, revision, records, raw bytes, decoded estimate,
+- Receive result: full message, quota overflow, EOF, or error;
+- Decode, validation, stage, persistence, and commit latency;
+- Private candidate section, revision, records, raw bytes, decoded estimate,
   age, and expected sequence;
-- exact replay and conflicting duplicate counts;
-- rejection and abort class;
-- accepted section revision and last completion time;
-- produced-versus-staged lag when measurable;
-- decision snapshot staleness, skew, compatibility, and block result.
+- Exact replay and conflicting duplicate counts;
+- Rejection and abort class;
+- Accepted section revision and last completion time;
+- Produced-versus-staged lag when measurable;
+- Decision snapshot staleness, skew, compatibility, and block result.
 
 Raw IDs, private payloads, native error strings, and unbounded per-frame traces
 do not belong in public diagnostics.
 
-- **CURRENT:** the developer debug sink includes raw entity IDs in frame
-  summaries. It must remain explicitly developer-only and access-bounded, or be
-  sanitized before any public diagnostics surface uses it.
+<!-- markdownlint-disable MD013 -->
 
-## Measurements required before choosing numbers
+[ADR-LG-003]: architecture-decisions.md#adr-lg-003-continuous-cooperative-scheduling
+[ADR-LG-004]: architecture-decisions.md#adr-lg-004-initial-scheduler-callback-seam
+[ADR-LG-005]: architecture-decisions.md#adr-lg-005-separate-collection-scheduler-and-transport-pump
+[ADR-LG-006]: architecture-decisions.md#adr-lg-006-independent-aggregate-safety-bounds
+[ADR-LG-007]: architecture-decisions.md#adr-lg-007-semantic-records-and-bounded-messages
+[ADR-LG-008]: architecture-decisions.md#adr-lg-008-carrier-neutral-application-protocol
+[ADR-LG-010]: architecture-decisions.md#adr-lg-010-small-inbound-control-plane
+[ADR-LG-011]: architecture-decisions.md#adr-lg-011-stop-and-wait-receiver-feedback
+[ADR-LG-012]: architecture-decisions.md#adr-lg-012-transport-expansion-ladder
+[ADR-LG-013]: architecture-decisions.md#adr-lg-013-identity-exact-retry-and-reconnect
+[ADR-LG-015]: architecture-decisions.md#adr-lg-015-bounded-keyed-rust-candidates
+[ADR-LG-016]: architecture-decisions.md#adr-lg-016-dependency-handling
+[ADR-LG-017]: architecture-decisions.md#adr-lg-017-content-bound-completion
+[ADR-LG-018]: architecture-decisions.md#adr-lg-018-atomic-durable-publication
 
-Do not inherit numeric limits from an existing test or X4 Live MCP. Measure:
-
-1. complete-record UTF-8 byte distributions, including long Unicode names and
-   every optional fact shape;
-2. section cardinality and total bytes for representative factions, the heavy
-   ship proof, the supported mod stack, and intended supported combinations;
-3. Lua normalization, serialization, concatenation, allocation, and
-   garbage-collection cost by record and batch size;
-4. every indivisible native call class separately under normal speed and SETA;
-5. actual callback cadence and same-frame clock behavior;
-6. raw pipe-write latency and failure behavior by message size with normal,
-   slow, and absent Rust readers;
-7. actual pipe quotas and whole-message behavior;
-8. Rust receive allocation, UTF-8/JSON decode, semantic validation, staging,
-   persistence, and marker commit cost;
-9. candidate raw bytes, decoded expansion, records, work, and age;
-10. retry and failure amplification: how much native and serialization work
-    repeats;
-11. backlog slope and drain time after a bounded stall;
-12. section completion time and game-time age under normal speed and sustained
-    SETA;
-13. if ACK is considered, safe Lua receive behavior, round-trip cost,
-    reentrancy, and deadlock behavior.
-
-Production limits come from the minimum independently safe boundary, not the
-largest buffer any one layer can allocate.
-
-## Verification contract
-
-### Pure scheduler tests
-
-- A frozen real clock cannot create an unbounded loop or repeated budget refill.
-- A coarse time jump is capped by maximum burst.
-- Callback step caps and the heavy permit are enforced.
-- A heavy overrun creates debt and suppresses later work.
-- SETA raises game-time urgency without increasing real-time token refill.
-- Core reservation cannot be consumed by details; unused core capacity may
-  spill.
-- Same-band fairness is bounded when capacity exists.
-- Overload marks lower-priority sections stale instead of hiding starvation.
-- Dependency change aborts only unpublished dependent candidates.
-
-### Collector tests
-
-- Count and fill occur as explicit resumable stages.
-- Dynamic collection size cannot create an unbounded per-callback loop.
-- Required identity or ownership failure aborts the section.
-- Optional detail failure produces unknown/stale state without entity deletion.
-- Output backpressure pauses before repeating native work.
-- Candidate-memory reservation occurs before a potentially large allocation.
-- Unsafe indivisible native stages fail production admission.
-
-### Batch and transport tests
-
-- Exact target and hard byte boundaries, plus one byte over.
-- Record-count and work boundaries independent of bytes.
-- Multiple complete records pack into a message; no record is split.
-- A terminal/control reservation prevents completion deadlock.
-- One oversized record fails before send.
-- Pending bytes remain immutable across retry.
-- Retry exhaustion suppresses completion and prevents an immediate rescan loop.
-- Receiver quota overflow produces an explicit oversize disposition and never
-  reaches protocol decoding.
-- Invalid UTF-8 discards the affected private candidate before a later marker.
-- Exact duplicate is idempotent; conflicting duplicate aborts.
-- Sequence gaps and reorder abort private state only.
-
-### Rust generation tests
-
-- The real listener/server path uses the same generation stager contract as
-  direct batch admission.
-- A completion proof commits while its message is handled.
-- Disconnect immediately after commit preserves the accepted projection.
-- Disconnect before commit preserves the previous accepted projection.
-- Candidate byte, work, record, decoded-memory, duration, and inactivity limits
-  apply.
-- A higher cardinality than an old fixture is accepted within those independent
-  bounds; the fixture cardinality does not become the new bound.
-- Two-absence reconciliation runs only after valid consecutive complete
-  revisions.
-- Save/load epoch and stable identity prevent cross-campaign or reused-ID
-  admission.
-
-### Cross-layer and X4 evidence
-
-- Lua batch fixtures pass through the real Rust decoder and stager.
-- Normal and SETA runs measure individual native stages and total callback cost.
-- Slow receiver, lost completion, malformed batch, Rust restart, disconnect, and
-  save/load transitions preserve last-complete authority.
-- Sustained staged throughput is at least produced throughput, or upstream
-  collection demonstrably slows before any bound is reached.
-- Multi-section dependencies reject stale, skewed, or referentially inconsistent
-  decision snapshots.
-- Event overflow or gap invalidates delta-derived completeness.
-- No visible or simulation-budget-breaking hitch occurs in the admitted
-  workload.
-
-## Current implementation gap summary
-
-The current code is a useful prototype but must not be described as the target
-stream:
-
-1. Mission Director invokes production observation on a requested 30-second
-   cadence.
-2. Discovery builds the complete station observation table synchronously.
-3. The bounded FIFO governs serialized messages only.
-4. Production fills the FIFO before pumping its existing head, so pump-first
-   backpressure is not implemented.
-5. Lua local write success is treated as handoff with no receiver
-   acknowledgement.
-6. Rust production uses the legacy 64-observation pending path, not the new
-   generation stager.
-7. The listener misclassifies receive-quota overflow as EOF and does not
-   invalidate pending state immediately on invalid UTF-8.
-8. The marker commits on a later data frame instead of immediately.
-9. The marker lacks a content-bound completeness certificate.
-10. Reconciliation removes after one absence instead of the locked
-    two-confirmation lifecycle.
-11. Optional capacity failure still aborts the scan, and current `RuntimeFacts`
-    cannot represent the locked explicit-unknown policy.
-12. One Rust candidate cannot represent independently interleaved sections.
-13. Global and section sequence identities conflict.
-14. Source/load epoch and stable native incarnation policy are absent.
-15. Accepted publication and durable recovery are not one fully specified
-    transaction.
-16. `GenerationLimits` omits age, inactivity, decoded-memory, and accepted-history
-    limits; total Lua continuation and diagnostics are also not one complete
-    bound set.
-17. No complete native X4 discovery proof exists yet. Phase 05.1 runtime evidence
-    still includes overflow without a marker, and the remaining native proof and
-    integration work is pending.
-
-Any new Phase 05.1 plan must explicitly map tasks and tests to these gaps or
-state why a gap belongs to a later phase. It must not preserve a known
-contradiction by renaming it.
-
-## Open decisions
-
-### LOCKED Phase 05.1 boundary; OPEN future receiver feedback
-
-Phase 05.1 remains unidirectional telemetry. Application ACK, NACK, receiver
-credit, and Rust-to-X4 acknowledgement vocabulary are outside its locked scope.
-An agent must treat re-scoping as rejected unless the owner explicitly reopens
-the phase boundary.
-
-The future architecture question remains open because, without receiver
-feedback, Lua can bound its own memory but cannot prove semantic backpressure or
-distinguish Rust rejection from acceptance.
-
-Recommendation: define the long-term architecture with stop-and-wait receiver
-feedback and implicit credit `1`. Assign it to an explicitly reopened or later
-phase only after proving a safe Lua receive path.
-
-### OPEN P0: Acceptance boundary and durability
-
-Question: when may Rust tell the producer that a message is accepted?
-
-Recommendation: distinguish durably staged batch acceptance from terminal atomic
-section publication. An in-memory copy must not be called durable acceptance.
-
-### OPEN P0: Sequence and identity model
-
-Question: how do global transport order, per-section batch order, reconnect,
-save/load, and exact replay compose?
-
-Recommendation: separate source epoch, transport epoch, global sequence, section
-revision, section-local ordinal, and record digest.
-
-### OPEN P0: Receiver candidate topology
-
-Question: one serialized section candidate or a bounded map of per-section
-candidates?
-
-Recommendation: start with one in-flight transport generation while allowing the
-collection scheduler to interleave sections. Revisit only when measured
-freshness shows head-of-line failure.
-
-### OPEN P0: Completion and source completeness
-
-Question: what certificate proves a completed section, and what X4 evidence
-makes its coverage claim truthful?
-
-Recommendation: bind count, emitted records, batches, digest, capture window,
-source epoch, schema/policy, and quality; separately prove the native source's
-completeness and mutation semantics.
-
-### OPEN P0: Stable identity and campaign/load epoch
-
-Question: what X4-owned value separates load states, and can native object
-identities be reused?
-
-Recommendation: do not admit cross-restart identity or deletion logic until both
-are proven or an incarnation mechanism is added.
-
-### OPEN P0: Total generation safety contract
-
-Question: which independent byte, work, record, memory, capture-window, and age
-bounds define a supported generation?
-
-Recommendation: remove only the obsolete 64/128 cardinality assumptions.
-Preserve finite measured bounds at every layer and correct the conflicting
-no-aggregate-cap statement in `.planning/STATE.md` through the GSD workflow.
-
-### OPEN P0: Heavy ship proof placement
-
-Question: does the faction ship core plus cargo/crew/loadout proof remain in
-Phase 05.1 or move to an explicitly owned successor slice?
-
-The discussion checkpoint records an owner selection to put a developer-only
-proof in Phase 05.1. That conflicts with the older Phase 05.1 station-capacity
-scope and Phase 05.2 ownership of the reusable Lua/X4 verification foundation.
-Until the owner reconciles those artifacts, an agent must not silently treat
-either placement as final or expand production scope.
-
-### OPEN P1: Evidence-derived policies
-
-The following must be measured or confirmed, not invented:
-
-- callback cadence and normal/SETA thresholds;
-- scheduler token rate, burst, step cap, heavy threshold, and fairness;
-- section freshness, skew, and stale-decision thresholds;
-- message target, hard ceiling, record count, and maximum record size;
-- native candidate-memory and total generation limits;
-- retry count, cooldown, candidate timeout, and maximum generation age;
-- save-window transport policy;
-- accepted-history retention and compaction;
-- whether point measurements may trigger decisions;
-- whether event/delta maintenance is complete enough for any source.
-
-## Agent guardrails
-
-Future agents must apply these rules before editing observation code or plans:
-
-1. Do not promote provisional evidence values or legacy ceilings (`129`, `64`,
-   `1,800 bytes`) into the durable architecture policy.
-2. Do not copy X4 Live MCP's `256 KiB`, `4 MiB`, or queue depth without Live
-   Galaxy measurements and architecture mapping.
-3. Do not call a pipe write "Rust acceptance."
-4. Do not call transport chunking "native paging."
-5. Do not call a marker "complete" without content-bound proof and a truthful
-   source coverage contract.
-6. Do not treat FIFO depth as a bound on native work, Lua heap, Rust decoded
-   memory, accepted history, or one-message cost.
-7. Do not treat one-heavy-step-per-callback as proof that the heavy step is
-   safe.
-8. Do not publish partial candidate state or delete entities from
-   failed/incomplete scans.
-9. Do not encode unknown as empty or missing detail as entity deletion.
-10. Do not claim a globally simultaneous galaxy snapshot.
-11. Do not let SETA multiply real-time work. It increases urgency, then degrades
-    detail freshness and finally blocks decisions.
-12. Do not start new expensive collection while transport is backpressured or a
-    required output reservation is unavailable.
-13. Do not retry with rebuilt bytes under the same identity.
-14. Do not cross reconnect or save/load epochs with a private candidate.
-15. Do not remove all aggregate bounds merely because an old cardinality cap was
-    arbitrary.
-16. Do not add ACK, abort, credit, or a sliding window without resolving the
-    phase and protocol boundary.
-17. Do not admit the heavy ship proof to Faction Minds before normal/SETA
-    evidence and dependency checks pass.
-18. Do not autonomously plan implementation while an affected OPEN P0 remains
-    unresolved.
-
-## Source map
-
-The architecture was synthesized from:
-
-- project authority and invariants in `AGENTS.md` and `.planning/PROJECT.md`;
-- Phase 01, 05.1, and 05.2 context and Phase 05.1 research/discussion artifacts;
-- current Lua runtime, scheduler, telemetry, component-discovery, and
-  X4-discovery code under `extensions/live_galaxy/`;
-- current Rust listener, wire, session, ingress, server, generation,
-  reconciliation, projection, and persistence paths under `crates/`;
-- X4 Live MCP's documented and observed named-pipe, cadence, batching, retry,
-  SETA, and native-call precedents;
-- installed X4 support API documentation and read-only runtime integration
-  evidence;
-- six independent architecture reviews covering X4 runtime constraints,
-  scheduler design, transport flow control, Rust generation admission, section
-  consistency, and adversarial failure modes.
-
-Current repository code remains the source of truth for implementation facts.
-Owner-approved planning artifacts remain the source of truth for phase scope.
-External precedent constrains risk but does not define Live Galaxy policy.
+<!-- markdownlint-enable MD013 -->
