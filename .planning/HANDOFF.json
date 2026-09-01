@@ -1,39 +1,109 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-31T19:25:11.875Z",
+  "timestamp": "2026-09-01T18:57:31.728Z",
   "phase": "05.1",
   "phase_name": "bounded-real-component-discovery-inserted",
   "phase_dir": ".planning/phases/05.1-bounded-real-component-discovery-inserted",
-  "plan": 5,
-  "task": 0,
-  "total_tasks": 8,
-  "status": "executing",
+  "plan": 9,
+  "task": 3,
+  "total_tasks": 7,
+  "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Complete Phase 05.1 Plan 01", "status": "done", "commit": "ac5b5d0"},
-    {"id": 2, "name": "Complete Phase 05.1 Plan 02", "status": "done", "commit": "1e0b767"},
-    {"id": 3, "name": "Complete Phase 05.1 Plan 03", "status": "done", "commit": "e245e7e"},
-    {"id": 4, "name": "Complete prerequisite Phase 05.2", "status": "done", "commit": "f7c618e"},
-    {"id": 5, "name": "Revise Phase 05.1 gap plans and obtain independent checker PASS", "status": "done", "commit": null}
+    {
+      "id": 1,
+      "name": "Complete the implemented Phase 05.1 Plan 05, 06, and 08 slices",
+      "status": "done",
+      "commit": "78747ee"
+    },
+    {
+      "id": 2,
+      "name": "Replace the mixed architecture draft with target architecture, ADR, and verification authorities",
+      "status": "done",
+      "commit": "1f9bef4"
+    },
+    {
+      "id": 3,
+      "name": "Add the Phase 05.1 Plan 09 RED bridge contracts and preserve the architecture discussion checkpoint",
+      "status": "done",
+      "commit": "d7f976a"
+    }
   ],
   "remaining_tasks": [
-    {"id": 6, "name": "Execute automated Phase 05.1 Plans 05, 06, 08, and 09 through GSD", "status": "not_started"},
-    {"id": 7, "name": "Run the owner-controlled disposable X4 normal-speed and SETA verification in Plan 07", "status": "not_started"},
-    {"id": 8, "name": "Run final verification, review, security, Nyquist, and phase closure", "status": "not_started"}
+    {
+      "id": 4,
+      "name": "Hard-relocate the complete repository into the owner-approved live-galaxy project root and verify Git plus machine-local state",
+      "status": "not_started"
+    },
+    {
+      "id": 5,
+      "name": "Create the shared X4 Modding agent instructions in their separately owned task",
+      "status": "not_started"
+    },
+    {
+      "id": 6,
+      "name": "Wire docs-mcp, live-mcp, and live-galaxy to the shared instructions; reconcile the legacy Phase 01 and 05.1 remainder into the accepted 05.3-05.5 boundaries",
+      "status": "not_started"
+    },
+    {
+      "id": 7,
+      "name": "Create owner-native Phase 05.3 context and route to Phase 05.3 planning",
+      "status": "not_started"
+    }
   ],
   "blockers": [
-    {"description": "Generic GSD progress routing selects lower-numbered incomplete Phase 1 even though its remaining X4 proof depends on Phase 05.1.", "type": "technical", "workaround": "Use explicit `$gsd-plan-phase 05.1 --gaps`, then `$gsd-execute-phase 05.1`; return to Phase 1 after 05.1 closes."}
+    {
+      "description": "Phase 05.3 is accepted in ADR-LG-023 but is not yet represented in ROADMAP.md, STATE.md, or a phase CONTEXT.md.",
+      "type": "technical",
+      "workaround": "After relocation and instruction wiring, reconcile the GSD artifacts from the architecture authorities before invoking any planning or execution workflow."
+    },
+    {
+      "description": "The legacy Phase 05.1 plans and STATE decisions encode superseded numerical and transport policy and must not be resumed as the target architecture.",
+      "type": "technical",
+      "workaround": "Treat docs/ARCHITECTURE.md and docs/architecture-decisions.md as the target authority; explicitly re-home unfinished Phase 01/05.1 work into 05.3-05.5 instead of executing the old route."
+    },
+    {
+      "description": "Shared agent instructions and cross-repository wiring are prerequisites selected by the owner before Phase 05.3 begins.",
+      "type": "external",
+      "workaround": "Complete those separately owned tasks, then resume this repository through $gsd-resume-work."
+    },
+    {
+      "description": "Project-local typed GSD agent routing is stale relative to .planning/config.json.",
+      "type": "technical",
+      "workaround": "After relocation and instruction wiring, regenerate project-local routing with the shared sync helper and restart Codex before the first typed GSD dispatch."
+    }
   ],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "Run the revised disposable X4 verification after local implementation and automated gates pass.", "context": "Native resource bounds, normal-speed/SETA behavior, and observed-in-X4 classification require an owner-controlled Creative Custom run.", "blocking": true}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Phase 05.1 is the next prerequisite after Phase 05.2, before returning to Phase 1 Plan 09.", "rationale": "Phase 1's remaining X4 proof depends on the real component-discovery path owned by Phase 05.1.", "phase": "05.1"},
-    {"decision": "Phase 05.1 Plan 04 is superseded by Plan 05; Phase 1 Plans 10 and 11 are superseded by the inserted Phase 05.1 work.", "rationale": "The roadmap already retired those designs, but their frontmatter did not expose machine-readable supersession.", "phase": "05.1"},
-    {"decision": "Execute only the independently approved Plans 05, 06, 08, and 09 before the human-only Plan 07 checkpoint.", "rationale": "The final checker passed the bounded native, telemetry, ingress, byte-accounting, marker, and verification contracts after three revision iterations.", "phase": "05.1"},
-    {"decision": "Redesign the autonomous workflow after Phases 1, 5.1, and 5.2 are closed.", "rationale": "The current broad delegation, review-loop, and test-layer flow was materially inefficient.", "phase": "workflow"}
+    {
+      "decision": "Do not continue the old Phase 05.1 execution route after this pause.",
+      "rationale": "The architecture discussion replaced legacy 129-member, 64-frame, 1800-byte, FIFO, marker, and transport assumptions with a source-agnostic target architecture whose limits must be measured and independently bounded.",
+      "phase": "05.1"
+    },
+    {
+      "decision": "Complete repository relocation and shared instruction wiring before creating or planning Phase 05.3.",
+      "rationale": "The owner explicitly fixed this ordering so all three X4 Modding repositories share the correct research and instruction boundaries first.",
+      "phase": "workflow"
+    },
+    {
+      "decision": "Phase 05.3 owns the generic observation data-flow foundation and feedback baseline; Phase 05.4 owns the heavy faction-ship proof across X4 and Rust; Phase 05.5 owns only station-specific remainder.",
+      "rationale": "Generic mechanisms must remain source-agnostic while ships and stations act only as conformance examples.",
+      "phase": "05.3"
+    },
+    {
+      "decision": "docs/ARCHITECTURE.md documents target behavior, docs/architecture-decisions.md owns ADRs, docs/architecture-verification.md owns evidence and probes, and .planning owns delivery state.",
+      "rationale": "Architecture documentation must not become a mixed decision transcript, status report, and plan dump.",
+      "phase": "workflow"
+    },
+    {
+      "decision": "X4 API research is owned by the separate Docs MCP repository and must preserve immutable snapshot provenance.",
+      "rationale": "Live Galaxy consumes researched API evidence rather than rebuilding a competing game-API corpus locally.",
+      "phase": "05.3"
+    }
   ],
-  "uncommitted_files": [],
-  "next_action": "Commit the independently approved Phase 05.1 planning checkpoint, then run `$gsd-execute-phase 05.1 --gaps-only --auto --no-transition` for Plans 05, 06, 08, and 09.",
-  "context_notes": "Phase 05.2 is fully complete at f7c618e. Phase 05.1 Plans 05-09 passed the final independent checker after three revision iterations. Plans 05, 06, 08, and 09 are automated; Plan 07 is the only human-controlled X4 normal-speed and SETA gate. Generic lowest-incomplete-phase routing still points at Phase 1, so use explicit Phase 05.1 routing. No X4, bridge, watcher, async job, save, or private artifact was started or touched during planning."
+  "uncommitted_files": [
+    ".gsd/dispatch-isolation-sentinel.json"
+  ],
+  "next_action": "Relocate the whole repository, including .git and the machine-local .gsd directory, into the owner-approved live-galaxy project root; verify HEAD, branch, remote, tracked and untracked manifests, and the sentinel digest. Do not execute Phase 05.1. After the separately owned shared-instructions task and three-repository wiring complete, regenerate project-local GSD routing and restart Codex. Then run $gsd-resume-work here, reconcile ROADMAP.md and STATE.md to Phases 05.3-05.5, create 05.3-CONTEXT.md from the architecture authorities, and route to $gsd-plan-phase 05.3.",
+  "context_notes": "The architecture discussion is complete enough to stop improvising from the station example. The target is a continuous bounded observation stream with separate collection and transport state machines, source-agnostic scheduling, independent section revisions, stop-and-wait receiver feedback as the baseline, carrier A behind a neutral facade, evidence-triggered carrier B, exact retry identity, bounded keyed Rust candidates, completion certificates, and atomic publication. Do not copy old Live MCP limits or the existing Phase 05.1 numbers into production policy. The current repository checkpoint is pushed at 07bb535; only the machine-local .gsd sentinel remains untracked and must move physically without being committed."
 }
