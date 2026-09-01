@@ -1,0 +1,163 @@
+{
+  "phase": "05.1",
+  "phase_name": "Bounded Real Component Discovery",
+  "timestamp": "2026-09-01T06:34:00+07:00",
+  "areas_completed": [
+    "Authoritative snapshot publication and absence semantics",
+    "Cooperative native discovery"
+  ],
+  "areas_remaining": [
+    "Pipe messages and queue headroom",
+    "Transport recovery and Rust acceptance",
+    "Owner control over replanning and execution"
+  ],
+  "decisions": {
+    "Authoritative snapshot publication and absence semantics": [
+      {
+        "question": "When does a newly scanned collection replace the working snapshot?",
+        "answer": "Keep the last complete snapshot authoritative while exposing new-scan progress and failures separately; publish only a completed replacement.",
+        "options_presented": [
+          "Publish complete scans only",
+          "Publish explicitly partial scans",
+          "Keep the complete snapshot and expose partial progress separately"
+        ]
+      },
+      {
+        "question": "Which per-entity failures invalidate a complete scan?",
+        "answer": "Identity or ownership failure invalidates the entire current scan attempt. Optional fact failures such as capacity remain explicit unknown values and do not exclude the entity.",
+        "options_presented": [
+          "Any field failure invalidates the scan",
+          "Accept entities without identity or ownership",
+          "Require identity and ownership while allowing optional facts to remain unknown"
+        ]
+      },
+      {
+        "question": "What happens when replacement scans keep failing?",
+        "answer": "Retain the last complete snapshot, but after an evidence-derived staleness threshold block new decisions that depend on that snapshot.",
+        "options_presented": [
+          "Use stale data indefinitely",
+          "Retain data but block dependent decisions after a threshold",
+          "Delete the snapshot after a threshold"
+        ]
+      },
+      {
+        "question": "How should absence and deletion work across all observed collections?",
+        "answer": "Use a general Rust reconciliation policy: one absence from a complete set snapshot becomes missing_once; two consecutive complete-snapshot absences remove the entity; an explicit authoritative deletion removes it immediately; absence in failed or incomplete scans has no meaning; an unavailable field becomes stale or unknown without deleting the entity. Stations are the first proof, not a station-specific implementation.",
+        "options_presented": [
+          "Remove after one complete-snapshot absence",
+          "Confirm absence in two consecutive complete snapshots",
+          "Never remove automatically"
+        ]
+      }
+    ],
+    "Cooperative native discovery": [
+      {
+        "question": "How should independently changing world data become one decision input?",
+        "answer": "Partition observation into independently completed section revisions with capture windows, coverage, quality, and freshness. Freeze exact accepted section revisions into one immutable decision snapshot; do not claim a globally simultaneous X4 snapshot.",
+        "options_presented": [
+          "One globally atomic galaxy scan",
+          "Independent completed sections composed into a frozen decision snapshot",
+          "Event streams only"
+        ]
+      },
+      {
+        "question": "How should Phase 05.1 prove the framework beyond stations?",
+        "answer": "Add a developer-only heavy faction-ship PoC: a complete ship identity/ownership/type/location index plus independently refreshed cargo, crew, and loadout detail sections. Use the Phase 05.2 harness and do not admit its data to Faction Minds before it passes normal-speed and SETA evidence gates.",
+        "options_presented": [
+          "Station collection only",
+          "Developer-only heavy ship candidate with partitioned details",
+          "Immediate production ship telemetry"
+        ]
+      },
+      {
+        "question": "How is game-thread work bounded across all collectors?",
+        "answer": "Use one global scheduler and shared real-time CPU/native-work budget. Game-time age determines urgency; real elapsed cost limits permitted work. Under the observed approximately 6.2x SETA factor, prioritize overdue core indexes without multiplying heavy native stages. If the scheduler cannot keep up, mark sections stale and block dependent decisions.",
+        "options_presented": [
+          "Independent per-collector quotas",
+          "One global scheduler with a shared budget",
+          "Run whole collectors sequentially"
+        ]
+      },
+      {
+        "question": "How are sections prioritized and degraded under load?",
+        "answer": "Classify every section independently by measured read cost, rate of change, and decision-specific importance/freshness. Reserve capacity for identity, ownership, location, and core indexes; defer cargo, crew, loadout, or other details according to active decision dependencies and freshness targets.",
+        "options_presented": [
+          "Defer detail sections before core indexes",
+          "Increase work until all sections catch up",
+          "Stop the whole observation cycle"
+        ]
+      },
+      {
+        "question": "What happens when an indivisible native enumeration stage causes a visible hitch?",
+        "answer": "Reject that collector from production until a safe source is found. A one-time enumeration followed by events is acceptable only after event coverage for additions and removals is proven. Exact release thresholds come from normal-speed and SETA measurements; visible or simulation-budget-breaking hitches fail the gate.",
+        "options_presented": [
+          "Reject the collector until a safe source exists",
+          "Allow one load-time hitch and then rely on events",
+          "Allow periodic hitches for completeness"
+        ]
+      },
+      {
+        "question": "What load shape should replace periodic full scans?",
+        "answer": "Advance small bounded collector steps from a frequent frame, tick, or pulse source and continuously pump ready messages instead of creating an N-second collection spike. Collection scheduling and transport pumping are separate state machines even when one callback invokes both. The exact X4 callback seam remains evidence-gated.",
+        "options_presented": [
+          "Run a full scan every N seconds and then transmit it",
+          "Advance a bounded continuous stream on frequent pulses",
+          "Collect continuously but transmit only after a full global snapshot"
+        ]
+      }
+    ],
+    "Pipe messages and queue headroom": [
+      {
+        "question": "How should complete observation records be packed into pipe messages?",
+        "answer": "Batch multiple complete records into each message, but never split one record across messages. Treat 256 KiB only as an X4 Live MCP precedent, not as a Live Galaxy limit; derive Live Galaxy's own hard ceiling from measured Lua allocation/copy cost, write latency, Rust decode cost, failure amplification, and queue memory.",
+        "options_presented": [
+          "One object per message",
+          "Multiple complete records per message without splitting a record",
+          "Arbitrary byte chunking across messages"
+        ]
+      }
+    ]
+  },
+  "unresolved_p0": [
+    {
+      "question": "Should the owner explicitly reopen Phase 05.1's locked unidirectional boundary, or assign application ACK, NACK, and receiver credit to a later phase?",
+      "why_blocking": "The current Phase 05.1 context excludes acknowledgement vocabulary. Without receiver feedback Lua can bound local memory but cannot prove Rust semantic acceptance or end-to-end backpressure; adding feedback requires a new owner decision and a proven safe Lua receive path."
+    },
+    {
+      "question": "What are the distinct source epoch, transport sequence, section revision, batch ordinal, and replay identities?",
+      "why_blocking": "The current Rust stager expects a section sequence starting at one while Lua emits heartbeat and health on the global session sequence first."
+    },
+    {
+      "question": "Does Rust stage one serialized section candidate or a bounded keyed set of independent section candidates?",
+      "why_blocking": "One candidate is simpler but can head-of-line block urgent core data; multiple candidates increase memory and recovery state."
+    },
+    {
+      "question": "What completion certificate and X4 source evidence make a complete-set claim authoritative?",
+      "why_blocking": "The current marker has no count, digest, capture window, source epoch, or proof of native snapshot completeness."
+    },
+    {
+      "question": "What X4-owned load epoch and native identity policy prevent cross-load or reused-ID admission?",
+      "why_blocking": "Current generation identity cannot isolate a candidate across campaign load or prove object incarnation."
+    },
+    {
+      "question": "Which measured record, byte, work, memory, capture-window, and age bounds define one supported generation?",
+      "why_blocking": "The legacy 64 and 128 cardinality assumptions are arbitrary, but removing every aggregate bound violates the project's bounded-collection invariant. The current STATE.md no-aggregate-frame-or-byte statement must be corrected through GSD rather than generalized into unbounded state."
+    },
+    {
+      "question": "Does the heavy faction-ship proof remain in Phase 05.1 or move to an explicitly owned successor slice?",
+      "why_blocking": "The discussion selected a developer-only ship proof for Phase 05.1, but that conflicts with the older station-capacity phase seam and Phase 05.2 ownership of the reusable verification foundation. The artifacts require explicit reconciliation before execution."
+    }
+  ],
+  "deferred_ideas": [],
+  "canonical_refs": [
+    ".planning/PROJECT.md",
+    ".planning/REQUIREMENTS.md",
+    ".planning/ROADMAP.md",
+    ".planning/STATE.md",
+    ".planning/phases/01-read-only-observation-spine/01-CONTEXT.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-CONTEXT.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-05-RESEARCH.md",
+    ".planning/phases/05.1-bounded-real-component-discovery-inserted/05.1-UAT.md",
+    ".planning/phases/05.2-layered-lua-and-x4-verification-foundation-inserted/05.2-CONTEXT.md"
+  ]
+}
