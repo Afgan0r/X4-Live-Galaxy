@@ -6,6 +6,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+if ($Suite -eq 'x4-package-conformance') {
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'package_conformance_contract.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Product package conformance contract failed.' }
+    exit 0
+}
 $admissionContract = Join-Path $root 'tools/x4-verification/tests/admission_contract.ps1'
 $packageConformanceContract = Join-Path $root 'tools/x4-verification/tests/package_conformance_contract.ps1'
 $candidateBuildContract = Join-Path $root 'tools/x4-verification/tests/candidate_build_contract.ps1'
@@ -473,7 +478,7 @@ foreach ($test in $tests) {
     $modulePath = Join-Path $root 'extensions\?.lua'
     $moduleInitPath = Join-Path $root 'extensions\?\init.lua'
     $extensionLuaPath = Join-Path $root 'extensions\live_galaxy\lua\?.lua'
-    $luaCommand = "package.path = [[${modulePath};${moduleInitPath};${extensionLuaPath};]] .. package.path local cases = dofile([[${path}]]) for name, case in pairs(cases) do case() print('PASS x4-candidate-runner:' .. name) end"
+    $luaCommand = "package.path = [[${modulePath};${moduleInitPath};${extensionLuaPath};]] .. package.path local cases = dofile([[${path}]]) assert(type(cases) == 'table', 'MALFORMED_LUA_CASE_TABLE') local count = 0 for name, case in pairs(cases) do assert(type(name) == 'string' and type(case) == 'function', 'MALFORMED_LUA_CASE_TABLE') count = count + 1 end assert(count > 0, 'EMPTY_LUA_CASE_TABLE') for name, case in pairs(cases) do case() print('PASS x4-candidate-runner:' .. name) end print('CASES ${test}: ' .. count)"
     Invoke-TimedStage -Gate $Suite -StageId "lua-$([IO.Path]::GetFileNameWithoutExtension($test))" `
         -Executable $lua -Arguments @('-e', $luaCommand) `
         -FailureMessage "Lua contract failed: $test" `
