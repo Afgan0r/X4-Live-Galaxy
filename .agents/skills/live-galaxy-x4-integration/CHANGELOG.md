@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-03
+
+- Retired the owner-approved local dossier, known-failure registry, candidate
+  build, and evidence-authority mandates with quick task 260903-06l.
+- Routed uncertain X4 claims through the shared Docs MCP contract and retained
+  product package/import, native-binding, Lua, and fake-adapter verification.
+- Named the focused package suite and final product aggregate while preserving
+  static versus in-game evidence limits and user ownership of game actions.
+
 ## 2026-08-30
 
 - Added source-saturated integration dossiers, independent admission authority,

@@ -18,11 +18,11 @@ implementation and review.
 - Trace which system owns a value, event, command, or patch before proposing an
   integration seam.
 
-## Integration Admission
+## Integration Context
 
-Do not design or implement an X4 seam from an isolated call signature. Before
-planning it, produce a phase-owned integration dossier backed by both the
-primary source and a verified working production precedent. Cover:
+Use the Docs MCP lookup and handoff contract in
+`.agent-instructions/x4/AGENTS.md` for unknown X4 API, loader, or lifecycle
+claims. Preserve source provenance and enough context to assess the seam:
 
 - loader, registration, extension-relative module resolution, and package path;
 - Lua runtime and native binding acquisition;
@@ -31,36 +31,16 @@ primary source and a verified working production precedent. Cover:
 - failure, partial-result, and completeness semantics;
 - observed or source-supported volume and performance behavior.
 
-Inspect adjacent production integration before test helpers. Expand research to
-installed mods and available public mod sources until no load-bearing question
-that sources can answer remains unknown. A fake derived from the proposed design
-is not an independent precedent. Do not send a source-resolvable uncertainty to
-an in-game probe.
+A fake derived from the proposed design proves only its local contract, not an
+independent production precedent. Keep source-resolvable uncertainty in the
+shared research workflow rather than turning it into an in-game probe.
 
-Source-collection agents may report evidence, conflicts, and unknowns, but may
-not declare the dossier sufficient. An independent planning or verification
-gate owns PASS or BLOCK.
+## Product Regression Coverage
 
-## Known-Failure Gate
-
-Before any X4 seam is planned, implemented, packaged, or tested in game, read
-the project-owned Known X4 Failure Registry and produce a coverage matrix. For
-every registered failure class, name the independent dossier evidence and
-executable check that exclude it, or justify why it is not applicable. Absence
-of the registry or a matrix row is blocking.
-
-The gate must cover the demonstrated classes of loader mismatch, native-binding
-assumptions, native-versus-canonical identity mismatch, invented unmeasured
-bounds, partial results represented as complete, permissive local harnesses, and
-isolated call-shape research without its integration context. Test the gate by
-reintroducing each registered defect in a negative fixture and proving that the
-gate fails. A green happy path alone is insufficient.
-
-There are no automatic exceptions for small changes. Only an explicit owner
-override may bypass the gate, and the decision ledger must record its scope,
-reason, and remaining risk. When a new X4 runtime defect is discovered, add its
-generalized class and a reproducing regression fixture before treating the fix
-as complete.
+Protect affected loader, native-binding, identity, bounded-work, and
+partial-result behavior with focused executable regressions. Invalid package
+fixtures must fail for the intended reason; a permissive test-only loader or a
+green happy path cannot establish production package correctness.
 
 ## Safety
 
@@ -105,22 +85,15 @@ entry point.
 
 Run packaged conformance with production module-resolution behavior; a more
 permissive test-only package path cannot prove that X4 can load the extension.
-Validate the dossier and Known X4 Failure coverage first, then static schemas,
-pure Lua behavior, focused adapter contracts, and packaged conformance. Only
-residual native uncertainty may proceed to a disposable in-game experiment.
+Use `extensions/live_galaxy/tests/run_contracts.ps1 -Suite
+x4-package-conformance` for the actual extension and isolated package fixtures.
+Use focused product suites during edits and `-Suite all` for the final product
+regression after review convergence. The aggregate covers product Lua, native
+binding, package guards, XML/persistence schema, and runner failure propagation.
 
-For residual uncertainty, prepare multiple source-derived candidates in one
-developer-only build when they can coexist safely. Execute them serially and in
-isolation so one failure does not suppress the remaining candidates. Separate
-each candidate's verdict into execution, contract, and effect; a successful call
-that returns a valid but unexpected answer is not a passing candidate. Log every
-stage with candidate identity, source, expected and actual result, completeness,
-elapsed real and game time, SETA state when relevant, and the exact classified
-failure point. Retain the full structured log as machine-local test evidence and
-record its run identity and digest in the sanitized phase decision ledger.
-
-Select production and fallback behavior only from the recorded evidence. Keep
-losing candidates in the dossier and negative fixtures when they establish a
-reusable incompatibility; remove disposable experiment code that provides no
-useful fallback. Capture exact game version, mod list, scenario, and independent
-readback used to judge the expected effect.
+Keep static/package, pure Lua, and fake-adapter results distinct from behavior
+observed in X4. Residual runtime uncertainty requires the applicable written
+disposable verification plan; the user performs all in-game actions under the
+shared contract. Record exact X4 version, mod set, scenario and workload,
+elapsed real and game time, SETA state when relevant, and independent readback.
+Scope conclusions and fallback choices to that evidence and its limitations.
