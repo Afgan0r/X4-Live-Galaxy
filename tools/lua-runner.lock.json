@@ -15,6 +15,19 @@
     "executableRelativePath": "tools/.cache/lua/5.1.5/bin/lua.exe",
     "binaryProvenance": "Built locally with the approved LLVM clang.exe source route from the checksum-verified official Lua 5.1.5 archive; no prebuilt binary is accepted."
   },
+  "bustedDevelopment": {
+    "rootRelativePath": "tools/.cache/lua-busted/5.1.5",
+    "treeRelativePath": "tools/.cache/luarocks-tree",
+    "compiler": "clang.exe",
+    "nativeRockCompiler": "cl.exe",
+    "crt": "MSVC dynamic CRT (/MD)",
+    "dependencies": "tools/live-galaxy-tests-1.0-1.rockspec",
+    "luarocks": {
+      "version": "3.13.0",
+      "url": "https://luarocks.github.io/luarocks/releases/luarocks-3.13.0-windows-64.zip",
+      "sha256": "0897ade5d459d55cd1962a948153745a6749feb345403c68aaa9207388557ab9"
+    }
+  },
   "provenance": {
     "source": "Official Lua.org FTP archive",
     "license": "MIT; Lua 5.1.5 COPYRIGHT is retained in the verified source archive.",
