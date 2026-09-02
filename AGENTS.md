@@ -79,21 +79,23 @@ documentation and repository evidence outrank memory.
 - Route every code-affecting task through the applicable GSD workflow, including
   runtime diagnostics, tests, and refactors. Do not hand-implement phase work
   outside GSD; use `gsd-progress` to route in-flight or new work first.
-- During an autonomous goal, keep chat output to brief status updates and real
-  blockers. Do not spend output tokens on narration the user does not need.
-- Run one deep product brainstorm before each new milestone. It must lock the
-  milestone product contract, every phase boundary, acceptance criteria, and
-  non-goals deeply enough for bounded autonomous execution.
-- Persist that discussion through GSD-owned artifacts rather than a standalone
-  brainstorm file: update `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, and
-  `STATE.md`, then create every planned phase's `CONTEXT.md` in one batch after
-  the roadmap is fixed. Those phase context files are the downstream planning
-  inputs and make autonomous mode skip routine Smart Discuss prompts.
-- After that contract is locked, do not require routine product discussion per
-  phase. Agents own technical decisions within the contract. Pause only for a
-  newly discovered P0 product fork that would change milestone scope, human-only
-  X4 validation, new external authority, or a blocker that survives the
-  workflow's retry ceiling.
+- Use the full interactive cycle for every phase:
+  `discuss -> research -> plan and plan-check -> execute -> code review ->
+  verify`. Research, code review, and verification are mandatory even when a
+  phase appears straightforward.
+- Do not use `gsd-autonomous`, skip phase discussion, auto-advance between
+  phases, or pre-authorize an entire milestone. The owner approves each phase's
+  discussion decisions, then its research plus checked plan, before execution.
+- Phase discussion resolves three or four real product or architecture forks.
+  It must establish the delivered result, visible behavior, system boundaries,
+  degradation behavior, permitted manual actions, and success criterion.
+- Prefer two or three plans for one verifiable vertical phase outcome. Do not
+  force a complete multi-phase design while research can still change the next
+  phase's direction.
+- During execution and ordinary review-fix loops, agents may repair defects and
+  test gaps that preserve accepted decisions. Return to the owner only when a
+  serious review finding contradicts accepted architecture, scope, or product
+  behavior. After fixes converge, run one final full regression.
 - `.planning/config.json` is the GSD configuration source of truth.
 - Project-local `.codex/agents/gsd-*.toml` files are generated machine-local
   routing artifacts. Never commit them.
@@ -102,6 +104,33 @@ documentation and repository evidence outrank memory.
   root and restart Codex before dispatching a typed GSD agent.
 - Repository documents and planning artifacts are written in English. Russian
   is the default conversation language.
+
+### Phase Layer and Risk Matrix
+
+Every phase discussion and plan must classify its affected layers. A phase may
+select more than one:
+
+- `rust-domain` — typed domain rules, orchestration, persistence, recovery, and
+  deterministic validation;
+- `x4-runtime` — Lua, Mission Director, adapters, packaging, loading, and game
+  behavior;
+- `llm` — model contracts, prompts, evaluations, caching, and model-facing
+  safety boundaries.
+
+Code review and verification always run. Add specialized gates only when the
+phase risk requires them:
+
+| Gate | Required when |
+| --- | --- |
+| security review | trust, secrets, external input, tool authority, persistence, or irreversible effects change |
+| AI specification and eval review | model-visible contracts, prompts, model selection, or evaluation behavior change |
+| mutation testing | deterministic domain validation or safety invariants change and ordinary tests may pass with weakened logic |
+| X4 probe | source, static, pure-Lua, and fake-adapter evidence cannot establish runtime behavior |
+| SETA soak | timing, scheduling, lifecycle, recovery, or load behavior can change under accelerated game time |
+| Nyquist validation | the phase introduces or exposes a requirement-to-test coverage gap |
+
+For a mixed-layer phase, use the union of applicable gates. Record selected and
+rejected gates with reasons in the plan instead of enabling every gate globally.
 
 ## Evidence and External Sources
 
@@ -148,7 +177,7 @@ mechanically.
 
 ### X4 Live MCP Repository
 
-Location: `F:\Agent Projects\X4 Live MCP`.
+Location: `F:\Agent Projects\X4 Modding\live-mcp`.
 
 Use it for existing X4 9.00 integration evidence: UI Lua, Mission Director XML,
 native `ffi.C` calls, `sn_mod_support_apis` named pipes, event identity and
@@ -217,8 +246,9 @@ mechanism can work in X4 or permit reproducing another mod's implementation.
 
 Route reference work by question:
 
-1. For X4 API availability or event semantics, inspect installed vanilla X4,
-   then the X4 Live MCP repository and its runtime evidence.
+1. For X4 API availability or event semantics, use the shared Docs MCP lookup
+   gate first. Inspect installed vanilla X4 or Live MCP only as narrowly scoped
+   secondary evidence when the current GSD research names an unresolved claim.
 2. For installed-mod conflicts or coexistence, inspect the exact extension under
    the installed `extensions` directory, then verify source license and version.
 3. For deterministic LLM-domain architecture, testing, and GSD execution
@@ -226,33 +256,14 @@ Route reference work by question:
 4. For an existing global LLM-mod analogue and its product or operational
    failure modes, inspect `wing_bannerlord`, especially AI Influence records.
 5. Record only the distilled Live Galaxy conclusion in its current GSD artifact
-   or `wing_x4_live_galaxy`; do not copy a foreign corpus into this repository or
-   duplicate the reference source itself.
-
-## X4 Reference Researcher
-
-The canonical read-only role is
-`.agents/agents/live-galaxy-x4-reference-researcher.md`. It supports four modes:
-vanilla files, installed mods, compatibility, and provenance/licensing.
-
-Assign every substantive X4 vanilla, installed-mod, compatibility, or
-provenance research task to this specialized subagent. The main agent may
-perform only the task bootstrap, narrowly targeted implementation reads, and
-final synthesis; it must not replace the specialist with a broad inline
-research pass.
-
-The agent must write research into the current GSD-owned artifact requested by
-the caller. Durable semantic conclusions belong in personal MemPalace wing
-`wing_x4_live_galaxy`; raw copied corpora do not. The role must never edit the
-repository, game installation, or installed mods.
+   or the shared X4 modding memory lifecycle; do not copy a foreign corpus into
+   this repository or duplicate the reference source itself.
 
 ## Memory
 
-Use only personal MemPalace wing `wing_x4_live_galaxy` for durable Live Galaxy
-knowledge. Recall relevant decisions before milestone and phase planning.
-Deduplicate before writing and verify every retained drawer after writing.
-Corrections, invalidations, and deletions require exact preview and explicit
-owner approval.
+The installed shared contract owns the X4 modding memory lifecycle. Use
+`.agent-instructions/x4/MEMORY.md`; do not add a second repository-local
+lifecycle or write new drawers to the legacy Live Galaxy wing.
 
 ## Engineering Invariants
 
