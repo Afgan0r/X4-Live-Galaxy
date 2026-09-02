@@ -6,7 +6,7 @@ status: executing
 stopped_at: Completed 05.1-08-PLAN.md
 last_updated: "2026-08-31T21:29:10.939Z"
 last_activity: 2026-09-03
-last_activity_desc: Completed quick 260903-06l product test workflow cleanup
+last_activity_desc: Completed quick 260903-32k Busted migration and product checks
 state_head: 18682f5463b6c3d9b70a62b713e9cfe8531901c4
 progress:
   total_phases: 10
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 Phase: 05.1 (Bounded Real Component Discovery) — READY TO EXECUTE
 Plan: 8 of 09 — ready for automated execution
 Status: Executing approved gap-closure plans
-Last activity: 2026-09-03 — Completed quick 260903-06l; phase execution remains paused per HANDOFF
+Last activity: 2026-09-03 — Completed quick 260903-32k; product all passed in 1.449 s; phase execution remains paused per HANDOFF
 
 Progress: [█████░░░░░] 50%
 
@@ -189,6 +189,7 @@ None yet.
 | --- | --- | --- | --- | --- | --- |
 | 260831-3m9 | Reduce Phase 05.2 test iteration time | 2026-08-31 | 3f3d9b5 | | [260831-3m9-reduce-phase-05-2-test-iteration-time-by](./quick/260831-3m9-reduce-phase-05-2-test-iteration-time-by/) |
 | 260903-06l | Retire research tooling; product all passes in 38.060 s | 2026-09-03 | 57db7ed | Verified | [260903-06l-remove-obsolete-x4-research-verification](./quick/260903-06l-remove-obsolete-x4-research-verification/) |
+| 260903-32k | Replace custom Lua tooling with Busted; product all passes in 1.449 s | 2026-09-03 | 8783d31 | Verified | [260903-32k-replace-custom-lua-test-infrastructure-w](./quick/260903-32k-replace-custom-lua-test-infrastructure-w/) |
 
 ### Roadmap Evolution
 
