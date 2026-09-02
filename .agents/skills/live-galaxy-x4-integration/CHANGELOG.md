@@ -2,6 +2,8 @@
 
 ## 2026-09-03
 
+- Applied the owner's decision to drop More AI Economy Ships compatibility;
+  similar functionality remains a possible future addition only if needed.
 - Replaced the owner-approved static import-graph mandate with interpreter
   compilation, real-module execution and explicit external-call evidence in
   quick task 260903-32k. Named Busted setup and focused suites; kept X4 runtime

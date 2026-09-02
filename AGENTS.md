@@ -146,8 +146,10 @@ rejected gates with reasons in the plan instead of enabling every gate globally.
 - Add a provenance entry only when a specific external source materially
   influences implementation. Do not build an exhaustive source corpus.
 - Live Galaxy is incompatible with the Faction Enhancer suite in the first
-  public alpha. It should support KUDA AI Tweaks, More AI Economy Ships, and
-  Add More Sectors, subject to verified compatibility tests.
+  public alpha. It should support KUDA AI Tweaks and Add More Sectors, subject
+  to verified compatibility tests. More AI Economy Ships compatibility is not
+  supported or a release gate. Similar economy-fleet functionality may be
+  considered for Live Galaxy later if needed; it is not committed scope.
 
 ## Reference Map
 

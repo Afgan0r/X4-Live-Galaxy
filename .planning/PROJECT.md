@@ -59,6 +59,9 @@ bounded by deterministic validation.
 - Mod-added factions — not implied by the vanilla-plus-DLC public-alpha target.
 - Faction Enhancer compatibility — the first public alpha is explicitly
   incompatible with that suite.
+- More AI Economy Ships compatibility — support and release gates are dropped.
+  Similar economy-fleet functionality may be considered for Live Galaxy later
+  if needed; no milestone or implementation commitment is made.
 - XRSGE compatibility — uncommitted and subject to a later evidence-based
   research spike.
 - Reading or modifying player save files — prohibited; only X4-owned save
@@ -131,8 +134,8 @@ evidence-driven implementation choices.
 The initial GSD roadmap describes only milestone 0.1. Later `0.x` milestones are
 internal prototypes that progressively validate fleet, economy, and institution
 autonomy. A private gameplay-ready build must cover the supported vanilla and
-DLC faction roster and pass compatibility gates for KUDA AI Tweaks, More AI
-Economy Ships, and Add More Sectors. Version `1.0.0` is the first public alpha,
+DLC faction roster and pass compatibility gates for KUDA AI Tweaks and
+Add More Sectors. Version `1.0.0` is the first public alpha,
 not a stable release. It ships the autonomous faction core before missions;
 the custom interface and Player Influence follow as separate milestones.
 
@@ -193,6 +196,7 @@ repository are read-only evidence sources.
 
 | Decision | Rationale | Outcome |
 | --- | --- | --- |
+| Drop More AI Economy Ships compatibility; consider similar functionality internally only if needed later | The owner chose to remove the external compatibility commitment without adding current product scope | Accepted 2026-09-03 |
 | Build a public Live Galaxy mod independently of X4 Live MCP | Personal campaign tooling must not become a public runtime dependency | — Pending |
 | Use Faction Minds under a deterministic kernel | Preserve faction agency without giving models arbitrary mutation authority | — Pending |
 | Make milestone 0.1 observation-only | Isolate strategy, ingestion, persistence, cost, and reliability before command integration | — Pending |

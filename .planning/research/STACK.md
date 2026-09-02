@@ -94,7 +94,7 @@ Busted
 - No player save-file reader or writer; X4-owned persistence integration remains a later evidence gate.
 - No custom dossier/chronicle/institution UI; use low-cost Mail/Logbook reports and external diagnostics.
 - No fixed vanilla map, hard-coded asset counts, or mod-added-faction assumptions.
-- No Faction Enhancer compatibility claim; KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors require later compatibility tests.
+- No Faction Enhancer compatibility claim; KUDA AI Tweaks and Add More Sectors require later compatibility tests. The owner dropped More AI Economy Ships compatibility on 2026-09-03; it is not a release gate.
 - No final Rust toolchain, crate versions, subscription model, public API model, CI image, or Lua runner version until phase benchmarks verify them.
 
 ## Sources

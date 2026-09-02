@@ -69,7 +69,7 @@ The following are product capabilities, not 0.1 acceptance criteria:
 - Deterministic application of fleet, economy, institution, and eventually diplomacy effects after Shadow Director evidence is sufficient.
 - Private institutional knowledge, changing influence, refusal, sabotage, and power struggles.
 - First-alpha diplomacy beyond bilateral war declaration and termination.
-- Broader vanilla-plus-DLC faction coverage and compatibility gates for KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors.
+- Broader vanilla-plus-DLC faction coverage and compatibility gates for KUDA AI Tweaks and Add More Sectors. The owner dropped More AI Economy Ships compatibility on 2026-09-03; similar functionality is only a possible later addition if needed.
 - Gameplay-ready autonomous faction core and later public-alpha packaging/release gates.
 - Missions, Player Influence, deeper diplomacy, historical simulations, and a custom in-game dossier/chronicle/institution interface.
 - Specialized XEN/KHK architecture beyond observation and parallel research.

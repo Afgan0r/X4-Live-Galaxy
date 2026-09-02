@@ -93,7 +93,7 @@
 ### Product Expansion
 
 - **PROD-01**: A private gameplay-ready build supports the selected vanilla and DLC faction roster.
-- **PROD-02**: The first public alpha passes evidence-based compatibility gates for KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors while remaining explicitly incompatible with Faction Enhancer.
+- **PROD-02**: The first public alpha passes evidence-based compatibility gates for KUDA AI Tweaks and Add More Sectors while remaining explicitly incompatible with Faction Enhancer. More AI Economy Ships compatibility is not supported or a release gate.
 - **PROD-03**: Player missions and Player Influence are introduced only after the autonomous faction core is proven.
 - **PROD-04**: A custom dossier, chronicle, or institution interface is introduced in a separate post-alpha milestone.
 - **PROD-05**: Version 1.0.0 is released as the first public alpha only after private closed-loop gameplay, provenance, licensing, packaging, and recovery gates pass.
@@ -114,6 +114,7 @@
 | Public runtime API integration in milestone 0.1 | Real-model prototype evidence uses developer-controlled subscription tooling until the public-alpha path begins. |
 | Full vanilla, DLC, or mod-added faction rollout | The first prototype deliberately exercises only full ZYA and ARG minds. |
 | Faction Enhancer compatibility | It is an explicit first-public-alpha incompatibility, not a milestone 0.1 target. |
+| More AI Economy Ships compatibility and a committed replacement | The owner dropped compatibility on 2026-09-03. Similar economy-fleet functionality may be considered internally later only if needed; no milestone commitment exists. |
 | XRSGE compatibility | No product commitment exists; a later evidence-based spike is required. |
 | Direct player save-file access | Save files are prohibited research and mutation targets; persistence must use an X4-owned contract. |
 | Public-ready or playable claims | Every 0.x release is an internal prototype; 1.0.0 is the first public alpha. |
@@ -182,4 +183,4 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 ---
 
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after milestone 0.1 product brainstorm*
+*Last updated: 2026-09-03 after the owner dropped More AI Economy Ships compatibility*

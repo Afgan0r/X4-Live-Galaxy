@@ -70,8 +70,10 @@ green happy path cannot establish production package correctness.
 - Map file patches, events, hooks, ownership, load order, and behavioral overlap
   before claiming compatibility.
 - The first public alpha is incompatible with the Faction Enhancer suite.
-- KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors require explicit
-  compatibility tests.
+- KUDA AI Tweaks and Add More Sectors require explicit compatibility tests.
+- More AI Economy Ships compatibility is not supported or a release gate.
+  Similar economy-fleet functionality is only a possible later addition to
+  Live Galaxy if needed, not committed scope.
 - Learn mechanisms from external code, but implement original algorithms. Quote
   minimally and record provenance only for material implementation influence.
 - Never copy code whose license or redistribution terms are unresolved.

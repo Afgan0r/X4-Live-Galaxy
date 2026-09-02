@@ -54,7 +54,7 @@ The stack recommendation is strong on boundaries but intentionally leaves versio
 **Defer (later milestones):**
 
 - Fleet, economy, institution, or diplomacy mutation; player missions and Player Influence; autonomous XEN/KHK minds.
-- Full vanilla/DLC or mod-added faction rollout and compatibility guarantees; test KUDA AI Tweaks, More AI Economy Ships, and Add More Sectors only in later evidence gates, while Faction Enhancer remains explicitly incompatible for the first public alpha.
+- Full vanilla/DLC or mod-added faction rollout and compatibility guarantees; test KUDA AI Tweaks and Add More Sectors only in later evidence gates, while Faction Enhancer remains explicitly incompatible for the first public alpha. The owner dropped More AI Economy Ships compatibility on 2026-09-03; similar economy-fleet functionality may be considered internally later only if needed, without a milestone commitment.
 - Custom dossier/chronicle/institution UI, save-file readers/writers, and unbounded chat/prose.
 
 ### Architecture Approach
