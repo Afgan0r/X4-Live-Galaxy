@@ -27,9 +27,9 @@ $script:failureCode = 'PACKAGE_READ_FAILED'
 $script:diagnostics = @()
 $script:totalBytes = 0
 $script:importCount = 0
-$script:visiting = @{}
-$script:visited = @{}
-$script:sources = @{}
+$script:visiting = [Collections.Generic.Dictionary[string, bool]]::new([StringComparer]::Ordinal)
+$script:visited = [Collections.Generic.Dictionary[string, bool]]::new([StringComparer]::Ordinal)
+$script:sources = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
 
 function Fail([string]$Code, [string]$LogicalPath = '') {
     $script:failureCode = $Code
@@ -398,7 +398,7 @@ function Visit-Module([string]$LogicalPath, [int]$Depth) {
         $child = Resolve-InternalModule $module
         if ($null -ne $child) { Visit-Module $child ($Depth + 1) }
     }
-    $script:visiting.Remove($LogicalPath)
+    [void]$script:visiting.Remove($LogicalPath)
     $script:visited[$LogicalPath] = $true
 }
 

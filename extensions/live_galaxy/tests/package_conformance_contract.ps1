@@ -75,6 +75,13 @@ Test-PackageCase 'literal-import' 'PASS' {
     Set-FixtureFile $p $entry ($binding + '; local dep = require("live_galaxy/lua/dependency")')
     Set-FixtureFile $p 'lua/dependency.lua' 'return {}'
 }
+Test-PackageCase 'repeated-import-wrong-case' 'UNRESOLVED_IMPORT' {
+    param($p)
+    Set-FixtureFile $p $entry ($binding + '; require("live_galaxy/lua/first"); require("live_galaxy/lua/second")')
+    Set-FixtureFile $p 'lua/first.lua' 'return require("live_galaxy/lua/leaf")'
+    Set-FixtureFile $p 'lua/second.lua' 'return require("live_galaxy/lua/Leaf")'
+    Set-FixtureFile $p 'lua/leaf.lua' 'return {}'
+}
 foreach ($escape in @('a', 'b', 'f', 'n', 'r', 't', 'v')) {
     Test-PackageCase "semantic-escape-$escape" 'UNRESOLVED_IMPORT' {
         param($p)
