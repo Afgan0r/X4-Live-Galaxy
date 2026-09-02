@@ -152,9 +152,42 @@ function Get-LuaTokens([string]$Source) {
                 $next = $Source[$index]
                 if ($next -eq '\') {
                     if ($index + 1 -ge $Source.Length) { Fail 'INVALID_LUA_SOURCE' }
-                    [void]$builder.Append($Source[$index + 1]); $index += 2; continue
+                    $index++
+                    $escaped = $Source[$index]
+                    if ($escaped -cmatch '^[0-9]$') {
+                        $start = $index
+                        while ($index -lt $Source.Length -and $index -lt $start + 3 -and
+                            $Source[$index] -cmatch '^[0-9]$') { $index++ }
+                        $value = [int]::Parse($Source.Substring($start, $index - $start))
+                        if ($value -gt 255) { Fail 'INVALID_LUA_SOURCE' }
+                        [void]$builder.Append([char]$value)
+                        continue
+                    }
+                    $index++
+                    if ($escaped -eq "`r" -or $escaped -eq "`n") {
+                        if ($index -lt $Source.Length -and
+                            ($Source[$index] -eq "`r" -or $Source[$index] -eq "`n") -and
+                            $Source[$index] -ne $escaped) { $index++ }
+                        [void]$builder.Append("`n")
+                        continue
+                    }
+                    $decoded = switch -CaseSensitive ($escaped) {
+                        'a' { [char]7 }
+                        'b' { [char]8 }
+                        'f' { [char]12 }
+                        'n' { [char]10 }
+                        'r' { [char]13 }
+                        't' { [char]9 }
+                        'v' { [char]11 }
+                        # Lua 5.1 preserves other escaped characters literally,
+                        # including quotes and backslashes (unlike later Lua).
+                        default { $escaped }
+                    }
+                    [void]$builder.Append($decoded)
+                    continue
                 }
                 if ($next -eq $quote) { $closed = $true; $index++; break }
+                if ($next -eq "`r" -or $next -eq "`n") { Fail 'INVALID_LUA_SOURCE' }
                 [void]$builder.Append($next); $index++
             }
             if (-not $closed) { Fail 'INVALID_LUA_SOURCE' }

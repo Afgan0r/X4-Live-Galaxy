@@ -75,6 +75,33 @@ Test-PackageCase 'literal-import' 'PASS' {
     Set-FixtureFile $p $entry ($binding + '; local dep = require("live_galaxy/lua/dependency")')
     Set-FixtureFile $p 'lua/dependency.lua' 'return {}'
 }
+foreach ($escape in @('a', 'b', 'f', 'n', 'r', 't', 'v')) {
+    Test-PackageCase "semantic-escape-$escape" 'UNRESOLVED_IMPORT' {
+        param($p)
+        Set-FixtureFile $p $entry ($binding + '; require("live_galaxy/lua/\' + $escape + 'leaf")')
+        Set-FixtureFile $p "lua/${escape}leaf.lua" 'return {}'
+    }
+}
+Test-PackageCase 'decimal-escape-import' 'PASS' {
+    param($p)
+    Set-FixtureFile $p $entry ($binding + '; require("live_galaxy/lua/\100ependency")')
+    Set-FixtureFile $p 'lua/dependency.lua' 'return {}'
+}
+Test-PackageCase 'decimal-escape-missing-module' 'UNRESOLVED_IMPORT' {
+    param($p)
+    Set-FixtureFile $p $entry ($binding + '; require("live_galaxy/lua/\100ependency")')
+    Set-FixtureFile $p 'lua/100ependency.lua' 'return {}'
+}
+foreach ($decimal in @('1', '01', '001')) {
+    Test-PackageCase "decimal-escape-width-$decimal" 'UNRESOLVED_IMPORT' {
+        param($p)
+        Set-FixtureFile $p $entry ($binding + '; require("live_galaxy/lua/\' + $decimal + 'leaf")')
+        Set-FixtureFile $p "lua/${decimal}leaf.lua" 'return {}'
+    }
+}
+Test-PackageCase 'decimal-escape-overflow' 'INVALID_LUA_SOURCE' {
+    param($p) Set-FixtureFile $p $entry ($binding + '; require("live_galaxy/lua/\256leaf")')
+}
 Test-PackageCase 'static-concatenation-and-decoys' 'PASS' {
     param($p)
     Set-FixtureFile $p $entry @'
