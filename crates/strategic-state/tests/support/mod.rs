@@ -1,4 +1,15 @@
-use observation_ingest::{AcceptedProjection, AdmissionOutcome, admit_batch};
+use observation_ingest::{
+    AcceptedProjection, AdmissionError, AdmissionOutcome, ReceiptClock,
+    admit_batch_with_receipt_clock,
+};
+
+struct FixtureReceiptClock;
+
+impl ReceiptClock for FixtureReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError> {
+        Ok(1)
+    }
+}
 
 pub fn runtime_fact_frames(frames: &[&str]) -> Vec<String> {
     frames
@@ -19,7 +30,8 @@ pub fn runtime_fact_frames(frames: &[&str]) -> Vec<String> {
 pub fn admit_runtime_fact_frames(frames: &[&str]) -> AcceptedProjection {
     let frames = runtime_fact_frames(frames);
     let input = frames.iter().map(String::as_str).collect::<Vec<_>>();
-    let outcome = admit_batch(AcceptedProjection::empty(), &input);
+    let outcome =
+        admit_batch_with_receipt_clock(AcceptedProjection::empty(), &input, &FixtureReceiptClock);
     assert!(
         matches!(outcome, AdmissionOutcome::Accepted(_)),
         "strict v2 runtime-fact fixture must be accepted before packet derivation"

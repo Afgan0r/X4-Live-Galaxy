@@ -18,6 +18,17 @@ fn packet(
 }
 
 #[test]
+fn fixture_admission_uses_a_fixed_receipt_timestamp() {
+    for frames in [&ORDERED[..0], &ORDERED[..1], &ORDERED[..]] {
+        let accepted = support::admit_runtime_fact_frames(frames);
+        assert_eq!(accepted.snapshot.observations.len(), frames.len());
+        for observation in accepted.snapshot.observations.values() {
+            assert_eq!(observation.record.observed_at().unix_millis(), 1);
+        }
+    }
+}
+
+#[test]
 fn permutations_have_one_canonical_packet_and_replay_identity() {
     let ordered_result = packet(&ORDERED);
     let permuted_result = packet(&[ORDERED[3], ORDERED[1], ORDERED[0], ORDERED[2]]);

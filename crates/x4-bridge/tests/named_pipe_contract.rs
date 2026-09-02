@@ -1,33 +1,30 @@
-use x4_bridge::{
-    AcceptAttempt, AcceptDisposition, MAX_CONSECUTIVE_ACCEPT_FAILURES, PIPE_ENDPOINT,
-    PipeDisposition, PipeServer, is_telemetry_only,
+use x4_bridge::{PIPE_ENDPOINT, PipeDisposition, PipeServer, is_telemetry_only};
+
+#[path = "named_pipe_contract/accept_contract.rs"]
+mod accept_contract;
+#[path = "named_pipe_contract/deferred_publication.rs"]
+mod deferred_publication;
+#[path = "named_pipe_contract/fixtures.rs"]
+mod fixtures;
+
+use fixtures::{
+    HEALTH, HEARTBEAT, HELLO, MARKER, MARKER_CONFIRMATION, OBSERVATION, observation,
+    station_observation,
 };
-
-const HELLO: &str = r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":1}"#;
-const OBSERVATION: &str = r#"{"type":"observation","scope":"runtime:sectors","entity_id":"sector:argon_prime","version":1,"quality":"fresh","runtime_facts":{"r":"x4_runtime","g":42,"q":"fresh","a":"available","s":[{"i":"sector:argon_prime"}],"x":[{"i":"asset:ship:1","p":"sector:argon_prime"}],"c":[{"i":"capacity:ship:storage","p":"asset:ship:1","v":42}],"o":[{"i":"ownership:ship:1","p":"asset:ship:1","n":"faction:argon"}]},"generation":1,"sequence":3}"#;
-const MARKER: &str = r#"{"type":"complete_marker","scope":"runtime:sectors","version":1,"generation":1,"sequence":4}"#;
-const HEARTBEAT: &str =
-    r#"{"type":"heartbeat","scope":"runtime:sectors","version":1,"generation":1,"sequence":1}"#;
-const HEALTH: &str = r#"{"type":"runtime_health","scope":"runtime:sectors","version":1,"status":"available","generation":1,"sequence":2}"#;
-
-fn observation(version: u64, sequence: u64) -> String {
-    format!(
-        r#"{{"type":"observation","scope":"runtime:sectors","entity_id":"sector:argon_prime","version":{version},"quality":"fresh","runtime_facts":{{"r":"x4_runtime","g":42,"q":"fresh","a":"available","s":[{{"i":"sector:argon_prime"}}],"x":[{{"i":"asset:ship:1","p":"sector:argon_prime"}}],"c":[{{"i":"capacity:ship:storage","p":"asset:ship:1","v":42}}],"o":[{{"i":"ownership:ship:1","p":"asset:ship:1","n":"faction:argon"}}]}},"generation":1,"sequence":{sequence}}}"#
-    )
-}
-
-fn station_observation(station: u64, sector: &str, sequence: u64) -> String {
-    format!(
-        r#"{{"type":"observation","scope":"runtime:sectors","entity_id":"asset:station:{station}","version":2,"quality":"fresh","runtime_facts":{{"r":"x4_runtime","q":"fresh","a":"available","s":[{{"i":"{sector}"}}],"x":[{{"i":"asset:station:{station}","p":"{sector}"}}],"c":[{{"i":"capacity:station:{station}","p":"asset:station:{station}","v":42}}],"o":[{{"i":"ownership:station:{station}","p":"asset:station:{station}","n":"faction:argon"}}]}},"generation":1,"sequence":{sequence}}}"#
-    )
-}
 
 #[test]
 fn project_pipe_identity_and_typed_batch_admission_are_aligned() {
     let mut server = PipeServer::new();
 
     assert_eq!(PIPE_ENDPOINT, r"\\.\pipe\live_galaxy");
-    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
+    for frame in [
+        HELLO,
+        HEARTBEAT,
+        HEALTH,
+        OBSERVATION,
+        MARKER,
+        MARKER_CONFIRMATION,
+    ] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
@@ -68,7 +65,7 @@ fn disconnect_or_conflicting_marker_discards_only_the_pending_snapshot() {
 }
 
 #[test]
-fn station_frames_remain_pending_until_one_matching_marker() {
+fn station_frames_remain_pending_until_marker_confirmation() {
     let mut server = PipeServer::new();
     let first = station_observation(10, "sector:argon_prime", 1);
     let second = station_observation(20, "sector:second_contact", 2);
@@ -79,25 +76,15 @@ fn station_frames_remain_pending_until_one_matching_marker() {
     assert_eq!(server.admit_message(&second), PipeDisposition::Accepted);
     assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
     assert_eq!(server.admit_message(marker), PipeDisposition::Accepted);
+    assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
+    assert_eq!(
+        server.admit_message(MARKER_CONFIRMATION),
+        PipeDisposition::Accepted
+    );
     assert_eq!(
         server.snapshot().entity_ids(),
         vec!["asset:station:10", "asset:station:20"]
     );
-}
-
-#[test]
-fn marker_admits_129_contiguous_station_frames_without_an_aggregate_cap() {
-    let mut server = PipeServer::new();
-
-    assert_eq!(server.admit_message(HELLO), PipeDisposition::Accepted);
-    for offset in 0..129_u64 {
-        let station = 1_000 + offset;
-        let frame = station_observation(station, "sector:argon_prime", offset + 1);
-        assert_eq!(server.admit_message(&frame), PipeDisposition::Accepted);
-    }
-    let marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":130}"#;
-    assert_eq!(server.admit_message(marker), PipeDisposition::Accepted);
-    assert_eq!(server.snapshot().entity_ids().len(), 129);
 }
 
 #[test]
@@ -116,7 +103,14 @@ fn session_rejects_stale_generation_replay_and_terminal_hello() {
 #[test]
 fn higher_generation_reconnect_preserves_completed_projection() {
     let mut server = PipeServer::new();
-    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
+    for frame in [
+        HELLO,
+        HEARTBEAT,
+        HEALTH,
+        OBSERVATION,
+        MARKER,
+        MARKER_CONFIRMATION,
+    ] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.admit_message(r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":2}"#), PipeDisposition::Accepted);
@@ -126,15 +120,22 @@ fn higher_generation_reconnect_preserves_completed_projection() {
 }
 
 #[test]
-fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
+fn unconfirmed_marker_then_disconnect_preserves_the_prior_projection() {
     let mut server = PipeServer::new();
-    let next_observation = station_observation(10, "sector:argon_prime", 5);
-    let admitted_marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":6}"#;
+    let next_observation = station_observation(10, "sector:argon_prime", 6);
+    let ambiguous_marker = r#"{"type":"complete_marker","scope":"runtime:sectors","version":2,"generation":1,"sequence":7}"#;
     let reconnect = r#"{"type":"hello","protocol_major":1,"game_build":"live-galaxy-x4-build-2","capabilities":["live-galaxy-observation-v2"],"generation":2}"#;
     let post_reconnect_heartbeat =
         r#"{"type":"heartbeat","scope":"runtime:sectors","version":2,"generation":2,"sequence":1}"#;
 
-    for frame in [HELLO, HEARTBEAT, HEALTH, OBSERVATION, MARKER] {
+    for frame in [
+        HELLO,
+        HEARTBEAT,
+        HEALTH,
+        OBSERVATION,
+        MARKER,
+        MARKER_CONFIRMATION,
+    ] {
         assert_eq!(server.admit_message(frame), PipeDisposition::Accepted);
     }
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
@@ -143,10 +144,10 @@ fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
         PipeDisposition::Accepted
     );
     assert_eq!(
-        server.admit_message(admitted_marker),
+        server.admit_message(ambiguous_marker),
         PipeDisposition::Accepted
     );
-    assert_eq!(server.snapshot().entity_ids(), vec!["asset:station:10"]);
+    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
 
     server.discard_pending();
     assert_eq!(server.admit_message(reconnect), PipeDisposition::Accepted);
@@ -154,7 +155,7 @@ fn delivered_marker_then_disconnect_preserves_the_completed_projection() {
         server.admit_message(post_reconnect_heartbeat),
         PipeDisposition::Accepted
     );
-    assert_eq!(server.snapshot().entity_ids(), vec!["asset:station:10"]);
+    assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
 }
 
 #[test]
@@ -175,39 +176,4 @@ fn completed_cycles_release_ingress_capacity_without_replaying_sequences() {
         assert_eq!(server.admit_message(&marker), PipeDisposition::Accepted);
     }
     assert_eq!(server.snapshot().entity_ids(), vec!["sector:argon_prime"]);
-}
-
-#[test]
-fn transient_accept_error_retries_before_a_replacement_client() {
-    let mut server = PipeServer::new();
-
-    assert_eq!(server.admit_message(HELLO), PipeDisposition::Accepted);
-    assert_eq!(server.admit_message(OBSERVATION), PipeDisposition::Accepted);
-    for _ in 1..MAX_CONSECUTIVE_ACCEPT_FAILURES {
-        assert_eq!(
-            server.record_accept(AcceptAttempt::TransientFailure),
-            AcceptDisposition::RetryAccept
-        );
-    }
-    assert_eq!(
-        server.record_accept(AcceptAttempt::TransientFailure),
-        AcceptDisposition::RetryAcceptDegraded { delay_millis: 100 }
-    );
-    assert_eq!(
-        server.record_accept(AcceptAttempt::TransientFailure),
-        AcceptDisposition::RetryAcceptDegraded { delay_millis: 200 }
-    );
-    for expected_delay in [400, 800, 1_000, 1_000] {
-        assert_eq!(
-            server.record_accept(AcceptAttempt::TransientFailure),
-            AcceptDisposition::RetryAcceptDegraded {
-                delay_millis: expected_delay
-            }
-        );
-    }
-    assert_eq!(
-        server.record_accept(AcceptAttempt::ClientAccepted),
-        AcceptDisposition::ServeClient
-    );
-    assert_eq!(server.snapshot().entity_ids(), Vec::<String>::new());
 }
