@@ -79,17 +79,24 @@ green happy path cannot establish production package correctness.
 ## Verification
 
 Use extension-relative module paths for every production Lua `require`,
-including dependencies loaded by other modules. Before deployment, statically
-verify the complete production import graph rather than only the registered
-entry point.
+including dependencies loaded by other modules. Compile shipped Lua with the
+actual interpreter and load real product modules through normal `require`.
+Exercise delayed imports through the native, lifecycle, and transport paths
+that use them. Fake only the external X4 environment and verify its calls;
+follow `live-galaxy-x4-tests` for test design and evidence requirements.
 
-Run packaged conformance with production module-resolution behavior; a more
-permissive test-only package path cannot prove that X4 can load the extension.
-Use `extensions/live_galaxy/tests/run_contracts.ps1 -Suite
-x4-package-conformance` for the actual extension and isolated package fixtures.
-Use focused product suites during edits and `-Suite all` for the final product
-regression after review convergence. The aggregate covers product Lua, native
-binding, package guards, XML/persistence schema, and runner failure propagation.
+Provision local Busted once with `tools/provision-lua.ps1 -WithBusted
+-CompilerPath <installed clang.exe>`. Normal tests use the installed tools.
+Run `extensions/live_galaxy/tests/run_contracts.ps1 -Suite telemetry` (or
+`component_discovery`, `x4_discovery`, `scheduler`, `syntax`, `xml`) for focused
+checks; `-Filter` forwards a Lua pattern to Busted. Use `-Suite all` once for
+the final product regression after review convergence. XML checks cover the
+manifest, UI registration, entrypoint existence, and persistence schema.
+
+A local module load proves only the paths executed against the supplied fake
+environment. It does not establish all imports or X4 loader/native
+compatibility. Do not recreate a source lexer, import-graph analyzer, or
+vocabulary guard as a substitute for executable behavior.
 
 Keep static/package, pure Lua, and fake-adapter results distinct from behavior
 observed in X4. Residual runtime uncertainty requires the applicable written

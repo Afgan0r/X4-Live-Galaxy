@@ -2,6 +2,10 @@
 
 ## 2026-09-03
 
+- Replaced the owner-approved static import-graph mandate with interpreter
+  compilation, real-module execution and explicit external-call evidence in
+  quick task 260903-32k. Named Busted setup and focused suites; kept X4 runtime
+  compatibility outside local-test claims.
 - Retired the owner-approved local dossier, known-failure registry, candidate
   build, and evidence-authority mandates with quick task 260903-06l.
 - Routed uncertain X4 claims through the shared Docs MCP contract and retained
