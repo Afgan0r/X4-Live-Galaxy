@@ -1,8 +1,13 @@
-package.path = package.path .. ";extensions/live_galaxy/lua/?.lua"
-
-local discovery = require("live_galaxy_component_discovery")
-local telemetry = require("live_galaxy_telemetry")
-local cases = {}
+local helper = require("test_helper")
+local json = require("dkjson")
+local discovery, telemetry, fixture
+describe("component_discovery", function()
+after_each(function() if fixture then fixture.restore() end end)
+before_each(function()
+    fixture = helper.new()
+    discovery = fixture.load("live_galaxy_component_discovery")
+    telemetry = fixture.load("live_galaxy_telemetry")
+end)
 
 local UNIVERSE_ID_BYTES = 8
 
@@ -69,7 +74,7 @@ local function fake_api(count)
     }, calls
 end
 
-function cases.validates_the_complete_owner_scope_before_component_reads()
+it("validates the complete owner scope before component reads", function()
     local api, calls = fake_api(130)
     local observation, err = discovery.new(api).read_observation(1)
 
@@ -77,9 +82,9 @@ function cases.validates_the_complete_owner_scope_before_component_reads()
     assert(err == "enumeration_overflow")
     assert(calls.allocations == 0)
     assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
-end
+end)
 
-function cases.derives_the_pre_run_policy_from_129_members_and_universe_id_size()
+it("derives the pre run policy from 129 members and universe id size", function()
     local policy = assert(discovery.derive_pre_run_native_policy(UNIVERSE_ID_BYTES))
 
     assert(policy.max_allocation_bytes == 129 * UNIVERSE_ID_BYTES)
@@ -87,9 +92,9 @@ function cases.derives_the_pre_run_policy_from_129_members_and_universe_id_size(
     assert(discovery.derive_pre_run_native_policy(0) == nil)
     assert(discovery.derive_pre_run_native_policy(1.5) == nil)
     assert(discovery.derive_pre_run_native_policy(math.huge) == nil)
-end
+end)
 
-function cases.accepts_the_exact_allocation_and_work_bound()
+it("accepts the exact allocation and work bound", function()
     local api, calls = fake_api()
     api.native_policy = native_policy(2, 10)
 
@@ -99,9 +104,9 @@ function cases.accepts_the_exact_allocation_and_work_bound()
     assert(calls.count == 1 and calls.fill == 1)
     assert(#calls.order == 10)
     assert(calls.order[1] == "count" and calls.order[2] == "fill")
-end
+end)
 
-function cases.rejects_one_byte_over_before_allocation_or_fill()
+it("rejects one byte over before allocation or fill", function()
     local api, calls = fake_api()
     api.native_policy = {
         max_allocation_bytes = 2 * UNIVERSE_ID_BYTES - 1,
@@ -114,9 +119,9 @@ function cases.rejects_one_byte_over_before_allocation_or_fill()
     assert(calls.count == 1)
     assert(calls.allocations == 0 and calls.fill == 0)
     assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
-end
+end)
 
-function cases.rejects_one_work_unit_over_before_allocation_or_fill()
+it("rejects one work unit over before allocation or fill", function()
     local api, calls = fake_api()
     api.native_policy = native_policy(2, 9)
 
@@ -126,9 +131,9 @@ function cases.rejects_one_work_unit_over_before_allocation_or_fill()
     assert(calls.count == 1)
     assert(calls.allocations == 0 and calls.fill == 0)
     assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
-end
+end)
 
-function cases.rejects_absent_or_invalid_policy_before_the_count_call()
+it("rejects absent or invalid policy before the count call", function()
     local invalid_policies = {
         nil,
         {},
@@ -146,9 +151,9 @@ function cases.rejects_absent_or_invalid_policy_before_the_count_call()
         assert(calls.count == 0 and calls.allocations == 0 and calls.fill == 0)
         assert(calls.convert == 0 and calls.metadata == 0 and calls.capacity == 0)
     end
-end
+end)
 
-function cases.emits_sorted_real_station_frames_only_after_all_members_validate()
+it("emits sorted real station frames only after all members validate", function()
     local api, calls = fake_api()
     local observations = assert(discovery.new(api).read_observations(1))
     local first, second = observations[1].runtime_facts, observations[2].runtime_facts
@@ -162,9 +167,9 @@ function cases.emits_sorted_real_station_frames_only_after_all_members_validate(
     assert(calls.order[3] == "convert" and calls.order[4] == "convert64")
     assert(calls.order[5] == "convert" and calls.order[6] == "convert64")
     assert(calls.order[7] == "metadata" and calls.order[8] == "capacity")
-end
+end)
 
-function cases.uses_a_native_faction_token_and_canonicalizes_owner_facts()
+it("uses a native faction token and canonicalizes owner facts", function()
     local api = fake_api(1)
     local counted_faction, filled_faction
     api.native_faction_id = "argon"
@@ -185,22 +190,24 @@ function cases.uses_a_native_faction_token_and_canonicalizes_owner_facts()
     assert(counted_faction == "argon")
     assert(filled_faction == "argon")
     assert(observation.runtime_facts.ownership[1].owner_id == "faction:argon")
-end
+end)
 
-function cases.serializes_each_station_in_its_own_compact_envelope()
+it("serializes each station in its own compact envelope", function()
     local api = fake_api()
     local payloads = assert(telemetry.produce_observations(discovery.new(api), 3))
     local payload = payloads[1]
 
     assert(#payloads == 2)
-    assert(payload:match('"entity_id":"asset:station:10"'))
+    local decoded, _, decode_error = json.decode(payload)
+    assert.is_nil(decode_error)
+    assert.equals("asset:station:10", decoded.entity_id)
     assert(#payload <= 1800)
-    assert(payload:match('"x":%[{"i":"asset:station:10","p":"sector:argon_prime"}%]'))
-    assert(payload:match('"c":%[{"i":"capacity:station:10","p":"asset:station:10","v":42}%]'))
-    assert(payload:match('"o":%[{"i":"ownership:station:10","p":"asset:station:10","n":"faction:argon"}%]'))
-end
+    assert.same({ { i = "asset:station:10", p = "sector:argon_prime" } }, decoded.runtime_facts.x)
+    assert.same({ { i = "capacity:station:10", p = "asset:station:10", v = 42 } }, decoded.runtime_facts.c)
+    assert.same({ { i = "ownership:station:10", p = "asset:station:10", n = "faction:argon" } }, decoded.runtime_facts.o)
+end)
 
-function cases.accepts_64_stations_under_the_resource_derived_policy()
+it("accepts 64 stations under the resource derived policy", function()
     local stations = {}
     for index = 1, 64 do stations[index] = string.format("station:%02d", index) end
     local api = {
@@ -233,7 +240,7 @@ function cases.accepts_64_stations_under_the_resource_derived_policy()
     end
     local payloads = assert(telemetry.produce_observations(discovery.new(api), 4))
     for _, payload in ipairs(payloads) do assert(#payload <= 1800) end
-end
+end)
 
 local function station_observation(index)
     local stable_id = string.format("%03d", index)
@@ -258,7 +265,7 @@ local function station_observation(index)
     }
 end
 
-function cases.streams_129_station_frames_in_order_without_an_aggregate_ceiling()
+it("streams 129 station frames in order without an aggregate ceiling", function()
     local observations = {}
     for index = 1, 129 do observations[index] = station_observation(index) end
     local adapter = { read_observations = function() return observations end }
@@ -277,18 +284,18 @@ function cases.streams_129_station_frames_in_order_without_an_aggregate_ceiling(
     local aggregate_bytes = 0
     for _, payload in ipairs(payloads) do aggregate_bytes = aggregate_bytes + #payload end
     assert(aggregate_bytes > telemetry.MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES)
-end
+end)
 
-function cases.enforces_the_canonical_encoded_frame_ceiling_per_frame()
+it("enforces the canonical encoded frame ceiling per frame", function()
     local ceiling = telemetry.MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES
     assert(ceiling == 1800)
     assert(telemetry.canonical_encoded_frame_utf8_bytes(string.rep("x", ceiling)) == ceiling)
     local bytes, err = telemetry.canonical_encoded_frame_utf8_bytes(string.rep("x", ceiling + 1))
     assert(bytes == nil)
     assert(err == "observation_oversized")
-end
+end)
 
-function cases.rejects_a_syntactically_valid_owner_outside_the_declared_scope()
+it("rejects a syntactically valid owner outside the declared scope", function()
     local api = fake_api()
     local original_get_component_data = api.get_component_data
     api.get_component_data = function(_, station)
@@ -302,9 +309,9 @@ function cases.rejects_a_syntactically_valid_owner_outside_the_declared_scope()
     assert(payload == nil)
     assert(err == "facts_unsupported")
     assert(adapter.diagnostic_class() == "owner_scope_mismatch")
-end
+end)
 
-function cases.classifies_closed_post_enumeration_failures_without_changing_the_error()
+it("classifies closed post enumeration failures without changing the error", function()
     local failures = {
         {
             class = "metadata_unavailable",
@@ -354,9 +361,9 @@ function cases.classifies_closed_post_enumeration_failures_without_changing_the_
         assert(err == "facts_unsupported")
         assert(adapter.diagnostic_class() == failure.class)
     end
-end
+end)
 
-function cases.clears_the_closed_diagnostic_class_after_a_successful_retry()
+it("clears the closed diagnostic class after a successful retry", function()
     local api = fake_api()
     api.get_people_capacity = function() return "private value" end
     local adapter = discovery.new(api)
@@ -369,9 +376,9 @@ function cases.clears_the_closed_diagnostic_class_after_a_successful_retry()
     end
     assert(adapter.read_observations(1) ~= nil)
     assert(adapter.diagnostic_class() == nil)
-end
+end)
 
-function cases.classifies_an_actual_empty_owner_scope_without_changing_the_error()
+it("classifies an actual empty owner scope without changing the error", function()
     local api = fake_api()
     api.count_stations = function() return 0 end
     local adapter = discovery.new(api)
@@ -380,18 +387,18 @@ function cases.classifies_an_actual_empty_owner_scope_without_changing_the_error
     assert(payload == nil)
     assert(err == "facts_unsupported")
     assert(adapter.diagnostic_class() == "owner_scope_empty")
-end
+end)
 
-function cases.suppresses_every_invalid_stage_without_partial_observation()
+it("suppresses every invalid stage without partial observation", function()
     local api = fake_api()
     api.fill_stations = function() return 1 end
     local payload, err = telemetry.produce_observation(discovery.new(api))
 
     assert(payload == nil)
     assert(err == "enumeration_incomplete")
-end
+end)
 
-function cases.fails_closed_when_count_call_throws()
+it("fails closed when count call throws", function()
     local api, calls = fake_api()
     api.count_stations = function() error("native count unavailable") end
     local payload, err = telemetry.produce_observation(discovery.new(api))
@@ -399,36 +406,36 @@ function cases.fails_closed_when_count_call_throws()
     assert(payload == nil)
     assert(err == "enumeration_unavailable")
     assert(calls.allocations == 0)
-end
+end)
 
-function cases.fails_closed_when_component_metadata_call_throws()
+it("fails closed when component metadata call throws", function()
     local api = fake_api()
     api.get_component_data = function() error("native metadata unavailable") end
     local payload, err = telemetry.produce_observation(discovery.new(api))
 
     assert(payload == nil)
     assert(err == "facts_unsupported")
-end
+end)
 
-function cases.fails_closed_when_component_capacity_call_throws()
+it("fails closed when component capacity call throws", function()
     local api = fake_api()
     api.get_people_capacity = function() error("native capacity unavailable") end
     local payload, err = telemetry.produce_observation(discovery.new(api))
 
     assert(payload == nil)
     assert(err == "facts_unsupported")
-end
+end)
 
-function cases.fails_closed_when_a_raw_universe_id_cannot_be_converted()
+it("fails closed when a raw universe id cannot be converted", function()
     local api = fake_api()
     api.to_component = function() return nil end
     local payload, err = telemetry.produce_observation(discovery.new(api))
 
     assert(payload == nil)
     assert(err == "identity_invalid")
-end
+end)
 
-function cases.fails_closed_before_capacity_when_component64_conversion_fails()
+it("fails closed before capacity when component64 conversion fails", function()
     local api, calls = fake_api()
     api.to_component64 = function()
         calls.convert64 = calls.convert64 + 1
@@ -440,9 +447,9 @@ function cases.fails_closed_before_capacity_when_component64_conversion_fails()
     assert(err == "identity_invalid")
     assert(calls.convert64 == 1)
     assert(calls.capacity == 0)
-end
+end)
 
-function cases.normalizes_native_count_and_fill_before_validation()
+it("normalizes native count and fill before validation", function()
     local api = fake_api()
     api.count_stations = function() return "2" end
     api.fill_stations = function(_, buffer, size)
@@ -453,6 +460,6 @@ function cases.normalizes_native_count_and_fill_before_validation()
     local observation = assert(discovery.new(api).read_observations(1))[1]
 
     assert(observation.runtime_facts.assets[1].id == "asset:station:10")
-end
+end)
 
-return cases
+end)

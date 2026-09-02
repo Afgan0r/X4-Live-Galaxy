@@ -1,13 +1,16 @@
-package.path = package.path .. ";extensions/live_galaxy/lua/?.lua"
-
-local component_discovery = require("live_galaxy_component_discovery")
-local discovery = require("live_galaxy_x4_discovery")
-local runtime = require("live_galaxy_runtime")
-local cases = {}
+local helper = require("test_helper")
+local component_discovery, discovery, runtime, fixture
+describe("x4_discovery", function()
+after_each(function() if fixture then fixture.restore() end end)
+before_each(function()
+    fixture = helper.new()
+    component_discovery = fixture.load("live_galaxy_component_discovery")
+    discovery = fixture.load("live_galaxy_x4_discovery")
+    runtime = fixture.runtime()
+end)
 
 local function fresh_runtime()
-    package.loaded["live_galaxy_runtime"] = nil
-    return require("live_galaxy_runtime")
+    return fixture.runtime()
 end
 
 local function station(sector_id, stable_id, capacity)
@@ -85,15 +88,15 @@ local function accepting_pipe(frames)
     }
 end
 
-function cases.sanitizes_embedded_version_without_exposing_unavailable_values()
+it("sanitizes embedded version without exposing unavailable values", function()
     assert(runtime.sanitize_embedded_version(nil) == "unavailable")
     assert(runtime.sanitize_embedded_version(42) == "unavailable")
     assert(runtime.sanitize_embedded_version("") == "unavailable")
     assert(runtime.sanitize_embedded_version("Lua\1 5.4\255") == "Lua_ 5.4_")
     assert(#runtime.sanitize_embedded_version(string.rep("x", 65)) == 64)
-end
+end)
 
-function cases.production_discovery_never_selects_the_synthetic_sector_adapter()
+it("production discovery never selects the synthetic sector adapter", function()
     local adapter = discovery.new({
         get_clusters = function() return { "cluster:one" } end,
         get_sectors = function() return { "sector:alpha" } end,
@@ -103,9 +106,9 @@ function cases.production_discovery_never_selects_the_synthetic_sector_adapter()
 
     assert(observation == nil)
     assert(err == "enumeration_unavailable")
-end
+end)
 
-function cases.runtime_drains_129_immutable_frames_through_bounded_fifo_resources()
+it("runtime drains 129 immutable frames through bounded fifo resources", function()
     local isolated_runtime = fresh_runtime()
     isolated_runtime.set_discovery_adapter({
         read_observations = function() return station_generation(129) end,
@@ -135,9 +138,9 @@ function cases.runtime_drains_129_immutable_frames_through_bounded_fifo_resource
         if frame:match('"type":"complete_marker"') then markers = markers + 1 end
     end
     assert(observations == 129 and markers == 1)
-end
+end)
 
-function cases.runtime_retries_the_same_fifo_head_without_double_accounting()
+it("runtime retries the same fifo head without double accounting", function()
     local isolated_runtime = fresh_runtime()
     isolated_runtime.set_discovery_adapter({
         read_observations = function() return station_generation(3) end,
@@ -166,9 +169,9 @@ function cases.runtime_retries_the_same_fifo_head_without_double_accounting()
     assert(released.enqueued_bytes == held.enqueued_bytes)
     assert(released.local_handoff_messages == 1)
     assert(attempted[#attempted] == attempted[#attempted - 1])
-end
+end)
 
-function cases.runtime_rejects_a_one_over_frame_before_fifo_accounting()
+it("runtime rejects a one over frame before fifo accounting", function()
     local isolated_runtime = fresh_runtime()
     isolated_runtime.set_discovery_adapter({
         read_observations = function() return { oversized_observation() } end,
@@ -183,9 +186,9 @@ function cases.runtime_rejects_a_one_over_frame_before_fifo_accounting()
         assert(not frame:match('"type":"observation"'))
         assert(not frame:match('"type":"complete_marker"'))
     end
-end
+end)
 
-function cases.runtime_discards_fifo_generation_and_restarts_after_reconnect()
+it("runtime discards fifo generation and restarts after reconnect", function()
     local isolated_runtime = fresh_runtime()
     isolated_runtime.set_discovery_adapter({
         read_observations = function() return station_generation(3) end,
@@ -210,9 +213,9 @@ function cases.runtime_discards_fifo_generation_and_restarts_after_reconnect()
     assert(hello:match('"generation":2'))
     local first, _, first_generation, first_sequence = isolated_runtime.next_payload()
     assert(first ~= nil and first_generation == 2 and first_sequence == 1)
-end
+end)
 
-function cases.runtime_never_marks_an_incomplete_or_health_only_generation()
+it("runtime never marks an incomplete or health only generation", function()
     local isolated_runtime = fresh_runtime()
     isolated_runtime.set_discovery_adapter({
         read_observations = function() return nil, "facts_unsupported" end,
@@ -224,18 +227,21 @@ function cases.runtime_never_marks_an_incomplete_or_health_only_generation()
     for _, frame in ipairs(accepted) do
         assert(not frame:match('"type":"complete_marker"'))
     end
-end
+end)
 
-function cases.runtime_emits_health_only_for_a_component_owner_scope_mismatch()
+it("runtime emits health only for a component owner scope mismatch", function()
     local isolated_runtime = fresh_runtime()
+    local metadata = spy.new(function() return "faction:antigone", "sector:second_contact" end)
     isolated_runtime.set_discovery_adapter(component_discovery.new({
         faction_id = "faction:argon",
+        universe_id_bytes = 8,
+        native_policy = { max_allocation_bytes = 8, max_work_units = 6 },
         count_stations = function() return 1 end,
         new_buffer = function() return {} end,
         fill_stations = function(_, buffer) buffer[0] = "station:20" return 1 end,
         to_component = function(_, value) return value end,
         to_component64 = function() return "20" end,
-        get_component_data = function() return "faction:antigone", "sector:second_contact" end,
+        get_component_data = function(...) return metadata(...) end,
         get_people_capacity = function() return 24 end,
     }))
     local accepted = {}
@@ -249,18 +255,18 @@ function cases.runtime_emits_health_only_for_a_component_owner_scope_mismatch()
         assert(not frame:match('"type":"complete_marker"'))
     end
     assert(unavailable > 0)
-end
+    assert.spy(metadata).was.called()
+end)
 
-function cases.runtime_emits_only_an_allowlisted_component_diagnostic_class()
-    local previous_debug_error = DebugError
+it("runtime emits only an allowlisted component diagnostic class", function()
     local trace_events = {}
-    package.loaded["live_galaxy/lua/live_galaxy_trace_config"] = {
+    fixture.trace_config({
         enabled = true,
         attempt_id = "d051-facts-class",
         max_frame_events = 64,
         version_diagnostic_enabled = false,
-    }
-    DebugError = function(message) trace_events[#trace_events + 1] = message end
+    })
+    _G.DebugError = function(message) trace_events[#trace_events + 1] = message end
     local isolated_runtime = fresh_runtime()
     local adapter = {
         read_observation = function() return nil, "facts_unsupported" end,
@@ -276,13 +282,9 @@ function cases.runtime_emits_only_an_allowlisted_component_diagnostic_class()
     end
     assert(class_events == 1)
 
-    DebugError = previous_debug_error
-    package.loaded["live_galaxy/lua/live_galaxy_trace_config"] = nil
-    package.loaded["live_galaxy_runtime"] = nil
-    require("live_galaxy_runtime")
-end
+end)
 
-function cases.runtime_discards_a_frame_that_crosses_a_restarted_pipe_connection()
+it("runtime discards a frame that crosses a restarted pipe connection", function()
     local writes, disconnects = 0, 0
     runtime.set_pipe_adapter({
         write_raw = function()
@@ -297,6 +299,6 @@ function cases.runtime_discards_a_frame_that_crosses_a_restarted_pipe_connection
     assert(not sent and status == "pipe_reconnect")
     assert(writes == 1 and disconnects == 1)
     runtime.set_pipe_adapter(nil)
-end
+end)
 
-return cases
+end)
