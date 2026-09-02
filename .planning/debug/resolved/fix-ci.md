@@ -67,6 +67,19 @@ updated: 2026-09-03
 - Unrelated changes to AGENTS.md, .planning/config.json, the deleted researcher
   profile, and machine-local .gsd remain outside this commit.
 
+### Clean Windows Checkout Follow-Up
+
+- Run 33682723335 passed all workspace checks, then exposed a further failure
+  in shadow-harness evidence_contract at its baseline corpus validation.
+- Reproduced that exact assertion with a disposable Git checkout using
+  core.autocrlf=true. The local checkout uses input; Windows conversion changed
+  the byte-digested JSON corpus from LF to CRLF.
+- Add a corpus-scoped .gitattributes rule for JSON text eol=lf. This follows
+  the official Git gitattributes contract and preserves manifest digests and
+  production validation; it does not normalize unrelated repository files.
+- Verify the same disposable checkout under core.autocrlf=true and the existing
+  evidence contracts after the rule, then recheck the full hosted workflow.
+
 ## Skill Learning
 
 Skill learning: none. Reviewed the clock-dependent regression, intentional

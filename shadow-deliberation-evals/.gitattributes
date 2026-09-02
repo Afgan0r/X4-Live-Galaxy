@@ -1,0 +1,2 @@
+# Corpus digests bind exact bytes, including line endings.
+*.json text eol=lf
