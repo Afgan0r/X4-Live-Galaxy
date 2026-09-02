@@ -117,4 +117,3 @@ Test-RunnerCase 'positive' 'x4_discovery' ($import + 'return { FIXTURE_READY = f
 Test-RunnerCase 'lua-assertion' 'x4_discovery' ($import + 'return { fails = function() error("FIXTURE_LUA_ASSERTION") end }') @('FIXTURE_LUA_ASSERTION', 'Lua contract failed: x4_discovery_contract.lua') 1
 Test-RunnerCase 'empty-cases' 'x4_discovery' ($import + 'print("FIXTURE_EMPTY_REACHED"); return {}') @('FIXTURE_EMPTY_REACHED', 'EMPTY_LUA_CASE_TABLE', 'Lua contract failed: x4_discovery_contract.lua') 1
 Test-RunnerCase 'binding-failure' 'component_discovery' '' @('FIXTURE_BINDING_REACHED', 'Component discovery binding contract failed.') 1
-
