@@ -20,6 +20,9 @@ architecture, development workflow, engineering conventions, tests, release,
 and branch/release policy. Commit and push authorization is owned by the
 shared Git Completion section below.
 
+Apply Proportionate Engineering below when assessing local plans, technical
+choices, review findings, and verification scope.
+
 ## Repository Routing
 
 The current repository identity is `x4/live-galaxy`; its local workflow
@@ -68,6 +71,48 @@ precedence.
 - If verification, a workflow gate, a commit, or a push is blocked, preserve
   the work and report the exact blocker and remaining Git state. Do not
   describe blocked or unpublished work as fully complete.
+
+## Proportionate Engineering
+
+These rules apply to all registered X4 modding repositories, including the
+canonical instruction repository. Keep engineering effort proportional to the
+current task and its actual use. Many research hypotheses, detailed searchable
+logs, and necessary product checks are legitimate complexity; line count or
+test count alone does not establish overengineering.
+
+- **Justify additional mechanisms.** Before adding a layer, protocol, generic
+  framework, or defensive mechanism, identify the concrete failure in the
+  current scenario and explain why the simpler approach is insufficient.
+  Speculative future reuse, a merely imaginable attacker, and generic claims
+  of reliability are not sufficient reasons. Keep disposable experiments
+  specific to their questions rather than building a permanent platform.
+- **Keep agent duties with the agent.** Source research, code review,
+  application of previous lessons, and honest interpretation of results are
+  agent responsibilities. Do not automatically turn them into certificates,
+  operator receipts, admission engines, or other project infrastructure.
+  An additional mechanism must satisfy the same necessity test.
+- **Question plans and review findings.** An agent-authored requirement does
+  not become justified merely by appearing in a plan or specification. A
+  severity label, including Critical, is not proof that a proposed mechanism
+  is needed. Independently assess findings against the agreed behavior and
+  concrete evidence; reject unjustified additions without asking the user
+  each time, and briefly explain the decision in the existing review record
+  or chat. Continue required review and fix substantiated defects.
+- **Respect the change boundary.** Ordinary local simplifications within the
+  agreed task need no additional approval. Before materially redesigning or
+  removing an existing mechanism, or changing an approved approach, explain
+  what would change, why, and its consequences, then obtain user approval.
+  Do not silently cancel explicit user requirements. Once the user approves
+  the scoped change, update its affected plans and implementation without
+  repeated permission requests for each file.
+- **Verify the affected behavior.** Select checks for the changed behavior
+  and affected contracts. Each additional or repeated run must resolve a
+  concrete remaining uncertainty or satisfy an applicable required gate.
+  Do not repeatedly run full suites after small edits, include unrelated
+  suites in an instruction-only change, or build a verification subsystem
+  solely to gain confidence in that subsystem. Stop when the agreed result
+  has sufficient evidence. Preserve necessary research coverage, product
+  checks, and existing evidence and safety boundaries.
 
 ## Common Evidence and Safety Boundaries
 
