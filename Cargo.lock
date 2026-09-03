@@ -145,6 +145,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "observation-persistence"
+version = "0.1.0"
+dependencies = [
+ "observation-domain",
+ "observation-ingest",
+ "sha2",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"

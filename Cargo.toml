@@ -2,6 +2,7 @@
 members = [
     "crates/observation-domain",
     "crates/observation-ingest",
+    "crates/observation-persistence",
     "crates/strategic-state",
     "crates/mind-domain",
     "crates/mind-persistence",
