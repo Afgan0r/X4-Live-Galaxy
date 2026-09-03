@@ -7,6 +7,7 @@ rust-version.workspace = true
 [dependencies]
 observation-domain = { path = "../observation-domain" }
 observation-ingest = { path = "../observation-ingest" }
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 sha2 = "=0.11.0"
 
 [lints]

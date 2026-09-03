@@ -2,10 +2,14 @@
 
 mod fake;
 mod port;
+mod schema;
+mod sqlite;
 mod types;
 
 pub use fake::FakeObservationRepository;
 pub use port::ObservationRepository;
+pub use schema::{OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY, OBSERVATION_REPOSITORY_SCHEMA_VERSION};
+pub use sqlite::SqliteObservationRepository;
 pub use types::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, PublicationLimits,
     PublicationReceipt, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
