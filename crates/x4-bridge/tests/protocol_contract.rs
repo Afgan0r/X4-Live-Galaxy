@@ -1,5 +1,9 @@
 use observation_ingest::AcceptedSnapshot;
-use x4_bridge::{BridgeError, CapabilityDecision, TelemetryFrame, admit_tracer_frame};
+use x4_bridge::{
+    BridgeError, CapabilityDecision, CompleteMessageSendOutcome, ConnectionState, ControlEnvelope,
+    ControlPollOutcome, FacadeError, ObservationCarrierFacade, TelemetryFrame, TransportEpoch,
+    admit_tracer_frame,
+};
 
 #[test]
 fn protocol_contract_admits_compatible_telemetry_only_frame() {
@@ -67,4 +71,43 @@ impl FakeX4Adapter {
             self.entity_id
         )
     }
+}
+
+struct CompileOnlyCarrier;
+
+impl ObservationCarrierFacade for CompileOnlyCarrier {
+    fn connection_state(&self) -> ConnectionState {
+        ConnectionState::Connected(TransportEpoch::new(2).expect("test epoch is positive"))
+    }
+
+    fn try_send_complete(&mut self, _: TransportEpoch, _: &[u8]) -> CompleteMessageSendOutcome {
+        CompleteMessageSendOutcome::LocalHandoff
+    }
+
+    fn poll_control(&mut self, _: usize) -> ControlPollOutcome {
+        ControlPollOutcome::Message(ControlEnvelope::Health)
+    }
+}
+
+#[test]
+fn compile_time_facade_is_bounded_to_observation_and_control() {
+    let mut carrier = CompileOnlyCarrier;
+    let epoch = TransportEpoch::new(2).expect("test epoch is positive");
+
+    assert_eq!(
+        carrier.connection_state(),
+        ConnectionState::Connected(epoch)
+    );
+    assert_eq!(
+        carrier.try_send_complete(epoch, b"complete-message"),
+        CompleteMessageSendOutcome::LocalHandoff
+    );
+    assert_eq!(
+        carrier.poll_control(1),
+        ControlPollOutcome::Message(ControlEnvelope::Health)
+    );
+    assert_ne!(
+        CompleteMessageSendOutcome::Rejected(FacadeError::StaleEpoch),
+        CompleteMessageSendOutcome::CapacityUnavailable
+    );
 }

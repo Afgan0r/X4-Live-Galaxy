@@ -6,6 +6,7 @@ mod feedback;
 mod generation;
 mod model;
 mod runtime_facts;
+mod scheduler;
 mod snapshot;
 mod wire;
 pub use batch::{
@@ -32,6 +33,10 @@ use observation_domain::{
 pub use runtime_facts::{
     RuntimeAsset, RuntimeCapacity, RuntimeFactAvailability, RuntimeFactQuality, RuntimeFacts,
     RuntimeOwnership, RuntimeSector,
+};
+pub use scheduler::{
+    CollectionPolicyLimits, DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome,
+    TransportPolicyLimits,
 };
 pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;
