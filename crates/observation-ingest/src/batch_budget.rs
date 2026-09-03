@@ -1,80 +1,12 @@
-use std::collections::BTreeSet;
-use std::num::{NonZeroU64, NonZeroUsize};
-
 use observation_domain::EntityId;
+use std::collections::BTreeSet;
 
+use crate::candidate_limits::{AggregateLimits, CandidateLimits};
 use crate::model::AdmissionError;
 
 use super::batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
 };
-
-#[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CandidateLimits {
-    pub(crate) raw_bytes: NonZeroUsize,
-    pub(crate) decoded_bytes: NonZeroUsize,
-    pub(crate) records: NonZeroUsize,
-    pub(crate) batches: NonZeroUsize,
-    pub(crate) work: NonZeroUsize,
-    pub(crate) age_millis: NonZeroU64,
-    pub(crate) inactivity_millis: NonZeroU64,
-}
-
-impl CandidateLimits {
-    #[must_use]
-    pub fn new(
-        raw: usize,
-        decoded: usize,
-        records: usize,
-        batches: usize,
-        work: usize,
-        age: u64,
-        inactivity: u64,
-    ) -> Option<Self> {
-        Some(Self {
-            raw_bytes: NonZeroUsize::new(raw)?,
-            decoded_bytes: NonZeroUsize::new(decoded)?,
-            records: NonZeroUsize::new(records)?,
-            batches: NonZeroUsize::new(batches)?,
-            work: NonZeroUsize::new(work)?,
-            age_millis: NonZeroU64::new(age)?,
-            inactivity_millis: NonZeroU64::new(inactivity)?,
-        })
-    }
-}
-
-#[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct AggregateLimits {
-    pub(crate) candidates: NonZeroUsize,
-    pub(crate) raw_bytes: NonZeroUsize,
-    pub(crate) decoded_bytes: NonZeroUsize,
-    pub(crate) records: NonZeroUsize,
-    pub(crate) batches: NonZeroUsize,
-    pub(crate) work: NonZeroUsize,
-}
-
-impl AggregateLimits {
-    #[must_use]
-    pub fn new(
-        candidates: usize,
-        raw: usize,
-        decoded: usize,
-        records: usize,
-        batches: usize,
-        work: usize,
-    ) -> Option<Self> {
-        Some(Self {
-            candidates: NonZeroUsize::new(candidates)?,
-            raw_bytes: NonZeroUsize::new(raw)?,
-            decoded_bytes: NonZeroUsize::new(decoded)?,
-            records: NonZeroUsize::new(records)?,
-            batches: NonZeroUsize::new(batches)?,
-            work: NonZeroUsize::new(work)?,
-        })
-    }
-}
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -102,7 +34,7 @@ impl CandidateUsage {
             work: self.work.checked_add(work)?,
         })
     }
-    pub(crate) fn within(self, limits: CandidateLimits) -> bool {
+    pub(crate) const fn within(self, limits: CandidateLimits) -> bool {
         self.raw_bytes <= limits.raw_bytes.get()
             && self.decoded_bytes <= limits.decoded_bytes.get()
             && self.records <= limits.records.get()
@@ -123,6 +55,15 @@ pub struct AggregateUsage {
 }
 
 impl AggregateUsage {
+    pub(crate) const ZERO: Self = Self {
+        candidate_count: 0,
+        raw_bytes: 0,
+        decoded_bytes: 0,
+        records: 0,
+        batches: 0,
+        work: 0,
+    };
+
     pub(crate) fn add_candidate(self) -> Option<Self> {
         Some(Self {
             candidate_count: self.candidate_count.checked_add(1)?,
@@ -149,7 +90,7 @@ impl AggregateUsage {
             work: self.work.checked_sub(charge.work)?,
         })
     }
-    pub(crate) fn within(self, limits: AggregateLimits) -> bool {
+    pub(crate) const fn within(self, limits: AggregateLimits) -> bool {
         self.candidate_count <= limits.candidates.get()
             && self.raw_bytes <= limits.raw_bytes.get()
             && self.decoded_bytes <= limits.decoded_bytes.get()
@@ -187,7 +128,7 @@ impl BatchBudget {
             .then_some(())
             .ok_or(AdmissionError::CollectionLimitExceeded)
     }
-    pub fn record_observation(&mut self) -> Result<(), AdmissionError> {
+    pub const fn record_observation(&mut self) -> Result<(), AdmissionError> {
         self.observations += 1;
         if self.observations > MAX_BATCH_OBSERVATIONS {
             return Err(AdmissionError::CollectionLimitExceeded);

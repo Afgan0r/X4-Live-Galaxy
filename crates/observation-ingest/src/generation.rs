@@ -1,49 +1,21 @@
-use std::collections::BTreeMap;
-
-use observation_domain::{
-    BatchId, EntityId, ImmutableBatchEnvelope, ObservationVersion, SectionKey, SectionRevisionId,
-    SectionStartEnvelope, SourceScopeId,
-};
-use sha2::{Digest, Sha256};
-
 use crate::batch_budget::{AggregateUsage, CandidateUsage};
-use crate::completion::CandidateContext;
+use crate::candidate_limits::AcceptedVersions;
+use crate::completion_types::{Candidate, StagedBatch};
 use crate::model::AcceptedProjection;
-use crate::wire::WireObservation;
 use crate::{GenerationLimits, ReceiverDisposition};
-
-#[derive(Clone)]
-pub(crate) struct StagedBatch {
-    pub(crate) ordinal: usize,
-    pub(crate) digest: [u8; 32],
-    pub(crate) envelope: ImmutableBatchEnvelope,
-}
-
-pub(crate) struct Candidate {
-    pub(crate) source_scope: SourceScopeId,
-    pub(crate) revision: SectionRevisionId,
-    pub(crate) expected_records: usize,
-    pub(crate) usage: CandidateUsage,
-    pub(crate) started_at: u64,
-    pub(crate) last_progress_at: u64,
-    pub(crate) batches: BTreeMap<BatchId, StagedBatch>,
-    pub(crate) legacy_identity: Option<(String, u64, u64)>,
-    pub(crate) next_sequence: u64,
-    pub(crate) legacy_frames: Vec<(WireObservation, u64)>,
-    pub(crate) context: Option<CandidateContext>,
-}
-
+use observation_domain::{BatchId, ImmutableBatchEnvelope, SectionKey, SectionStartEnvelope};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 pub struct GenerationStager {
     pub(crate) accepted: AcceptedProjection,
     pub(crate) limits: GenerationLimits,
     pub(crate) candidates: BTreeMap<SectionKey, Candidate>,
     pub(crate) aggregate: AggregateUsage,
-    accepted_versions: BTreeMap<(SourceScopeId, EntityId), (ObservationVersion, [u8; 32])>,
+    pub accepted_versions: AcceptedVersions,
     pub(crate) cooldowns: BTreeMap<SectionKey, u64>,
     pub(crate) last_admitted_generation: Option<u64>,
     pub(crate) admitted_generation_count: u64,
 }
-
 impl GenerationStager {
     #[must_use]
     pub const fn new(accepted: AcceptedProjection, limits: GenerationLimits) -> Self {
@@ -51,21 +23,13 @@ impl GenerationStager {
             accepted,
             limits,
             candidates: BTreeMap::new(),
-            aggregate: AggregateUsage {
-                candidate_count: 0,
-                raw_bytes: 0,
-                decoded_bytes: 0,
-                records: 0,
-                batches: 0,
-                work: 0,
-            },
+            aggregate: AggregateUsage::ZERO,
             accepted_versions: BTreeMap::new(),
             cooldowns: BTreeMap::new(),
             last_admitted_generation: None,
             admitted_generation_count: 0,
         }
     }
-
     #[must_use]
     pub const fn resume(
         accepted: AcceptedProjection,
@@ -76,7 +40,6 @@ impl GenerationStager {
         stager.last_admitted_generation = Some(last_admitted_generation);
         stager
     }
-
     pub const fn accepted(&self) -> &AcceptedProjection {
         &self.accepted
     }
@@ -107,40 +70,20 @@ impl GenerationStager {
             .map(|batch| (batch.ordinal, &batch.envelope.batch_id))
             .collect()
     }
-    #[must_use]
     pub const fn aggregate_usage(&self) -> AggregateUsage {
         self.aggregate
     }
-
-    pub fn record_accepted_entity(
-        &mut self,
-        scope: SourceScopeId,
-        entity: EntityId,
-        version: ObservationVersion,
-        canonical_content: &[u8],
-    ) -> bool {
-        let digest: [u8; 32] = Sha256::digest(canonical_content).into();
-        match self.accepted_versions.get(&(scope.clone(), entity.clone())) {
-            Some((current, _)) if version < *current => false,
-            Some((current, prior)) if version == *current && prior != &digest => false,
-            _ => {
-                self.accepted_versions
-                    .insert((scope, entity), (version, digest));
-                true
-            }
-        }
-    }
-
     pub fn start_section(&mut self, start: SectionStartEnvelope, now: u64) -> ReceiverDisposition {
         let key = start.section_key.clone();
-        if let Some(current) = self.candidates.get(&key) {
-            if current.source_scope == start.source_scope
-                && current.revision == start.section_revision
-            {
-                return ReceiverDisposition::Received;
-            }
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
+        let existing = self.candidates.get(&key).map(|current| {
+            let scope_matches = current.source_scope == start.source_scope;
+            let revision_matches = current.revision == start.section_revision;
+            scope_matches && revision_matches
+        });
+        match existing {
+            Some(true) => return ReceiverDisposition::Received,
+            Some(false) => return self.reject_candidate(&key),
+            None => {}
         }
         let Some(next) = self.aggregate.add_candidate() else {
             return ReceiverDisposition::CapacityUnavailable;
@@ -167,7 +110,6 @@ impl GenerationStager {
         );
         ReceiverDisposition::Received
     }
-
     pub fn stage_section_batch(
         &mut self,
         batch: ImmutableBatchEnvelope,
@@ -181,22 +123,22 @@ impl GenerationStager {
         let Some(candidate) = self.candidates.get(&key) else {
             return ReceiverDisposition::PermanentlyRejected;
         };
-        if candidate.source_scope != batch.source_scope
-            || candidate.revision != batch.section_revision
-        {
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
+        let scope_matches = candidate.source_scope == batch.source_scope;
+        let revision_matches = candidate.revision == batch.section_revision;
+        if !scope_matches || !revision_matches {
+            return self.reject_candidate(&key);
         }
-        if let Some(prior) = candidate.batches.get(&batch.batch_id) {
-            if prior.digest == digest {
-                return ReceiverDisposition::Received;
-            }
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
+        match candidate
+            .batches
+            .get(&batch.batch_id)
+            .map(|prior| prior.digest == digest)
+        {
+            Some(true) => return ReceiverDisposition::Received,
+            Some(false) => return self.reject_candidate(&key),
+            None => {}
         }
         if !self.versions_admit(&batch) {
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
+            return self.reject_candidate(&key);
         }
         let delta = CandidateUsage {
             raw_bytes: canonical_bytes.len(),
@@ -205,25 +147,9 @@ impl GenerationStager {
             batches: 1,
             work,
         };
-        let Some(candidate_usage) = candidate.usage.charged(
-            delta.raw_bytes,
-            delta.decoded_bytes,
-            delta.records,
-            delta.work,
-        ) else {
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
+        let Some((candidate_usage, aggregate)) = self.checked_charge(candidate, delta) else {
+            return self.reject_candidate(&key);
         };
-        let Some(aggregate) = self.aggregate.add(delta) else {
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
-        };
-        if !candidate_usage.within(self.limits.candidate)
-            || !aggregate.within(self.limits.aggregate)
-        {
-            self.drop_candidate(&key);
-            return ReceiverDisposition::PermanentlyRejected;
-        }
         let Some(candidate) = self.candidates.get_mut(&key) else {
             return ReceiverDisposition::PermanentlyRejected;
         };
@@ -242,41 +168,33 @@ impl GenerationStager {
         ReceiverDisposition::Received
     }
 
-    pub fn expire_candidates(&mut self, now: u64) -> usize {
-        let keys: Vec<_> = self
-            .candidates
-            .iter()
-            .filter(|(_, candidate)| {
-                now.saturating_sub(candidate.started_at) > self.limits.candidate.age_millis.get()
-                    || now.saturating_sub(candidate.last_progress_at)
-                        > self.limits.candidate.inactivity_millis.get()
-            })
-            .map(|(key, _)| key.clone())
-            .collect();
-        for key in &keys {
-            self.drop_candidate(key);
-        }
-        keys.len()
-    }
-
-    fn versions_admit(&self, batch: &ImmutableBatchEnvelope) -> bool {
-        batch.records.iter().all(|record| {
-            match self
-                .accepted_versions
-                .get(&(batch.source_scope.clone(), record.entity_id.clone()))
-            {
-                Some((version, _)) if record.observation_version < *version => false,
-                Some((version, digest)) if record.observation_version == *version => {
-                    <[u8; 32]>::from(Sha256::digest(record.content.as_bytes())) == *digest
-                }
-                _ => true,
-            }
-        })
-    }
-
     pub(crate) fn drop_candidate(&mut self, key: &SectionKey) -> Option<Candidate> {
         let candidate = self.candidates.remove(key)?;
         self.aggregate = self.aggregate.release(candidate.usage)?;
         Some(candidate)
+    }
+
+    fn reject_candidate(&mut self, key: &SectionKey) -> ReceiverDisposition {
+        self.drop_candidate(key);
+        ReceiverDisposition::PermanentlyRejected
+    }
+
+    fn checked_charge(
+        &self,
+        candidate: &Candidate,
+        delta: CandidateUsage,
+    ) -> Option<(CandidateUsage, AggregateUsage)> {
+        let candidate_usage = candidate.usage.charged(
+            delta.raw_bytes,
+            delta.decoded_bytes,
+            delta.records,
+            delta.work,
+        )?;
+        let aggregate = self.aggregate.add(delta)?;
+        candidate_usage
+            .within(self.limits.candidate)
+            .then_some(())
+            .and_then(|()| aggregate.within(self.limits.aggregate).then_some(()))
+            .map(|()| (candidate_usage, aggregate))
     }
 }

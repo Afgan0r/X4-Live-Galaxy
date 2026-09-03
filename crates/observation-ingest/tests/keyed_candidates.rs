@@ -1,7 +1,4 @@
-#![expect(
-    clippy::expect_used,
-    reason = "test fixtures fail immediately when their invariants are invalid"
-)]
+#![expect(clippy::expect_used, reason = "invalid test fixtures fail immediately")]
 
 use observation_domain::{
     BatchId, EntityId, EnvelopeRecord, ImmutableBatchEnvelope, ObservationVersion,
@@ -92,6 +89,11 @@ fn alternating_batches_advance_independent_keyed_candidates() {
             .batches,
         1
     );
+    assert_eq!(
+        stager.invalidate_source_scope(&id("scope:x4", SourceScopeId::new)),
+        2
+    );
+    assert_eq!(stager.aggregate_usage().candidate_count, 0);
 }
 
 #[test]

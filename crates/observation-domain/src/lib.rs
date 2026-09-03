@@ -1,10 +1,12 @@
 #![forbid(unsafe_code)]
 
+mod absence;
 mod identity;
 mod observation;
 mod reconciliation;
 mod section;
 
+pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
 pub use identity::{
     BatchId, CanonicalizationVersion, CompletionCoverage, ControlEnvelope, DecisionSnapshotId,
     DigestAlgorithmVersion, EntityId, EnvelopeDecodeError, EventId, FrameHeader,

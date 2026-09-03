@@ -69,6 +69,9 @@ impl CollectionSize {
 pub enum ReconciliationDecision {
     PreservedIncompleteScope,
     RejectedCollectionLimit,
+    AwaitingSecondAbsence {
+        members: Vec<CanonicalObservationKey>,
+    },
     Reconciled {
         members: Vec<CanonicalObservationKey>,
         tombstones: Vec<CanonicalObservationKey>,

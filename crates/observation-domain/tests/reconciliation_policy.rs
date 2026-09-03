@@ -6,8 +6,7 @@
 use observation_domain::{
     AbsenceEvidence, AbsenceTracker, CanonicalObservationKey, CollectionLimit, CollectionSize,
     CompleteMarker, CompletionCoverage, CountError, EntityId, ObservationVersion,
-    ReconciliationDecision, SourceScopeId, reconcile_membership,
-    reconcile_qualified_membership,
+    ReconciliationDecision, SourceScopeId, reconcile_membership, reconcile_qualified_membership,
 };
 
 fn entity(value: &str) -> EntityId {
@@ -140,17 +139,47 @@ fn weak_evidence_and_scope_change_have_no_absence_meaning() {
     let mut tracker = AbsenceTracker::new();
     let limit = CollectionLimit::new(1).expect("positive limit");
     for evidence in [
-        AbsenceEvidence::new(source("scope:x4"), CompletionCoverage::Partial, true, true, false),
-        AbsenceEvidence::new(source("scope:x4"), CompletionCoverage::Complete, false, true, false),
-        AbsenceEvidence::new(source("scope:x4"), CompletionCoverage::Complete, true, false, true),
+        AbsenceEvidence::new(
+            source("scope:x4"),
+            CompletionCoverage::Partial,
+            true,
+            true,
+            false,
+        ),
+        AbsenceEvidence::new(
+            source("scope:x4"),
+            CompletionCoverage::Complete,
+            false,
+            true,
+            false,
+        ),
+        AbsenceEvidence::new(
+            source("scope:x4"),
+            CompletionCoverage::Complete,
+            true,
+            false,
+            true,
+        ),
     ] {
         assert_eq!(
             reconcile_qualified_membership(&prior, vec![], &evidence, &mut tracker, limit),
             ReconciliationDecision::PreservedIncompleteScope
         );
     }
-    let first = AbsenceEvidence::new(source("scope:a"), CompletionCoverage::Complete, true, true, false);
-    let changed = AbsenceEvidence::new(source("scope:b"), CompletionCoverage::Complete, true, true, false);
+    let first = AbsenceEvidence::new(
+        source("scope:a"),
+        CompletionCoverage::Complete,
+        true,
+        true,
+        false,
+    );
+    let changed = AbsenceEvidence::new(
+        source("scope:b"),
+        CompletionCoverage::Complete,
+        true,
+        true,
+        false,
+    );
     let _ = reconcile_qualified_membership(&prior, vec![], &first, &mut tracker, limit);
     assert!(matches!(
         reconcile_qualified_membership(&prior, vec![], &changed, &mut tracker, limit),

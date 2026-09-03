@@ -1,13 +1,10 @@
-use std::collections::BTreeMap;
+use observation_domain::{CanonicalObservationKey, ObservationVersion, SectionCompletionEnvelope};
 
-use observation_domain::{
-    CanonicalObservationKey, CanonicalizationVersion, CaptureWindow, CompletionCoverage,
-    DigestAlgorithmVersion, EnvelopeRecord, ObservationPolicyVersion, ObservationSchemaVersion,
-    ObservationVersion, SectionCompletionEnvelope, SectionKey, SectionRevisionId, SectionState,
-    SourceScopeId,
+use crate::completion_digest::{candidate_material, content_digest};
+use crate::completion_types::{
+    CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome,
+    ValidatedSectionRevision,
 };
-use sha2::{Digest, Sha256};
-
 use crate::{GenerationStager, ReceiverDisposition, RejectionReason};
 
 #[must_use]
@@ -35,156 +32,6 @@ impl CompletedScope {
     }
 }
 
-#[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ContractVersions {
-    schema: ObservationSchemaVersion,
-    policy: ObservationPolicyVersion,
-    canonicalization: CanonicalizationVersion,
-    digest: DigestAlgorithmVersion,
-}
-
-impl ContractVersions {
-    pub const fn new(
-        schema: ObservationSchemaVersion,
-        policy: ObservationPolicyVersion,
-        canonicalization: CanonicalizationVersion,
-        digest: DigestAlgorithmVersion,
-    ) -> Self {
-        Self {
-            schema,
-            policy,
-            canonicalization,
-            digest,
-        }
-    }
-}
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CandidateContext {
-    versions: ContractVersions,
-    capture_window: CaptureWindow,
-    state: SectionState,
-    dependencies: BTreeMap<SectionKey, SectionRevisionId>,
-    expected_current: Option<SectionRevisionId>,
-    stable_identity: bool,
-}
-
-impl CandidateContext {
-    pub const fn new(
-        versions: ContractVersions,
-        capture_window: CaptureWindow,
-        state: SectionState,
-        dependencies: BTreeMap<SectionKey, SectionRevisionId>,
-        expected_current: Option<SectionRevisionId>,
-        stable_identity: bool,
-    ) -> Self {
-        Self {
-            versions,
-            capture_window,
-            state,
-            dependencies,
-            expected_current,
-            stable_identity,
-        }
-    }
-    pub const fn capture_window(&self) -> CaptureWindow {
-        self.capture_window
-    }
-    pub const fn state(&self) -> SectionState {
-        self.state
-    }
-    pub const fn versions(&self) -> ContractVersions {
-        self.versions
-    }
-    pub const fn stable_identity(&self) -> bool {
-        self.stable_identity
-    }
-}
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CompletionCurrent {
-    dependencies: BTreeMap<SectionKey, SectionRevisionId>,
-    current_pointer: Option<SectionRevisionId>,
-}
-
-impl CompletionCurrent {
-    pub const fn new(
-        dependencies: BTreeMap<SectionKey, SectionRevisionId>,
-        current_pointer: Option<SectionRevisionId>,
-    ) -> Self {
-        Self {
-            dependencies,
-            current_pointer,
-        }
-    }
-}
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CompletionCertificate {
-    pub envelope: SectionCompletionEnvelope,
-    pub batch_count: usize,
-    pub record_count: usize,
-    pub raw_bytes: usize,
-    pub decoded_bytes: usize,
-    pub ordered_batch_manifest_digest: [u8; 32],
-    pub canonical_content_digest: [u8; 32],
-    pub versions: ContractVersions,
-}
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ValidatedSectionRevision {
-    source_scope: SourceScopeId,
-    section_key: SectionKey,
-    section_revision: SectionRevisionId,
-    records: Vec<EnvelopeRecord>,
-    coverage: CompletionCoverage,
-    context: CandidateContext,
-    manifest_digest: [u8; 32],
-    content_digest: [u8; 32],
-}
-
-impl ValidatedSectionRevision {
-    pub const fn source_scope(&self) -> &SourceScopeId {
-        &self.source_scope
-    }
-    pub const fn section_key(&self) -> &SectionKey {
-        &self.section_key
-    }
-    pub const fn section_revision(&self) -> SectionRevisionId {
-        self.section_revision
-    }
-    pub fn records(&self) -> &[EnvelopeRecord] {
-        &self.records
-    }
-    pub const fn coverage(&self) -> CompletionCoverage {
-        self.coverage
-    }
-    pub const fn context(&self) -> &CandidateContext {
-        &self.context
-    }
-    pub const fn manifest_digest(&self) -> &[u8; 32] {
-        &self.manifest_digest
-    }
-    pub const fn content_digest(&self) -> &[u8; 32] {
-        &self.content_digest
-    }
-    pub const fn is_published(&self) -> bool {
-        false
-    }
-}
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CompletionOutcome {
-    Validated(ValidatedSectionRevision),
-    Rejected(RejectionReason),
-}
-
 impl GenerationStager {
     pub fn start_section_with_context(
         &mut self,
@@ -207,14 +54,15 @@ impl GenerationStager {
             return ReceiverDisposition::PermanentlyRejected;
         }
         let disposition = self.start_section(start, now);
-        if disposition == ReceiverDisposition::Received {
-            if let Some(candidate) = self.candidates.get_mut(&key) {
-                candidate.context = Some(context);
-            }
+        if disposition == ReceiverDisposition::Received
+            && let Some(candidate) = self.candidates.get_mut(&key)
+        {
+            candidate.context = Some(context);
         }
         disposition
     }
 
+    #[must_use]
     pub fn completion_certificate(
         &self,
         envelope: SectionCompletionEnvelope,
@@ -236,7 +84,7 @@ impl GenerationStager {
 
     pub fn complete_section(
         &mut self,
-        certificate: CompletionCertificate,
+        certificate: &CompletionCertificate,
         current: &CompletionCurrent,
         now: u64,
     ) -> CompletionOutcome {
@@ -248,40 +96,17 @@ impl GenerationStager {
             self.drop_candidate(&key);
             return CompletionOutcome::Rejected(RejectionReason::CompletionMismatch);
         };
-        let dependency_changed = context.dependencies != current.dependencies
-            || context.expected_current != current.current_pointer;
+        let dependencies_match = context.dependencies == current.dependencies;
+        let pointer_matches = context.expected_current == current.current_pointer;
+        let dependency_changed = !dependencies_match || !pointer_matches;
         let (manifest, records) = candidate_material(candidate);
-        let exact = candidate.source_scope == certificate.envelope.source_scope
-            && candidate.revision == certificate.envelope.section_revision
-            && candidate.expected_records == records.len()
-            && certificate.envelope.record_count == records.len()
-            && certificate.batch_count == candidate.batches.len()
-            && certificate.record_count == records.len()
-            && certificate.raw_bytes == candidate.usage.raw_bytes
-            && certificate.decoded_bytes == candidate.usage.decoded_bytes
-            && certificate.versions == context.versions
-            && certificate.ordered_batch_manifest_digest == manifest
-            && certificate.canonical_content_digest == content_digest(&records);
-        if dependency_changed || !exact {
-            self.drop_candidate(&key);
-            let reason = if dependency_changed {
-                RejectionReason::DependencyChanged
-            } else {
-                RejectionReason::CompletionMismatch
-            };
-            if dependency_changed {
-                self.cooldowns.insert(
-                    key,
-                    now.saturating_add(self.limits.candidate.inactivity_millis.get()),
-                );
-            }
-            self.accepted = std::mem::take(&mut self.accepted).record_rejection(reason);
-            return CompletionOutcome::Rejected(reason);
+        if dependency_changed || !completion_is_exact(candidate, certificate, &context, &records) {
+            return self.reject_completion(key, dependency_changed, now);
         }
         let Some(candidate) = self.drop_candidate(&key) else {
             return CompletionOutcome::Rejected(RejectionReason::CompletionMismatch);
         };
-        CompletionOutcome::Validated(ValidatedSectionRevision {
+        CompletionOutcome::Validated(Box::new(ValidatedSectionRevision {
             source_scope: candidate.source_scope,
             section_key: key,
             section_revision: candidate.revision,
@@ -290,37 +115,45 @@ impl GenerationStager {
             context,
             manifest_digest: manifest,
             content_digest: certificate.canonical_content_digest,
-        })
+        }))
+    }
+
+    fn reject_completion(
+        &mut self,
+        key: observation_domain::SectionKey,
+        dependency_changed: bool,
+        now: u64,
+    ) -> CompletionOutcome {
+        self.drop_candidate(&key);
+        let reason = if dependency_changed {
+            self.cooldowns.insert(
+                key,
+                now.saturating_add(self.limits.candidate.inactivity_millis.get()),
+            );
+            RejectionReason::DependencyChanged
+        } else {
+            RejectionReason::CompletionMismatch
+        };
+        self.accepted = std::mem::take(&mut self.accepted).record_rejection(reason);
+        CompletionOutcome::Rejected(reason)
     }
 }
 
-fn candidate_material(candidate: &crate::generation::Candidate) -> ([u8; 32], Vec<EnvelopeRecord>) {
-    let mut batches: Vec<_> = candidate.batches.values().collect();
-    batches.sort_by_key(|batch| batch.ordinal);
-    let mut manifest = Sha256::new();
-    let mut records = Vec::new();
-    for batch in batches {
-        framed(&mut manifest, &batch.ordinal.to_be_bytes());
-        framed(&mut manifest, batch.envelope.batch_id.as_str().as_bytes());
-        framed(&mut manifest, &batch.digest);
-        records.extend(batch.envelope.records.clone());
-    }
-    records.sort_by(|left, right| left.record_id.cmp(&right.record_id));
-    (manifest.finalize().into(), records)
-}
-
-fn content_digest(records: &[EnvelopeRecord]) -> [u8; 32] {
-    let mut digest = Sha256::new();
-    for record in records {
-        framed(&mut digest, record.record_id.as_str().as_bytes());
-        framed(&mut digest, record.entity_id.as_str().as_bytes());
-        framed(&mut digest, &record.observation_version.get().to_be_bytes());
-        framed(&mut digest, record.content.as_bytes());
-    }
-    digest.finalize().into()
-}
-
-fn framed(digest: &mut Sha256, value: &[u8]) {
-    digest.update((value.len() as u64).to_be_bytes());
-    digest.update(value);
+fn completion_is_exact(
+    candidate: &crate::completion_types::Candidate,
+    certificate: &CompletionCertificate,
+    context: &CandidateContext,
+    records: &[observation_domain::EnvelopeRecord],
+) -> bool {
+    candidate.source_scope == certificate.envelope.source_scope
+        && candidate.revision == certificate.envelope.section_revision
+        && candidate.expected_records == records.len()
+        && certificate.envelope.record_count == records.len()
+        && certificate.batch_count == candidate.batches.len()
+        && certificate.record_count == records.len()
+        && certificate.raw_bytes == candidate.usage.raw_bytes
+        && certificate.decoded_bytes == candidate.usage.decoded_bytes
+        && certificate.versions == context.versions
+        && certificate.ordered_batch_manifest_digest == candidate_material(candidate).0
+        && certificate.canonical_content_digest == content_digest(records)
 }

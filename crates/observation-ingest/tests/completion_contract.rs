@@ -1,10 +1,4 @@
-#![expect(
-    clippy::expect_used,
-    reason = "test fixtures fail immediately when their invariants are invalid"
-)]
-
-use std::collections::BTreeMap;
-
+#![expect(clippy::expect_used, reason = "invalid test fixtures fail immediately")]
 use observation_domain::{
     BatchId, CanonicalizationVersion, CaptureWindow, CompletionCoverage, DigestAlgorithmVersion,
     EntityId, EnvelopeRecord, ImmutableBatchEnvelope, ObservationPolicyVersion,
@@ -18,7 +12,7 @@ use observation_ingest::{
     CompletionOutcome, ContractVersions, DecisionEligibility, DecisionRevisionIndex,
     EligibilityBlocker, GenerationLimits, GenerationStager, ReceiverDisposition, RejectionReason,
 };
-
+use std::collections::BTreeMap;
 fn value<T>(raw: &str, make: impl FnOnce(String) -> Option<T>) -> T {
     make(raw.to_owned()).expect("fixture identity is valid")
 }
@@ -28,7 +22,7 @@ const fn revision(raw: u64) -> SectionRevisionId {
 fn key(raw: &str) -> SectionKey {
     value(raw, SectionKey::new)
 }
-fn versions() -> ContractVersions {
+const fn versions() -> ContractVersions {
     ContractVersions::new(
         ObservationSchemaVersion::new(1).expect("version is positive"),
         ObservationPolicyVersion::new(2).expect("version is positive"),
@@ -104,60 +98,44 @@ fn staged() -> GenerationStager {
         stager.start_section_with_context(start(), context(), 1),
         ReceiverDisposition::Received
     );
-    assert_eq!(
-        stager.stage_section_batch(
-            batch("batch:1", "ship:2", "record:2"),
-            b"batch-two",
-            20,
-            1,
-            2
-        ),
-        ReceiverDisposition::Received
-    );
-    assert_eq!(
-        stager.stage_section_batch(
-            batch("batch:2", "ship:1", "record:1"),
-            b"batch-one",
-            20,
-            1,
-            3
-        ),
-        ReceiverDisposition::Received
-    );
+    let batches = [
+        (batch("batch:1", "ship:2", "record:2"), &b"batch-two"[..], 2),
+        (batch("batch:2", "ship:1", "record:1"), &b"batch-one"[..], 3),
+    ];
+    for (batch, bytes, now) in batches {
+        assert_eq!(
+            stager.stage_section_batch(batch, bytes, 20, 1, now),
+            ReceiverDisposition::Received
+        );
+    }
     stager
 }
-
-fn validated_revision() -> observation_ingest::ValidatedSectionRevision {
-    let mut stager = staged();
+fn finish(stager: &mut GenerationStager) -> observation_ingest::ValidatedSectionRevision {
     let certificate = stager
         .completion_certificate(completion())
         .expect("candidate exists");
-    let CompletionOutcome::Validated(revision) =
-        stager.complete_section(certificate, &current(), 4)
-    else {
-        panic!("exact completion must validate")
-    };
-    revision
+    let revision = match stager.complete_section(&certificate, &current(), 4) {
+        CompletionOutcome::Validated(revision) => Some(revision),
+        CompletionOutcome::Rejected(_) => None,
+    }
+    .expect("exact completion validates");
+    *revision
 }
-
 #[test]
 fn exact_completion_yields_one_immutable_unpublished_revision() {
     let mut stager = staged();
-    let certificate = stager
-        .completion_certificate(completion())
-        .expect("candidate exists");
-    let CompletionOutcome::Validated(revision) =
-        stager.complete_section(certificate, &current(), 4)
-    else {
-        panic!("exact completion must validate")
-    };
+    let revision = finish(&mut stager);
     assert_eq!(revision.section_key(), &key("ships"));
     assert_eq!(revision.records()[0].record_id.as_str(), "record:1");
     assert_eq!(revision.records()[1].record_id.as_str(), "record:2");
-    assert_eq!(revision.context(), &context());
+    assert_eq!(revision.coverage(), CompletionCoverage::Complete);
+    assert_eq!(
+        revision.context().capture_window(),
+        CaptureWindow::new(10, 20).expect("window is ordered")
+    );
+    assert!(!revision.is_published());
     assert_eq!(stager.candidate_count(), 0);
 }
-
 #[test]
 fn any_count_length_digest_or_version_mismatch_discards_candidate() {
     let mut stager = staged();
@@ -166,13 +144,12 @@ fn any_count_length_digest_or_version_mismatch_discards_candidate() {
         .expect("candidate exists");
     certificate.record_count += 1;
     assert_eq!(
-        stager.complete_section(certificate, &current(), 4),
+        stager.complete_section(&certificate, &current(), 4),
         CompletionOutcome::Rejected(RejectionReason::CompletionMismatch)
     );
     assert_eq!(stager.candidate_count(), 0);
     assert_eq!(stager.aggregate_usage().candidate_count, 0);
 }
-
 #[test]
 fn frozen_dependency_mismatch_discards_and_arms_finite_cooldown() {
     let mut stager = staged();
@@ -184,7 +161,7 @@ fn frozen_dependency_mismatch_discards_and_arms_finite_cooldown() {
         Some(revision(6)),
     );
     assert_eq!(
-        stager.complete_section(certificate, &changed, 4),
+        stager.complete_section(&certificate, &changed, 4),
         CompletionOutcome::Rejected(RejectionReason::DependencyChanged)
     );
     assert_eq!(
@@ -196,37 +173,22 @@ fn frozen_dependency_mismatch_discards_and_arms_finite_cooldown() {
         ReceiverDisposition::Received
     );
 }
-
 #[test]
-fn coverage_and_capture_evidence_are_preserved_without_publishing() {
-    let mut stager = staged();
-    let certificate = stager
-        .completion_certificate(completion())
-        .expect("candidate exists");
-    let CompletionOutcome::Validated(revision) =
-        stager.complete_section(certificate, &current(), 4)
-    else {
-        panic!("exact completion must validate")
-    };
-    assert_eq!(revision.coverage(), CompletionCoverage::Complete);
-    assert_eq!(
-        revision.context().capture_window(),
-        CaptureWindow::new(10, 20).expect("window is ordered")
-    );
-    assert!(!revision.is_published());
-}
-
-#[test]
-fn source_uncertainty_drops_matching_candidates_and_retires_current_revision() {
-    let mut stager = staged();
-    assert_eq!(
-        stager.invalidate_source_scope(&value("scope:x4", SourceScopeId::new)),
-        1
-    );
-    assert_eq!(stager.aggregate_usage().candidate_count, 0);
-
+fn eligible_revision_becomes_stale_then_history_only_under_uncertainty() {
     let mut index = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
-    index.accept(validated_revision(), 4);
+    index.accept(finish(&mut staged()), 4);
+    index.record_current_pointer(key("sectors"), revision(4));
+    let set = match index.eligibility(&[key("ships")], 10, 10) {
+        DecisionEligibility::Eligible(set) => Some(set),
+        DecisionEligibility::Blocked(_) => None,
+    }
+    .expect("fresh exact revision is eligible");
+    assert_eq!(set.revisions().len(), 1);
+    assert!(set.revisions().contains_key(&key("ships")));
+    assert_eq!(
+        index.eligibility(&[key("ships")], 15, 10),
+        DecisionEligibility::Blocked(vec![EligibilityBlocker::Stale(key("ships"))])
+    );
     index.mark_scope_uncertain(&value("scope:x4", SourceScopeId::new));
     assert_eq!(index.current_count(), 0);
     assert_eq!(index.history_count(), 1);
@@ -235,18 +197,4 @@ fn source_uncertainty_drops_matching_candidates_and_retires_current_revision() {
         DecisionEligibility::Blocked(ref blockers)
             if blockers == &[EligibilityBlocker::Uncertain(value("scope:x4", SourceScopeId::new))]
     ));
-}
-
-#[test]
-fn exact_revision_set_is_canonical_and_staleness_blocks_visibly() {
-    let mut index = DecisionRevisionIndex::new(2).expect("blocker limit is non-zero");
-    index.accept(validated_revision(), 4);
-    let DecisionEligibility::Eligible(set) = index.eligibility(&[key("ships")], 10, 10) else {
-        panic!("fresh exact revision must be eligible")
-    };
-    assert_eq!(set.revisions().keys().collect::<Vec<_>>(), vec![&key("ships")]);
-    assert_eq!(
-        index.eligibility(&[key("ships")], 15, 10),
-        DecisionEligibility::Blocked(vec![EligibilityBlocker::Stale(key("ships"))])
-    );
 }
