@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.3
 current_phase_name: Generic Observation Contracts and Durable Publication
 status: executing
-stopped_at: Completed 05.3-01-PLAN.md
-last_updated: "2026-09-03T21:28:12.260Z"
+stopped_at: Completed 05.3-02-PLAN.md
+last_updated: "2026-09-03T22:25:58.972Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 05.3 execution started
-state_head: e07c3b291bf11acc6bb7bc884f03c528589b47fc
+state_head: 03c1d91fae19fe9aeba7e88e130a5841a146a4ab
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 40
-  completed_plans: 38
+  completed_plans: 39
   percent: 36
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 ## Current Position
 
 Phase: 05.3 (Generic Observation Contracts and Durable Publication) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-04 — Phase 05.3 execution started
 
@@ -90,6 +90,7 @@ Progress: [████░░░░░░] 36% (5 of 14 phases historically comp
 | Phase 05.1 P06 | 29m | 2 tasks | 6 files |
 | Phase 05.1 P08 | 41m | 2 tasks | 5 files |
 | Phase 05.3 P01 | 27min | 3 tasks | 13 files |
+| Phase 05.3 P02 | 49min | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -179,6 +180,9 @@ Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md o
 - [Phase 05.3]: Durable publication remains distinct from local handoff and volatile receipt; ambiguous publication never advances the sender.
 - [Phase 05.3]: Game-time urgency is an ordering hint only; injected monotonic real time and finite non-zero limits own admission.
 - [Phase 05.3]: The X4 facade exposes complete-message transport and bounded control vocabulary without any game-state mutation command.
+- [Phase 05.3]: Candidate and aggregate limits remain injected non-zero policy; no production numeric default was introduced.
+- [Phase 05.3]: Source uncertainty retires matching accepted revisions to history and drops matching volatile candidates without inventing authority.
+- [Phase 05.3]: Deletion requires two qualifying same-scope absences; weak evidence preserves the core entity.
 
 ### Pending Todos
 
@@ -216,6 +220,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T21:28:11.457Z
-Stopped at: Completed 05.3-01-PLAN.md
+Last session: 2026-09-03T22:25:58.171Z
+Stopped at: Completed 05.3-02-PLAN.md
 Resume file: None
