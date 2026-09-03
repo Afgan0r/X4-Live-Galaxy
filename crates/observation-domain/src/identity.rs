@@ -90,7 +90,7 @@ impl EventId {
 }
 
 #[must_use]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ObservationSource {
     X4Runtime,
 }
@@ -116,3 +116,58 @@ impl ObservationTime {
 }
 
 non_zero_identity!(ObservationVersion);
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompletionCoverage {
+    Complete,
+    KnownEmpty,
+    Partial,
+    Unknown,
+    Unsupported,
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ControlEnvelope {
+    Handshake,
+    Demand,
+    Disposition,
+    CollectionIntent,
+    Health,
+    Reset,
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EnvelopeDecodeError {
+    MessageTooLarge,
+    InvalidShape,
+    UnsupportedVersion,
+    InvalidIdentity,
+    InvalidVersion,
+}
+
+impl EnvelopeDecodeError {
+    pub fn require_contract(version: u64) -> Result<(), Self> {
+        (version == 1).then_some(()).ok_or(Self::UnsupportedVersion)
+    }
+}
+
+#[must_use]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FrameHeader {
+    Hello {
+        protocol_major: u16,
+        game_build: String,
+        capabilities: Vec<String>,
+        generation: u64,
+    },
+    Data {
+        kind: &'static str,
+        scope: String,
+        version: u64,
+        generation: u64,
+        sequence: u64,
+    },
+}

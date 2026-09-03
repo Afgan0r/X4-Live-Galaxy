@@ -30,17 +30,74 @@ pub enum SectionCoverage {
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum SectionAvailability {
+    Available,
+    Unavailable,
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct CaptureWindow {
+    start_millis: u64,
+    end_millis: u64,
+}
+
+impl CaptureWindow {
+    #[must_use]
+    pub const fn new(start_millis: u64, end_millis: u64) -> Option<Self> {
+        if start_millis <= end_millis {
+            Some(Self {
+                start_millis,
+                end_millis,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SectionState {
+    capture_window: CaptureWindow,
     freshness: SectionFreshness,
+    quality: SectionQuality,
+    availability: SectionAvailability,
     coverage: SectionCoverage,
 }
 
 impl SectionState {
     pub const fn new(freshness: SectionFreshness, coverage: SectionCoverage) -> Self {
         Self {
+            capture_window: CaptureWindow {
+                start_millis: 0,
+                end_millis: 0,
+            },
             freshness,
+            quality: SectionQuality::Unknown,
+            availability: SectionAvailability::Available,
             coverage,
         }
+    }
+
+    pub const fn with_evidence(
+        capture_window: CaptureWindow,
+        freshness: SectionFreshness,
+        quality: SectionQuality,
+        availability: SectionAvailability,
+        coverage: SectionCoverage,
+    ) -> Self {
+        Self {
+            capture_window,
+            freshness,
+            quality,
+            availability,
+            coverage,
+        }
+    }
+
+    pub const fn capture_window(self) -> CaptureWindow {
+        self.capture_window
     }
 
     pub const fn freshness(self) -> SectionFreshness {
@@ -49,6 +106,14 @@ impl SectionState {
 
     pub const fn coverage(self) -> SectionCoverage {
         self.coverage
+    }
+
+    pub const fn quality(self) -> SectionQuality {
+        self.quality
+    }
+
+    pub const fn availability(self) -> SectionAvailability {
+        self.availability
     }
 }
 

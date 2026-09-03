@@ -21,6 +21,10 @@ pub use model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, MAX_REJECTION_EVIDENCE,
     RejectionEvidence, RejectionReason,
 };
+pub use observation_domain::{
+    CompleteMessage, CompletionCoverage, ControlEnvelope, EnvelopeDecodeError, EnvelopeRecord,
+    FrameHeader, ImmutableBatchEnvelope, SectionCompletionEnvelope, SectionStartEnvelope,
+};
 use observation_domain::{
     EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
     SectionQuality,
@@ -31,8 +35,66 @@ pub use runtime_facts::{
 };
 pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;
-pub use wire::{FrameHeader, inspect_frame};
+pub use wire::decode_complete_message;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
+
+pub fn inspect_frame(payload: &str) -> Result<FrameHeader, AdmissionError> {
+    if payload.len() > 2_048 {
+        return Err(AdmissionError::FrameTooLarge);
+    }
+    match serde_json::from_str(payload).map_err(|_| AdmissionError::InvalidFixture)? {
+        wire::WireFrame::Hello(frame) => Ok(FrameHeader::Hello {
+            protocol_major: frame.protocol_major,
+            game_build: frame.game_build,
+            capabilities: frame.capabilities,
+            generation: frame.generation,
+        }),
+        wire::WireFrame::Heartbeat(frame) => frame_header("heartbeat", frame),
+        wire::WireFrame::RuntimeHealth(frame) => {
+            if frame.status.is_empty() {
+                return Err(AdmissionError::InvalidFixture);
+            }
+            frame_header("runtime_health", frame)
+        }
+        wire::WireFrame::Observation(frame) => frame_header("observation", frame),
+        wire::WireFrame::CompleteMarker(frame) => frame_header("complete_marker", frame),
+    }
+}
+
+trait HeaderFields {
+    fn into_fields(self) -> (String, u64, Option<u64>, Option<u64>);
+}
+macro_rules! header_fields {
+    ($($ty:ty),+ $(,)?) => {$(
+        impl HeaderFields for $ty {
+            fn into_fields(self) -> (String, u64, Option<u64>, Option<u64>) {
+                (self.scope, self.version, self.generation, self.sequence)
+            }
+        }
+    )+};
+}
+header_fields!(
+    wire::WireHeartbeat,
+    wire::WireRuntimeHealth,
+    wire::WireObservation,
+    wire::WireCompleteMarker
+);
+
+fn frame_header(
+    kind: &'static str,
+    frame: impl HeaderFields,
+) -> Result<FrameHeader, AdmissionError> {
+    let (scope, version, generation, sequence) = frame.into_fields();
+    let _ = EntityId::new(scope.clone()).ok_or(AdmissionError::InvalidScope)?;
+    let _ = ObservationVersion::new(version).ok_or(AdmissionError::InvalidVersion)?;
+    Ok(FrameHeader::Data {
+        kind,
+        scope,
+        version,
+        generation: generation.ok_or(AdmissionError::InvalidFixture)?,
+        sequence: sequence.ok_or(AdmissionError::InvalidFixture)?,
+    })
+}
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GenerationLimits {
