@@ -121,18 +121,18 @@
 
 ## Traceability
 
-Every milestone 0.1 requirement has one primary roadmap owner. Supporting evidence may be delivered in later phases. On 2026-09-03, ADR-LG-023 moved unclosed observation acceptance from historical Phase 1/05.1 into 05.3-05.5. Earlier local implementations and summaries remain evidence; reopening these acceptance checkboxes does not claim that their code was removed. OBS-06 has primary owner 05.4, with conditional station evidence in 05.5. No new milestone requirement was added.
+Every milestone 0.1 requirement has one primary roadmap owner. Supporting evidence may be delivered in later phases. On 2026-09-03, ADR-LG-023 moved unclosed observation acceptance from historical Phase 1/05.1 into successor phases. On 2026-09-04, evidence against Carrier A triggered a separate owned-carrier phase: generic contracts remain in 05.3, production X4 transport moves to 05.4, heavy ship proof moves to 05.5, and conditional station evidence moves to 05.6. Earlier local implementations and summaries remain evidence; reopening these acceptance checkboxes does not claim that their code was removed. No new milestone requirement was added.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| OBS-01 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-01 | Phase 05.4 | Historical local implementation; owned-carrier successor acceptance pending |
 | OBS-02 | Phase 05.3 | Historical local implementation; successor acceptance pending |
 | OBS-03 | Phase 05.3 | Historical local implementation; successor acceptance pending |
 | OBS-04 | Phase 3 | Complete |
 | OBS-05 | Phase 3 | Complete |
-| OBS-06 | Phase 05.4 | Historical local implementation; successor acceptance pending |
+| OBS-06 | Phase 05.5 | Historical local implementation; successor acceptance pending |
 | OBS-07 | Phase 05.3 | Historical local implementation; successor acceptance pending |
-| OBS-08 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-08 | Phase 05.4 | Historical local implementation; no-mutation proof pending on owned carrier |
 | MIND-01 | Phase 4 | Complete |
 | MIND-02 | Phase 3 | Complete |
 | MIND-03 | Phase 3 | Complete |
@@ -173,7 +173,7 @@ Every milestone 0.1 requirement has one primary roadmap owner. Supporting eviden
 | VAL-03 | Phase 7 | Pending |
 | VAL-04 | Phase 8 | Pending |
 | VAL-05 | Phase 8 | Pending |
-| VAL-06 | Phase 05.3 | Pending; observation evidence includes 05.4/05.5, report evidence remains in 06 |
+| VAL-06 | Phase 05.4 | Pending; contracts originate in 05.3, observation evidence continues through 05.5/05.6, and report evidence remains in 06 |
 | RES-01 | Phase 2 | Complete |
 | RES-02 | Phase 2 | Complete |
 | RES-03 | Phase 2 | Complete |
