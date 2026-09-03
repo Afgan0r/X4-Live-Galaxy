@@ -7,14 +7,14 @@
 
 ### Observation and Normalization
 
-- [x] **OBS-01**: The system can ingest bounded, versioned observation envelopes from X4 without blocking the game thread on bridge or model work, and the X4 adapter and Rust bridge negotiate explicit transport/session capabilities before accepting traffic.
-- [x] **OBS-02**: Every observed entity and event used by strategy has a stable typed identity, source, observation time, and monotonic state or event version.
-- [x] **OBS-03**: Normalized world-state sections preserve freshness, coverage, quality, and explicit unknown or unsupported states instead of fabricating missing facts.
+- [ ] **OBS-01**: The system can ingest bounded, versioned observation envelopes from X4 without blocking the game thread on bridge or model work, and the X4 adapter and Rust bridge negotiate explicit transport/session capabilities before accepting traffic.
+- [ ] **OBS-02**: Every observed entity and event used by strategy has a stable typed identity, source, observation time, and monotonic state or event version.
+- [ ] **OBS-03**: Normalized world-state sections preserve freshness, coverage, quality, and explicit unknown or unsupported states instead of fabricating missing facts.
 - [x] **OBS-04**: The observation model provides the supported economic, military, territorial, and threat facts required by the ZYA and ARG minds.
 - [x] **OBS-05**: XEN is represented as the primary hostile pressure shared by ZYA and ARG, and KHK is recognized when authoritative observations contain it.
-- [x] **OBS-06**: Runtime sectors, assets, capacity, and ownership are discovered from observed state rather than assumed from a fixed vanilla map or job count.
-- [x] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
-- [x] **OBS-08**: Milestone 0.1 X4 integration exposes no fleet, economy, diplomacy, institution, or other game-state mutation command.
+- [ ] **OBS-06**: Runtime sectors, assets, capacity, and ownership are discovered from observed state rather than assumed from a fixed vanilla map or job count.
+- [ ] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
+- [ ] **OBS-08**: Milestone 0.1 X4 integration exposes no fleet, economy, diplomacy, institution, or other game-state mutation command.
 
 ### Faction Minds and Deterministic Strategy
 
@@ -121,18 +121,18 @@
 
 ## Traceability
 
-Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
+Every milestone 0.1 requirement has one primary roadmap owner. Supporting evidence may be delivered in later phases. On 2026-09-03, ADR-LG-023 moved unclosed observation acceptance from historical Phase 1/05.1 into 05.3-05.5. Earlier local implementations and summaries remain evidence; reopening these acceptance checkboxes does not claim that their code was removed. OBS-06 has primary owner 05.4, with conditional station evidence in 05.5. No new milestone requirement was added.
 
 | Requirement | Phase | Status |
 | --- | --- | --- |
-| OBS-01 | Phase 1 | Complete |
-| OBS-02 | Phase 1 | Complete |
-| OBS-03 | Phase 1 | Complete |
+| OBS-01 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-02 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-03 | Phase 05.3 | Historical local implementation; successor acceptance pending |
 | OBS-04 | Phase 3 | Complete |
 | OBS-05 | Phase 3 | Complete |
-| OBS-06 | Phase 1 | Complete |
-| OBS-07 | Phase 1 | Complete |
-| OBS-08 | Phase 1 | Complete |
+| OBS-06 | Phase 05.4 | Historical local implementation; successor acceptance pending |
+| OBS-07 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-08 | Phase 05.3 | Historical local implementation; successor acceptance pending |
 | MIND-01 | Phase 4 | Complete |
 | MIND-02 | Phase 3 | Complete |
 | MIND-03 | Phase 3 | Complete |
@@ -173,7 +173,7 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 | VAL-03 | Phase 7 | Pending |
 | VAL-04 | Phase 8 | Pending |
 | VAL-05 | Phase 8 | Pending |
-| VAL-06 | Phase 1 | Pending |
+| VAL-06 | Phase 05.3 | Pending; observation evidence includes 05.4/05.5, report evidence remains in 06 |
 | RES-01 | Phase 2 | Complete |
 | RES-02 | Phase 2 | Complete |
 | RES-03 | Phase 2 | Complete |
@@ -183,4 +183,4 @@ Every milestone 0.1 requirement is assigned to exactly one roadmap phase.
 ---
 
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-09-03 after the owner dropped More AI Economy Ships compatibility*
+*Last updated: 2026-09-03 after owner-approved successor reconciliation and readiness review*

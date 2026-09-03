@@ -22,11 +22,16 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 
 ## Phases
 
-- [ ] **Phase 1: Read-Only Observation Spine** - Produce trustworthy, bounded, replayable X4 observations without mutation or game-thread stalls.
+- [ ] **Phase 1: Read-Only Observation Spine** - Historical implementation; unclosed observation proof is reassigned to 05.3-05.5, not completed.
 - [x] **Phase 2: Hostile-Faction Research Track** - Establish versioned XEN/KHK evidence independently of the ZYA/ARG critical path.
 - [x] **Phase 3: Faction-Scoped Strategic State** - Turn frozen observations into deterministic faction and fixed-priority institution inputs for ZYA and ARG.
 - [x] **Phase 4: Persistent Full Faction Minds** - Preserve distinct ZYA/ARG goals, institution initiatives, causal history, and recovery state across interruption boundaries.
 - [x] **Phase 5: Bounded Shadow Deliberation** - Arbitrate and admit provider proposals and institution initiatives only through deterministic validation, budgets, and exact replay contracts. (completed 2026-08-29)
+- [ ] **Phase 05.1: Bounded Real Component Discovery** - Historical partial implementation; do not execute the superseded remainder.
+- [x] **Phase 05.2: Layered Lua and X4 Verification Foundation** - Historical completed phase; obsolete research tooling was retired by quick 260903-06l and 260903-32k.
+- [ ] **Phase 05.3: Generic Observation Data Flow and Feedback** - Source-agnostic observation assembly, bounded scheduling and receiver feedback.
+- [ ] **Phase 05.4: Heavy Faction Ship Conformance** - Prove the shared flow with heavy ship observations across X4 and Rust.
+- [ ] **Phase 05.5: Station-Specific Observation Remainder** - Close only station-specific gaps remaining after 05.4; conditional scope.
 - [ ] **Phase 6: Correlated Reports and Diagnostics** - Emit safe concise X4 reports while retaining complete external decision evidence.
 - [ ] **Phase 7: X4 Operational Proof** - Demonstrate bounded normal-speed, SETA, reconnect, recovery, and unattended behavior in disposable X4 runs.
 - [ ] **Phase 8: Evaluation and Internal Prototype Gate** - Measure strategic quality and reliability and classify the 0.1 evidence without public-ready claims.
@@ -47,7 +52,8 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 5. Disposable X4 9.00 evidence shows observation and transport work is bounded and no mutation command exists or can be emitted.
 
 **Research**: Required — confirm exact X4 9.00 observation, identity, scheduling, transport, embedded Lua, Mission Director, compatibility-negotiation, degraded-mode, and restart-condition semantics before relying on them.
-**Plans**: 9 plans
+**Status:** Historical partial implementation. Do not resume the legacy execution route. Eight summaries remain implementation evidence; the unearned runtime claims remain open under the successor mapping below.
+**Plans**: 8 summarized; 01-09 reassigned, 01-10/01-11 already superseded.
 
 - [x] 01-01-PLAN.md
 - [x] 01-02-PLAN.md
@@ -57,7 +63,7 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 - [x] 01-06-PLAN.md
 - [x] 01-07-PLAN.md
 - [x] 01-08-PLAN.md
-- [ ] 01-09-PLAN.md
+- [ ] 01-09-PLAN.md — Reassigned to 05.3 generic integration and 05.4/05.5 source proof; not executed or waived.
 
 ### Phase 2: Hostile-Faction Research Track
 
@@ -168,6 +174,8 @@ Plans:
 
 ### Phase 05.2: Layered Lua and X4 Verification Foundation (INSERTED)
 
+**Current disposition:** Historical completion is preserved. The shared Docs MCP contract now owns API research and disposable knowledge probes. Quick 260903-06l retired the obsolete research platform; quick 260903-32k replaced the custom Lua analyzer with Busted product checks. The historical criteria below do not authorize rebuilding those retired mechanisms.
+
 **Goal:** Require source-saturated dossiers, an executable known-failure gate,
 production-faithful conformance, and bounded read-only candidate experiments
 before any future X4 seam is planned, implemented, packaged, or tested in game.
@@ -227,7 +235,8 @@ Plans:
 
 **Research**: Required — inspect installed vanilla X4 first, then the X4 Live reference call shapes and exact installed mod/version evidence; treat runtime semantics as unknown until the disposable probe.
 **Requirement mapping note**: This conditional evidence closure strengthens the existing OBS-06 / D-09 contract and introduces no new milestone requirement ID.
-**Plans:** 3 completed, 1 superseded, 5 queued
+**Status:** Historical partial implementation, superseded by ADR-LG-023. No remaining plan is executable as written. Preserve earned evidence; do not treat legacy numeric limits or one-way transport as target policy.
+**Plans:** 6 summarized; 05.1-04 superseded; 05.1-09 and 05.1-07 reassigned without completion claims.
 
 Plans:
 **Wave 1**
@@ -251,16 +260,77 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 05.1-09-PLAN.md — Connect marker-owned bridge admission, listener overflow, and concurrent backpressure.
+- [ ] 05.1-09-PLAN.md — Reassigned to 05.3: content-bound terminal admission, whole-message receive and backpressure. Legacy marker/numeric policy is superseded; committed RED contracts are history to assess during planning.
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 05.1-07-PLAN.md — Run the final owner X4 checkpoint, record durable budget decisions, and execute closure gates.
+- [ ] 05.1-07-PLAN.md — Reassigned to 05.3 generic budget/integration proof, 05.4 heavy ship proof and conditional 05.5 station proof. No human run is claimed.
+
+### Phase 05.3: Generic Observation Data Flow and Feedback (INSERTED)
+
+**Goal:** Transfer independently captured observation sections through a source-agnostic bounded flow, preserving explicit coverage and publishing only validated durable revisions to immutable decision inputs.
+**Depends on:** Phase 5; reuse earned Phase 1/05.1 implementation and current product checks without reviving their superseded policy.
+**Requirements:** OBS-01, OBS-02, OBS-03, OBS-07, OBS-08, VAL-06 (observation integration); supporting STATE-02/03/04/06 and later VAL-01/02 evidence.
+**Layers:** `rust-domain`, `x4-runtime`; no model-facing contract change is admitted by this reconciliation.
+**Success Criteria:**
+
+1. At least two materially different conformance examples traverse the same section lifecycle; native source adapters do not define generic scheduling, transport or publication policy.
+2. Separate collection and transport state machines enforce independent finite work, byte, count and age bounds. SETA changes urgency, never the real-time work allowance; stale required sections block dependent decisions.
+3. The carrier-neutral facade uses carrier A first and one globally unacknowledged immutable batch. Local write, volatile `received`, durable `committed` and terminal rejection remain distinct; retry never rebuilds bytes under the same identity.
+4. Bounded keyed candidates validate section-local sequence, content-bound completion, exact versions and frozen dependencies before one atomic revision/receipt/current-pointer transaction. Duplicate, crash and reconnect cases preserve the last accepted state without double publication.
+5. Coverage is never strengthened downstream. Unknown source epoch fences one uninterrupted runtime scope; uncertain boundaries invalidate current decision eligibility. Complete-set absence remains disabled without qualifying source and identity evidence.
+6. Local behavioral evidence and the minimal Live Galaxy integration proof are reported separately. Docs MCP gaps block only dependent runtime slices; the owner approves research and checked plans before execution.
+
+**Research:** Required. Start from `05.3-CONTEXT.md` and `05.3-READINESS.md`; obtain missing carrier pressure, MD delivery and save-window evidence through Docs MCP. Do not infer runtime guarantees from local fakes or repeat the archived Docs probe wholesale.
+**Plans:** 0; context restored from accepted ADRs, research and plan-check not yet performed.
+
+### Phase 05.4: Heavy Faction Ship Conformance (INSERTED)
+
+**Goal:** Demonstrate the shared observation architecture on a deliberately heavy faction ship workload across X4, Lua, transport and Rust, without admitting a new Faction Mind feature.
+**Depends on:** Phase 05.3
+**Requirements:** OBS-06 (primary owner of successor runtime discovery proof); supporting VAL-01/02/06 and VER-LG-003/011/012.
+**Layers:** `rust-domain`, `x4-runtime`.
+**Success Criteria:**
+
+1. One heavy ordinary eligible faction passes before the proof expands to all dynamically discovered `mind_candidate` factions; every faction is classified and unknown eligibility blocks closure.
+2. Core ship observations and applicable cargo/crew/loadout groups preserve exact core dependencies, explicit availability and eventual group coverage without claiming simultaneous global capture.
+3. Normal-time and sustained SETA observations demonstrate independently bounded collection, feedback, candidate assembly, durable publication, recovery and freshness under the measured workload.
+4. Source coverage remains as weak as the available proof requires. KHK, the player faction and XEN remain excluded under ADR-LG-022; source gaps become explicit blockers, not fabricated complete sets.
+
+**Research:** Required, after owner discussion. Exact ship APIs and source completeness are not audited by the 05.3 readiness check.
+**Plans:** 0; future phase, not pre-approved for execution.
+
+### Phase 05.5: Station-Specific Observation Remainder (INSERTED)
+
+**Goal:** Close only station-specific membership, identity, ownership, capacity, completeness or compatibility gaps that remain after the shared architecture and heavy ship proof.
+**Depends on:** Phase 05.4
+**Requirements:** Supports OBS-06 and VAL-06; primary requirement ownership stays with 05.4/05.3 respectively.
+**Layers:** `x4-runtime`, plus `rust-domain` only if the remaining station adapter contract requires it.
+**Success Criteria:**
+
+1. The owner and research identify the concrete station remainder from 05.4 evidence; shrink or remove this phase through GSD if none remains.
+2. Any station complete-set, known-empty, ownership-transfer or deletion claim has qualifying source and identity evidence; partial observations do not drive absence reconciliation.
+3. Remaining station integration is verified under its actual workload without rebuilding generic mechanisms already owned by 05.3.
+
+**Research:** Required only for the admitted remainder, after owner discussion.
+**Plans:** 0; conditional future scope, not pre-approved for execution.
+
+### Successor obligation mapping
+
+| Historical obligation | Current owner | Preserved boundary |
+| --- | --- | --- |
+| 01-09 loader, negotiation, bounded transport and compatible reconnect proof | 05.3; sustained operational coverage in 07 | Earlier local and disposable evidence stays scoped; no automatic completion |
+| 01-10/01-11 and 05.1-04 source discovery remainder | 05.4, then station-only remainder in 05.5 | Already-superseded plans stay historical; no synthetic capacity source |
+| 05.1-09 terminal admission, listener overflow, backpressure | 05.3 | Replace marker-only and arbitrary limit policy through checked plans |
+| 05.1-07 independent budgets and generic normal-time/SETA integration | 05.3 | Values come from evidence; no blanket reuse of 129/64/1800 or old FIFO limits |
+| 05.1-07 component coverage, identity and completeness proof | 05.4; station-specific 05.5 | No runtime success is inferred from moved ownership |
+| Phase 05.2 source-research platform | Docs MCP shared workflow | Historical completion retained; retired tooling is not a successor deliverable |
+| Mail/Logbook, full director soak and quality evaluation | 06, 07, 08 | Not pulled into 05.3 |
 
 ### Phase 6: Correlated Reports and Diagnostics
 
 **Goal**: Operators receive safe concise X4 reports and complete, bounded external evidence for every shadow decision and degraded path.
-**Depends on**: Phase 5
+**Depends on**: Phase 05.4, plus Phase 05.5 if its remainder is retained; Phase 05.3 supplies the shared control channel.
 **Requirements**: DIAG-01, DIAG-02, DIAG-03, DIAG-04, DIAG-05
 **Success Criteria** (what must be TRUE):
 
@@ -309,16 +379,23 @@ Plans:
 
 **Execution order:** Phase 1 starts the critical path. Phase 2 is an independent
 research track and may run in parallel; Phase 3 depends only on Phase 1. The
-critical implementation path continues through Phases 3–7. Phase 8 requires
+critical implementation path continues through Phases 3–5, 05.3, 05.4,
+conditional 05.5, and 6–7. Historical Phase 1/05.1 execution is not resumed;
+their unclosed claims follow the successor mapping above. Phase 8 requires
 both the research artifact from Phase 2 and operational evidence from Phase 7.
 
 | Phase | Plans Complete | Status | Completed |
 | --- | --- | --- | --- |
-| 1. Read-Only Observation Spine | 8/9 | In Progress |  |
+| 1. Read-Only Observation Spine | 8 summarized | Remainder reassigned; runtime claims open | - |
 | 2. Hostile-Faction Research Track | 1/1 | Complete | 2026-08-29 |
 | 3. Faction-Scoped Strategic State | 3/3 | Complete | 2026-08-29 |
 | 4. Persistent Full Faction Minds | 4/4 | Complete | 2026-08-29 |
 | 5. Bounded Shadow Deliberation | 5/5 | Complete    | 2026-08-29 |
+| 05.1. Bounded Real Component Discovery | 6 summarized | Remainder superseded/reassigned | - |
+| 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
+| 05.3. Generic Observation Data Flow and Feedback | 0/TBD | Context restored; research pending | - |
+| 05.4. Heavy Faction Ship Conformance | 0/TBD | Awaiting 05.3 and owner discussion | - |
+| 05.5. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.4 | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |
 | 8. Evaluation and Internal Prototype Gate | 0/TBD | Not started | - |

@@ -152,8 +152,9 @@ implements and tests one milestone in game before selecting and discussing the
 next; the Bannerlord-derived catalogue remains a reference source rather than a
 precommitted product backlog.
 
-Durable product decisions and historical planning evidence live in personal
-MemPalace wing `wing_x4_live_galaxy`. The repository owns active GSD state,
+Durable development decisions follow `.agent-instructions/x4/MEMORY.md` in
+personal MemPalace wing `wing_x4_modding`; the older Live Galaxy wing is a
+read-only historical source. The repository owns active GSD state,
 source, tests, release artifacts, and concise conclusions needed by the current
 milestone. Installed X4 data, installed mods, TALKER, and the X4 Live MCP
 repository are read-only evidence sources.

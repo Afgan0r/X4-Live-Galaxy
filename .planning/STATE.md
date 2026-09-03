@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-current_phase: 05.1
-current_phase_name: Bounded Real Component Discovery
-status: executing
-stopped_at: Completed 05.1-08-PLAN.md
-last_updated: "2026-08-31T21:29:10.939Z"
+current_phase: 05.3
+current_phase_name: Generic Observation Data Flow and Feedback
+status: Ready for research; dependent X4 runtime slices await Docs MCP evidence
+stopped_at: Resumed and reconciled to 05.3; instructions and Docs MCP ready; phase research pending and dependent runtime knowledge gaps remain
+last_updated: "2026-09-03T14:42:58.707Z"
 last_activity: 2026-09-03
-last_activity_desc: Completed quick 260903-32k Busted migration and product checks
-state_head: 18682f5463b6c3d9b70a62b713e9cfe8531901c4
+last_activity_desc: Reconciled accepted successor boundaries and checked instruction/Docs MCP readiness
+state_head: ea5e6b054448b9ebac448f3d26164373782d915f
 progress:
-  total_phases: 10
+  total_phases: 13
   completed_phases: 5
-  total_plans: 40
+  total_plans: 37
   completed_plans: 37
-  percent: 50
+  percent: 38
 ---
 
 # Project State
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-28)
 
 **Core value:** Factions pursue coherent, distinct, long-lived strategies while X4 remains authoritative and every proposed effect stays observable, recoverable, and bounded by deterministic validation.
-**Current focus:** Phase 05.1 — Bounded Real Component Discovery
+**Current focus:** Phase 05.3 - Generic Observation Data Flow and Feedback; historical 01/05.1 execution is superseded
 
 ## Current Position
 
-Phase: 05.1 (Bounded Real Component Discovery) — READY TO EXECUTE
-Plan: 8 of 09 — ready for automated execution
-Status: Executing approved gap-closure plans
-Last activity: 2026-09-03 — Completed quick 260903-32k; product all passed in 1.449 s; phase execution remains paused per HANDOFF
+Phase: 05.3 (Generic Observation Data Flow and Feedback)
+Plan: Not planned; accepted context restored
+Status: Ready for research; dependent X4 runtime slices await Docs MCP evidence
+Last activity: 2026-09-03 - Reconciled accepted successor boundaries and checked instruction/Docs MCP readiness
 
-Progress: [█████░░░░░] 50%
+Progress: 38% (5 of 13 phases historically complete; successor plans not yet defined)
 
 ## Performance Metrics
 
@@ -95,9 +95,10 @@ Progress: [█████░░░░░] 50%
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md override conflicting numerical, transport and retired research-platform policies:
 
 - [Milestone 0.1]: Shadow Director is observation-only and internal; X4 remains authoritative and no mutation command is admitted.
+
 - [Milestone 0.1]: Full ZYA and ARG minds share XEN pressure, recognize observed KHK, and are accepted through AFK/SETA evidence.
 - [Milestone 0.1]: Primitive institutions share the authoritative faction-visible snapshot, apply fixed priorities, and own at most one active Shadow initiative under bounded Executive arbitration.
 - [Workflow]: The 103 Bannerlord-derived ideas remain a reference catalogue; development selects one small visible milestone, verifies it in game, and only then discusses the next.
@@ -172,6 +173,7 @@ Recent decisions affecting current work:
 - [Phase 05.1]: The Lua package authority guard accepts exactly four named production files. — Fixed paths prevent unrelated production code from acquiring the phase telemetry vocabulary.
 - [Phase 05.1]: Incremental generation candidates reconcile from their exact staged canonical membership rather than legacy aggregate ceilings. — This preserves strict atomic admission while allowing 129-plus streamed frames.
 - [Phase 05.1]: Restart callers restore the last admitted generation explicitly. — Generation identity cannot be inferred safely from unrelated snapshot fields.
+- [Phase 05.3]: ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md supersede conflicting historical Phase 01/05.1/05.2 entries: use source-agnostic sections, one stop-and-wait slot, distinct received/committed, bounded keyed candidates and independent aggregate bounds; never resume the old remainder or retired research platform. — Owner approved GSD reconciliation on 2026-09-03; past implementation evidence is preserved without promoting obsolete policies.
 
 ### Pending Todos
 
@@ -182,6 +184,7 @@ None yet.
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
 - [Phase 6]: The bounded Rust-to-X4 Mail/Logbook return channel and acknowledgement semantics require disposable evidence; topology and framing remain technical decisions.
+- 05.3 runtime admission: Docs MCP has scoped transport/lifecycle observations but outbound full-pipe/short-write behavior, selected MD pulse delivery and save-window gate remain insufficient. See 05.3-READINESS.md; independent research may proceed.
 
 ### Quick Tasks Completed
 
@@ -195,6 +198,7 @@ None yet.
 
 - Phase 05.1 inserted after Phase 5: Bounded Real Component Discovery; conditional successor for actual component-level X4 telemetry, separated from the Phase 1 transport spine. (URGENT)
 - Phase 05.2 inserted after Phase 5 and reordered before further Phase 05.1 X4 execution: it must build the admission gate and read-only candidate harness first; Phase 05.1 then owns one prepared X4 run over the remaining candidate matrix. (URGENT)
+- Phase 05.3 inserted after Phase 5: Owner-approved ADR-LG-023 reconciliation: 05.3 generic flow and feedback; 05.4 heavy ship proof; conditional 05.5 station remainder. Historical 01/05.1 gaps remain open under new owners.
 
 ## Deferred Items
 
@@ -206,6 +210,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-08-31T21:29:10.167Z
-Stopped at: Completed 05.1-08-PLAN.md
-Resume file: None
+Last session: 2026-09-03T14:41:58.428Z
+Stopped at: Resumed and reconciled to 05.3; instructions and Docs MCP ready; phase research pending and dependent runtime knowledge gaps remain
+Resume file: .planning/phases/05.3-generic-observation-data-flow-and-feedback/05.3-CONTEXT.md
