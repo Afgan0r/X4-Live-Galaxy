@@ -10,7 +10,8 @@ use observation_domain::{
     TransportEpoch,
 };
 use observation_ingest::{
-    DeliveryStage, ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, StopAndWaitSlot,
+    CompleteMessage, DeliveryStage, EnvelopeDecodeError, ImmutableApplicationBatch,
+    ReceiverDisposition, SlotAdmission, StopAndWaitSlot, decode_complete_message,
 };
 
 const fn epoch(value: u64) -> TransportEpoch {
@@ -121,4 +122,44 @@ fn lifecycle_identifiers_have_distinct_compile_time_types() {
     for (index, left) in names.iter().enumerate() {
         assert!(names.iter().skip(index + 1).all(|right| left != right));
     }
+}
+
+#[test]
+fn strict_whole_message_decode_rejects_invalid_contracts_before_staging() {
+    let oversized = vec![b' '; 513];
+    assert_eq!(
+        decode_complete_message(&oversized, 512),
+        Err(EnvelopeDecodeError::MessageTooLarge)
+    );
+    for invalid in [
+        br#"{"type":"section_start"}"#.as_slice(),
+        br#"{"type":"section_start","contract_version":2,"source_scope":"scope:ships","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"ships","section_revision":1,"expected_records":1}"#.as_slice(),
+        br#"{"type":"section_start","contract_version":1,"source_scope":"","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"ships","section_revision":1,"expected_records":1}"#.as_slice(),
+        br#"{"type":"section_start","contract_version":1,"source_scope":"scope:ships","producer_incarnation":"producer:1","transport_epoch":0,"section_key":"ships","section_revision":1,"expected_records":1}"#.as_slice(),
+        br#"{"type":"section_start","contract_version":1,"source_scope":"scope:ships","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"ships","section_revision":1,"expected_records":1,"unknown":true}"#.as_slice(),
+    ] {
+        assert!(decode_complete_message(invalid, 512).is_err());
+    }
+}
+
+#[test]
+fn ship_and_known_empty_station_use_the_same_strict_envelopes() {
+    let ship = br#"{"type":"immutable_batch","contract_version":1,"source_scope":"scope:ships","section_key":"ships","section_revision":3,"batch_id":"batch:ships:3","records":[{"record_id":"record:ship:1","entity_id":"ship:1","observation_version":4,"content":"core"},{"record_id":"record:ship:2","entity_id":"ship:2","observation_version":2,"content":"core"}],"optional_detail":"detail_unavailable"}"#;
+    let station = br#"{"type":"section_completion","contract_version":1,"source_scope":"scope:stations","section_key":"stations","section_revision":8,"record_count":0,"coverage":"known_empty"}"#;
+
+    let CompleteMessage::ImmutableBatch(ship) =
+        decode_complete_message(ship, 1024).expect("ship fixture is valid")
+    else {
+        panic!("expected immutable batch")
+    };
+    let CompleteMessage::SectionCompletion(station) =
+        decode_complete_message(station, 1024).expect("station fixture is valid")
+    else {
+        panic!("expected section completion")
+    };
+
+    assert_eq!(ship.records.len(), 2);
+    assert_eq!(ship.optional_detail.as_deref(), Some("detail_unavailable"));
+    assert_eq!(station.record_count, 0);
+    assert!(station.is_qualified_known_empty());
 }

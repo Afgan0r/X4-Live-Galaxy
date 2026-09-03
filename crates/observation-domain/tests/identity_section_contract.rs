@@ -4,9 +4,10 @@
 )]
 
 use observation_domain::{
-    CanonicalObservationKey, CompleteMarker, DuplicateDecision, EntityId, ObservationRecord,
-    ObservationSource, ObservationTime, ObservationVersion, SectionCoverage, SectionFreshness,
-    SectionState, classify_duplicate, quality_for_empty_section,
+    CanonicalObservationKey, CaptureWindow, CompleteMarker, DuplicateDecision, EntityId,
+    ObservationRecord, ObservationSource, ObservationTime, ObservationVersion, RecordId,
+    SectionAvailability, SectionCoverage, SectionFreshness, SectionQuality, SectionState,
+    SourceScopeId, classify_duplicate, quality_for_empty_section,
 };
 
 fn entity(value: &str) -> EntityId {
@@ -19,6 +20,19 @@ const fn version(value: u64) -> ObservationVersion {
 
 fn record(id: &str, record_version: u64, content: &str) -> ObservationRecord {
     ObservationRecord::new(
+        entity(id),
+        ObservationSource::x4_runtime(),
+        ObservationTime::from_unix_millis(1_725_000_000_000),
+        version(record_version),
+        content,
+    )
+    .expect("test record is valid")
+}
+
+fn scoped_record(scope: &str, id: &str, record_version: u64, content: &str) -> ObservationRecord {
+    ObservationRecord::scoped(
+        SourceScopeId::new(scope).expect("test scope is valid"),
+        RecordId::new(format!("record:{id}")).expect("test record id is valid"),
         entity(id),
         ObservationSource::x4_runtime(),
         ObservationTime::from_unix_millis(1_725_000_000_000),
@@ -74,4 +88,83 @@ fn freshness_is_independent_and_canonical_keys_are_stable() {
 
     assert_ne!(fresh, stale);
     assert!(key_a < key_b);
+}
+
+#[test]
+fn evidence_axes_remain_independent_and_never_promote_coverage() {
+    let window = CaptureWindow::new(10, 20).expect("capture window is ordered");
+    let partial = SectionState::with_evidence(
+        window,
+        SectionFreshness::Fresh,
+        SectionQuality::Fresh,
+        SectionAvailability::Available,
+        SectionCoverage::Partial,
+    );
+    let unsupported = SectionState::with_evidence(
+        window,
+        SectionFreshness::Stale,
+        SectionQuality::Fresh,
+        SectionAvailability::Unavailable,
+        SectionCoverage::Unsupported,
+    );
+
+    assert_eq!(partial.capture_window(), window);
+    assert_eq!(partial.coverage(), SectionCoverage::Partial);
+    assert_eq!(unsupported.quality(), SectionQuality::Fresh);
+    assert_eq!(unsupported.coverage(), SectionCoverage::Unsupported);
+    assert_ne!(partial.availability(), unsupported.availability());
+}
+
+#[test]
+fn scoped_versions_reject_lower_replay_equal_and_admit_only_higher() {
+    let accepted = scoped_record("scope:ships", "ship:1", 7, "stable");
+
+    assert_eq!(
+        classify_duplicate(
+            &accepted,
+            &scoped_record("scope:ships", "ship:1", 6, "stable")
+        ),
+        DuplicateDecision::Conflict
+    );
+    assert_eq!(
+        classify_duplicate(
+            &accepted,
+            &scoped_record("scope:ships", "ship:1", 7, "stable")
+        ),
+        DuplicateDecision::Idempotent
+    );
+    assert_eq!(
+        classify_duplicate(
+            &accepted,
+            &scoped_record("scope:ships", "ship:1", 7, "changed")
+        ),
+        DuplicateDecision::Conflict
+    );
+    assert_eq!(
+        classify_duplicate(
+            &accepted,
+            &scoped_record("scope:ships", "ship:1", 8, "advanced")
+        ),
+        DuplicateDecision::Conflict
+    );
+    assert_eq!(
+        classify_duplicate(
+            &accepted,
+            &scoped_record("scope:stations", "ship:1", 7, "stable")
+        ),
+        DuplicateDecision::DifferentIdentity
+    );
+}
+
+#[test]
+fn canonical_record_order_is_independent_of_input_permutation() {
+    let first = scoped_record("scope:ships", "ship:2", 1, "beta");
+    let second = scoped_record("scope:ships", "ship:1", 2, "alpha");
+    let mut left = vec![first.clone(), second.clone()];
+    let mut right = vec![second, first];
+
+    left.sort();
+    right.sort();
+
+    assert_eq!(left, right);
 }
