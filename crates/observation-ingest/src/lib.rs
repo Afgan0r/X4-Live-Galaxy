@@ -14,8 +14,8 @@ pub use batch::{
     admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
 pub use feedback::{
-    DeliveryStage, FeedbackError, ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission,
-    StopAndWaitSlot,
+    CollectionPolicyLimits, DeliveryStage, FeedbackError, ImmutableApplicationBatch,
+    ReceiverDisposition, SlotAdmission, StopAndWaitSlot, TransportPolicyLimits,
 };
 pub use generation::GenerationStager;
 pub use model::{
@@ -25,6 +25,7 @@ pub use model::{
 pub use observation_domain::{
     CompleteMessage, CompletionCoverage, ControlEnvelope, EnvelopeDecodeError, EnvelopeRecord,
     FrameHeader, ImmutableBatchEnvelope, SectionCompletionEnvelope, SectionStartEnvelope,
+    TransportEpoch,
 };
 use observation_domain::{
     EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
@@ -34,10 +35,7 @@ pub use runtime_facts::{
     RuntimeAsset, RuntimeCapacity, RuntimeFactAvailability, RuntimeFactQuality, RuntimeFacts,
     RuntimeOwnership, RuntimeSector,
 };
-pub use scheduler::{
-    CollectionPolicyLimits, DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome,
-    TransportPolicyLimits,
-};
+pub use scheduler::{DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome};
 pub use snapshot::ProjectionSnapshot;
 use wire::TracerObservation;
 pub use wire::decode_complete_message;

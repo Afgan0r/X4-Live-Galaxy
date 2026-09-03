@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod facade;
 mod ingress;
 mod listener;
 mod protocol;
@@ -21,3 +22,7 @@ pub use telemetry::{BridgeError, TelemetryFrame, admit_tracer_frame};
 pub const fn is_telemetry_only() -> bool {
     true
 }
+pub use facade::{
+    CompleteMessageSendOutcome, ConnectionState, ControlEnvelope, ControlPollOutcome, FacadeError,
+    ObservationCarrierFacade, TransportEpoch,
+};

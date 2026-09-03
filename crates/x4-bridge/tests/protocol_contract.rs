@@ -1,3 +1,8 @@
+#![expect(
+    clippy::expect_used,
+    reason = "test fixtures fail immediately when their invariants are invalid"
+)]
+
 use observation_ingest::AcceptedSnapshot;
 use x4_bridge::{
     BridgeError, CapabilityDecision, CompleteMessageSendOutcome, ConnectionState, ControlEnvelope,

@@ -1,11 +1,133 @@
+use crate::feedback::{CollectionPolicyLimits, TransportPolicyLimits};
+
+pub trait MonotonicClock {
+    fn now_millis(&self) -> u64;
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DeliveredPulse {
+    _game_time_urgency: u64,
+    downstream_capacity: bool,
+}
+
+impl DeliveredPulse {
+    pub const fn new(game_time_urgency: u64, downstream_capacity: bool) -> Self {
+        Self {
+            _game_time_urgency: game_time_urgency,
+            downstream_capacity,
+        }
+    }
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SchedulerOutcome {
+    pumped_bytes: usize,
+    collection_started: bool,
+}
+
+impl SchedulerOutcome {
+    #[must_use]
+    pub const fn pumped_bytes(self) -> usize {
+        self.pumped_bytes
+    }
+    #[must_use]
+    pub const fn collection_started(self) -> bool {
+        self.collection_started
+    }
+}
+
+pub struct ObservationScheduler<C> {
+    clock: C,
+    collection: CollectionPolicyLimits,
+    transport: TransportPolicyLimits,
+    last_refill: u64,
+    permits: usize,
+    pending: Option<Vec<u8>>,
+}
+
+impl<C: MonotonicClock> ObservationScheduler<C> {
+    pub fn new(
+        clock: C,
+        collection: CollectionPolicyLimits,
+        transport: TransportPolicyLimits,
+    ) -> Self {
+        let last_refill = clock.now_millis();
+        Self {
+            clock,
+            collection,
+            transport,
+            last_refill,
+            permits: collection.burst.get(),
+            pending: None,
+        }
+    }
+
+    pub fn stage_pending(&mut self, bytes: Vec<u8>) -> Result<(), Vec<u8>> {
+        if bytes.is_empty()
+            || bytes.len() > self.transport.max_pump_bytes.get()
+            || self.pending.is_some()
+        {
+            return Err(bytes);
+        }
+        self.pending = Some(bytes);
+        Ok(())
+    }
+
+    pub fn deliver_pulse(&mut self, pulse: DeliveredPulse) -> SchedulerOutcome {
+        self.refill();
+        if self.pending.is_some() && !pulse.downstream_capacity {
+            return SchedulerOutcome {
+                pumped_bytes: 0,
+                collection_started: false,
+            };
+        }
+        if let Some(bytes) = self.pending.take() {
+            return SchedulerOutcome {
+                pumped_bytes: bytes.len(),
+                collection_started: false,
+            };
+        }
+        let finite_policy = self.collection.step_work.get() > 0
+            && self.collection.heavy_permits.get() > 0
+            && self.transport.terminal_reserve.get() > 0;
+        let collection_started = pulse.downstream_capacity && self.permits > 0 && finite_policy;
+        if collection_started {
+            self.permits -= 1;
+        }
+        SchedulerOutcome {
+            pumped_bytes: 0,
+            collection_started,
+        }
+    }
+
+    pub fn pending_bytes(&self) -> Option<&[u8]> {
+        self.pending.as_deref()
+    }
+
+    fn refill(&mut self) {
+        let now = self.clock.now_millis();
+        let elapsed = now.saturating_sub(self.last_refill);
+        let refill = elapsed / self.collection.refill_millis.get();
+        if refill == 0 {
+            return;
+        }
+        let refill = usize::try_from(refill).unwrap_or(usize::MAX);
+        self.permits = self
+            .permits
+            .saturating_add(refill)
+            .min(self.collection.burst.get());
+        self.last_refill = now;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{cell::Cell, rc::Rc};
 
-    use super::{
-        CollectionPolicyLimits, DeliveredPulse, MonotonicClock, ObservationScheduler,
-        TransportPolicyLimits,
-    };
+    use super::{DeliveredPulse, MonotonicClock, ObservationScheduler};
+    use crate::{CollectionPolicyLimits, TransportPolicyLimits};
 
     #[derive(Clone)]
     struct FakeClock(Rc<Cell<u64>>);
