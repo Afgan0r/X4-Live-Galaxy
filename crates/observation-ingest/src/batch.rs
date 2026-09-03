@@ -1,15 +1,20 @@
 use crate::batch_budget::BatchBudget;
+use crate::generation::Candidate;
 use crate::model::{
     AcceptedProjection, AdmissionError, AdmissionOutcome, RejectionEvidence, RejectionReason,
 };
 use crate::runtime_facts::RuntimeFacts;
 use crate::snapshot::{ProjectionSnapshot, ScopedObservation};
 use crate::wire::{WireCompleteMarker, WireFrame, WireObservation};
-use crate::{ReceiptClock, SystemReceiptClock, validate_health, validate_telemetry};
+use crate::{
+    GenerationProgress, GenerationStager, ReceiptClock, SystemReceiptClock, validate_health,
+    validate_telemetry,
+};
 use observation_domain::{
     CanonicalObservationKey, CollectionLimit, CompleteMarker, DuplicateDecision, EntityId,
     ObservationRecord, ObservationSource, ObservationTime, ObservationVersion,
-    ReconciliationDecision, SectionQuality, classify_duplicate, reconcile_membership,
+    ReconciliationDecision, SectionKey, SectionQuality, SectionRevisionId, SourceScopeId,
+    classify_duplicate, reconcile_membership,
 };
 use std::collections::BTreeMap;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 2_048;
@@ -24,6 +29,176 @@ pub fn validate_batch(
     frames: &[&str],
 ) -> Result<ProjectionSnapshot, AdmissionError> {
     Ok(validate_runtime_batch(accepted, frames, 1)?.0)
+}
+
+impl GenerationStager {
+    pub fn stage_frame_at(&mut self, payload: &str, receipt: u64) -> GenerationProgress {
+        let key = crate::inspect_frame(payload)
+            .ok()
+            .and_then(|header| match header {
+                crate::wire::FrameHeader::Data { scope, .. } => SectionKey::new(scope),
+                crate::wire::FrameHeader::Hello { .. } => None,
+            });
+        match self.try_stage_legacy(payload, receipt) {
+            Ok(progress) => progress,
+            Err(error) => {
+                if let Some(key) = key {
+                    let _ = self.drop_candidate(&key);
+                }
+                let reason = RejectionReason::from(&error);
+                self.accepted = std::mem::take(&mut self.accepted).record_rejection(reason);
+                GenerationProgress::Rejected(reason)
+            }
+        }
+    }
+
+    fn try_stage_legacy(
+        &mut self,
+        payload: &str,
+        receipt: u64,
+    ) -> Result<GenerationProgress, AdmissionError> {
+        if receipt == 0 {
+            return Err(AdmissionError::ReceiptClockUnavailable);
+        }
+        let crate::wire::FrameHeader::Data {
+            scope,
+            version,
+            generation,
+            sequence,
+            ..
+        } = crate::inspect_frame(payload)?
+        else {
+            return Err(AdmissionError::InvalidFixture);
+        };
+        if generation == 0
+            || self
+                .last_admitted_generation
+                .is_some_and(|last| generation < last)
+        {
+            return Err(AdmissionError::OutOfOrderVersion);
+        }
+        let key = SectionKey::new(scope.clone()).ok_or(AdmissionError::InvalidScope)?;
+        if !self.candidates.contains_key(&key) {
+            if sequence != 1 {
+                return Err(AdmissionError::OutOfOrderVersion);
+            }
+            let aggregate = self
+                .aggregate
+                .add_candidate()
+                .ok_or(AdmissionError::CollectionLimitExceeded)?;
+            if !aggregate.within(self.limits.aggregate) {
+                return Err(AdmissionError::CollectionLimitExceeded);
+            }
+            self.aggregate = aggregate;
+            self.candidates.insert(
+                key.clone(),
+                Candidate {
+                    source_scope: SourceScopeId::new(scope.clone())
+                        .ok_or(AdmissionError::InvalidScope)?,
+                    revision: SectionRevisionId::new(version)
+                        .ok_or(AdmissionError::InvalidVersion)?,
+                    expected_records: 0,
+                    usage: crate::CandidateUsage::default(),
+                    started_at: receipt,
+                    last_progress_at: receipt,
+                    batches: BTreeMap::new(),
+                    legacy_identity: Some((scope.clone(), version, generation)),
+                    next_sequence: 1,
+                    legacy_frames: Vec::new(),
+                },
+            );
+        }
+        let candidate = self
+            .candidates
+            .get(&key)
+            .ok_or(AdmissionError::InvalidFixture)?;
+        if candidate.legacy_identity != Some((scope, version, generation))
+            || candidate.next_sequence != sequence
+        {
+            return Err(AdmissionError::OutOfOrderVersion);
+        }
+        let usage = candidate
+            .usage
+            .charged(payload.len(), payload.len(), 0, 1)
+            .ok_or(AdmissionError::CollectionLimitExceeded)?;
+        let delta = crate::CandidateUsage {
+            raw_bytes: payload.len(),
+            decoded_bytes: payload.len(),
+            records: 0,
+            batches: 1,
+            work: 1,
+        };
+        let aggregate = self
+            .aggregate
+            .add(delta)
+            .ok_or(AdmissionError::CollectionLimitExceeded)?;
+        if usage.raw_bytes > self.limits.max_staged_bytes
+            || usage.work > self.limits.max_work_units
+            || !aggregate.within(self.limits.aggregate)
+        {
+            return Err(AdmissionError::CollectionLimitExceeded);
+        }
+        let candidate = self
+            .candidates
+            .get_mut(&key)
+            .ok_or(AdmissionError::InvalidFixture)?;
+        candidate.usage = usage;
+        candidate.next_sequence = sequence
+            .checked_add(1)
+            .ok_or(AdmissionError::CollectionLimitExceeded)?;
+        self.aggregate = aggregate;
+        match serde_json::from_str(payload).map_err(|_| AdmissionError::InvalidFixture)? {
+            WireFrame::Observation(frame) => {
+                candidate.legacy_frames.push((frame, receipt));
+                Ok(GenerationProgress::Staged)
+            }
+            WireFrame::CompleteMarker(frame) => self.commit_legacy(&key, frame, generation),
+            _ => Err(AdmissionError::InvalidFixture),
+        }
+    }
+
+    fn commit_legacy(
+        &mut self,
+        key: &SectionKey,
+        frame: WireCompleteMarker,
+        generation: u64,
+    ) -> Result<GenerationProgress, AdmissionError> {
+        let marker = complete_marker(frame)?;
+        let candidate = self
+            .drop_candidate(key)
+            .ok_or(AdmissionError::InvalidFixture)?;
+        let mut snapshot = self.accepted.snapshot.clone();
+        let mut runtime_facts = self.accepted.runtime_facts.clone();
+        let mut observed = Vec::new();
+        for (frame, receipt) in candidate.legacy_frames {
+            let (_, observation, entity, facts) = apply_observation(&mut snapshot, frame, receipt)?;
+            observed.push(observation);
+            runtime_facts.insert(entity, facts);
+        }
+        let replay = self
+            .accepted
+            .snapshot
+            .completed_scope(marker.scope())
+            .is_some_and(|scope| scope.is_exact_replay(marker.version(), &observed));
+        apply_reconciliation_with_limit(
+            &self.accepted.snapshot,
+            &mut snapshot,
+            &marker,
+            &observed,
+            observed.len().max(1),
+        )?;
+        runtime_facts.retain(|id, _| snapshot.observations.contains_key(id));
+        self.accepted = AcceptedProjection::with_runtime_facts(snapshot, runtime_facts);
+        if replay || self.last_admitted_generation == Some(generation) {
+            return Ok(GenerationProgress::Replay);
+        }
+        self.last_admitted_generation = Some(generation);
+        self.admitted_generation_count = self
+            .admitted_generation_count
+            .checked_add(1)
+            .ok_or(AdmissionError::CollectionLimitExceeded)?;
+        Ok(GenerationProgress::Admitted)
+    }
 }
 fn validate_runtime_batch(
     accepted: &AcceptedProjection,

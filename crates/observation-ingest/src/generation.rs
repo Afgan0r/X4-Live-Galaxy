@@ -1,38 +1,67 @@
-use crate::batch::{apply_observation, apply_reconciliation_with_limit, complete_marker};
-use crate::model::{AcceptedProjection, AdmissionError as Error, RejectionReason};
-use crate::runtime_facts::RuntimeFacts;
-use crate::snapshot::ProjectionSnapshot;
-use crate::wire::{FrameHeader, WireFrame};
-use crate::{GenerationLimits, GenerationProgress as Progress};
-use observation_domain::{CanonicalObservationKey, EntityId};
 use std::collections::BTreeMap;
-struct Candidate {
-    identity: (String, u64, u64),
-    next_sequence: u64,
-    staged_bytes: usize,
-    work_units: usize,
-    snapshot: ProjectionSnapshot,
-    runtime_facts: BTreeMap<EntityId, RuntimeFacts>,
-    observed: Vec<CanonicalObservationKey>,
+
+use observation_domain::{
+    BatchId, EntityId, ImmutableBatchEnvelope, ObservationVersion, SectionKey, SectionRevisionId,
+    SectionStartEnvelope, SourceScopeId,
+};
+use sha2::{Digest, Sha256};
+
+use crate::batch_budget::{AggregateUsage, CandidateUsage};
+use crate::model::AcceptedProjection;
+use crate::wire::WireObservation;
+use crate::{GenerationLimits, ReceiverDisposition};
+
+#[derive(Clone)]
+pub(crate) struct StagedBatch {
+    pub(crate) ordinal: usize,
+    pub(crate) digest: [u8; 32],
+    pub(crate) envelope: ImmutableBatchEnvelope,
 }
+
+pub(crate) struct Candidate {
+    pub(crate) source_scope: SourceScopeId,
+    pub(crate) revision: SectionRevisionId,
+    pub(crate) expected_records: usize,
+    pub(crate) usage: CandidateUsage,
+    pub(crate) started_at: u64,
+    pub(crate) last_progress_at: u64,
+    pub(crate) batches: BTreeMap<BatchId, StagedBatch>,
+    pub(crate) legacy_identity: Option<(String, u64, u64)>,
+    pub(crate) next_sequence: u64,
+    pub(crate) legacy_frames: Vec<(WireObservation, u64)>,
+}
+
 pub struct GenerationStager {
-    accepted: AcceptedProjection,
-    limits: GenerationLimits,
-    candidate: Option<Candidate>,
-    last_admitted_generation: Option<u64>,
-    admitted_generation_count: u64,
+    pub(crate) accepted: AcceptedProjection,
+    pub(crate) limits: GenerationLimits,
+    pub(crate) candidates: BTreeMap<SectionKey, Candidate>,
+    pub(crate) aggregate: AggregateUsage,
+    accepted_versions: BTreeMap<(SourceScopeId, EntityId), (ObservationVersion, [u8; 32])>,
+    pub(crate) last_admitted_generation: Option<u64>,
+    pub(crate) admitted_generation_count: u64,
 }
+
 impl GenerationStager {
     #[must_use]
     pub const fn new(accepted: AcceptedProjection, limits: GenerationLimits) -> Self {
         Self {
             accepted,
             limits,
-            candidate: None,
+            candidates: BTreeMap::new(),
+            aggregate: AggregateUsage {
+                candidate_count: 0,
+                raw_bytes: 0,
+                decoded_bytes: 0,
+                records: 0,
+                batches: 0,
+                work: 0,
+            },
+            accepted_versions: BTreeMap::new(),
             last_admitted_generation: None,
             admitted_generation_count: 0,
         }
     }
+
     #[must_use]
     pub const fn resume(
         accepted: AcceptedProjection,
@@ -43,6 +72,7 @@ impl GenerationStager {
         stager.last_admitted_generation = Some(last_admitted_generation);
         stager
     }
+
     pub const fn accepted(&self) -> &AcceptedProjection {
         &self.accepted
     }
@@ -50,141 +80,198 @@ impl GenerationStager {
     pub const fn admitted_generation_count(&self) -> u64 {
         self.admitted_generation_count
     }
-    pub fn stage_frame_at(&mut self, payload: &str, receipt: u64) -> Progress {
-        match self.try_stage(payload, receipt) {
-            Ok(progress) => progress,
-            Err(error) => self.reject(&error),
+    #[must_use]
+    pub fn candidate_count(&self) -> usize {
+        self.candidates.len()
+    }
+    #[must_use]
+    pub fn candidate_usage(&self, key: &SectionKey) -> Option<CandidateUsage> {
+        self.candidates.get(key).map(|candidate| candidate.usage)
+    }
+    #[must_use]
+    pub fn candidate_expected_records(&self, key: &SectionKey) -> Option<usize> {
+        self.candidates
+            .get(key)
+            .map(|candidate| candidate.expected_records)
+    }
+    #[must_use]
+    pub fn candidate_manifest(&self, key: &SectionKey) -> Vec<(usize, &BatchId)> {
+        self.candidates
+            .get(key)
+            .into_iter()
+            .flat_map(|candidate| candidate.batches.values())
+            .map(|batch| (batch.ordinal, &batch.envelope.batch_id))
+            .collect()
+    }
+    #[must_use]
+    pub const fn aggregate_usage(&self) -> AggregateUsage {
+        self.aggregate
+    }
+
+    pub fn record_accepted_entity(
+        &mut self,
+        scope: SourceScopeId,
+        entity: EntityId,
+        version: ObservationVersion,
+        canonical_content: &[u8],
+    ) -> bool {
+        let digest: [u8; 32] = Sha256::digest(canonical_content).into();
+        match self.accepted_versions.get(&(scope.clone(), entity.clone())) {
+            Some((current, _)) if version < *current => false,
+            Some((current, prior)) if version == *current && prior != &digest => false,
+            _ => {
+                self.accepted_versions
+                    .insert((scope, entity), (version, digest));
+                true
+            }
         }
     }
-    fn try_stage(&mut self, payload: &str, receipt: u64) -> Result<Progress, Error> {
-        if receipt == 0 {
-            return Err(Error::ReceiptClockUnavailable);
+
+    pub fn start_section(&mut self, start: SectionStartEnvelope, now: u64) -> ReceiverDisposition {
+        let key = start.section_key.clone();
+        if let Some(current) = self.candidates.get(&key) {
+            if current.source_scope == start.source_scope
+                && current.revision == start.section_revision
+            {
+                return ReceiverDisposition::Received;
+            }
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
         }
-        let header = crate::inspect_frame(payload)?;
-        let FrameHeader::Data {
-            scope,
-            version,
-            generation,
-            sequence,
-            ..
-        } = header
-        else {
-            return Err(Error::InvalidFixture);
+        let Some(next) = self.aggregate.add_candidate() else {
+            return ReceiverDisposition::CapacityUnavailable;
         };
-        self.prepare(&scope, version, generation, sequence, payload.len())?;
-        let frame = serde_json::from_str(payload).map_err(|_| Error::InvalidFixture)?;
-        match frame {
-            WireFrame::Observation(frame) => self.stage_observation(frame, receipt),
-            WireFrame::CompleteMarker(frame) => self.commit_marker(frame, generation),
-            _ => Err(Error::InvalidFixture),
+        if !next.within(self.limits.aggregate) {
+            return ReceiverDisposition::CapacityUnavailable;
         }
+        self.aggregate = next;
+        self.candidates.insert(
+            key,
+            Candidate {
+                source_scope: start.source_scope,
+                revision: start.section_revision,
+                expected_records: start.expected_records,
+                usage: CandidateUsage::default(),
+                started_at: now,
+                last_progress_at: now,
+                batches: BTreeMap::new(),
+                legacy_identity: None,
+                next_sequence: 1,
+                legacy_frames: Vec::new(),
+            },
+        );
+        ReceiverDisposition::Received
     }
-    fn prepare(
+
+    pub fn stage_section_batch(
         &mut self,
-        scope: &str,
-        version: u64,
-        generation: u64,
-        sequence: u64,
-        bytes: usize,
-    ) -> Result<(), Error> {
-        if generation == 0
-            || self
-                .last_admitted_generation
-                .is_some_and(|last| generation < last)
+        batch: ImmutableBatchEnvelope,
+        canonical_bytes: &[u8],
+        decoded_bytes: usize,
+        work: usize,
+        now: u64,
+    ) -> ReceiverDisposition {
+        let key = batch.section_key.clone();
+        let digest: [u8; 32] = Sha256::digest(canonical_bytes).into();
+        let Some(candidate) = self.candidates.get(&key) else {
+            return ReceiverDisposition::PermanentlyRejected;
+        };
+        if candidate.source_scope != batch.source_scope
+            || candidate.revision != batch.section_revision
         {
-            return Err(Error::OutOfOrderVersion);
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
         }
-        if self.candidate.is_none() && sequence != 1 {
-            return Err(Error::OutOfOrderVersion);
+        if let Some(prior) = candidate.batches.get(&batch.batch_id) {
+            if prior.digest == digest {
+                return ReceiverDisposition::Received;
+            }
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
         }
-        if self.candidate.is_none() {
-            self.start_candidate(scope, version, generation);
+        if !self.versions_admit(&batch) {
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
         }
-        let candidate = self.candidate.as_mut().ok_or(Error::InvalidFixture)?;
-        if candidate.identity != (scope.to_owned(), version, generation)
-            || candidate.next_sequence != sequence
+        let delta = CandidateUsage {
+            raw_bytes: canonical_bytes.len(),
+            decoded_bytes,
+            records: batch.records.len(),
+            batches: 1,
+            work,
+        };
+        let Some(candidate_usage) = candidate.usage.charged(
+            delta.raw_bytes,
+            delta.decoded_bytes,
+            delta.records,
+            delta.work,
+        ) else {
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
+        };
+        let Some(aggregate) = self.aggregate.add(delta) else {
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
+        };
+        if !candidate_usage.within(self.limits.candidate)
+            || !aggregate.within(self.limits.aggregate)
         {
-            return Err(Error::OutOfOrderVersion);
+            self.drop_candidate(&key);
+            return ReceiverDisposition::PermanentlyRejected;
         }
-        candidate.staged_bytes = candidate
-            .staged_bytes
-            .checked_add(bytes)
-            .ok_or(Error::CollectionLimitExceeded)?;
-        candidate.work_units = candidate
-            .work_units
-            .checked_add(1)
-            .ok_or(Error::CollectionLimitExceeded)?;
-        if candidate.staged_bytes > self.limits.max_staged_bytes
-            || candidate.work_units > self.limits.max_work_units
-        {
-            return Err(Error::CollectionLimitExceeded);
+        let Some(candidate) = self.candidates.get_mut(&key) else {
+            return ReceiverDisposition::PermanentlyRejected;
+        };
+        let ordinal = candidate.batches.len() + 1;
+        candidate.batches.insert(
+            batch.batch_id.clone(),
+            StagedBatch {
+                ordinal,
+                digest,
+                envelope: batch,
+            },
+        );
+        candidate.usage = candidate_usage;
+        candidate.last_progress_at = now;
+        self.aggregate = aggregate;
+        ReceiverDisposition::Received
+    }
+
+    pub fn expire_candidates(&mut self, now: u64) -> usize {
+        let keys: Vec<_> = self
+            .candidates
+            .iter()
+            .filter(|(_, candidate)| {
+                now.saturating_sub(candidate.started_at) > self.limits.candidate.age_millis.get()
+                    || now.saturating_sub(candidate.last_progress_at)
+                        > self.limits.candidate.inactivity_millis.get()
+            })
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in &keys {
+            self.drop_candidate(key);
         }
-        candidate.next_sequence = sequence
-            .checked_add(1)
-            .ok_or(Error::CollectionLimitExceeded)?;
-        Ok(())
+        keys.len()
     }
-    fn start_candidate(&mut self, scope: &str, version: u64, generation: u64) {
-        self.candidate = Some(Candidate {
-            identity: (scope.to_owned(), version, generation),
-            next_sequence: 1,
-            staged_bytes: 0,
-            work_units: 0,
-            snapshot: self.accepted.snapshot.clone(),
-            runtime_facts: self.accepted.runtime_facts.clone(),
-            observed: Vec::new(),
-        });
+
+    fn versions_admit(&self, batch: &ImmutableBatchEnvelope) -> bool {
+        batch.records.iter().all(|record| {
+            match self
+                .accepted_versions
+                .get(&(batch.source_scope.clone(), record.entity_id.clone()))
+            {
+                Some((version, _)) if record.observation_version < *version => false,
+                Some((version, digest)) if record.observation_version == *version => {
+                    <[u8; 32]>::from(Sha256::digest(record.content.as_bytes())) == *digest
+                }
+                _ => true,
+            }
+        })
     }
-    fn stage_observation(
-        &mut self,
-        frame: crate::wire::WireObservation,
-        receipt: u64,
-    ) -> Result<Progress, Error> {
-        let candidate = self.candidate.as_mut().ok_or(Error::InvalidFixture)?;
-        let (_, key, entity_id, facts) =
-            apply_observation(&mut candidate.snapshot, frame, receipt)?;
-        candidate.observed.push(key);
-        candidate.runtime_facts.insert(entity_id, facts);
-        Ok(Progress::Staged)
-    }
-    fn commit_marker(
-        &mut self,
-        frame: crate::wire::WireCompleteMarker,
-        generation: u64,
-    ) -> Result<Progress, Error> {
-        let marker = complete_marker(frame)?;
-        let mut candidate = self.candidate.take().ok_or(Error::InvalidFixture)?;
-        let exact_replay = self
-            .accepted
-            .snapshot
-            .completed_scope(marker.scope())
-            .is_some_and(|scope| scope.is_exact_replay(marker.version(), &candidate.observed));
-        apply_reconciliation_with_limit(
-            &self.accepted.snapshot,
-            &mut candidate.snapshot,
-            &marker,
-            &candidate.observed,
-            candidate.observed.len().max(1),
-        )?;
-        candidate
-            .runtime_facts
-            .retain(|id, _| candidate.snapshot.observations.contains_key(id));
-        self.accepted =
-            AcceptedProjection::with_runtime_facts(candidate.snapshot, candidate.runtime_facts);
-        if exact_replay || self.last_admitted_generation == Some(generation) {
-            return Ok(Progress::Replay);
-        }
-        self.last_admitted_generation = Some(generation);
-        self.admitted_generation_count = self
-            .admitted_generation_count
-            .checked_add(1)
-            .ok_or(Error::CollectionLimitExceeded)?;
-        Ok(Progress::Admitted)
-    }
-    fn reject(&mut self, error: &Error) -> Progress {
-        self.candidate = None;
-        let reason = RejectionReason::from(error);
-        self.accepted = std::mem::take(&mut self.accepted).record_rejection(reason);
-        Progress::Rejected(reason)
+
+    pub(crate) fn drop_candidate(&mut self, key: &SectionKey) -> Option<Candidate> {
+        let candidate = self.candidates.remove(key)?;
+        self.aggregate = self.aggregate.release(candidate.usage)?;
+        Some(candidate)
     }
 }

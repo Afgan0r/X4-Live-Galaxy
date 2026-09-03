@@ -13,6 +13,7 @@ pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
     admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
+pub use batch_budget::{AggregateLimits, AggregateUsage, CandidateLimits, CandidateUsage};
 pub use feedback::{
     CollectionPolicyLimits, DeliveryStage, FeedbackError, ImmutableApplicationBatch,
     ReceiverDisposition, SlotAdmission, StopAndWaitSlot, TransportPolicyLimits,
@@ -103,12 +104,57 @@ fn frame_header(
 pub struct GenerationLimits {
     pub(crate) max_staged_bytes: usize,
     pub(crate) max_work_units: usize,
+    pub(crate) candidate: CandidateLimits,
+    pub(crate) aggregate: AggregateLimits,
 }
 impl GenerationLimits {
     pub const fn new(max_staged_bytes: usize, max_work_units: usize) -> Self {
+        let candidate = CandidateLimits {
+            raw_bytes: match std::num::NonZeroUsize::new(max_staged_bytes) {
+                Some(value) => value,
+                None => std::num::NonZeroUsize::MIN,
+            },
+            decoded_bytes: match std::num::NonZeroUsize::new(max_staged_bytes) {
+                Some(value) => value,
+                None => std::num::NonZeroUsize::MIN,
+            },
+            records: match std::num::NonZeroUsize::new(max_work_units) {
+                Some(value) => value,
+                None => std::num::NonZeroUsize::MIN,
+            },
+            batches: match std::num::NonZeroUsize::new(max_work_units) {
+                Some(value) => value,
+                None => std::num::NonZeroUsize::MIN,
+            },
+            work: match std::num::NonZeroUsize::new(max_work_units) {
+                Some(value) => value,
+                None => std::num::NonZeroUsize::MIN,
+            },
+            age_millis: std::num::NonZeroU64::MAX,
+            inactivity_millis: std::num::NonZeroU64::MAX,
+        };
+        let aggregate = AggregateLimits {
+            candidates: candidate.records,
+            raw_bytes: candidate.raw_bytes,
+            decoded_bytes: candidate.decoded_bytes,
+            records: candidate.records,
+            batches: candidate.batches,
+            work: candidate.work,
+        };
         Self {
             max_staged_bytes,
             max_work_units,
+            candidate,
+            aggregate,
+        }
+    }
+
+    pub const fn bounded(candidate: CandidateLimits, aggregate: AggregateLimits) -> Self {
+        Self {
+            max_staged_bytes: candidate.raw_bytes.get(),
+            max_work_units: candidate.work.get(),
+            candidate,
+            aggregate,
         }
     }
 }

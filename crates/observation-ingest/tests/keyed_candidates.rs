@@ -54,8 +54,14 @@ fn limits() -> GenerationLimits {
 #[test]
 fn alternating_batches_advance_independent_keyed_candidates() {
     let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits());
-    assert_eq!(stager.start_section(start("ships", 1, 1), 1), ReceiverDisposition::Received);
-    assert_eq!(stager.start_section(start("stations", 1, 1), 1), ReceiverDisposition::Received);
+    assert_eq!(
+        stager.start_section(start("ships", 1, 1), 1),
+        ReceiverDisposition::Received
+    );
+    assert_eq!(
+        stager.start_section(start("stations", 1, 1), 1),
+        ReceiverDisposition::Received
+    );
 
     assert_eq!(
         stager.stage_section_batch(batch("ships", 1, "batch:ships", 1), b"ship", 8, 1, 2),
@@ -72,8 +78,20 @@ fn alternating_batches_advance_independent_keyed_candidates() {
         ReceiverDisposition::Received
     );
     assert_eq!(stager.candidate_count(), 2);
-    assert_eq!(stager.candidate_usage(&id("ships", SectionKey::new)).unwrap().batches, 1);
-    assert_eq!(stager.candidate_usage(&id("stations", SectionKey::new)).unwrap().batches, 1);
+    assert_eq!(
+        stager
+            .candidate_usage(&id("ships", SectionKey::new))
+            .unwrap()
+            .batches,
+        1
+    );
+    assert_eq!(
+        stager
+            .candidate_usage(&id("stations", SectionKey::new))
+            .unwrap()
+            .batches,
+        1
+    );
 }
 
 #[test]
@@ -96,8 +114,16 @@ fn exact_replay_is_charge_free_and_changed_bytes_drop_only_that_key() {
         stager.stage_section_batch(ship_batch, b"changed", 8, 1, 4),
         ReceiverDisposition::PermanentlyRejected
     );
-    assert!(stager.candidate_usage(&id("ships", SectionKey::new)).is_none());
-    assert!(stager.candidate_usage(&id("stations", SectionKey::new)).is_some());
+    assert!(
+        stager
+            .candidate_usage(&id("ships", SectionKey::new))
+            .is_none()
+    );
+    assert!(
+        stager
+            .candidate_usage(&id("stations", SectionKey::new))
+            .is_some()
+    );
 }
 
 #[test]
@@ -129,11 +155,11 @@ fn accepted_versions_reject_regression_and_equal_version_conflicts() {
         id("scope:x4", SourceScopeId::new),
         id("entity:ships", EntityId::new),
         ObservationVersion::new(2).expect("version is positive"),
-        b"content:ships:2",
+        b"accepted:ships:2",
     ));
 
     for (version, expected) in [
-        (1, ReceiverDisposition::StaleEpoch),
+        (1, ReceiverDisposition::PermanentlyRejected),
         (2, ReceiverDisposition::PermanentlyRejected),
         (3, ReceiverDisposition::Received),
     ] {
