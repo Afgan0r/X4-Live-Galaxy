@@ -1,11 +1,15 @@
 #![forbid(unsafe_code)]
 
+mod fake;
 mod port;
+mod types;
 
-pub use port::{
-    CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, FakeObservationRepository,
-    ObservationRepository, PublicationLimits, PublicationReceipt, PublishOutcome, PublishRequest,
-    RepositoryDiagnostic, RepositoryError, RevisionRecord, UnpinOutcome,
+pub use fake::FakeObservationRepository;
+pub use port::ObservationRepository;
+pub use types::{
+    CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, PublicationLimits,
+    PublicationReceipt, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
+    RevisionRecord, UnpinOutcome,
 };
 
 #[cfg(test)]
@@ -20,9 +24,10 @@ pub(crate) mod test_support {
         SourceScopeId, TransportEpoch,
     };
     use observation_ingest::{
-        AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits,
-        CompletionCurrent, CompletionOutcome, ContractVersions, GenerationLimits,
-        GenerationStager, ReceiverDisposition, ValidatedSectionRevision,
+        AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent,
+        CompletionOutcome, ContractVersions, DecisionEligibility, DecisionRevisionIndex,
+        DecisionRevisionSet, GenerationLimits, GenerationStager, ReceiverDisposition,
+        ValidatedSectionRevision,
     };
 
     pub fn key(value: &str) -> SectionKey {
@@ -90,6 +95,16 @@ pub(crate) mod test_support {
         ) {
             CompletionOutcome::Validated(revision) => *revision,
             CompletionOutcome::Rejected(reason) => panic!("test completion failed: {reason:?}"),
+        }
+    }
+
+    pub fn decision_set(revision: ValidatedSectionRevision) -> DecisionRevisionSet {
+        let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
+        let section = revision.section_key().clone();
+        index.accept(revision, 1);
+        match index.eligibility(&[section], 1, 1) {
+            DecisionEligibility::Eligible(set) => set,
+            DecisionEligibility::Blocked(blockers) => panic!("test set blocked: {blockers:?}"),
         }
     }
 }
