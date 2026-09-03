@@ -4,12 +4,18 @@
 )]
 
 use observation_domain::{
-    CanonicalObservationKey, CollectionLimit, CollectionSize, CompleteMarker, CountError, EntityId,
-    ObservationVersion, ReconciliationDecision, reconcile_membership,
+    AbsenceEvidence, AbsenceTracker, CanonicalObservationKey, CollectionLimit, CollectionSize,
+    CompleteMarker, CompletionCoverage, CountError, EntityId, ObservationVersion,
+    ReconciliationDecision, SourceScopeId, reconcile_membership,
+    reconcile_qualified_membership,
 };
 
 fn entity(value: &str) -> EntityId {
     EntityId::new(value).expect("test identity is valid")
+}
+
+fn source(value: &str) -> SourceScopeId {
+    SourceScopeId::new(value).expect("test source scope is valid")
 }
 
 const fn version(value: u64) -> ObservationVersion {
@@ -98,4 +104,56 @@ fn explicit_collection_boundaries_reject_overflow_without_precision_loss() {
         CollectionSize::from_u128((usize::MAX as u128) + 1),
         Err(CountError::ExceedsPlatformCapacity)
     );
+}
+
+#[test]
+fn deletion_requires_two_qualifying_same_scope_absences() {
+    let prior = vec![key("ship:alpha", 1)];
+    let mut tracker = AbsenceTracker::new();
+    let evidence = AbsenceEvidence::new(
+        source("scope:x4"),
+        CompletionCoverage::Complete,
+        true,
+        true,
+        false,
+    );
+    let limit = CollectionLimit::new(1).expect("positive limit");
+
+    assert_eq!(
+        reconcile_qualified_membership(&prior, vec![], &evidence, &mut tracker, limit),
+        ReconciliationDecision::AwaitingSecondAbsence {
+            members: prior.clone()
+        }
+    );
+    assert_eq!(
+        reconcile_qualified_membership(&prior, vec![], &evidence, &mut tracker, limit),
+        ReconciliationDecision::Reconciled {
+            members: vec![],
+            tombstones: prior
+        }
+    );
+}
+
+#[test]
+fn weak_evidence_and_scope_change_have_no_absence_meaning() {
+    let prior = vec![key("ship:alpha", 1)];
+    let mut tracker = AbsenceTracker::new();
+    let limit = CollectionLimit::new(1).expect("positive limit");
+    for evidence in [
+        AbsenceEvidence::new(source("scope:x4"), CompletionCoverage::Partial, true, true, false),
+        AbsenceEvidence::new(source("scope:x4"), CompletionCoverage::Complete, false, true, false),
+        AbsenceEvidence::new(source("scope:x4"), CompletionCoverage::Complete, true, false, true),
+    ] {
+        assert_eq!(
+            reconcile_qualified_membership(&prior, vec![], &evidence, &mut tracker, limit),
+            ReconciliationDecision::PreservedIncompleteScope
+        );
+    }
+    let first = AbsenceEvidence::new(source("scope:a"), CompletionCoverage::Complete, true, true, false);
+    let changed = AbsenceEvidence::new(source("scope:b"), CompletionCoverage::Complete, true, true, false);
+    let _ = reconcile_qualified_membership(&prior, vec![], &first, &mut tracker, limit);
+    assert!(matches!(
+        reconcile_qualified_membership(&prior, vec![], &changed, &mut tracker, limit),
+        ReconciliationDecision::AwaitingSecondAbsence { .. }
+    ));
 }

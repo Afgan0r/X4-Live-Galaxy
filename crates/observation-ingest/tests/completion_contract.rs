@@ -15,8 +15,8 @@ use observation_domain::{
 };
 use observation_ingest::{
     AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent,
-    CompletionOutcome, ContractVersions, GenerationLimits, GenerationStager, ReceiverDisposition,
-    RejectionReason,
+    CompletionOutcome, ContractVersions, DecisionEligibility, DecisionRevisionIndex,
+    EligibilityBlocker, GenerationLimits, GenerationStager, ReceiverDisposition, RejectionReason,
 };
 
 fn value<T>(raw: &str, make: impl FnOnce(String) -> Option<T>) -> T {
@@ -127,6 +127,19 @@ fn staged() -> GenerationStager {
     stager
 }
 
+fn validated_revision() -> observation_ingest::ValidatedSectionRevision {
+    let mut stager = staged();
+    let certificate = stager
+        .completion_certificate(completion())
+        .expect("candidate exists");
+    let CompletionOutcome::Validated(revision) =
+        stager.complete_section(certificate, &current(), 4)
+    else {
+        panic!("exact completion must validate")
+    };
+    revision
+}
+
 #[test]
 fn exact_completion_yields_one_immutable_unpublished_revision() {
     let mut stager = staged();
@@ -201,4 +214,39 @@ fn coverage_and_capture_evidence_are_preserved_without_publishing() {
         CaptureWindow::new(10, 20).expect("window is ordered")
     );
     assert!(!revision.is_published());
+}
+
+#[test]
+fn source_uncertainty_drops_matching_candidates_and_retires_current_revision() {
+    let mut stager = staged();
+    assert_eq!(
+        stager.invalidate_source_scope(&value("scope:x4", SourceScopeId::new)),
+        1
+    );
+    assert_eq!(stager.aggregate_usage().candidate_count, 0);
+
+    let mut index = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
+    index.accept(validated_revision(), 4);
+    index.mark_scope_uncertain(&value("scope:x4", SourceScopeId::new));
+    assert_eq!(index.current_count(), 0);
+    assert_eq!(index.history_count(), 1);
+    assert!(matches!(
+        index.eligibility(&[key("ships")], 5, 10),
+        DecisionEligibility::Blocked(ref blockers)
+            if blockers == &[EligibilityBlocker::Uncertain(value("scope:x4", SourceScopeId::new))]
+    ));
+}
+
+#[test]
+fn exact_revision_set_is_canonical_and_staleness_blocks_visibly() {
+    let mut index = DecisionRevisionIndex::new(2).expect("blocker limit is non-zero");
+    index.accept(validated_revision(), 4);
+    let DecisionEligibility::Eligible(set) = index.eligibility(&[key("ships")], 10, 10) else {
+        panic!("fresh exact revision must be eligible")
+    };
+    assert_eq!(set.revisions().keys().collect::<Vec<_>>(), vec![&key("ships")]);
+    assert_eq!(
+        index.eligibility(&[key("ships")], 15, 10),
+        DecisionEligibility::Blocked(vec![EligibilityBlocker::Stale(key("ships"))])
+    );
 }
