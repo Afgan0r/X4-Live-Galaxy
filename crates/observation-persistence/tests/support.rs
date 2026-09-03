@@ -115,6 +115,7 @@ impl TempDatabase {
             std::process::id()
         )))
     }
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.0
     }

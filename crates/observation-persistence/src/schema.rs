@@ -1,3 +1,4 @@
+use observation_domain::CompletionCoverage;
 use rusqlite::Connection;
 
 use crate::{RepositoryDiagnostic, RepositoryError};
@@ -5,7 +6,7 @@ use crate::{RepositoryDiagnostic, RepositoryError};
 pub const OBSERVATION_REPOSITORY_SCHEMA_VERSION: u32 = 1;
 pub const OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY: &str = "live_galaxy.observation_repository.v1";
 
-const CREATE_SCHEMA: &str = r#"
+const CREATE_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS repository_metadata (
   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
   schema_version INTEGER NOT NULL,
@@ -15,7 +16,7 @@ INSERT OR IGNORE INTO repository_metadata VALUES (1, 1, 'live_galaxy.observation
 CREATE TABLE IF NOT EXISTS revisions (
   section_key TEXT NOT NULL, revision INTEGER NOT NULL, source_scope TEXT NOT NULL,
   coverage TEXT NOT NULL, manifest_digest BLOB NOT NULL, content_digest BLOB NOT NULL,
-  context_token TEXT NOT NULL, expected_current INTEGER,
+  integrity_digest BLOB NOT NULL, context_token TEXT NOT NULL, expected_current INTEGER,
   PRIMARY KEY (section_key, revision)
 );
 CREATE TABLE IF NOT EXISTS revision_dependencies (
@@ -52,7 +53,7 @@ CREATE TABLE IF NOT EXISTS decision_pin_revisions (
   FOREIGN KEY (decision_id) REFERENCES decision_pins(decision_id) ON DELETE CASCADE,
   FOREIGN KEY (section_key, revision) REFERENCES revisions(section_key, revision)
 );
-"#;
+";
 
 pub fn initialize(connection: &Connection) -> Result<(), RepositoryError> {
     connection
@@ -75,7 +76,46 @@ pub fn initialize(connection: &Connection) -> Result<(), RepositoryError> {
             code: "schema-incompatible",
         }));
     }
+    validate_foreign_keys(connection)?;
     Ok(())
+}
+
+pub fn validate_foreign_keys(connection: &Connection) -> Result<(), RepositoryError> {
+    let mut statement = connection
+        .prepare("PRAGMA foreign_key_check")
+        .map_err(|_| storage("foreign-key-check"))?;
+    if statement
+        .exists([])
+        .map_err(|_| storage("foreign-key-check"))?
+    {
+        return Err(RepositoryError::Corrupt(RepositoryDiagnostic {
+            code: "foreign-key-violation",
+        }));
+    }
+    Ok(())
+}
+
+pub const fn coverage_name(coverage: CompletionCoverage) -> &'static str {
+    match coverage {
+        CompletionCoverage::Complete => "complete",
+        CompletionCoverage::KnownEmpty => "known_empty",
+        CompletionCoverage::Partial => "partial",
+        CompletionCoverage::Unknown => "unknown",
+        CompletionCoverage::Unsupported => "unsupported",
+    }
+}
+
+pub fn parse_coverage(value: &str) -> Result<CompletionCoverage, RepositoryError> {
+    match value {
+        "complete" => Ok(CompletionCoverage::Complete),
+        "known_empty" => Ok(CompletionCoverage::KnownEmpty),
+        "partial" => Ok(CompletionCoverage::Partial),
+        "unknown" => Ok(CompletionCoverage::Unknown),
+        "unsupported" => Ok(CompletionCoverage::Unsupported),
+        _ => Err(RepositoryError::Corrupt(RepositoryDiagnostic {
+            code: "coverage-invalid",
+        })),
+    }
 }
 
 const fn storage(code: &'static str) -> RepositoryError {

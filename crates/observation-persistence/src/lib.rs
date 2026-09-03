@@ -2,8 +2,12 @@
 
 mod fake;
 mod port;
+mod record;
 mod schema;
 mod sqlite;
+mod sqlite_pins;
+mod sqlite_read;
+mod sqlite_write;
 mod types;
 
 pub use fake::FakeObservationRepository;

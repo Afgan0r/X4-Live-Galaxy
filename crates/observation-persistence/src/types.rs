@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
 use observation_domain::{
-    DecisionSnapshotId, EnvelopeRecord, SectionKey, SectionRevisionId, SourceScopeId,
+    CompletionCoverage, DecisionSnapshotId, EnvelopeRecord, SectionKey, SectionRevisionId,
+    SourceScopeId,
 };
 use observation_ingest::ValidatedSectionRevision;
 
@@ -54,8 +55,12 @@ pub struct RevisionRecord {
     pub section_key: SectionKey,
     pub revision: SectionRevisionId,
     pub records: Vec<EnvelopeRecord>,
+    pub coverage: CompletionCoverage,
+    pub dependencies: BTreeMap<SectionKey, SectionRevisionId>,
+    pub expected_current: Option<SectionRevisionId>,
     pub manifest_digest: [u8; 32],
     pub content_digest: [u8; 32],
+    pub integrity_digest: [u8; 32],
     pub context_token: String,
 }
 

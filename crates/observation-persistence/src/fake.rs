@@ -1,14 +1,12 @@
 use std::collections::BTreeMap;
 
-use observation_domain::{DecisionSnapshotId, SectionKey, SectionRevisionId};
-use observation_ingest::DecisionRevisionSet;
-use sha2::{Digest, Sha256};
-
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
     PublicationLimits, PublicationReceipt, PublishOutcome, PublishRequest, RepositoryDiagnostic,
-    RepositoryError, RevisionRecord, UnpinOutcome,
+    RepositoryError, RevisionRecord, UnpinOutcome, record,
 };
+use observation_domain::{DecisionSnapshotId, SectionKey, SectionRevisionId};
+use observation_ingest::DecisionRevisionSet;
 
 pub struct FakeObservationRepository {
     limits: PublicationLimits,
@@ -17,7 +15,6 @@ pub struct FakeObservationRepository {
     current: BTreeMap<SectionKey, SectionRevisionId>,
     pins: BTreeMap<DecisionSnapshotId, DecisionRevisionPin>,
     next_publication: u64,
-    next_pin: u64,
 }
 
 impl FakeObservationRepository {
@@ -30,40 +27,7 @@ impl FakeObservationRepository {
             current: BTreeMap::new(),
             pins: BTreeMap::new(),
             next_publication: 1,
-            next_pin: 1,
         }
-    }
-
-    fn normalized(&self, request: &PublishRequest) -> Option<RevisionRecord> {
-        let revision = &request.revision;
-        if request.expected_current != revision.context().expected_current()
-            || request.frozen_dependencies != *revision.context().dependencies()
-            || revision.records().len() > self.limits.max_records.get()
-        {
-            return None;
-        }
-        let mut digest = Sha256::new();
-        let mut bytes = 0usize;
-        for record in revision.records() {
-            bytes = bytes.checked_add(record.content.len())?;
-            hash(&mut digest, record.record_id.as_str().as_bytes());
-            hash(&mut digest, record.entity_id.as_str().as_bytes());
-            hash(&mut digest, &record.observation_version.get().to_be_bytes());
-            hash(&mut digest, record.content.as_bytes());
-        }
-        let calculated: [u8; 32] = digest.finalize().into();
-        if bytes > self.limits.max_content_bytes.get() || calculated != *revision.content_digest() {
-            return None;
-        }
-        Some(RevisionRecord {
-            source_scope: revision.source_scope().clone(),
-            section_key: revision.section_key().clone(),
-            revision: revision.section_revision(),
-            records: revision.records().to_vec(),
-            manifest_digest: *revision.manifest_digest(),
-            content_digest: calculated,
-            context_token: format!("{:?}", revision.context()),
-        })
     }
 
     fn replay(
@@ -82,7 +46,7 @@ impl FakeObservationRepository {
 
 impl ObservationRepository for FakeObservationRepository {
     fn publish(&mut self, request: PublishRequest) -> PublishOutcome {
-        let Some(record) = self.normalized(&request) else {
+        let Some(record) = record::normalize(&request, self.limits) else {
             return PublishOutcome::PermanentRejection(diagnostic("invalid-revision"));
         };
         let identity = (record.section_key.clone(), record.revision);
@@ -145,13 +109,14 @@ impl ObservationRepository for FakeObservationRepository {
         {
             return Ok(pin.receipt.clone());
         }
-        let decision = DecisionSnapshotId::new(format!("decision:{}", self.next_pin))
+        let decision = record::decision_identity(set)
             .ok_or(RepositoryError::Storage(diagnostic("pin-identity")))?;
+        let ordinal = self.next_publication;
         let receipt = DecisionPinReceipt {
             decision: decision.clone(),
-            ordinal: self.next_pin,
+            ordinal,
         };
-        self.next_pin = self.next_pin.saturating_add(1);
+        self.next_publication = self.next_publication.saturating_add(1);
         self.pins.insert(
             decision,
             DecisionRevisionPin {
@@ -187,11 +152,6 @@ impl ObservationRepository for FakeObservationRepository {
         self.pins.remove(&receipt.decision);
         Ok(UnpinOutcome::Unpinned)
     }
-}
-
-fn hash(digest: &mut Sha256, value: &[u8]) {
-    digest.update((value.len() as u64).to_be_bytes());
-    digest.update(value);
 }
 
 const fn diagnostic(code: &'static str) -> RepositoryDiagnostic {
