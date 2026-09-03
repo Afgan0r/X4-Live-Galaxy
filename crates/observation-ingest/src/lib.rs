@@ -2,6 +2,7 @@
 mod batch;
 mod batch_budget;
 mod completion;
+mod feedback;
 mod generation;
 mod model;
 mod runtime_facts;
@@ -10,6 +11,10 @@ mod wire;
 pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
     admit_batch, admit_batch_with_receipt_clock, validate_batch,
+};
+pub use feedback::{
+    DeliveryStage, FeedbackError, ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission,
+    StopAndWaitSlot,
 };
 pub use generation::GenerationStager;
 pub use model::{

@@ -5,7 +5,12 @@ mod observation;
 mod reconciliation;
 mod section;
 
-pub use identity::{EntityId, EventId, ObservationSource, ObservationTime, ObservationVersion};
+pub use identity::{
+    BatchId, CanonicalizationVersion, DecisionSnapshotId, DigestAlgorithmVersion, EntityId,
+    EventId, ObservationPolicyVersion, ObservationSchemaVersion, ObservationSource,
+    ObservationTime, ObservationVersion, ProducerIncarnationId, RecordId, SectionKey,
+    SectionRevisionId, SourceScopeId, TransportEpoch,
+};
 pub use observation::{
     DuplicateDecision, ObservationRecord, ObservationRecordError, classify_duplicate,
 };

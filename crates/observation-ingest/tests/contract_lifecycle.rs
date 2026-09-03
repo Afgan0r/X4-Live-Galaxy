@@ -6,14 +6,14 @@
 use std::any::type_name;
 
 use observation_domain::{
-    BatchId, DecisionSnapshotId, ProducerIncarnationId, RecordId, SectionRevisionId,
-    SourceScopeId, TransportEpoch,
+    BatchId, DecisionSnapshotId, ProducerIncarnationId, RecordId, SectionRevisionId, SourceScopeId,
+    TransportEpoch,
 };
 use observation_ingest::{
     DeliveryStage, ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, StopAndWaitSlot,
 };
 
-fn epoch(value: u64) -> TransportEpoch {
+const fn epoch(value: u64) -> TransportEpoch {
     TransportEpoch::new(value).expect("test epoch is positive")
 }
 
@@ -31,7 +31,10 @@ fn immutable_batch_distinguishes_progress_handoff_and_volatile_receipt() {
     let mut slot = StopAndWaitSlot::empty();
 
     assert_eq!(slot.stage(), DeliveryStage::CollectionProgress);
-    assert_eq!(slot.stage_batch(batch("batch:ship:7", b"ship-core")), SlotAdmission::Staged);
+    assert_eq!(
+        slot.stage_batch(batch("batch:ship:7", b"ship-core")),
+        SlotAdmission::Staged
+    );
     assert_eq!(slot.mark_local_handoff(), Ok(DeliveryStage::LocalHandoff));
     assert_eq!(
         slot.apply_disposition(ReceiverDisposition::Received),
@@ -47,9 +50,11 @@ fn exact_replay_returns_prior_disposition_but_changed_bytes_conflict() {
     let original = batch("batch:ship:8", b"immutable");
 
     assert_eq!(slot.stage_batch(original.clone()), SlotAdmission::Staged);
-    slot.mark_local_handoff().expect("handoff is valid");
-    slot.apply_disposition(ReceiverDisposition::Received)
-        .expect("receipt is valid");
+    assert_eq!(slot.mark_local_handoff(), Ok(DeliveryStage::LocalHandoff));
+    assert_eq!(
+        slot.apply_disposition(ReceiverDisposition::Received),
+        Ok(DeliveryStage::Received)
+    );
     assert_eq!(
         slot.stage_batch(original),
         SlotAdmission::ExactReplay(ReceiverDisposition::Received)
@@ -65,16 +70,31 @@ fn exact_replay_returns_prior_disposition_but_changed_bytes_conflict() {
 #[test]
 fn non_consumption_and_terminal_outcomes_remain_distinct() {
     for (disposition, expected) in [
-        (ReceiverDisposition::CapacityUnavailable, DeliveryStage::CollectionProgress),
-        (ReceiverDisposition::TimedOutOrSuperseded, DeliveryStage::TerminalRejection),
-        (ReceiverDisposition::StaleEpoch, DeliveryStage::TerminalRejection),
-        (ReceiverDisposition::PermanentlyRejected, DeliveryStage::TerminalRejection),
-        (ReceiverDisposition::AmbiguousCommit, DeliveryStage::AmbiguousPublication),
+        (
+            ReceiverDisposition::CapacityUnavailable,
+            DeliveryStage::CollectionProgress,
+        ),
+        (
+            ReceiverDisposition::TimedOutOrSuperseded,
+            DeliveryStage::TerminalRejection,
+        ),
+        (
+            ReceiverDisposition::StaleEpoch,
+            DeliveryStage::TerminalRejection,
+        ),
+        (
+            ReceiverDisposition::PermanentlyRejected,
+            DeliveryStage::TerminalRejection,
+        ),
+        (
+            ReceiverDisposition::AmbiguousCommit,
+            DeliveryStage::AmbiguousPublication,
+        ),
     ] {
         let mut slot = StopAndWaitSlot::empty();
         let pending = batch("batch:ship:9", b"pending");
         assert_eq!(slot.stage_batch(pending.clone()), SlotAdmission::Staged);
-        slot.mark_local_handoff().expect("handoff is valid");
+        assert_eq!(slot.mark_local_handoff(), Ok(DeliveryStage::LocalHandoff));
         assert_eq!(slot.apply_disposition(disposition), Ok(expected));
         assert_eq!(slot.pending_bytes(), Some(&b"pending"[..]));
         if disposition == ReceiverDisposition::CapacityUnavailable {
