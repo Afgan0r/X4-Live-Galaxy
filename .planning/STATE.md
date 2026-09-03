@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 05.3
 current_phase_name: Generic Observation Contracts and Durable Publication
-status: Ready to execute
-stopped_at: Phase 05.3 planned in three checked waves; awaiting owner approval to execute
-last_updated: "2026-09-03T20:11:32.624Z"
+status: executing
+stopped_at: Completed 05.3-01-PLAN.md
+last_updated: "2026-09-03T21:28:12.260Z"
 last_activity: 2026-09-04
-last_activity_desc: Split owned Carrier B into Phase 05.4 and shifted heavy ship/station proof to 05.5/05.6
-state_head: a480a871843c5f70dac04ae58e8b58912bb6dec2
+last_activity_desc: Phase 05.3 execution started
+state_head: e07c3b291bf11acc6bb7bc884f03c528589b47fc
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 40
-  completed_plans: 37
+  completed_plans: 38
   percent: 36
 ---
 
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-28)
 
 **Core value:** Factions pursue coherent, distinct, long-lived strategies while X4 remains authoritative and every proposed effect stays observable, recoverable, and bounded by deterministic validation.
-**Current focus:** Phase 05.3 - Generic Observation Contracts and Durable Publication; production Carrier B is isolated in Phase 05.4 and historical 01/05.1 execution is superseded
+**Current focus:** Phase 05.3 — Generic Observation Contracts and Durable Publication
 
 ## Current Position
 
-Phase: 05.3 (Generic Observation Contracts and Durable Publication) — READY TO EXECUTE
-Plan: 3 plans in 3 sequential waves
-Status: Ready to execute; research and plan-check passed
-Last activity: 2026-09-04 - Planned narrowed Phase 05.3 and split production Carrier B into Phase 05.4
+Phase: 05.3 (Generic Observation Contracts and Durable Publication) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-09-04 — Phase 05.3 execution started
 
-Progress: 36% (5 of 14 phases historically complete; Phase 05.3 has 3 pending plans)
+Progress: [████░░░░░░] 36% (5 of 14 phases historically complete; Phase 05.3 has 3 pending plans)
 
 ## Performance Metrics
 
@@ -89,6 +89,7 @@ Progress: 36% (5 of 14 phases historically complete; Phase 05.3 has 3 pending pl
 | Phase 05.1 P05 | 25m | 2 tasks | 6 files |
 | Phase 05.1 P06 | 29m | 2 tasks | 6 files |
 | Phase 05.1 P08 | 41m | 2 tasks | 5 files |
+| Phase 05.3 P01 | 27min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,9 @@ Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md o
 - [Phase 05.1]: Restart callers restore the last admitted generation explicitly. — Generation identity cannot be inferred safely from unrelated snapshot fields.
 - [Phase 05.3]: ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md supersede conflicting historical Phase 01/05.1/05.2 entries: use source-agnostic sections, one immutable stop-and-wait contract slot, distinct received/committed, bounded keyed candidates and independent aggregate bounds; never resume the old remainder or retired research platform. — Owner approved GSD reconciliation on 2026-09-03; past implementation evidence is preserved without promoting obsolete policies.
 - [Phases 05.3/05.4]: Docs MCP evidence demonstrated Carrier A's bounded-result gap. The owner selected Carrier B and required a separate phase: 05.3 owns generic Rust contracts/publication, while 05.4 owns the minimal native/Lua production path and runtime proof. Heavy ship and station proof move to 05.5/05.6. — Owner approved on 2026-09-04.
+- [Phase 05.3]: Durable publication remains distinct from local handoff and volatile receipt; ambiguous publication never advances the sender.
+- [Phase 05.3]: Game-time urgency is an ordering hint only; injected monotonic real time and finite non-zero limits own admission.
+- [Phase 05.3]: The X4 facade exposes complete-message transport and bounded control vocabulary without any game-state mutation command.
 
 ### Pending Todos
 
@@ -212,6 +216,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T03:11:32.624+07:00
-Stopped at: Phase 05.3 planned in three checked waves; awaiting owner approval to execute
-Resume file: .planning/phases/05.3-generic-observation-contracts-and-durable-publication/05.3-CONTEXT.md
+Last session: 2026-09-03T21:28:11.457Z
+Stopped at: Completed 05.3-01-PLAN.md
+Resume file: None
