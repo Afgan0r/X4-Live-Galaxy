@@ -105,6 +105,7 @@ impl GenerationStager {
                     legacy_identity: Some((scope.clone(), version, generation)),
                     next_sequence: 1,
                     legacy_frames: Vec::new(),
+                    context: None,
                 },
             );
         }

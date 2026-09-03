@@ -14,6 +14,10 @@ pub use batch::{
     admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
 pub use batch_budget::{AggregateLimits, AggregateUsage, CandidateLimits, CandidateUsage};
+pub use completion::{
+    CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome,
+    ContractVersions, ValidatedSectionRevision,
+};
 pub use feedback::{
     CollectionPolicyLimits, DeliveryStage, FeedbackError, ImmutableApplicationBatch,
     ReceiverDisposition, SlotAdmission, StopAndWaitSlot, TransportPolicyLimits,

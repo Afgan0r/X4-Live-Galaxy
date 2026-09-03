@@ -18,6 +18,8 @@ pub enum AdmissionError {
     OutOfOrderVersion,
     EqualVersionConflict,
     CollectionLimitExceeded,
+    CompletionMismatch,
+    DependencyChanged,
 }
 
 #[must_use]
@@ -30,6 +32,8 @@ pub enum RejectionReason {
     OutOfOrderVersion,
     EqualVersionConflict,
     CollectionLimitExceeded,
+    CompletionMismatch,
+    DependencyChanged,
 }
 
 impl From<&AdmissionError> for RejectionReason {
@@ -41,6 +45,8 @@ impl From<&AdmissionError> for RejectionReason {
             AdmissionError::OutOfOrderVersion => Self::OutOfOrderVersion,
             AdmissionError::EqualVersionConflict => Self::EqualVersionConflict,
             AdmissionError::CollectionLimitExceeded => Self::CollectionLimitExceeded,
+            AdmissionError::CompletionMismatch => Self::CompletionMismatch,
+            AdmissionError::DependencyChanged => Self::DependencyChanged,
             AdmissionError::InvalidFixture
             | AdmissionError::InvalidQuality
             | AdmissionError::InvalidContent

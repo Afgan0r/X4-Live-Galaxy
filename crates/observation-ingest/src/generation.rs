@@ -7,6 +7,7 @@ use observation_domain::{
 use sha2::{Digest, Sha256};
 
 use crate::batch_budget::{AggregateUsage, CandidateUsage};
+use crate::completion::CandidateContext;
 use crate::model::AcceptedProjection;
 use crate::wire::WireObservation;
 use crate::{GenerationLimits, ReceiverDisposition};
@@ -29,6 +30,7 @@ pub(crate) struct Candidate {
     pub(crate) legacy_identity: Option<(String, u64, u64)>,
     pub(crate) next_sequence: u64,
     pub(crate) legacy_frames: Vec<(WireObservation, u64)>,
+    pub(crate) context: Option<CandidateContext>,
 }
 
 pub struct GenerationStager {
@@ -37,6 +39,7 @@ pub struct GenerationStager {
     pub(crate) candidates: BTreeMap<SectionKey, Candidate>,
     pub(crate) aggregate: AggregateUsage,
     accepted_versions: BTreeMap<(SourceScopeId, EntityId), (ObservationVersion, [u8; 32])>,
+    pub(crate) cooldowns: BTreeMap<SectionKey, u64>,
     pub(crate) last_admitted_generation: Option<u64>,
     pub(crate) admitted_generation_count: u64,
 }
@@ -57,6 +60,7 @@ impl GenerationStager {
                 work: 0,
             },
             accepted_versions: BTreeMap::new(),
+            cooldowns: BTreeMap::new(),
             last_admitted_generation: None,
             admitted_generation_count: 0,
         }
@@ -158,6 +162,7 @@ impl GenerationStager {
                 legacy_identity: None,
                 next_sequence: 1,
                 legacy_frames: Vec::new(),
+                context: None,
             },
         );
         ReceiverDisposition::Received
