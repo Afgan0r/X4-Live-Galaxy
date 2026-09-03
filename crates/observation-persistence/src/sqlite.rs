@@ -9,6 +9,7 @@ use crate::{
     PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
     UnpinOutcome, schema, sqlite_pins, sqlite_read, sqlite_write,
 };
+use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 
 pub struct SqliteObservationRepository {
     connection: Connection,
@@ -41,6 +42,29 @@ impl SqliteObservationRepository {
             .pragma_query_value(None, "foreign_keys", |row| row.get::<_, i64>(0))
             .map(|value| value == 1)
             .map_err(|_| storage("foreign-keys-query"))
+    }
+
+    pub fn publish_with_failpoint(
+        &mut self,
+        _request: PublishRequest,
+        _failpoint: PublicationFailpoint,
+    ) -> PublishOutcome {
+        PublishOutcome::PermanentRejection(RepositoryDiagnostic {
+            code: "failpoint-not-implemented",
+        })
+    }
+
+    pub fn reconcile_publication(&mut self, _request: &PublishRequest) -> ReconciliationOutcome {
+        ReconciliationOutcome::Ambiguous(RepositoryDiagnostic {
+            code: "reconciliation-not-implemented",
+        })
+    }
+
+    pub fn run_retention(
+        &mut self,
+        _policy: RetentionPolicy,
+    ) -> Result<RetentionReport, RepositoryError> {
+        Err(storage("retention-not-implemented"))
     }
 
     fn validate_stored_revisions(&self) -> Result<(), RepositoryError> {

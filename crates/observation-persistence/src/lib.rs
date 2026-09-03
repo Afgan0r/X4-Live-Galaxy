@@ -3,6 +3,7 @@
 mod fake;
 mod port;
 mod record;
+mod recovery;
 mod schema;
 mod sqlite;
 mod sqlite_pins;
@@ -12,6 +13,7 @@ mod types;
 
 pub use fake::FakeObservationRepository;
 pub use port::ObservationRepository;
+pub use recovery::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 pub use schema::{OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY, OBSERVATION_REPOSITORY_SCHEMA_VERSION};
 pub use sqlite::SqliteObservationRepository;
 pub use types::{
