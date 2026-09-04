@@ -6,8 +6,9 @@
 use std::{cell::Cell, rc::Rc};
 
 use observation_ingest::{
-    CollectionClass, CollectionIntent, CollectionIntentId, CollectionPolicyLimits, DeliveredPulse,
-    MonotonicClock, ObservationScheduler, SchedulerSafetyLimits, TransportPolicyLimits, WorkKind,
+    CollectionClass, CollectionIntent, CollectionIntentId, CollectionPolicyLimits,
+    CompletionDisposition, DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome,
+    SchedulerSafetyLimits, TransportPolicyLimits, WorkKind,
 };
 
 #[derive(Clone)]
@@ -19,24 +20,37 @@ impl MonotonicClock for FakeClock {
     }
 }
 
-fn scheduler() -> ObservationScheduler<FakeClock> {
-    ObservationScheduler::new(
-        FakeClock(Rc::new(Cell::new(0))),
-        CollectionPolicyLimits::new(10, 1, 4, 1).expect("collection limits are finite"),
-        TransportPolicyLimits::new(8, 2).expect("transport limits are finite"),
-        SchedulerSafetyLimits::new(4, 8).expect("safety limits are finite"),
-    )
+fn scheduler() -> (ObservationScheduler<FakeClock>, FakeClock) {
+    let clock = FakeClock(Rc::new(Cell::new(0)));
+    let value = ObservationScheduler::new(
+        clock.clone(),
+        CollectionPolicyLimits::new(10, 2, 4, 1).expect("finite collection limits"),
+        TransportPolicyLimits::new(8, 2).expect("finite transport limits"),
+        SchedulerSafetyLimits::new(4, 8).expect("finite safety limits"),
+    );
+    (value, clock)
 }
 
-fn intent(id: &str, class: CollectionClass, urgency: u64) -> CollectionIntent {
-    CollectionIntent::new(
-        CollectionIntentId::new(id).expect("intent identity is non-empty"),
-        class,
-        WorkKind::Light,
-        4,
-        urgency,
-    )
-    .expect("declared work is positive")
+fn id(value: &str) -> CollectionIntentId {
+    CollectionIntentId::new(value).expect("non-empty intent identity")
+}
+
+fn pulse(value: &mut ObservationScheduler<FakeClock>) -> SchedulerOutcome {
+    value.deliver_pulse(DeliveredPulse::new(3))
+}
+
+macro_rules! enq {
+    ($scheduler:ident, $name:expr, $class:ident, $kind:ident, $work:expr, $urgency:expr) => {{
+        let intent = CollectionIntent::new(
+            id($name),
+            CollectionClass::$class,
+            WorkKind::$kind,
+            $work,
+            $urgency,
+        )
+        .expect("positive declared work");
+        $scheduler.enqueue(intent).is_ok()
+    }};
 }
 
 #[test]
@@ -47,93 +61,132 @@ fn urgency_orders_without_increasing_allowance() {
 }
 
 fn assert_priority_order() {
-    let mut ranked = scheduler();
-    assert!(
-        ranked
-            .enqueue(intent("detail", CollectionClass::Detail, u64::MAX))
-            .is_ok()
-    );
-    assert!(
-        ranked
-            .enqueue(intent("core-low", CollectionClass::Core, 1))
-            .is_ok()
-    );
-    assert!(
-        ranked
-            .enqueue(intent("core-high", CollectionClass::Core, 9))
-            .is_ok()
-    );
-    let selected = ranked.deliver_pulse(DeliveredPulse::new(3));
+    let (mut ranked, _) = scheduler();
+    assert!(enq!(ranked, "detail", Detail, Light, 4, u64::MAX));
+    assert!(enq!(ranked, "core-low", Core, Light, 4, 1));
+    assert!(enq!(ranked, "core-high", Core, Light, 4, 9));
     assert_eq!(
-        selected
-            .admission()
-            .map(|admission| admission.intent_id().as_str()),
-        Some("core-high")
+        pulse(&mut ranked).admission().map(|a| a.intent_id()),
+        Some(&id("core-high"))
     );
-
-    let mut tied = scheduler();
-    assert!(
-        tied.enqueue(intent("first", CollectionClass::Core, 4))
-            .is_ok()
-    );
-    assert!(
-        tied.enqueue(intent("second", CollectionClass::Core, 4))
-            .is_ok()
-    );
+    let (mut tied, _) = scheduler();
+    assert!(enq!(tied, "first", Core, Light, 4, 4));
+    assert!(enq!(tied, "second", Core, Light, 4, 4));
     assert_eq!(
-        tied.deliver_pulse(DeliveredPulse::new(3))
-            .admission()
-            .map(|admission| admission.intent_id().as_str()),
-        Some("first")
+        pulse(&mut tied).admission().map(|a| a.intent_id()),
+        Some(&id("first"))
     );
 }
 
 fn assert_urgency_keeps_allowance() {
-    let mut low = scheduler();
-    let mut high = scheduler();
-    assert!(
-        low.enqueue(intent("same", CollectionClass::Core, 1))
-            .is_ok()
-    );
-    assert!(
-        high.enqueue(intent("same", CollectionClass::Core, u64::MAX))
-            .is_ok()
-    );
-    let low = low.deliver_pulse(DeliveredPulse::new(3));
-    let high = high.deliver_pulse(DeliveredPulse::new(3));
-    assert_eq!(low.remaining_permits(), high.remaining_permits());
-    assert_eq!(low.admitted_work(), high.admitted_work());
+    let (mut low, _) = scheduler();
+    let (mut high, _) = scheduler();
+    assert!(enq!(low, "same", Core, Light, 4, 1));
+    assert!(enq!(high, "same", Core, Light, 4, u64::MAX));
+    let low = pulse(&mut low);
+    let high = pulse(&mut high);
     assert_eq!(
-        low.remaining_heavy_permits(),
-        high.remaining_heavy_permits()
+        (
+            low.remaining_permits(),
+            low.admitted_work(),
+            low.overrun_debt()
+        ),
+        (
+            high.remaining_permits(),
+            high.admitted_work(),
+            high.overrun_debt()
+        )
     );
-    assert_eq!(
-        low.terminal_reserved_bytes(),
-        high.terminal_reserved_bytes()
-    );
-    assert_eq!(low.overrun_debt(), high.overrun_debt());
 }
 
 fn assert_pump_first_reserve() {
-    let mut pump_first = scheduler();
-    pump_first
-        .stage_pending(b"123456".to_vec())
-        .expect("pending message fits the pump ceiling");
-    assert!(
-        pump_first
-            .enqueue(intent("waiting", CollectionClass::Core, 3))
-            .is_ok()
+    let (mut value, _) = scheduler();
+    assert!(value.stage_pending(b"123456".to_vec()).is_ok());
+    assert!(enq!(value, "waiting", Core, Light, 4, 3));
+    let pumped = value.deliver_pulse(DeliveredPulse::new(8));
+    assert_eq!(
+        (pumped.pumped_bytes(), pumped.terminal_reserved_bytes()),
+        (6, 2)
     );
-    let pumped = pump_first.deliver_pulse(DeliveredPulse::new(8));
-    assert_eq!(pumped.pumped_bytes(), 6);
-    assert_eq!(pumped.terminal_reserved_bytes(), 2);
     assert!(pumped.admission().is_none());
+    assert!(value.stage_pending(b"123456".to_vec()).is_ok());
+    assert_eq!(
+        value.deliver_pulse(DeliveredPulse::new(7)).pumped_bytes(),
+        0
+    );
+    assert_eq!(value.pending_bytes(), Some(&b"123456"[..]));
+}
 
-    pump_first
-        .stage_pending(b"123456".to_vec())
-        .expect("slot was released after the exact pump");
-    let retained = pump_first.deliver_pulse(DeliveredPulse::new(7));
-    assert_eq!(retained.pumped_bytes(), 0);
-    assert!(retained.admission().is_none());
-    assert_eq!(pump_first.pending_bytes(), Some(&b"123456"[..]));
+#[test]
+fn step_and_heavy_limits_are_exact_and_completion_is_idempotent() {
+    let (mut value, _) = scheduler();
+    assert!(!enq!(value, "too-large", Core, Light, 5, 0));
+    assert!(enq!(value, "heavy", Core, Heavy, 4, 0));
+    assert!(enq!(value, "blocked", Core, Heavy, 4, 0));
+    let admitted = pulse(&mut value);
+    assert_eq!(
+        (
+            admitted.admitted_work(),
+            admitted.remaining_permits(),
+            admitted.remaining_heavy_permits()
+        ),
+        (4, 1, 0)
+    );
+    assert!(pulse(&mut value).admission().is_none());
+    assert_eq!(
+        value.complete(&id("unknown"), 4),
+        CompletionDisposition::Unknown
+    );
+    assert_eq!(
+        value.complete(&id("heavy"), 4),
+        CompletionDisposition::Completed
+    );
+    assert_eq!(
+        value.complete(&id("heavy"), 4),
+        CompletionDisposition::Unknown
+    );
+    assert_eq!(pulse(&mut value).remaining_heavy_permits(), 1);
+}
+
+#[test]
+fn overrun_debt_repayment_is_bounded_under_frozen_and_coarse_clocks() {
+    let (mut value, clock) = scheduler();
+    assert!(enq!(value, "overrun", Core, Light, 4, 0));
+    assert!(pulse(&mut value).admission().is_some());
+    assert_eq!(
+        value.complete(&id("overrun"), 10),
+        CompletionDisposition::Completed
+    );
+    assert_eq!(pulse(&mut value).overrun_debt(), 6);
+    clock.0.set(100);
+    assert_eq!(pulse(&mut value).overrun_debt(), 2);
+    assert_eq!(pulse(&mut value).overrun_debt(), 0);
+    assert_eq!(pulse(&mut value).remaining_permits(), 1);
+}
+
+#[test]
+fn policy_dimensions_reject_one_over_without_state_change() {
+    let (mut value, _) = scheduler();
+    for number in 0..4 {
+        assert!(enq!(value, &format!("q{number}"), Detail, Light, 4, 0));
+    }
+    assert!(!enq!(value, "queue-over", Core, Light, 4, 0));
+    let before = pulse(&mut value);
+    assert_eq!(
+        (before.queued_intents(), before.remaining_permits()),
+        (3, 1)
+    );
+    assert_eq!(
+        value.complete(&id("q0"), 13),
+        CompletionDisposition::CollectorRejected
+    );
+    let after = pulse(&mut value);
+    assert_eq!(
+        (
+            after.overrun_debt(),
+            after.queued_intents(),
+            after.remaining_permits()
+        ),
+        (8, 3, 1)
+    );
 }
