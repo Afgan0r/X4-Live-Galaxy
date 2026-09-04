@@ -283,7 +283,7 @@ Plans:
 6. Local behavioral and persistence evidence proves the generic contracts without being reported as X4 integration proof. The owner approves research and checked plans before execution.
 
 **Research:** Required. Start from `05.3-CONTEXT.md`, `05.3-READINESS.md` and the closed Docs MCP admission evidence. Carrier A's measured limitation and the resulting Carrier B decision constrain the facade but do not pull production transport into this phase.
-**Plans:** 3/3 plans executed across 3 waves; research and plan-check passed on 2026-09-04.
+**Plans:** 3/5 plans executed; two verified gap-closure plans are ready across Waves 4-5.
 **Wave 1**
 
 - [x] 05.3-01-PLAN.md
@@ -295,6 +295,14 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 05.3-03-PLAN.md
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05.3-05-PLAN.md — enforce bounded scheduler urgency, work admission, reserve and debt policy
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 05.3-04-PLAN.md — connect the carrier-neutral ingress-to-publication lifecycle
 
 ### Phase 05.4: Owned Carrier B and Production Observation Path
 
