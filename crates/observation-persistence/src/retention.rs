@@ -14,11 +14,8 @@ pub fn run(
         .map_err(|_| storage("retention-begin"))?;
     let protected = protected_revisions(&transaction)?;
     let revisions = receipt_revisions(&transaction)?;
-    let keep = policy
-        .history_per_section
-        .get()
-        .min(policy.receipt_count.get().saturating_sub(1));
     let mut seen = BTreeMap::<SectionKey, usize>::new();
+    let mut retained_receipts = 0usize;
     let mut victims = Vec::new();
     for identity in revisions {
         if protected.contains(&identity) {
@@ -26,8 +23,12 @@ pub fn run(
         }
         let count = seen.entry(identity.0.clone()).or_default();
         *count = count.saturating_add(1);
-        if *count > keep {
+        if *count > policy.history_per_section.get()
+            || retained_receipts >= policy.receipt_count.get()
+        {
             victims.push(identity);
+        } else {
+            retained_receipts = retained_receipts.saturating_add(1);
         }
     }
     for (key, revision) in &victims {
@@ -61,7 +62,7 @@ fn receipt_revisions(
     let mut statement = connection
         .prepare(
             "SELECT section_key, revision FROM publication_receipts
-             ORDER BY section_key, ordinal DESC",
+             ORDER BY ordinal DESC, section_key, revision DESC",
         )
         .map_err(|_| storage("retention-scan"))?;
     let rows = statement
