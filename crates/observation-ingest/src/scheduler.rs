@@ -41,24 +41,26 @@ impl SchedulerOutcome {
     pub const fn terminal_reserved_bytes(&self) -> usize {
         self.terminal_reserved_bytes
     }
+    #[must_use]
     pub const fn admission(&self) -> Option<&SchedulerAdmission> {
         self.admission.as_ref()
     }
-    pub const fn collection_started(&self) -> bool {
-        self.admission.is_some()
-    }
+    #[must_use]
     pub const fn admitted_work(&self) -> usize {
         match &self.admission {
             Some(admission) => admission.declared_work,
             None => 0,
         }
     }
+    #[must_use]
     pub const fn remaining_permits(&self) -> usize {
         self.remaining_permits
     }
+    #[must_use]
     pub const fn remaining_heavy_permits(&self) -> usize {
         self.remaining_heavy_permits
     }
+    #[must_use]
     pub const fn overrun_debt(&self) -> usize {
         self.overrun_debt
     }
@@ -123,36 +125,10 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
             .available_bytes
             .saturating_sub(reserve)
             .min(self.transport.max_pump_bytes.get());
-        if let Some(pending) = self.pending.as_ref() {
-            let pumped_bytes = if pending.len() <= bulk_capacity {
-                self.pending.take().map_or(0, |bytes| bytes.len())
-            } else {
-                0
-            };
+        if let Some(pumped_bytes) = self.pump_pending(bulk_capacity) {
             return self.outcome(pumped_bytes, reserve, None);
         }
-        let can_admit = bulk_capacity > 0 && self.permits > 0 && self.debt == 0;
-        let step_work = self.collection.step_work.get();
-        let heavy_permits = self.heavy_permits;
-        let admission = can_admit
-            .then(|| {
-                self.queue.take_best_where(|intent| {
-                    intent.declared_work() <= step_work
-                        && (intent.work_kind() == WorkKind::Light || heavy_permits > 0)
-                })
-            })
-            .flatten()
-            .map(|intent| SchedulerAdmission {
-                intent_id: intent.id().clone(),
-                work_kind: intent.work_kind(),
-                declared_work: intent.declared_work(),
-            });
-        if let Some(admission) = &admission {
-            self.permits -= 1;
-            if admission.work_kind == WorkKind::Heavy {
-                self.heavy_permits -= 1;
-            }
-        }
+        let admission = self.select_admission(bulk_capacity);
         self.outcome(0, reserve, admission)
     }
 
@@ -160,7 +136,36 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
         self.pending.as_deref()
     }
 
-    fn outcome(
+    fn pump_pending(&mut self, bulk_capacity: usize) -> Option<usize> {
+        let pending_len = self.pending.as_ref()?.len();
+        if pending_len > bulk_capacity {
+            return Some(0);
+        }
+        Some(self.pending.take().map_or(0, |bytes| bytes.len()))
+    }
+
+    fn select_admission(&mut self, bulk_capacity: usize) -> Option<SchedulerAdmission> {
+        if bulk_capacity == 0 || self.permits == 0 || self.debt > 0 {
+            return None;
+        }
+        let step_work = self.collection.step_work.get();
+        let heavy_permits = self.heavy_permits;
+        let intent = self.queue.take_best_where(|intent| {
+            intent.declared_work() <= step_work
+                && (intent.work_kind() == WorkKind::Light || heavy_permits > 0)
+        })?;
+        self.permits -= 1;
+        if intent.work_kind() == WorkKind::Heavy {
+            self.heavy_permits -= 1;
+        }
+        Some(SchedulerAdmission {
+            intent_id: intent.id().clone(),
+            work_kind: intent.work_kind(),
+            declared_work: intent.declared_work(),
+        })
+    }
+
+    const fn outcome(
         &self,
         pumped_bytes: usize,
         terminal_reserved_bytes: usize,

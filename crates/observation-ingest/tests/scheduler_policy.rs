@@ -41,6 +41,12 @@ fn intent(id: &str, class: CollectionClass, urgency: u64) -> CollectionIntent {
 
 #[test]
 fn urgency_orders_without_increasing_allowance() {
+    assert_priority_order();
+    assert_urgency_keeps_allowance();
+    assert_pump_first_reserve();
+}
+
+fn assert_priority_order() {
     let mut ranked = scheduler();
     assert!(
         ranked
@@ -80,7 +86,9 @@ fn urgency_orders_without_increasing_allowance() {
             .map(|admission| admission.intent_id().as_str()),
         Some("first")
     );
+}
 
+fn assert_urgency_keeps_allowance() {
     let mut low = scheduler();
     let mut high = scheduler();
     assert!(
@@ -104,7 +112,9 @@ fn urgency_orders_without_increasing_allowance() {
         high.terminal_reserved_bytes()
     );
     assert_eq!(low.overrun_debt(), high.overrun_debt());
+}
 
+fn assert_pump_first_reserve() {
     let mut pump_first = scheduler();
     pump_first
         .stage_pending(b"123456".to_vec())

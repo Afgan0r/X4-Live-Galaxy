@@ -38,6 +38,7 @@ pub struct SchedulerSafetyLimits {
 }
 
 impl SchedulerSafetyLimits {
+    #[must_use]
     pub fn new(queue_capacity: usize, max_overrun_debt: usize) -> Option<Self> {
         Some(Self {
             queue_capacity: NonZeroUsize::new(queue_capacity)?,
@@ -57,6 +58,7 @@ pub struct CollectionIntent {
 }
 
 impl CollectionIntent {
+    #[must_use]
     pub fn new(
         id: CollectionIntentId,
         class: CollectionClass,
@@ -81,6 +83,7 @@ impl CollectionIntent {
         self.work_kind
     }
 
+    #[must_use]
     pub const fn declared_work(&self) -> usize {
         self.declared_work.get()
     }
@@ -103,6 +106,7 @@ impl SchedulerAdmission {
         self.work_kind
     }
 
+    #[must_use]
     pub const fn declared_work(&self) -> usize {
         self.declared_work
     }
@@ -113,14 +117,14 @@ struct QueuedIntent {
     ordinal: u64,
 }
 
-pub(crate) struct IntentQueue {
+pub struct IntentQueue {
     capacity: NonZeroUsize,
     next_ordinal: u64,
     queued: Vec<QueuedIntent>,
 }
 
 impl IntentQueue {
-    pub(crate) const fn new(capacity: NonZeroUsize) -> Self {
+    pub(super) const fn new(capacity: NonZeroUsize) -> Self {
         Self {
             capacity,
             next_ordinal: 0,
@@ -128,7 +132,7 @@ impl IntentQueue {
         }
     }
 
-    pub(crate) fn enqueue(&mut self, intent: CollectionIntent) -> Result<(), CollectionIntent> {
+    pub(super) fn enqueue(&mut self, intent: CollectionIntent) -> Result<(), CollectionIntent> {
         if self.queued.len() >= self.capacity.get()
             || self
                 .queued
@@ -146,7 +150,7 @@ impl IntentQueue {
         Ok(())
     }
 
-    pub(crate) fn take_best_where(
+    pub(super) fn take_best_where(
         &mut self,
         eligible: impl Fn(&CollectionIntent) -> bool,
     ) -> Option<CollectionIntent> {
