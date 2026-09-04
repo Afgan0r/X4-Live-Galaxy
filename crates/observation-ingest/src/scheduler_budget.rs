@@ -67,15 +67,18 @@ impl SchedulerBudget {
         if !self.can_admit(intent) {
             return None;
         }
-        self.permits = self.permits.checked_sub(1)?;
-        if intent.work_kind() == WorkKind::Heavy {
-            self.heavy_permits = self.heavy_permits.checked_sub(1)?;
-        }
+        let remaining_permits = self.permits.checked_sub(1)?;
+        let remaining_heavy = match intent.work_kind() {
+            WorkKind::Light => self.heavy_permits,
+            WorkKind::Heavy => self.heavy_permits.checked_sub(1)?,
+        };
         let admission = SchedulerAdmission {
             intent_id: intent.id().clone(),
             work_kind: intent.work_kind(),
             declared_work: intent.declared_work(),
         };
+        self.permits = remaining_permits;
+        self.heavy_permits = remaining_heavy;
         self.in_flight.push(InFlightAdmission {
             intent_id: intent.id().clone(),
             work_kind: intent.work_kind(),
