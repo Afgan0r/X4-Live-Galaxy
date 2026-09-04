@@ -91,9 +91,17 @@ fn publish_in_transaction(
     if failpoint == Some(PublicationFailpoint::AfterContent) {
         return Err(rejection("failpoint-after-content"));
     }
+    let receipt = PublicationReceipt {
+        section_key: revision.section_key.clone(),
+        revision: revision.revision,
+        content_digest: revision.content_digest,
+        previous: revision.expected_current,
+        ordinal: u64::try_from(ordinal).map_err(|_| rejection("receipt-ordinal"))?,
+    };
+    let receipt_integrity = sqlite_receipt::integrity_digest(&receipt);
     connection.execute(
-        "INSERT INTO publication_receipts(section_key, revision, content_digest, previous_revision, ordinal) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get()).map_err(storage)?, revision.content_digest.as_slice(), revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose().map_err(storage)?, ordinal],
+        "INSERT INTO publication_receipts(section_key, revision, content_digest, previous_revision, ordinal, integrity_digest) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get()).map_err(storage)?, revision.content_digest.as_slice(), revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose().map_err(storage)?, ordinal, receipt_integrity.as_slice()],
     ).map_err(|_| rejection("receipt-insert"))?;
     if failpoint == Some(PublicationFailpoint::AfterReceipt) {
         return Err(rejection("failpoint-after-receipt"));
@@ -102,13 +110,7 @@ fn publish_in_transaction(
     if failpoint == Some(PublicationFailpoint::AfterPointer) {
         return Err(rejection("failpoint-after-pointer"));
     }
-    Ok(WriteOutcome::New(PublicationReceipt {
-        section_key: revision.section_key.clone(),
-        revision: revision.revision,
-        content_digest: revision.content_digest,
-        previous: revision.expected_current,
-        ordinal: u64::try_from(ordinal).map_err(|_| rejection("receipt-ordinal"))?,
-    }))
+    Ok(WriteOutcome::New(receipt))
 }
 
 const fn storage(_: RepositoryError) -> PublishOutcome {

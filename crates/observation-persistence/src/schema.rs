@@ -3,8 +3,8 @@ use rusqlite::Connection;
 
 use crate::{RepositoryDiagnostic, RepositoryError};
 
-pub const OBSERVATION_REPOSITORY_SCHEMA_VERSION: u32 = 2;
-pub const OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY: &str = "live_galaxy.observation_repository.v2";
+pub const OBSERVATION_REPOSITORY_SCHEMA_VERSION: u32 = 3;
+pub const OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY: &str = "live_galaxy.observation_repository.v3";
 
 const CREATE_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS repository_metadata (
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS repository_metadata (
   schema_version INTEGER NOT NULL,
   protocol_identity TEXT NOT NULL
 );
-INSERT OR IGNORE INTO repository_metadata VALUES (1, 2, 'live_galaxy.observation_repository.v2');
+INSERT OR IGNORE INTO repository_metadata VALUES (1, 3, 'live_galaxy.observation_repository.v3');
 CREATE TABLE IF NOT EXISTS revisions (
   section_key TEXT NOT NULL, revision INTEGER NOT NULL, source_scope TEXT NOT NULL,
   producer_incarnation TEXT NOT NULL, transport_epoch INTEGER NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS revision_records (
 );
 CREATE TABLE IF NOT EXISTS publication_receipts (
   section_key TEXT NOT NULL, revision INTEGER NOT NULL, content_digest BLOB NOT NULL,
-  previous_revision INTEGER, ordinal INTEGER NOT NULL UNIQUE,
+  previous_revision INTEGER, ordinal INTEGER NOT NULL UNIQUE, integrity_digest BLOB NOT NULL,
   PRIMARY KEY (section_key, revision),
   FOREIGN KEY (section_key, revision) REFERENCES revisions(section_key, revision) ON DELETE CASCADE
 );
