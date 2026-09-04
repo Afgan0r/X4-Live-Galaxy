@@ -1,4 +1,7 @@
-use observation_domain::{CanonicalObservationKey, ObservationVersion, SectionCompletionEnvelope};
+use observation_domain::{
+    CanonicalObservationKey, CompletionCoverage, ObservationVersion, SectionCompletionEnvelope,
+    SectionCoverage,
+};
 
 use crate::completion_digest::{candidate_material, content_digest};
 use crate::completion_types::{
@@ -156,6 +159,24 @@ fn completion_is_exact(
         && certificate.raw_bytes == candidate.usage.raw_bytes
         && certificate.decoded_bytes == candidate.usage.decoded_bytes
         && certificate.versions == context.versions
+        && coverage_is_consistent(context, certificate.envelope.coverage, records.len())
         && certificate.ordered_batch_manifest_digest == candidate_material(candidate).0
         && certificate.canonical_content_digest == content_digest(records)
+}
+
+fn coverage_is_consistent(
+    context: &CandidateContext,
+    terminal: CompletionCoverage,
+    record_count: usize,
+) -> bool {
+    let expected = match context.state().coverage() {
+        SectionCoverage::Complete => CompletionCoverage::Complete,
+        SectionCoverage::KnownEmpty => CompletionCoverage::KnownEmpty,
+        SectionCoverage::Partial => CompletionCoverage::Partial,
+        SectionCoverage::Unknown => CompletionCoverage::Unknown,
+        SectionCoverage::Unsupported => CompletionCoverage::Unsupported,
+    };
+    terminal == expected
+        && (!matches!(terminal, CompletionCoverage::KnownEmpty)
+            || (record_count == 0 && context.stable_identity()))
 }

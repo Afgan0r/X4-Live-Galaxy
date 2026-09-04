@@ -13,6 +13,8 @@ use observation_ingest::{
     EligibilityBlocker, GenerationLimits, GenerationStager, ReceiverDisposition, RejectionReason,
 };
 use std::collections::BTreeMap;
+#[path = "completion_contract/coverage.rs"]
+mod coverage;
 #[path = "completion_contract/rejections.rs"]
 mod rejections;
 fn value<T>(raw: &str, make: impl FnOnce(String) -> Option<T>) -> T {

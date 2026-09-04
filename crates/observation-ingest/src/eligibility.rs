@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
 
 use observation_domain::{
-    SectionAvailability, SectionCoverage, SectionFreshness, SectionKey, SectionQuality,
+    CompletionCoverage, SectionAvailability, SectionFreshness, SectionKey, SectionQuality,
     SectionRevisionId, SourceScopeId,
 };
 
@@ -187,8 +187,8 @@ fn evidence_qualifies(revision: &ValidatedSectionRevision) -> bool {
         && state.freshness() == SectionFreshness::Fresh
         && state.availability() == SectionAvailability::Available
         && matches!(
-            state.coverage(),
-            SectionCoverage::Complete | SectionCoverage::KnownEmpty
+            revision.coverage(),
+            CompletionCoverage::Complete | CompletionCoverage::KnownEmpty
         )
         && !matches!(
             state.quality(),
