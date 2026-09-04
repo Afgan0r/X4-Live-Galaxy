@@ -81,6 +81,14 @@ fn open_rejects_tampered_digest_and_partial_row_set() {
             "tampered",
             "UPDATE revisions SET content_digest=zeroblob(32)",
         ),
+        (
+            "receipt-digest",
+            "UPDATE publication_receipts SET content_digest=zeroblob(32)",
+        ),
+        (
+            "receipt-predecessor",
+            "UPDATE publication_receipts SET previous_revision=99",
+        ),
         ("partial", "DELETE FROM publication_receipts"),
     ] {
         let database = TempDatabase::new(label);

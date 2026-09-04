@@ -8,7 +8,8 @@ use rusqlite::Connection;
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
     PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    UnpinOutcome, record, retention, schema, sqlite_pins, sqlite_read, sqlite_write,
+    UnpinOutcome, record, retention, schema, sqlite_pins, sqlite_read, sqlite_receipt,
+    sqlite_write,
 };
 use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 
@@ -82,7 +83,7 @@ impl SqliteObservationRepository {
         };
         let identity = (candidate.section_key.clone(), candidate.revision);
         let receipt =
-            sqlite_read::load_receipt(&self.connection, &candidate.section_key, candidate.revision);
+            sqlite_receipt::load(&self.connection, &candidate.section_key, candidate.revision);
         let current = sqlite_read::current_pointer(&self.connection, &candidate.section_key);
         let outcome = match (receipt, current) {
             (Ok(Some(receipt)), Ok(Some(current)))
@@ -134,10 +135,9 @@ impl SqliteObservationRepository {
                 .ok()
                 .and_then(observation_domain::SectionRevisionId::new)
                 .ok_or_else(|| storage("revision-invalid"))?;
-            let _ = sqlite_read::load_revision(&self.connection, &key, revision)?
+            let record = sqlite_read::load_revision(&self.connection, &key, revision)?
                 .ok_or_else(|| storage("revision-missing"))?;
-            let _ = sqlite_read::load_receipt(&self.connection, &key, revision)?
-                .ok_or(corrupt("receipt-missing"))?;
+            let _ = sqlite_receipt::load_validated(&self.connection, &record)?;
         }
         Ok(())
     }
@@ -188,8 +188,4 @@ const fn storage(code: &'static str) -> RepositoryError {
 
 const fn ambiguous(code: &'static str) -> ReconciliationOutcome {
     ReconciliationOutcome::Ambiguous(RepositoryDiagnostic { code })
-}
-
-const fn corrupt(code: &'static str) -> RepositoryError {
-    RepositoryError::Corrupt(RepositoryDiagnostic { code })
 }

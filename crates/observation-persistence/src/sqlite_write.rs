@@ -2,7 +2,8 @@ use rusqlite::{Connection, TransactionBehavior, params};
 
 use crate::{
     PublicationFailpoint, PublicationLimits, PublicationReceipt, PublishOutcome, PublishRequest,
-    RepositoryDiagnostic, RepositoryError, RevisionRecord, record, sqlite_read, sqlite_write_rows,
+    RepositoryDiagnostic, RepositoryError, RevisionRecord, record, sqlite_read, sqlite_receipt,
+    sqlite_write_rows,
 };
 
 pub fn publish(
@@ -69,10 +70,7 @@ fn publish_in_transaction(
         if existing != *revision {
             return Err(PublishOutcome::Conflict(diagnostic("content-conflict")));
         }
-        let receipt =
-            sqlite_read::load_receipt(connection, &revision.section_key, revision.revision)
-                .map_err(storage)?
-                .ok_or_else(|| rejection("receipt-missing"))?;
+        let receipt = sqlite_receipt::load_validated(connection, revision).map_err(storage)?;
         return Ok(WriteOutcome::Replay(receipt));
     }
     if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?

@@ -7,8 +7,8 @@ use observation_domain::{
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
-    CurrentRevision, PublicationReceipt, RepositoryDiagnostic, RepositoryError, RevisionRecord,
-    record, schema,
+    CurrentRevision, RepositoryDiagnostic, RepositoryError, RevisionRecord, record, schema,
+    sqlite_receipt,
 };
 
 pub fn current(
@@ -19,7 +19,7 @@ pub fn current(
         return Ok(None);
     };
     let record = load_revision(connection, key, revision)?.ok_or(corrupt("dangling-current"))?;
-    let receipt = load_receipt(connection, key, revision)?.ok_or(corrupt("missing-receipt"))?;
+    let receipt = sqlite_receipt::load_validated(connection, &record)?;
     Ok(Some(CurrentRevision {
         revision: record,
         receipt,
@@ -87,27 +87,6 @@ pub fn load_revision(
         return Err(corrupt("integrity-digest-mismatch"));
     }
     Ok(Some(record))
-}
-
-pub fn load_receipt(
-    connection: &Connection,
-    key: &SectionKey,
-    revision_id: SectionRevisionId,
-) -> Result<Option<PublicationReceipt>, RepositoryError> {
-    let row: Option<(Vec<u8>, Option<i64>, i64)> = connection.query_row(
-        "SELECT content_digest, previous_revision, ordinal FROM publication_receipts WHERE section_key=?1 AND revision=?2",
-        params![key.as_str(), sql_u64(revision_id.get())?], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    ).optional().map_err(|_| storage("receipt-read"))?;
-    row.map(|(content, previous, ordinal)| {
-        Ok(PublicationReceipt {
-            section_key: key.clone(),
-            revision: revision_id,
-            content_digest: digest(&content)?,
-            previous: previous.map(revision).transpose()?,
-            ordinal: rust_u64(ordinal)?,
-        })
-    })
-    .transpose()
 }
 
 fn load_records(
