@@ -96,6 +96,12 @@ documentation and repository evidence outrank memory.
   test gaps that preserve accepted decisions. Return to the owner only when a
   serious review finding contradicts accepted architecture, scope, or product
   behavior. After fixes converge, run one final full regression.
+- A mechanical responsibility split required only to keep Rust production files
+  within the 200-line limit does not require an owner checkpoint. Agents may add
+  narrowly named helper modules inside the current plan-owned crate when the
+  split preserves behavior, dependencies, architecture, and product scope.
+  Document the file-scope deviation and continue verification; checkpoint only
+  if the change crosses one of those boundaries.
 - `.planning/config.json` is the GSD configuration source of truth.
 - Project-local `.codex/agents/gsd-*.toml` files are generated machine-local
   routing artifacts. Never commit them.
