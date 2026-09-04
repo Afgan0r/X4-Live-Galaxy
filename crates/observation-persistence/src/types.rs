@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 
 use observation_domain::{
     CompletionCoverage, DecisionSnapshotId, EnvelopeRecord, SectionKey, SectionRevisionId,
-    SourceScopeId,
+    SourceScopeId, SourceSessionIdentity,
 };
 use observation_ingest::ValidatedSectionRevision;
 
@@ -36,13 +36,18 @@ pub struct PublishRequest {
     pub revision: ValidatedSectionRevision,
     pub expected_current: Option<SectionRevisionId>,
     pub frozen_dependencies: BTreeMap<SectionKey, SectionRevisionId>,
+    pub authoritative_session: SourceSessionIdentity,
 }
 
 impl PublishRequest {
-    pub fn from_revision(revision: ValidatedSectionRevision) -> Self {
+    pub fn from_revision(
+        revision: ValidatedSectionRevision,
+        authoritative_session: SourceSessionIdentity,
+    ) -> Self {
         Self {
             expected_current: revision.context().expected_current(),
             frozen_dependencies: revision.context().dependencies().clone(),
+            authoritative_session,
             revision,
         }
     }
@@ -52,6 +57,7 @@ impl PublishRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevisionRecord {
     pub source_scope: SourceScopeId,
+    pub source_session: SourceSessionIdentity,
     pub section_key: SectionKey,
     pub revision: SectionRevisionId,
     pub records: Vec<EnvelopeRecord>,

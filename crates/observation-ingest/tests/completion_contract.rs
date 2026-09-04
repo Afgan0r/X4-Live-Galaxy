@@ -5,7 +5,7 @@ use observation_domain::{
     ObservationSchemaVersion, ObservationVersion, ProducerIncarnationId, RecordId,
     SectionAvailability, SectionCompletionEnvelope, SectionCoverage, SectionFreshness, SectionKey,
     SectionQuality, SectionRevisionId, SectionStartEnvelope, SectionState, SourceScopeId,
-    TransportEpoch,
+    SourceSessionIdentity, TransportEpoch,
 };
 use observation_ingest::{
     AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent,
@@ -183,7 +183,13 @@ fn eligible_revision_becomes_stale_then_history_only_under_uncertainty() {
         index.eligibility(&[key("ships")], 15, 10),
         DecisionEligibility::Blocked(vec![EligibilityBlocker::Stale(key("ships"))])
     );
-    index.mark_scope_uncertain(&value("scope:x4", SourceScopeId::new));
+    index.mark_scope_uncertain(
+        &value("scope:x4", SourceScopeId::new),
+        SourceSessionIdentity::new(
+            value("producer:2", ProducerIncarnationId::new),
+            TransportEpoch::new(2).expect("epoch is positive"),
+        ),
+    );
     assert_eq!(index.current_count(), 0);
     assert_eq!(index.history_count(), 1);
     assert!(matches!(

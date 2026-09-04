@@ -9,10 +9,10 @@ mod support;
 use std::collections::BTreeMap;
 
 use observation_persistence::{
-    ObservationRepository, PublicationLimits, PublishOutcome, PublishRequest, RetentionPolicy,
+    ObservationRepository, PublicationLimits, PublishOutcome, RetentionPolicy,
     SqliteObservationRepository,
 };
-use support::{TempDatabase, revision, validated};
+use support::{TempDatabase, publish_request, revision, validated};
 
 const fn limits() -> PublicationLimits {
     PublicationLimits::new(4, 256).expect("limits are non-zero")
@@ -26,7 +26,7 @@ fn repository_with_histories(
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
     for section in sections {
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(
+            repository.publish(publish_request(validated(
                 section,
                 1,
                 None,
@@ -35,7 +35,7 @@ fn repository_with_histories(
             PublishOutcome::CommittedNew(_)
         ));
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(
+            repository.publish(publish_request(validated(
                 section,
                 2,
                 Some(revision(1)),

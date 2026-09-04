@@ -10,11 +10,11 @@ use std::fs;
 
 use observation_persistence::{
     OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY, OBSERVATION_REPOSITORY_SCHEMA_VERSION,
-    ObservationRepository, PublicationLimits, PublishOutcome, PublishRequest, RepositoryError,
+    ObservationRepository, PublicationLimits, PublishOutcome, RepositoryError,
     SqliteObservationRepository,
 };
 use rusqlite::{Connection, params};
-use support::{TempDatabase, validated};
+use support::{TempDatabase, publish_request, validated};
 
 const fn limits() -> PublicationLimits {
     PublicationLimits::new(4, 256).expect("limits are non-zero")
@@ -22,10 +22,10 @@ const fn limits() -> PublicationLimits {
 
 #[test]
 fn schema_identity_and_dependency_pin_are_exact() {
-    assert_eq!(OBSERVATION_REPOSITORY_SCHEMA_VERSION, 1);
+    assert_eq!(OBSERVATION_REPOSITORY_SCHEMA_VERSION, 2);
     assert_eq!(
         OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY,
-        "live_galaxy.observation_repository.v1"
+        "live_galaxy.observation_repository.v2"
     );
     let manifest =
         fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
@@ -94,7 +94,7 @@ fn open_rejects_tampered_digest_and_partial_row_set() {
         let database = TempDatabase::new(label);
         let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(
+            repository.publish(publish_request(validated(
                 "ships",
                 1,
                 None,

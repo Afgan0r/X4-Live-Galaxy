@@ -1,9 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
 
+mod authority;
+
 use observation_domain::{
     CompletionCoverage, SectionAvailability, SectionFreshness, SectionKey, SectionQuality,
-    SectionRevisionId, SourceScopeId,
+    SectionRevisionId, SourceScopeId, SourceSessionIdentity,
 };
 
 use crate::ValidatedSectionRevision;
@@ -45,6 +47,7 @@ pub struct DecisionRevisionIndex {
     pointers: BTreeMap<SectionKey, SectionRevisionId>,
     history: Vec<(ValidatedSectionRevision, u64)>,
     uncertain_scopes: BTreeSet<SourceScopeId>,
+    authoritative_sessions: BTreeMap<SourceScopeId, SourceSessionIdentity>,
 }
 
 impl DecisionRevisionIndex {
@@ -56,45 +59,9 @@ impl DecisionRevisionIndex {
             pointers: BTreeMap::new(),
             history: Vec::new(),
             uncertain_scopes: BTreeSet::new(),
+            authoritative_sessions: BTreeMap::new(),
         })
     }
-    pub fn accept(&mut self, revision: ValidatedSectionRevision, accepted_at: u64) {
-        let key = revision.section_key().clone();
-        self.uncertain_scopes.remove(revision.source_scope());
-        self.pointers
-            .insert(key.clone(), revision.section_revision());
-        if let Some(previous) = self.current.insert(key, (revision, accepted_at)) {
-            self.history.push(previous);
-        }
-    }
-    pub fn record_current_pointer(&mut self, key: SectionKey, revision: SectionRevisionId) {
-        self.pointers.insert(key, revision);
-    }
-    pub fn mark_scope_uncertain(&mut self, scope: &SourceScopeId) {
-        self.uncertain_scopes.insert(scope.clone());
-        let keys: Vec<_> = self
-            .current
-            .iter()
-            .filter(|(_, (revision, _))| revision.source_scope() == scope)
-            .map(|(key, _)| key.clone())
-            .collect();
-        for key in keys {
-            self.current
-                .remove(&key)
-                .into_iter()
-                .for_each(|revision| self.history.push(revision));
-            self.pointers.remove(&key);
-        }
-    }
-    #[must_use]
-    pub fn current_count(&self) -> usize {
-        self.current.len()
-    }
-    #[must_use]
-    pub const fn history_count(&self) -> usize {
-        self.history.len()
-    }
-
     pub fn eligibility(
         &self,
         required: &[SectionKey],

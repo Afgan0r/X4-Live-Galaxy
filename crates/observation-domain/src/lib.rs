@@ -5,6 +5,7 @@ mod identity;
 mod observation;
 mod reconciliation;
 mod section;
+mod session;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
 pub use identity::{
@@ -26,3 +27,4 @@ pub use section::{
     CaptureWindow, CompleteMarker, SectionAvailability, SectionCoverage, SectionDescriptor,
     SectionFreshness, SectionQuality, SectionState, quality_for_empty_section,
 };
+pub use session::SourceSessionIdentity;

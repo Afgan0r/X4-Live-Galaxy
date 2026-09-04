@@ -17,6 +17,7 @@ use observation_domain::{SectionKey, SectionRevisionId};
 use observation_ingest::{
     DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet, ValidatedSectionRevision,
 };
+use observation_persistence::PublishRequest;
 
 #[path = "support/revisions.rs"]
 mod revisions;
@@ -30,6 +31,11 @@ pub fn key(value: &str) -> SectionKey {
 
 pub const fn revision(value: u64) -> SectionRevisionId {
     SectionRevisionId::new(value).expect("fixture revision is non-zero")
+}
+
+pub fn publish_request(revision: ValidatedSectionRevision) -> PublishRequest {
+    let session = revision.source_session().clone();
+    PublishRequest::from_revision(revision, session)
 }
 
 pub fn decision_set(revisions: Vec<ValidatedSectionRevision>) -> DecisionRevisionSet {

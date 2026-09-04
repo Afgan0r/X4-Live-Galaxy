@@ -1,14 +1,13 @@
 use observation_domain::{
     CanonicalObservationKey, CompletionCoverage, ObservationVersion, SectionCompletionEnvelope,
-    SectionCoverage,
+    SectionCoverage, SourceSessionIdentity,
 };
 
 use crate::completion_digest::{candidate_material, content_digest};
 use crate::completion_types::{
     CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome,
-    ValidatedSectionRevision,
 };
-use crate::{GenerationStager, ReceiverDisposition, RejectionReason};
+use crate::{GenerationStager, ReceiverDisposition, RejectionReason, ValidatedSectionRevision};
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -111,6 +110,10 @@ impl GenerationStager {
         };
         CompletionOutcome::Validated(Box::new(ValidatedSectionRevision {
             source_scope: candidate.start.source_scope,
+            source_session: SourceSessionIdentity::new(
+                candidate.start.producer_incarnation,
+                candidate.start.transport_epoch,
+            ),
             section_key: key,
             section_revision: candidate.start.section_revision,
             records,

@@ -8,12 +8,17 @@ mod support;
 
 use std::collections::BTreeMap;
 
+use observation_domain::{ProducerIncarnationId, SourceSessionIdentity, TransportEpoch};
+use observation_ingest::DecisionRevisionIndex;
 use observation_persistence::{
     FakeObservationRepository, ObservationRepository, PublicationLimits, PublishOutcome,
     PublishRequest, SqliteObservationRepository, UnpinOutcome,
 };
 use rusqlite::Connection;
-use support::{TempDatabase, decision_set, key, revision, validated};
+use support::{
+    RevisionFixture, TempDatabase, decision_set, key, publish_request, revision, validated,
+    validated_with,
+};
 
 const fn limits() -> PublicationLimits {
     PublicationLimits::new(4, 256).expect("limits are non-zero")
@@ -21,7 +26,7 @@ const fn limits() -> PublicationLimits {
 
 fn shared_contract(repository: &mut dyn ObservationRepository) {
     let candidate = validated("ships", 1, None, BTreeMap::new());
-    let request = PublishRequest::from_revision(candidate.clone());
+    let request = publish_request(candidate.clone());
     let receipt = match repository.publish(request.clone()) {
         PublishOutcome::CommittedNew(receipt) => receipt,
         outcome => panic!("genesis must commit, got {outcome:?}"),
@@ -37,7 +42,7 @@ fn shared_contract(repository: &mut dyn ObservationRepository) {
     assert_eq!(current.revision.content_digest, *candidate.content_digest());
     assert_eq!(current.receipt, receipt);
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(validated(
+        repository.publish(publish_request(validated(
             "ships",
             2,
             None,
@@ -71,7 +76,7 @@ fn pin_contract(
 
 fn cas_contract(repository: &mut dyn ObservationRepository) {
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(validated(
+        repository.publish(publish_request(validated(
             "ships",
             1,
             Some(revision(1)),
@@ -81,12 +86,12 @@ fn cas_contract(repository: &mut dyn ObservationRepository) {
     ));
     let dependency = validated("sectors", 1, None, BTreeMap::new());
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(dependency)),
+        repository.publish(publish_request(dependency)),
         PublishOutcome::CommittedNew(_)
     ));
     let dependencies = BTreeMap::from([(key("sectors"), revision(1))]);
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(validated(
+        repository.publish(publish_request(validated(
             "ships",
             2,
             Some(revision(1)),
@@ -96,7 +101,7 @@ fn cas_contract(repository: &mut dyn ObservationRepository) {
     ));
     let stale = BTreeMap::from([(key("sectors"), revision(2))]);
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(validated(
+        repository.publish(publish_request(validated(
             "ships",
             3,
             Some(revision(2)),
@@ -136,4 +141,34 @@ fn fake_and_sqlite_share_the_publication_contract() {
             )
             .is_err()
     );
+}
+
+#[test]
+fn reconnect_keeps_a_delayed_validated_revision_history_only() {
+    let delayed = validated_with(
+        "ships",
+        1,
+        None,
+        BTreeMap::new(),
+        RevisionFixture::default(),
+    );
+    let scope = delayed.source_scope().clone();
+    let current_session = SourceSessionIdentity::new(
+        ProducerIncarnationId::new("producer:2").expect("producer is valid"),
+        TransportEpoch::new(2).expect("epoch is non-zero"),
+    );
+    let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
+    index.mark_scope_uncertain(&scope, current_session.clone());
+    assert!(!index.accept(delayed.clone(), 4));
+    assert_eq!(index.current_count(), 0);
+    assert_eq!(index.history_count(), 1);
+
+    let database = TempDatabase::new("delayed-session");
+    let mut repository = SqliteObservationRepository::open(database.path(), limits())
+        .expect("SQLite repository opens");
+    assert!(matches!(
+        repository.publish(PublishRequest::from_revision(delayed, current_session)),
+        PublishOutcome::PermanentRejection(_)
+    ));
+    assert_eq!(repository.current(&key("ships")), Ok(None));
 }

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use observation_domain::{
-    EntityId, EnvelopeRecord, ObservationVersion, RecordId, SectionKey, SectionRevisionId,
-    SourceScopeId,
+    EntityId, EnvelopeRecord, ObservationVersion, ProducerIncarnationId, RecordId, SectionKey,
+    SectionRevisionId, SourceScopeId, SourceSessionIdentity, TransportEpoch,
 };
 use rusqlite::{Connection, OptionalExtension, params};
 
@@ -49,6 +49,8 @@ pub fn load_revision(
     type Header = (
         String,
         String,
+        i64,
+        String,
         Vec<u8>,
         Vec<u8>,
         Vec<u8>,
@@ -56,12 +58,21 @@ pub fn load_revision(
         Option<i64>,
     );
     let header: Option<Header> = connection.query_row(
-        "SELECT source_scope, coverage, manifest_digest, content_digest, integrity_digest, context_token, expected_current FROM revisions WHERE section_key=?1 AND revision=?2",
+        "SELECT source_scope, producer_incarnation, transport_epoch, coverage, manifest_digest, content_digest, integrity_digest, context_token, expected_current FROM revisions WHERE section_key=?1 AND revision=?2",
         params![key.as_str(), sql_u64(revision_id.get())?],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?)),
     ).optional().map_err(|_| storage("revision-read"))?;
-    let Some((source, coverage, manifest, content_bytes, integrity, context_token, expected)) =
-        header
+    let Some((
+        source,
+        producer,
+        epoch,
+        coverage,
+        manifest,
+        content_bytes,
+        integrity,
+        context_token,
+        expected,
+    )) = header
     else {
         return Ok(None);
     };
@@ -72,6 +83,10 @@ pub fn load_revision(
     }
     let record = RevisionRecord {
         source_scope: SourceScopeId::new(source).ok_or(corrupt("source-invalid"))?,
+        source_session: SourceSessionIdentity::new(
+            ProducerIncarnationId::new(producer).ok_or(corrupt("producer-invalid"))?,
+            TransportEpoch::new(rust_u64(epoch)?).ok_or(corrupt("epoch-invalid"))?,
+        ),
         section_key: key.clone(),
         revision: revision_id,
         records,

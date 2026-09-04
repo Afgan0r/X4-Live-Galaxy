@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use observation_domain::{
-    BatchId, CanonicalizationVersion, CaptureWindow, CompletionCoverage, DigestAlgorithmVersion,
-    EnvelopeRecord, ObservationPolicyVersion, ObservationSchemaVersion, SectionCompletionEnvelope,
-    SectionKey, SectionRevisionId, SectionStartEnvelope, SectionState, SourceScopeId,
+    BatchId, CanonicalizationVersion, CaptureWindow, DigestAlgorithmVersion,
+    ObservationPolicyVersion, ObservationSchemaVersion, SectionCompletionEnvelope, SectionKey,
+    SectionRevisionId, SectionStartEnvelope, SectionState,
 };
 
 use crate::CandidateUsage;
@@ -141,54 +141,7 @@ pub struct CompletionCertificate {
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ValidatedSectionRevision {
-    pub(crate) source_scope: SourceScopeId,
-    pub(crate) section_key: SectionKey,
-    pub(crate) section_revision: SectionRevisionId,
-    pub(crate) records: Vec<EnvelopeRecord>,
-    pub(crate) coverage: CompletionCoverage,
-    pub(crate) context: CandidateContext,
-    pub(crate) manifest_digest: [u8; 32],
-    pub(crate) content_digest: [u8; 32],
-}
-
-impl ValidatedSectionRevision {
-    pub const fn source_scope(&self) -> &SourceScopeId {
-        &self.source_scope
-    }
-    pub const fn section_key(&self) -> &SectionKey {
-        &self.section_key
-    }
-    pub const fn section_revision(&self) -> SectionRevisionId {
-        self.section_revision
-    }
-    #[must_use]
-    pub fn records(&self) -> &[EnvelopeRecord] {
-        &self.records
-    }
-    pub const fn coverage(&self) -> CompletionCoverage {
-        self.coverage
-    }
-    pub const fn context(&self) -> &CandidateContext {
-        &self.context
-    }
-    #[must_use]
-    pub const fn manifest_digest(&self) -> &[u8; 32] {
-        &self.manifest_digest
-    }
-    #[must_use]
-    pub const fn content_digest(&self) -> &[u8; 32] {
-        &self.content_digest
-    }
-    #[must_use]
-    pub const fn is_published(&self) -> bool {
-        false
-    }
-}
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompletionOutcome {
-    Validated(Box<ValidatedSectionRevision>),
+    Validated(Box<crate::ValidatedSectionRevision>),
     Rejected(RejectionReason),
 }

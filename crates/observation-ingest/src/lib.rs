@@ -15,6 +15,7 @@ mod model;
 mod runtime_facts;
 mod scheduler;
 mod snapshot;
+mod validated_revision;
 mod wire;
 pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
@@ -23,8 +24,7 @@ pub use batch::{
 pub use batch_budget::{AggregateUsage, CandidateUsage};
 pub use candidate_limits::{AggregateLimits, CandidateLimits, GenerationLimits};
 pub use completion_types::{
-    CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome,
-    ContractVersions, ValidatedSectionRevision,
+    CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome, ContractVersions,
 };
 pub use eligibility::{
     DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet, EligibilityBlocker,
@@ -53,6 +53,7 @@ pub use runtime_facts::{
 };
 pub use scheduler::{DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome};
 pub use snapshot::ProjectionSnapshot;
+pub use validated_revision::ValidatedSectionRevision;
 use wire::TracerObservation;
 pub use wire::decode_complete_message;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;

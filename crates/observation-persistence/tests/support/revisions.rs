@@ -14,6 +14,8 @@ use observation_ingest::{
 #[derive(Clone, Copy)]
 pub struct RevisionFixture {
     pub source_scope: &'static str,
+    pub producer_incarnation: &'static str,
+    pub transport_epoch: u64,
     pub coverage: SectionCoverage,
     pub quality: SectionQuality,
     pub capture_start: u64,
@@ -24,6 +26,8 @@ impl Default for RevisionFixture {
     fn default() -> Self {
         Self {
             source_scope: "scope:x4",
+            producer_incarnation: "producer:1",
+            transport_epoch: 1,
             coverage: SectionCoverage::KnownEmpty,
             quality: SectionQuality::KnownEmpty,
             capture_start: 10,
@@ -62,8 +66,9 @@ pub fn validated_with(
         AggregateLimits::new(1, 1_024, 2_048, 1, 1, 1).expect("limits are non-zero"),
     );
     let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits);
-    let producer = ProducerIncarnationId::new("producer:1").expect("producer is valid");
-    let epoch = TransportEpoch::new(1).expect("epoch is non-zero");
+    let producer =
+        ProducerIncarnationId::new(fixture.producer_incarnation).expect("producer is valid");
+    let epoch = TransportEpoch::new(fixture.transport_epoch).expect("epoch is non-zero");
     let start = SectionStartEnvelope {
         source_scope: source_scope.clone(),
         producer_incarnation: producer.clone(),

@@ -35,10 +35,15 @@ mod tests {
         FakeObservationRepository::new(PublicationLimits::new(4, 256).expect("limits are non-zero"))
     }
 
+    fn request(revision: observation_ingest::ValidatedSectionRevision) -> PublishRequest {
+        let session = revision.source_session().clone();
+        PublishRequest::from_revision(revision, session)
+    }
+
     #[test]
     fn publishes_genesis_and_replays_exact_receipt() {
         let mut repository = repository();
-        let request = PublishRequest::from_revision(validated(1, None));
+        let request = request(validated(1, None));
         assert!(matches!(
             repository.publish(request.clone()),
             PublishOutcome::CommittedNew(_)
@@ -60,7 +65,7 @@ mod tests {
         let revision = validated(1, None);
         let set = decision_set(revision.clone());
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(revision)),
+            repository.publish(request(revision)),
             PublishOutcome::CommittedNew(_)
         ));
         let receipt = repository.pin_decision(&set).expect("stored revision pins");
@@ -83,19 +88,19 @@ mod tests {
     fn rejects_conflict_stale_pointer_and_inconsistent_request() {
         let mut repository = repository();
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(1, None))),
+            repository.publish(request(validated(1, None))),
             PublishOutcome::CommittedNew(_)
         ));
         let first = crate::test_support::revision(1);
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(1, Some(first)))),
+            repository.publish(request(validated(1, Some(first)))),
             PublishOutcome::Conflict(_)
         ));
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(2, None))),
+            repository.publish(request(validated(2, None))),
             PublishOutcome::StalePointer(_)
         ));
-        let mut invalid = PublishRequest::from_revision(validated(2, Some(first)));
+        let mut invalid = request(validated(2, Some(first)));
         invalid
             .frozen_dependencies
             .insert(key("missing"), crate::test_support::revision(9));

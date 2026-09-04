@@ -3,8 +3,8 @@ use rusqlite::Connection;
 
 use crate::{RepositoryDiagnostic, RepositoryError};
 
-pub const OBSERVATION_REPOSITORY_SCHEMA_VERSION: u32 = 1;
-pub const OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY: &str = "live_galaxy.observation_repository.v1";
+pub const OBSERVATION_REPOSITORY_SCHEMA_VERSION: u32 = 2;
+pub const OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY: &str = "live_galaxy.observation_repository.v2";
 
 const CREATE_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS repository_metadata (
@@ -12,9 +12,10 @@ CREATE TABLE IF NOT EXISTS repository_metadata (
   schema_version INTEGER NOT NULL,
   protocol_identity TEXT NOT NULL
 );
-INSERT OR IGNORE INTO repository_metadata VALUES (1, 1, 'live_galaxy.observation_repository.v1');
+INSERT OR IGNORE INTO repository_metadata VALUES (1, 2, 'live_galaxy.observation_repository.v2');
 CREATE TABLE IF NOT EXISTS revisions (
   section_key TEXT NOT NULL, revision INTEGER NOT NULL, source_scope TEXT NOT NULL,
+  producer_incarnation TEXT NOT NULL, transport_epoch INTEGER NOT NULL,
   coverage TEXT NOT NULL, manifest_digest BLOB NOT NULL, content_digest BLOB NOT NULL,
   integrity_digest BLOB NOT NULL, context_token TEXT NOT NULL, expected_current INTEGER,
   PRIMARY KEY (section_key, revision)

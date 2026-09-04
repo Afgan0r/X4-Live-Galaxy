@@ -10,11 +10,12 @@ use std::collections::BTreeMap;
 
 use observation_domain::{SectionCoverage, SectionQuality};
 use observation_persistence::{
-    ObservationRepository, PublicationFailpoint, PublicationLimits, PublishOutcome, PublishRequest,
+    ObservationRepository, PublicationFailpoint, PublicationLimits, PublishOutcome,
     ReconciliationOutcome, RetentionPolicy, SqliteObservationRepository,
 };
 use support::{
-    RevisionFixture, TempDatabase, decision_set, key, revision, validated, validated_with,
+    RevisionFixture, TempDatabase, decision_set, key, publish_request, revision, validated,
+    validated_with,
 };
 
 const fn limits() -> PublicationLimits {
@@ -23,7 +24,7 @@ const fn limits() -> PublicationLimits {
 
 fn precommit_cut(cut: PublicationFailpoint) {
     let database = TempDatabase::new("precommit-cut");
-    let request = PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
+    let request = publish_request(validated("ships", 1, None, BTreeMap::default()));
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
     assert!(matches!(
         repository.publish_with_failpoint(&request, cut),
@@ -54,8 +55,7 @@ fn ambiguous_commit_requires_reconciliation_and_replays_once() {
         PublicationFailpoint::AfterCommitBeforeResponse,
     ] {
         let database = TempDatabase::new("ambiguous-cut");
-        let request =
-            PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
+        let request = publish_request(validated("ships", 1, None, BTreeMap::default()));
         let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
         assert!(matches!(
             repository.publish_with_failpoint(&request, cut),
@@ -83,7 +83,7 @@ fn ambiguous_commit_requires_reconciliation_and_replays_once() {
 #[test]
 fn reconciliation_proves_an_absent_attempt_retryable() {
     let database = TempDatabase::new("retryable");
-    let request = PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
+    let request = publish_request(validated("ships", 1, None, BTreeMap::default()));
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
     assert_eq!(
         repository.reconcile_publication(&request),
@@ -98,7 +98,7 @@ fn reconciliation_proves_an_absent_attempt_retryable() {
 #[test]
 fn reconciliation_rejects_same_content_with_changed_authority() {
     let database = TempDatabase::new("authority-mismatch");
-    let original = PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
+    let original = publish_request(validated("ships", 1, None, BTreeMap::default()));
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
     assert!(matches!(
         repository.publish(original),
@@ -144,7 +144,7 @@ fn reconciliation_rejects_same_content_with_changed_authority() {
         ));
     }
     for revision in variants {
-        let request = PublishRequest::from_revision(revision);
+        let request = publish_request(revision);
         assert!(matches!(
             repository.reconcile_publication(&request),
             ReconciliationOutcome::Ambiguous(_)
@@ -158,13 +158,13 @@ fn retention_preserves_current_and_pinned_history_until_unpinned() {
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
     let first = validated("ships", 1, None, BTreeMap::default());
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(first.clone())),
+        repository.publish(publish_request(first.clone())),
         PublishOutcome::CommittedNew(_)
     ));
     let pin = repository.pin_decision(&decision_set(vec![first])).unwrap();
     for value in 2..=4 {
         assert!(matches!(
-            repository.publish(PublishRequest::from_revision(validated(
+            repository.publish(publish_request(validated(
                 "ships",
                 value,
                 Some(revision(value - 1)),

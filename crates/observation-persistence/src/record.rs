@@ -13,6 +13,7 @@ pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<
     let revision = &request.revision;
     if request.expected_current != revision.context().expected_current()
         || request.frozen_dependencies != *revision.context().dependencies()
+        || request.authoritative_session != *revision.source_session()
         || revision.records().len() > limits.max_records.get()
         || revision.context().versions() != expected_versions()?
     {
@@ -30,6 +31,7 @@ pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<
     }
     let mut record = RevisionRecord {
         source_scope: revision.source_scope().clone(),
+        source_session: revision.source_session().clone(),
         section_key: revision.section_key().clone(),
         revision: revision.section_revision(),
         records: revision.records().to_vec(),
@@ -74,6 +76,18 @@ pub fn decision_identity(set: &DecisionRevisionSet) -> Option<DecisionSnapshotId
 pub fn integrity_digest(record: &RevisionRecord) -> [u8; 32] {
     let mut digest = Sha256::new();
     hash(&mut digest, record.source_scope.as_str().as_bytes());
+    hash(
+        &mut digest,
+        record
+            .source_session
+            .producer_incarnation()
+            .as_str()
+            .as_bytes(),
+    );
+    hash(
+        &mut digest,
+        &record.source_session.transport_epoch().get().to_be_bytes(),
+    );
     hash(&mut digest, record.section_key.as_str().as_bytes());
     hash(&mut digest, &record.revision.get().to_be_bytes());
     hash(&mut digest, &[coverage_byte(record.coverage)]);
