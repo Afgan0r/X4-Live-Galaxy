@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::path::Path;
 
 use observation_domain::{DecisionSnapshotId, SectionKey};
@@ -8,15 +7,15 @@ use rusqlite::Connection;
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
     PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    UnpinOutcome, retention, schema, sqlite_pins, sqlite_read, sqlite_receipt, sqlite_reconcile,
-    sqlite_write,
+    UnpinOutcome, retention, schema, sqlite_ambiguity, sqlite_pins, sqlite_publish, sqlite_read,
+    sqlite_receipt, sqlite_reconcile,
 };
 use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 
 pub struct SqliteObservationRepository {
     connection: Connection,
     limits: PublicationLimits,
-    ambiguous: BTreeSet<(SectionKey, observation_domain::SectionRevisionId)>,
+    ambiguous: sqlite_ambiguity::AmbiguousSet,
 }
 
 impl SqliteObservationRepository {
@@ -35,10 +34,11 @@ impl SqliteObservationRepository {
             return Err(storage("foreign-keys-disabled"));
         }
         schema::initialize(&connection)?;
+        let ambiguous = sqlite_ambiguity::load(&connection)?;
         let repository = Self {
             connection,
             limits,
-            ambiguous: BTreeSet::new(),
+            ambiguous,
         };
         repository.validate_stored_revisions()?;
         Ok(repository)
@@ -56,20 +56,13 @@ impl SqliteObservationRepository {
         request: &PublishRequest,
         failpoint: PublicationFailpoint,
     ) -> PublishOutcome {
-        let identity = (
-            request.revision.section_key().clone(),
-            request.revision.section_revision(),
-        );
-        let outcome = sqlite_write::publish_with_failpoint(
+        sqlite_publish::publish(
             &mut self.connection,
             self.limits,
+            &mut self.ambiguous,
             request,
             Some(failpoint),
-        );
-        if matches!(outcome, PublishOutcome::Ambiguous(_)) {
-            self.ambiguous.insert(identity);
-        }
-        outcome
+        )
     }
 
     pub fn reconcile_publication(&mut self, request: &PublishRequest) -> ReconciliationOutcome {
@@ -83,7 +76,11 @@ impl SqliteObservationRepository {
             request.revision.section_revision(),
         );
         let outcome = sqlite_reconcile::classify(&self.connection, request, self.limits);
-        if !matches!(outcome, ReconciliationOutcome::Ambiguous(_)) {
+        let definitive = !matches!(outcome, ReconciliationOutcome::Ambiguous(_));
+        if definitive && sqlite_ambiguity::clear(&self.connection, &identity).is_err() {
+            return ambiguous("reconciliation-barrier-clear");
+        }
+        if definitive {
             self.ambiguous.remove(&identity);
         }
         outcome
@@ -123,15 +120,13 @@ impl SqliteObservationRepository {
 
 impl ObservationRepository for SqliteObservationRepository {
     fn publish(&mut self, request: PublishRequest) -> PublishOutcome {
-        if self.ambiguous.contains(&(
-            request.revision.section_key().clone(),
-            request.revision.section_revision(),
-        )) {
-            return PublishOutcome::Ambiguous(RepositoryDiagnostic {
-                code: "reconciliation-required",
-            });
-        }
-        sqlite_write::publish(&mut self.connection, self.limits, &request)
+        sqlite_publish::publish(
+            &mut self.connection,
+            self.limits,
+            &mut self.ambiguous,
+            &request,
+            None,
+        )
     }
 
     fn current(&self, key: &SectionKey) -> Result<Option<CurrentRevision>, RepositoryError> {

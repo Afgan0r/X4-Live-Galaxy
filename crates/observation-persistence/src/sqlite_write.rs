@@ -6,14 +6,6 @@ use crate::{
     sqlite_write_rows,
 };
 
-pub fn publish(
-    connection: &mut Connection,
-    limits: PublicationLimits,
-    request: &PublishRequest,
-) -> PublishOutcome {
-    publish_with_failpoint(connection, limits, request, None)
-}
-
 pub fn publish_with_failpoint(
     connection: &mut Connection,
     limits: PublicationLimits,

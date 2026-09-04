@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS current_revisions (
   section_key TEXT PRIMARY KEY, revision INTEGER NOT NULL,
   FOREIGN KEY (section_key, revision) REFERENCES revisions(section_key, revision)
 );
+CREATE TABLE IF NOT EXISTS ambiguous_publications (
+  section_key TEXT NOT NULL, revision INTEGER NOT NULL,
+  PRIMARY KEY (section_key, revision)
+);
 CREATE TABLE IF NOT EXISTS decision_pins (
   decision_id TEXT PRIMARY KEY, ordinal INTEGER NOT NULL UNIQUE
 );

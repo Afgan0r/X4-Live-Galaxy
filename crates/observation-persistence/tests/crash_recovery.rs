@@ -65,12 +65,16 @@ fn ambiguous_commit_requires_reconciliation_and_replays_once() {
             repository.publish(request.clone()),
             PublishOutcome::Ambiguous(_)
         ));
-        assert!(matches!(
-            repository.reconcile_publication(&request),
-            ReconciliationOutcome::CommittedReplay(_)
-        ));
         drop(repository);
         let mut reopened = SqliteObservationRepository::open(database.path(), limits()).unwrap();
+        assert!(matches!(
+            reopened.publish(request.clone()),
+            PublishOutcome::Ambiguous(_)
+        ));
+        assert!(matches!(
+            reopened.reconcile_publication(&request),
+            ReconciliationOutcome::CommittedReplay(_)
+        ));
         let replay = reopened.publish(request);
         assert!(matches!(replay, PublishOutcome::CommittedReplay(receipt) if receipt.ordinal == 1));
     }
