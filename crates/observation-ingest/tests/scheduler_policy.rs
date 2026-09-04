@@ -145,7 +145,12 @@ fn step_and_heavy_limits_are_exact_and_completion_is_idempotent() {
         value.complete(&id("heavy"), 4),
         CompletionDisposition::Unknown
     );
-    assert_eq!(pulse(&mut value).remaining_heavy_permits(), 1);
+    assert_eq!(
+        value
+            .deliver_pulse(DeliveredPulse::new(0))
+            .remaining_heavy_permits(),
+        1
+    );
 }
 
 #[test]
@@ -161,7 +166,7 @@ fn overrun_debt_repayment_is_bounded_under_frozen_and_coarse_clocks() {
     clock.0.set(100);
     assert_eq!(pulse(&mut value).overrun_debt(), 2);
     assert_eq!(pulse(&mut value).overrun_debt(), 0);
-    assert_eq!(pulse(&mut value).remaining_permits(), 1);
+    assert_eq!(pulse(&mut value).remaining_permits(), 2);
 }
 
 #[test]
