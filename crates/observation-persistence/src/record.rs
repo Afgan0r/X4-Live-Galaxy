@@ -10,10 +10,8 @@ use sha2::{Digest, Sha256};
 use crate::{PublicationLimits, PublishRequest, RevisionRecord};
 
 pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<RevisionRecord> {
-    let revision = &request.revision;
-    if request.expected_current != revision.context().expected_current()
-        || request.frozen_dependencies != *revision.context().dependencies()
-        || request.authoritative_session != *revision.source_session()
+    let revision = request.revision();
+    if !request.is_authoritative()
         || revision.records().len() > limits.max_records.get()
         || revision.context().versions() != expected_versions()?
     {
@@ -36,8 +34,8 @@ pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<
         revision: revision.section_revision(),
         records: revision.records().to_vec(),
         coverage: revision.coverage(),
-        dependencies: request.frozen_dependencies.clone(),
-        expected_current: request.expected_current,
+        dependencies: request.frozen_dependencies().clone(),
+        expected_current: request.expected_current(),
         manifest_digest: *revision.manifest_digest(),
         content_digest: calculated,
         integrity_digest: [0; 32],

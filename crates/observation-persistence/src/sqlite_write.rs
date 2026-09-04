@@ -66,11 +66,11 @@ fn publish_in_transaction(
         return Ok(WriteOutcome::Replay(receipt));
     }
     if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?
-        != request.expected_current
+        != request.expected_current()
     {
         return Err(PublishOutcome::StalePointer(diagnostic("stale-pointer")));
     }
-    for (key, expected) in &request.frozen_dependencies {
+    for (key, expected) in request.frozen_dependencies() {
         if sqlite_read::current_pointer(connection, key).map_err(storage)? != Some(*expected) {
             return Err(PublishOutcome::StaleDependency(diagnostic(
                 "stale-dependency",

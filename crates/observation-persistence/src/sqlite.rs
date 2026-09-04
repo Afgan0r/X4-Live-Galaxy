@@ -72,8 +72,8 @@ impl SqliteObservationRepository {
             return ambiguous("reconciliation-corrupt");
         }
         let identity = (
-            request.revision.section_key().clone(),
-            request.revision.section_revision(),
+            request.revision().section_key().clone(),
+            request.revision().section_revision(),
         );
         let outcome = sqlite_reconcile::classify(&self.connection, request, self.limits);
         let definitive = !matches!(outcome, ReconciliationOutcome::Ambiguous(_));

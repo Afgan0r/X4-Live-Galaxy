@@ -3,7 +3,9 @@ use super::*;
 #[test]
 fn eligible_revision_becomes_stale_then_history_only_under_uncertainty() {
     let mut index = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
-    index.accept(finish(&mut staged()), 4);
+    let _accepted = index
+        .accept(finish(&mut staged()), 4)
+        .expect("current session is accepted");
     index.record_current_pointer(key("sectors"), revision(4));
     let set = match index.eligibility(&[key("ships")], 10, 10) {
         DecisionEligibility::Eligible(set) => Some(set),

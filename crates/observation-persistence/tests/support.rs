@@ -34,8 +34,11 @@ pub const fn revision(value: u64) -> SectionRevisionId {
 }
 
 pub fn publish_request(revision: ValidatedSectionRevision) -> PublishRequest {
-    let session = revision.source_session().clone();
-    PublishRequest::from_revision(revision, session)
+    let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
+    let accepted = index
+        .accept(revision, 1)
+        .expect("fixture revision is authoritative");
+    PublishRequest::from_accepted(accepted)
 }
 
 pub fn decision_set(revisions: Vec<ValidatedSectionRevision>) -> DecisionRevisionSet {
@@ -45,7 +48,9 @@ pub fn decision_set(revisions: Vec<ValidatedSectionRevision>) -> DecisionRevisio
         .collect();
     let mut index = DecisionRevisionIndex::new(required.len()).expect("set is non-empty");
     for revision in revisions {
-        index.accept(revision, 1);
+        let _accepted = index
+            .accept(revision, 1)
+            .expect("fixture revision is authoritative");
     }
     match index.eligibility(&required, 1, 1) {
         DecisionEligibility::Eligible(set) => set,

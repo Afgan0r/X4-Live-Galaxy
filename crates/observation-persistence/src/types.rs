@@ -5,7 +5,7 @@ use observation_domain::{
     CompletionCoverage, DecisionSnapshotId, EnvelopeRecord, SectionKey, SectionRevisionId,
     SourceScopeId, SourceSessionIdentity,
 };
-use observation_ingest::ValidatedSectionRevision;
+use observation_ingest::{AcceptedPublication, ValidatedSectionRevision};
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -31,25 +31,30 @@ impl PublicationLimits {
 }
 
 #[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct PublishRequest {
-    pub revision: ValidatedSectionRevision,
-    pub expected_current: Option<SectionRevisionId>,
-    pub frozen_dependencies: BTreeMap<SectionKey, SectionRevisionId>,
-    pub authoritative_session: SourceSessionIdentity,
+    accepted: AcceptedPublication,
 }
 
 impl PublishRequest {
-    pub fn from_revision(
-        revision: ValidatedSectionRevision,
-        authoritative_session: SourceSessionIdentity,
-    ) -> Self {
-        Self {
-            expected_current: revision.context().expected_current(),
-            frozen_dependencies: revision.context().dependencies().clone(),
-            authoritative_session,
-            revision,
-        }
+    pub const fn from_accepted(accepted: AcceptedPublication) -> Self {
+        Self { accepted }
+    }
+
+    pub(crate) const fn revision(&self) -> &ValidatedSectionRevision {
+        self.accepted.revision()
+    }
+
+    pub(crate) const fn expected_current(&self) -> Option<SectionRevisionId> {
+        self.revision().context().expected_current()
+    }
+
+    pub(crate) const fn frozen_dependencies(&self) -> &BTreeMap<SectionKey, SectionRevisionId> {
+        self.revision().context().dependencies()
+    }
+
+    pub(crate) fn is_authoritative(&self) -> bool {
+        self.accepted.is_authoritative()
     }
 }
 

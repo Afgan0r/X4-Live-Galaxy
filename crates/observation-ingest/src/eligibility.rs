@@ -1,7 +1,10 @@
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroUsize;
+use std::rc::Rc;
 
 mod authority;
+pub use authority::AcceptedPublication;
 
 use observation_domain::{
     CompletionCoverage, SectionAvailability, SectionFreshness, SectionKey, SectionQuality,
@@ -47,7 +50,12 @@ pub struct DecisionRevisionIndex {
     pointers: BTreeMap<SectionKey, SectionRevisionId>,
     history: Vec<(ValidatedSectionRevision, u64)>,
     uncertain_scopes: BTreeSet<SourceScopeId>,
-    authoritative_sessions: BTreeMap<SourceScopeId, SourceSessionIdentity>,
+    authoritative_sessions: BTreeMap<SourceScopeId, SessionAuthority>,
+}
+
+pub struct SessionAuthority {
+    identity: SourceSessionIdentity,
+    generation: Rc<Cell<u64>>,
 }
 
 impl DecisionRevisionIndex {

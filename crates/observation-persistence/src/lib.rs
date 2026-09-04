@@ -120,7 +120,9 @@ pub(crate) mod test_support {
     pub fn decision_set(revision: ValidatedSectionRevision) -> DecisionRevisionSet {
         let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
         let section = revision.section_key().clone();
-        index.accept(revision, 1);
+        let _accepted = index
+            .accept(revision, 1)
+            .expect("test revision is authoritative");
         match index.eligibility(&[section], 1, 1) {
             DecisionEligibility::Eligible(set) => set,
             DecisionEligibility::Blocked(blockers) => panic!("test set blocked: {blockers:?}"),

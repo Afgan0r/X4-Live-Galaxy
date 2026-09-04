@@ -44,7 +44,7 @@ fn not_committed(
 ) -> ReconciliationOutcome {
     let receipt = sqlite_receipt::load(connection, &candidate.section_key, candidate.revision);
     let current = sqlite_read::current_pointer(connection, &candidate.section_key);
-    let dependencies_match = request.frozen_dependencies.iter().all(|(key, expected)| {
+    let dependencies_match = request.frozen_dependencies().iter().all(|(key, expected)| {
         sqlite_read::current_pointer(connection, key) == Ok(Some(*expected))
     });
     match (receipt, current) {

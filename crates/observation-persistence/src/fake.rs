@@ -53,11 +53,11 @@ impl ObservationRepository for FakeObservationRepository {
         if let Some(outcome) = self.replay(&identity, &record) {
             return outcome;
         }
-        if self.current.get(&record.section_key).copied() != request.expected_current {
+        if self.current.get(&record.section_key).copied() != request.expected_current() {
             return PublishOutcome::StalePointer(diagnostic("stale-pointer"));
         }
         if request
-            .frozen_dependencies
+            .frozen_dependencies()
             .iter()
             .any(|(key, revision)| self.current.get(key) != Some(revision))
         {
@@ -67,7 +67,7 @@ impl ObservationRepository for FakeObservationRepository {
             section_key: record.section_key.clone(),
             revision: record.revision,
             content_digest: record.content_digest,
-            previous: request.expected_current,
+            previous: request.expected_current(),
             ordinal: self.next_publication,
         };
         self.next_publication = self.next_publication.saturating_add(1);

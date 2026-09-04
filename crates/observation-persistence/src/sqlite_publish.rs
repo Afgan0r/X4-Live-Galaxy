@@ -13,8 +13,8 @@ pub fn publish(
     failpoint: Option<PublicationFailpoint>,
 ) -> PublishOutcome {
     let identity = (
-        request.revision.section_key().clone(),
-        request.revision.section_revision(),
+        request.revision().section_key().clone(),
+        request.revision().section_revision(),
     );
     if ambiguous.contains(&identity) {
         return PublishOutcome::Ambiguous(diagnostic("reconciliation-required"));

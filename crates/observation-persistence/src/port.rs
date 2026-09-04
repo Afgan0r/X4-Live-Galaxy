@@ -36,8 +36,12 @@ mod tests {
     }
 
     fn request(revision: observation_ingest::ValidatedSectionRevision) -> PublishRequest {
-        let session = revision.source_session().clone();
-        PublishRequest::from_revision(revision, session)
+        let mut index =
+            observation_ingest::DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
+        let accepted = index
+            .accept(revision, 1)
+            .expect("test revision is authoritative");
+        PublishRequest::from_accepted(accepted)
     }
 
     #[test]
@@ -99,14 +103,6 @@ mod tests {
         assert!(matches!(
             repository.publish(request(validated(2, None))),
             PublishOutcome::StalePointer(_)
-        ));
-        let mut invalid = request(validated(2, Some(first)));
-        invalid
-            .frozen_dependencies
-            .insert(key("missing"), crate::test_support::revision(9));
-        assert!(matches!(
-            repository.publish(invalid),
-            PublishOutcome::PermanentRejection(_)
         ));
         let current = repository
             .current(&key("ships"))

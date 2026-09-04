@@ -158,17 +158,31 @@ fn reconnect_keeps_a_delayed_validated_revision_history_only() {
         TransportEpoch::new(2).expect("epoch is non-zero"),
     );
     let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
-    index.mark_scope_uncertain(&scope, current_session.clone());
-    assert!(!index.accept(delayed.clone(), 4));
+    let accepted = index
+        .accept(delayed.clone(), 3)
+        .expect("session A starts authoritative");
+    let stale_request = PublishRequest::from_accepted(accepted);
+    index.mark_scope_uncertain(&scope, current_session);
+    assert!(index.accept(delayed, 4).is_none());
     assert_eq!(index.current_count(), 0);
-    assert_eq!(index.history_count(), 1);
+    assert_eq!(index.history_count(), 2);
 
     let database = TempDatabase::new("delayed-session");
     let mut repository = SqliteObservationRepository::open(database.path(), limits())
         .expect("SQLite repository opens");
     assert!(matches!(
-        repository.publish(PublishRequest::from_revision(delayed, current_session)),
+        repository.publish(stale_request),
         PublishOutcome::PermanentRejection(_)
     ));
     assert_eq!(repository.current(&key("ships")), Ok(None));
+    drop(repository);
+    let connection = Connection::open(database.path()).expect("fixture database opens");
+    for table in ["revisions", "publication_receipts", "current_revisions"] {
+        let count: i64 = connection
+            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .expect("publication table count is readable");
+        assert_eq!(count, 0, "stale authority wrote {table}");
+    }
 }

@@ -1,30 +1,82 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
 use observation_domain::{SectionKey, SectionRevisionId, SourceScopeId, SourceSessionIdentity};
 
-use super::DecisionRevisionIndex;
+use super::{DecisionRevisionIndex, SessionAuthority};
 use crate::ValidatedSectionRevision;
 
+#[must_use]
+#[derive(Clone, Debug)]
+pub struct AcceptedPublication {
+    revision: ValidatedSectionRevision,
+    authority_generation: Rc<Cell<u64>>,
+    accepted_generation: u64,
+}
+
+impl AcceptedPublication {
+    pub const fn revision(&self) -> &ValidatedSectionRevision {
+        &self.revision
+    }
+
+    #[must_use]
+    pub fn is_authoritative(&self) -> bool {
+        self.authority_generation.get() == self.accepted_generation
+    }
+}
+
+impl SessionAuthority {
+    fn new(identity: SourceSessionIdentity) -> Self {
+        Self {
+            identity,
+            generation: Rc::new(Cell::new(0)),
+        }
+    }
+
+    fn accepted(&self, revision: ValidatedSectionRevision) -> AcceptedPublication {
+        AcceptedPublication {
+            revision,
+            authority_generation: Rc::clone(&self.generation),
+            accepted_generation: self.generation.get(),
+        }
+    }
+
+    fn replace(&mut self, identity: SourceSessionIdentity) {
+        self.identity = identity;
+        self.generation.set(self.generation.get().saturating_add(1));
+    }
+}
+
 impl DecisionRevisionIndex {
-    pub fn accept(&mut self, revision: ValidatedSectionRevision, accepted_at: u64) -> bool {
+    pub fn accept(
+        &mut self,
+        revision: ValidatedSectionRevision,
+        accepted_at: u64,
+    ) -> Option<AcceptedPublication> {
         let scope = revision.source_scope().clone();
         if self
             .authoritative_sessions
             .get(&scope)
-            .is_some_and(|current| current != revision.source_session())
+            .is_some_and(|current| &current.identity != revision.source_session())
         {
             self.history.push((revision, accepted_at));
-            return false;
+            return None;
         }
         let key = revision.section_key().clone();
         self.authoritative_sessions
             .entry(scope.clone())
-            .or_insert_with(|| revision.source_session().clone());
+            .or_insert_with(|| SessionAuthority::new(revision.source_session().clone()));
+        let accepted = self
+            .authoritative_sessions
+            .get(&scope)
+            .map(|authority| authority.accepted(revision.clone()))?;
         self.uncertain_scopes.remove(&scope);
         self.pointers
             .insert(key.clone(), revision.section_revision());
         if let Some(previous) = self.current.insert(key, (revision, accepted_at)) {
             self.history.push(previous);
         }
-        true
+        Some(accepted)
     }
 
     pub fn record_current_pointer(&mut self, key: SectionKey, revision: SectionRevisionId) {
@@ -38,7 +90,9 @@ impl DecisionRevisionIndex {
     ) {
         self.uncertain_scopes.insert(scope.clone());
         self.authoritative_sessions
-            .insert(scope.clone(), authoritative_session);
+            .entry(scope.clone())
+            .and_modify(|authority| authority.replace(authoritative_session.clone()))
+            .or_insert_with(|| SessionAuthority::new(authoritative_session));
         let keys: Vec<_> = self
             .current
             .iter()

@@ -27,7 +27,8 @@ pub use completion_types::{
     CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome, ContractVersions,
 };
 pub use eligibility::{
-    DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet, EligibilityBlocker,
+    AcceptedPublication, DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet,
+    EligibilityBlocker,
 };
 pub use feedback::{
     CollectionPolicyLimits, DeliveryStage, FeedbackError, ImmutableApplicationBatch,
