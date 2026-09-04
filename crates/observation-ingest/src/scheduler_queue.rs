@@ -32,6 +32,14 @@ pub enum WorkKind {
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompletionDisposition {
+    Completed,
+    Unknown,
+    CollectorRejected,
+}
+
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SchedulerSafetyLimits {
     pub(crate) queue_capacity: NonZeroUsize,
     pub(crate) max_overrun_debt: NonZeroUsize,
@@ -162,6 +170,10 @@ impl IntentQueue {
             .min_by(|(_, left), (_, right)| compare(left, right))
             .map(|(index, _)| index)?;
         Some(self.queued.remove(selected).intent)
+    }
+
+    pub(super) const fn len(&self) -> usize {
+        self.queued.len()
     }
 }
 

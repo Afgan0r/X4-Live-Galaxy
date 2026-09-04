@@ -1,7 +1,9 @@
 use crate::{
     feedback::{CollectionPolicyLimits, TransportPolicyLimits},
+    scheduler_budget::SchedulerBudget,
     scheduler_queue::{
-        CollectionIntent, IntentQueue, SchedulerAdmission, SchedulerSafetyLimits, WorkKind,
+        CollectionIntent, CollectionIntentId, CompletionDisposition, IntentQueue,
+        SchedulerAdmission, SchedulerSafetyLimits,
     },
 };
 
@@ -30,6 +32,7 @@ pub struct SchedulerOutcome {
     remaining_permits: usize,
     remaining_heavy_permits: usize,
     overrun_debt: usize,
+    queued_intents: usize,
 }
 
 impl SchedulerOutcome {
@@ -64,16 +67,16 @@ impl SchedulerOutcome {
     pub const fn overrun_debt(&self) -> usize {
         self.overrun_debt
     }
+    #[must_use]
+    pub const fn queued_intents(&self) -> usize {
+        self.queued_intents
+    }
 }
 
 pub struct ObservationScheduler<C> {
     clock: C,
-    collection: CollectionPolicyLimits,
     transport: TransportPolicyLimits,
-    last_refill: u64,
-    permits: usize,
-    heavy_permits: usize,
-    debt: usize,
+    budget: SchedulerBudget,
     pending: Option<Vec<u8>>,
     queue: IntentQueue,
 }
@@ -88,19 +91,26 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
         let last_refill = clock.now_millis();
         Self {
             clock,
-            collection,
             transport,
-            last_refill,
-            permits: collection.burst.get(),
-            heavy_permits: collection.heavy_permits.get(),
-            debt: 0,
+            budget: SchedulerBudget::new(collection, safety, last_refill),
             pending: None,
             queue: IntentQueue::new(safety.queue_capacity),
         }
     }
 
     pub fn enqueue(&mut self, intent: CollectionIntent) -> Result<(), CollectionIntent> {
+        if !self.budget.accepts_declared(intent.declared_work()) {
+            return Err(intent);
+        }
         self.queue.enqueue(intent)
+    }
+
+    pub fn complete(
+        &mut self,
+        intent_id: &CollectionIntentId,
+        actual_work: usize,
+    ) -> CompletionDisposition {
+        self.budget.complete(intent_id, actual_work)
     }
 
     pub fn stage_pending(&mut self, bytes: Vec<u8>) -> Result<(), Vec<u8>> {
@@ -115,7 +125,7 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
     }
 
     pub fn deliver_pulse(&mut self, pulse: DeliveredPulse) -> SchedulerOutcome {
-        self.refill();
+        self.budget.refill(self.clock.now_millis());
         let reserve = self
             .transport
             .terminal_reserve
@@ -132,6 +142,7 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
         self.outcome(0, reserve, admission)
     }
 
+    #[must_use]
     pub fn pending_bytes(&self) -> Option<&[u8]> {
         self.pending.as_deref()
     }
@@ -145,24 +156,14 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
     }
 
     fn select_admission(&mut self, bulk_capacity: usize) -> Option<SchedulerAdmission> {
-        if bulk_capacity == 0 || self.permits == 0 || self.debt > 0 {
+        if bulk_capacity == 0 {
             return None;
         }
-        let step_work = self.collection.step_work.get();
-        let heavy_permits = self.heavy_permits;
-        let intent = self.queue.take_best_where(|intent| {
-            intent.declared_work() <= step_work
-                && (intent.work_kind() == WorkKind::Light || heavy_permits > 0)
-        })?;
-        self.permits -= 1;
-        if intent.work_kind() == WorkKind::Heavy {
-            self.heavy_permits -= 1;
-        }
-        Some(SchedulerAdmission {
-            intent_id: intent.id().clone(),
-            work_kind: intent.work_kind(),
-            declared_work: intent.declared_work(),
-        })
+        let budget = &self.budget;
+        let intent = self
+            .queue
+            .take_best_where(|intent| budget.can_admit(intent))?;
+        self.budget.admit(&intent)
     }
 
     const fn outcome(
@@ -175,24 +176,10 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
             pumped_bytes,
             terminal_reserved_bytes,
             admission,
-            remaining_permits: self.permits,
-            remaining_heavy_permits: self.heavy_permits,
-            overrun_debt: self.debt,
+            remaining_permits: self.budget.permits(),
+            remaining_heavy_permits: self.budget.heavy_permits(),
+            overrun_debt: self.budget.debt().amount(),
+            queued_intents: self.queue.len(),
         }
-    }
-
-    fn refill(&mut self) {
-        let now = self.clock.now_millis();
-        let elapsed = now.saturating_sub(self.last_refill);
-        let refill = elapsed / self.collection.refill_millis.get();
-        if refill == 0 {
-            return;
-        }
-        let refill = usize::try_from(refill).unwrap_or(usize::MAX);
-        self.permits = self
-            .permits
-            .saturating_add(refill)
-            .min(self.collection.burst.get());
-        self.last_refill = now;
     }
 }
