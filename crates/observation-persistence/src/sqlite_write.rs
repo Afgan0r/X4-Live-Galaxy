@@ -1,14 +1,23 @@
 use rusqlite::{Connection, TransactionBehavior, params};
 
 use crate::{
-    PublicationLimits, PublicationReceipt, PublishOutcome, PublishRequest, RepositoryDiagnostic,
-    RepositoryError, RevisionRecord, record, schema, sqlite_read,
+    PublicationFailpoint, PublicationLimits, PublicationReceipt, PublishOutcome, PublishRequest,
+    RepositoryDiagnostic, RepositoryError, RevisionRecord, record, sqlite_read, sqlite_write_rows,
 };
 
 pub fn publish(
     connection: &mut Connection,
     limits: PublicationLimits,
     request: &PublishRequest,
+) -> PublishOutcome {
+    publish_with_failpoint(connection, limits, request, None)
+}
+
+pub fn publish_with_failpoint(
+    connection: &mut Connection,
+    limits: PublicationLimits,
+    request: &PublishRequest,
+    failpoint: Option<PublicationFailpoint>,
 ) -> PublishOutcome {
     let Some(revision) = record::normalize(request, limits) else {
         return rejection("invalid-revision");
@@ -17,12 +26,26 @@ pub fn publish(
     else {
         return rejection("transaction-begin");
     };
-    let receipt = match publish_in_transaction(&transaction, request, &revision) {
+    let receipt = match publish_in_transaction(&transaction, request, &revision, failpoint) {
         Ok(WriteOutcome::Replay(receipt)) => return PublishOutcome::CommittedReplay(receipt),
         Ok(WriteOutcome::New(receipt)) => receipt,
         Err(outcome) => return outcome,
     };
+    if failpoint == Some(PublicationFailpoint::BeforeCommit) {
+        return rejection("failpoint-before-commit");
+    }
     match transaction.commit() {
+        Ok(())
+            if matches!(
+                failpoint,
+                Some(
+                    PublicationFailpoint::CommitResultUnknown
+                        | PublicationFailpoint::AfterCommitBeforeResponse
+                )
+            ) =>
+        {
+            PublishOutcome::Ambiguous(diagnostic("commit-result-unknown"))
+        }
         Ok(()) => PublishOutcome::CommittedNew(receipt),
         Err(_) => PublishOutcome::Ambiguous(diagnostic("commit-result-unknown")),
     }
@@ -37,6 +60,7 @@ fn publish_in_transaction(
     connection: &Connection,
     request: &PublishRequest,
     revision: &RevisionRecord,
+    failpoint: Option<PublicationFailpoint>,
 ) -> Result<WriteOutcome, PublishOutcome> {
     if let Some(existing) =
         sqlite_read::load_revision(connection, &revision.section_key, revision.revision)
@@ -70,12 +94,24 @@ fn publish_in_transaction(
             |row| row.get(0),
         )
         .map_err(|_| rejection("receipt-ordinal"))?;
-    insert_revision(connection, revision).map_err(storage)?;
+    if failpoint == Some(PublicationFailpoint::BeforeContent) {
+        return Err(rejection("failpoint-before-content"));
+    }
+    sqlite_write_rows::insert_revision(connection, revision).map_err(storage)?;
+    if failpoint == Some(PublicationFailpoint::AfterContent) {
+        return Err(rejection("failpoint-after-content"));
+    }
     connection.execute(
         "INSERT INTO publication_receipts(section_key, revision, content_digest, previous_revision, ordinal) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get()).map_err(storage)?, revision.content_digest.as_slice(), revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose().map_err(storage)?, ordinal],
     ).map_err(|_| rejection("receipt-insert"))?;
-    update_current(connection, revision).map_err(storage)?;
+    if failpoint == Some(PublicationFailpoint::AfterReceipt) {
+        return Err(rejection("failpoint-after-receipt"));
+    }
+    sqlite_write_rows::update_current(connection, revision).map_err(storage)?;
+    if failpoint == Some(PublicationFailpoint::AfterPointer) {
+        return Err(rejection("failpoint-after-pointer"));
+    }
     Ok(WriteOutcome::New(PublicationReceipt {
         section_key: revision.section_key.clone(),
         revision: revision.revision,
@@ -83,75 +119,6 @@ fn publish_in_transaction(
         previous: revision.expected_current,
         ordinal: u64::try_from(ordinal).map_err(|_| rejection("receipt-ordinal"))?,
     }))
-}
-
-fn insert_revision(
-    connection: &Connection,
-    revision: &RevisionRecord,
-) -> Result<(), RepositoryError> {
-    connection.execute(
-        "INSERT INTO revisions(section_key, revision, source_scope, coverage, manifest_digest, content_digest, integrity_digest, context_token, expected_current) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get())?, revision.source_scope.as_str(), schema::coverage_name(revision.coverage), revision.manifest_digest.as_slice(), revision.content_digest.as_slice(), revision.integrity_digest.as_slice(), &revision.context_token, revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose()?],
-    ).map_err(|_| error("revision-insert"))?;
-    for (position, item) in revision.records.iter().enumerate() {
-        connection
-            .execute(
-                "INSERT INTO revision_records VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![
-                    revision.section_key.as_str(),
-                    sqlite_read::sql_u64(revision.revision.get())?,
-                    i64::try_from(position).map_err(|_| error("integer-range"))?,
-                    item.record_id.as_str(),
-                    item.entity_id.as_str(),
-                    sqlite_read::sql_u64(item.observation_version.get())?,
-                    &item.content
-                ],
-            )
-            .map_err(|_| error("record-insert"))?;
-    }
-    for (key, value) in &revision.dependencies {
-        connection
-            .execute(
-                "INSERT INTO revision_dependencies VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    revision.section_key.as_str(),
-                    sqlite_read::sql_u64(revision.revision.get())?,
-                    key.as_str(),
-                    sqlite_read::sql_u64(value.get())?
-                ],
-            )
-            .map_err(|_| error("dependency-insert"))?;
-    }
-    Ok(())
-}
-
-fn update_current(
-    connection: &Connection,
-    revision: &RevisionRecord,
-) -> Result<(), RepositoryError> {
-    let changed = if let Some(expected) = revision.expected_current {
-        connection.execute(
-            "UPDATE current_revisions SET revision=?1 WHERE section_key=?2 AND revision=?3",
-            params![
-                sqlite_read::sql_u64(revision.revision.get())?,
-                revision.section_key.as_str(),
-                sqlite_read::sql_u64(expected.get())?
-            ],
-        )
-    } else {
-        connection.execute(
-            "INSERT INTO current_revisions(section_key, revision) VALUES (?1, ?2)",
-            params![
-                revision.section_key.as_str(),
-                sqlite_read::sql_u64(revision.revision.get())?
-            ],
-        )
-    }
-    .map_err(|_| error("current-update"))?;
-    if changed != 1 {
-        return Err(error("current-cas"));
-    }
-    Ok(())
 }
 
 const fn storage(_: RepositoryError) -> PublishOutcome {
@@ -162,7 +129,4 @@ const fn rejection(code: &'static str) -> PublishOutcome {
 }
 const fn diagnostic(code: &'static str) -> RepositoryDiagnostic {
     RepositoryDiagnostic { code }
-}
-const fn error(code: &'static str) -> RepositoryError {
-    RepositoryError::Storage(diagnostic(code))
 }

@@ -1,3 +1,13 @@
+#![allow(
+    dead_code,
+    reason = "each integration-test crate uses a different fixture subset"
+)]
+#![expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "invalid integration fixtures must fail immediately"
+)]
+
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -124,5 +134,8 @@ impl TempDatabase {
 impl Drop for TempDatabase {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+        for suffix in ["-journal", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", self.0.display()));
+        }
     }
 }

@@ -4,11 +4,13 @@ mod fake;
 mod port;
 mod record;
 mod recovery;
+mod retention;
 mod schema;
 mod sqlite;
 mod sqlite_pins;
 mod sqlite_read;
 mod sqlite_write;
+mod sqlite_write_rows;
 mod types;
 
 pub use fake::FakeObservationRepository;

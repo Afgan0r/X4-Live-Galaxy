@@ -1,13 +1,20 @@
+#![expect(
+    clippy::expect_used,
+    reason = "schema fixtures must fail immediately when setup or corruption injection fails"
+)]
+
 mod support;
 
+use std::collections::BTreeMap;
 use std::fs;
 
 use observation_persistence::{
     OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY, OBSERVATION_REPOSITORY_SCHEMA_VERSION,
-    PublicationLimits, RepositoryError, SqliteObservationRepository,
+    ObservationRepository, PublicationLimits, PublishOutcome, PublishRequest, RepositoryError,
+    SqliteObservationRepository,
 };
 use rusqlite::{Connection, params};
-use support::TempDatabase;
+use support::{TempDatabase, validated};
 
 const fn limits() -> PublicationLimits {
     PublicationLimits::new(4, 256).expect("limits are non-zero")
@@ -20,7 +27,9 @@ fn schema_identity_and_dependency_pin_are_exact() {
         OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY,
         "live_galaxy.observation_repository.v1"
     );
-    let manifest = fs::read_to_string("crates/observation-persistence/Cargo.toml").unwrap();
+    let manifest =
+        fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))
+            .unwrap();
     assert!(manifest.contains(
         "rusqlite = { version = \"=0.40.2\", default-features = false, features = [\"bundled\"] }"
     ));
@@ -50,6 +59,9 @@ fn open_rejects_an_orphan_built_with_foreign_keys_disabled() {
     drop(SqliteObservationRepository::open(database.path(), limits()).unwrap());
     let connection = Connection::open(database.path()).unwrap();
     connection
+        .pragma_update(None, "foreign_keys", false)
+        .unwrap();
+    connection
         .execute(
             "INSERT INTO current_revisions(section_key, revision) VALUES (?1, ?2)",
             params!["ships", 99_i64],
@@ -60,4 +72,38 @@ fn open_rejects_an_orphan_built_with_foreign_keys_disabled() {
         SqliteObservationRepository::open(database.path(), limits()),
         Err(RepositoryError::Corrupt(_))
     ));
+}
+
+#[test]
+fn open_rejects_tampered_digest_and_partial_row_set() {
+    for (label, mutation) in [
+        (
+            "tampered",
+            "UPDATE revisions SET content_digest=zeroblob(32)",
+        ),
+        ("partial", "DELETE FROM publication_receipts"),
+    ] {
+        let database = TempDatabase::new(label);
+        let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
+        assert!(matches!(
+            repository.publish(PublishRequest::from_revision(validated(
+                "ships",
+                1,
+                None,
+                BTreeMap::default(),
+            ))),
+            PublishOutcome::CommittedNew(_)
+        ));
+        drop(repository);
+        let connection = Connection::open(database.path()).unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", false)
+            .unwrap();
+        connection.execute(mutation, []).unwrap();
+        drop(connection);
+        assert!(matches!(
+            SqliteObservationRepository::open(database.path(), limits()),
+            Err(RepositoryError::Corrupt(_))
+        ));
+    }
 }

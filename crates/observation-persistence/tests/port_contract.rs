@@ -1,3 +1,9 @@
+#![expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "contract-test setup and mismatches must fail immediately"
+)]
+
 mod support;
 
 use std::collections::BTreeMap;

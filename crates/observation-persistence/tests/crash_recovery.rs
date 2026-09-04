@@ -1,4 +1,12 @@
+#![expect(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "crash fixtures must fail immediately when setup or recovery is invalid"
+)]
+
 mod support;
+
+use std::collections::BTreeMap;
 
 use observation_persistence::{
     ObservationRepository, PublicationFailpoint, PublicationLimits, PublishOutcome, PublishRequest,
@@ -12,10 +20,10 @@ const fn limits() -> PublicationLimits {
 
 fn precommit_cut(cut: PublicationFailpoint) {
     let database = TempDatabase::new("precommit-cut");
-    let request = PublishRequest::from_revision(validated("ships", 1, None, Default::default()));
+    let request = PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
     assert!(matches!(
-        repository.publish_with_failpoint(request, cut),
+        repository.publish_with_failpoint(&request, cut),
         PublishOutcome::PermanentRejection(_)
     ));
     drop(repository);
@@ -44,10 +52,10 @@ fn ambiguous_commit_requires_reconciliation_and_replays_once() {
     ] {
         let database = TempDatabase::new("ambiguous-cut");
         let request =
-            PublishRequest::from_revision(validated("ships", 1, None, Default::default()));
+            PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
         let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
         assert!(matches!(
-            repository.publish_with_failpoint(request.clone(), cut),
+            repository.publish_with_failpoint(&request, cut),
             PublishOutcome::Ambiguous(_)
         ));
         assert!(matches!(
@@ -66,10 +74,25 @@ fn ambiguous_commit_requires_reconciliation_and_replays_once() {
 }
 
 #[test]
+fn reconciliation_proves_an_absent_attempt_retryable() {
+    let database = TempDatabase::new("retryable");
+    let request = PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
+    let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
+    assert_eq!(
+        repository.reconcile_publication(&request),
+        ReconciliationOutcome::ProvenNotCommitted
+    );
+    assert!(matches!(
+        repository.publish(request),
+        PublishOutcome::CommittedNew(_)
+    ));
+}
+
+#[test]
 fn retention_preserves_current_and_pinned_history_until_unpinned() {
     let database = TempDatabase::new("retention");
     let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
-    let first = validated("ships", 1, None, Default::default());
+    let first = validated("ships", 1, None, BTreeMap::default());
     assert!(matches!(
         repository.publish(PublishRequest::from_revision(first.clone())),
         PublishOutcome::CommittedNew(_)
@@ -81,7 +104,7 @@ fn retention_preserves_current_and_pinned_history_until_unpinned() {
                 "ships",
                 value,
                 Some(revision(value - 1)),
-                Default::default(),
+                BTreeMap::default(),
             ))),
             PublishOutcome::CommittedNew(_)
         ));

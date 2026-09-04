@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use observation_domain::{DecisionSnapshotId, SectionKey};
@@ -7,13 +8,14 @@ use rusqlite::Connection;
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
     PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    UnpinOutcome, schema, sqlite_pins, sqlite_read, sqlite_write,
+    UnpinOutcome, record, retention, schema, sqlite_pins, sqlite_read, sqlite_write,
 };
 use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 
 pub struct SqliteObservationRepository {
     connection: Connection,
     limits: PublicationLimits,
+    ambiguous: BTreeSet<(SectionKey, observation_domain::SectionRevisionId)>,
 }
 
 impl SqliteObservationRepository {
@@ -32,7 +34,11 @@ impl SqliteObservationRepository {
             return Err(storage("foreign-keys-disabled"));
         }
         schema::initialize(&connection)?;
-        let repository = Self { connection, limits };
+        let repository = Self {
+            connection,
+            limits,
+            ambiguous: BTreeSet::new(),
+        };
         repository.validate_stored_revisions()?;
         Ok(repository)
     }
@@ -46,25 +52,69 @@ impl SqliteObservationRepository {
 
     pub fn publish_with_failpoint(
         &mut self,
-        _request: PublishRequest,
-        _failpoint: PublicationFailpoint,
+        request: &PublishRequest,
+        failpoint: PublicationFailpoint,
     ) -> PublishOutcome {
-        PublishOutcome::PermanentRejection(RepositoryDiagnostic {
-            code: "failpoint-not-implemented",
-        })
+        let identity = (
+            request.revision.section_key().clone(),
+            request.revision.section_revision(),
+        );
+        let outcome = sqlite_write::publish_with_failpoint(
+            &mut self.connection,
+            self.limits,
+            request,
+            Some(failpoint),
+        );
+        if matches!(outcome, PublishOutcome::Ambiguous(_)) {
+            self.ambiguous.insert(identity);
+        }
+        outcome
     }
 
-    pub fn reconcile_publication(&mut self, _request: &PublishRequest) -> ReconciliationOutcome {
-        ReconciliationOutcome::Ambiguous(RepositoryDiagnostic {
-            code: "reconciliation-not-implemented",
-        })
+    pub fn reconcile_publication(&mut self, request: &PublishRequest) -> ReconciliationOutcome {
+        if schema::validate_foreign_keys(&self.connection).is_err()
+            || self.validate_stored_revisions().is_err()
+        {
+            return ambiguous("reconciliation-corrupt");
+        }
+        let Some(candidate) = record::normalize(request, self.limits) else {
+            return ambiguous("reconciliation-invalid");
+        };
+        let identity = (candidate.section_key.clone(), candidate.revision);
+        let receipt =
+            sqlite_read::load_receipt(&self.connection, &candidate.section_key, candidate.revision);
+        let current = sqlite_read::current_pointer(&self.connection, &candidate.section_key);
+        let outcome = match (receipt, current) {
+            (Ok(Some(receipt)), Ok(Some(current)))
+                if current == candidate.revision
+                    && receipt.content_digest == candidate.content_digest =>
+            {
+                ReconciliationOutcome::CommittedReplay(receipt)
+            }
+            (Ok(None), Ok(current))
+                if current == candidate.expected_current && self.dependencies_match(request) =>
+            {
+                ReconciliationOutcome::ProvenNotCommitted
+            }
+            _ => ambiguous("reconciliation-ambiguous"),
+        };
+        if !matches!(outcome, ReconciliationOutcome::Ambiguous(_)) {
+            self.ambiguous.remove(&identity);
+        }
+        outcome
     }
 
     pub fn run_retention(
         &mut self,
-        _policy: RetentionPolicy,
+        policy: RetentionPolicy,
     ) -> Result<RetentionReport, RepositoryError> {
-        Err(storage("retention-not-implemented"))
+        retention::run(&mut self.connection, policy)
+    }
+
+    fn dependencies_match(&self, request: &PublishRequest) -> bool {
+        request.frozen_dependencies.iter().all(|(key, expected)| {
+            sqlite_read::current_pointer(&self.connection, key) == Ok(Some(*expected))
+        })
     }
 
     fn validate_stored_revisions(&self) -> Result<(), RepositoryError> {
@@ -86,6 +136,8 @@ impl SqliteObservationRepository {
                 .ok_or_else(|| storage("revision-invalid"))?;
             let _ = sqlite_read::load_revision(&self.connection, &key, revision)?
                 .ok_or_else(|| storage("revision-missing"))?;
+            let _ = sqlite_read::load_receipt(&self.connection, &key, revision)?
+                .ok_or(corrupt("receipt-missing"))?;
         }
         Ok(())
     }
@@ -93,6 +145,14 @@ impl SqliteObservationRepository {
 
 impl ObservationRepository for SqliteObservationRepository {
     fn publish(&mut self, request: PublishRequest) -> PublishOutcome {
+        if self.ambiguous.contains(&(
+            request.revision.section_key().clone(),
+            request.revision.section_revision(),
+        )) {
+            return PublishOutcome::Ambiguous(RepositoryDiagnostic {
+                code: "reconciliation-required",
+            });
+        }
         sqlite_write::publish(&mut self.connection, self.limits, &request)
     }
 
@@ -124,4 +184,12 @@ impl ObservationRepository for SqliteObservationRepository {
 
 const fn storage(code: &'static str) -> RepositoryError {
     RepositoryError::Storage(RepositoryDiagnostic { code })
+}
+
+const fn ambiguous(code: &'static str) -> ReconciliationOutcome {
+    ReconciliationOutcome::Ambiguous(RepositoryDiagnostic { code })
+}
+
+const fn corrupt(code: &'static str) -> RepositoryError {
+    RepositoryError::Corrupt(RepositoryDiagnostic { code })
 }
