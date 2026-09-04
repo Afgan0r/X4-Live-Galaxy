@@ -34,8 +34,8 @@ const fn versions() -> ContractVersions {
 }
 fn limits() -> GenerationLimits {
     GenerationLimits::bounded(
-        CandidateLimits::new(128, 256, 4, 4, 8, 100, 10).expect("limits are non-zero"),
-        AggregateLimits::new(4, 512, 1024, 16, 16, 32).expect("limits are non-zero"),
+        CandidateLimits::new(2_048, 4_096, 4, 4, 8, 100, 10).expect("limits are non-zero"),
+        AggregateLimits::new(4, 8_192, 16_384, 16, 16, 32).expect("limits are non-zero"),
     )
 }
 fn start() -> SectionStartEnvelope {
@@ -105,12 +105,12 @@ fn staged() -> GenerationStager {
         ReceiverDisposition::Received
     );
     let batches = [
-        (batch("batch:1", "ship:2", "record:2"), &b"batch-two"[..], 2),
-        (batch("batch:2", "ship:1", "record:1"), &b"batch-one"[..], 3),
+        (batch("batch:1", "ship:2", "record:2"), 2),
+        (batch("batch:2", "ship:1", "record:1"), 3),
     ];
-    for (batch, bytes, now) in batches {
+    for (batch, now) in batches {
         assert_eq!(
-            stager.stage_section_batch(batch, bytes, 20, 1, now),
+            stager.stage_section_batch(batch, 1, now),
             ReceiverDisposition::Received
         );
     }

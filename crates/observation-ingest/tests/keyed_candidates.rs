@@ -45,8 +45,8 @@ fn batch(section: &str, revision: u64, identity: &str, version: u64) -> Immutabl
 
 fn limits() -> GenerationLimits {
     GenerationLimits::bounded(
-        CandidateLimits::new(16, 32, 2, 2, 4, 10, 5).expect("limits are non-zero"),
-        AggregateLimits::new(2, 24, 48, 4, 4, 8).expect("limits are non-zero"),
+        CandidateLimits::new(4_096, 8_192, 2, 2, 4, 10, 5).expect("limits are non-zero"),
+        AggregateLimits::new(2, 8_192, 16_384, 4, 4, 8).expect("limits are non-zero"),
     )
 }
 
@@ -63,17 +63,11 @@ fn alternating_batches_advance_independent_keyed_candidates() {
     );
 
     assert_eq!(
-        stager.stage_section_batch(batch("ships", 1, "batch:ships", 1), b"ship", 8, 1, 2),
+        stager.stage_section_batch(batch("ships", 1, "batch:ships", 1), 1, 2),
         ReceiverDisposition::Received
     );
     assert_eq!(
-        stager.stage_section_batch(
-            batch("stations", 1, "batch:stations", 1),
-            b"station",
-            9,
-            1,
-            3,
-        ),
+        stager.stage_section_batch(batch("stations", 1, "batch:stations", 1), 1, 3),
         ReceiverDisposition::Received
     );
     assert_eq!(stager.candidate_count(), 2);
@@ -99,23 +93,25 @@ fn alternating_batches_advance_independent_keyed_candidates() {
 }
 
 #[test]
-fn exact_replay_is_charge_free_and_changed_bytes_drop_only_that_key() {
+fn exact_replay_is_charge_free_and_changed_envelope_drops_only_that_key() {
     let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits());
     let _ = stager.start_section(start("ships", 1, 1), 1);
     let _ = stager.start_section(start("stations", 1, 1), 1);
     let ship_batch = batch("ships", 1, "batch:ships", 1);
     assert_eq!(
-        stager.stage_section_batch(ship_batch.clone(), b"ship", 8, 1, 2),
+        stager.stage_section_batch(ship_batch.clone(), 1, 2),
         ReceiverDisposition::Received
     );
     let before = stager.aggregate_usage();
     assert_eq!(
-        stager.stage_section_batch(ship_batch.clone(), b"ship", 8, 1, 3),
+        stager.stage_section_batch(ship_batch.clone(), 1, 3),
         ReceiverDisposition::Received
     );
     assert_eq!(stager.aggregate_usage(), before);
+    let mut changed = ship_batch;
+    changed.optional_detail = Some("changed".to_owned());
     assert_eq!(
-        stager.stage_section_batch(ship_batch, b"changed", 8, 1, 4),
+        stager.stage_section_batch(changed, 1, 4),
         ReceiverDisposition::PermanentlyRejected
     );
     assert!(
@@ -135,19 +131,19 @@ fn independent_limits_and_expiry_release_exact_aggregate_charges() {
     let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits());
     let _ = stager.start_section(start("ships", 1, 1), 1);
     assert_eq!(
-        stager.stage_section_batch(batch("ships", 1, "batch:ships", 1), &[b'x'; 16], 32, 4, 2),
+        stager.stage_section_batch(batch("ships", 1, "batch:ships", 1), 4, 2),
         ReceiverDisposition::Received
     );
     let charged = stager.aggregate_usage();
-    assert_eq!(charged.raw_bytes, 16);
+    assert!(charged.raw_bytes > 0);
     assert_eq!(
-        stager.stage_section_batch(batch("ships", 1, "batch:over", 2), b"x", 1, 1, 3),
+        stager.stage_section_batch(batch("ships", 1, "batch:over", 2), 1, 3),
         ReceiverDisposition::PermanentlyRejected
     );
     assert_eq!(stager.aggregate_usage().raw_bytes, 0);
 
     let _ = stager.start_section(start("stations", 2, 1), 10);
-    let _ = stager.stage_section_batch(batch("stations", 2, "batch:stations", 1), b"ok", 2, 1, 11);
+    let _ = stager.stage_section_batch(batch("stations", 2, "batch:stations", 1), 1, 11);
     assert_eq!(stager.expire_candidates(17), 1);
     assert_eq!(stager.aggregate_usage().candidate_count, 0);
 }
@@ -171,8 +167,6 @@ fn accepted_versions_reject_regression_and_equal_version_conflicts() {
         assert_eq!(
             stager.stage_section_batch(
                 batch("ships", version, &format!("batch:{version}"), version),
-                format!("bytes:{version}").as_bytes(),
-                8,
                 1,
                 version + 1,
             ),

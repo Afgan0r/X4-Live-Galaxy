@@ -13,6 +13,7 @@ use crate::wire::WireObservation;
 #[derive(Clone)]
 pub struct StagedBatch {
     pub ordinal: usize,
+    pub canonical_bytes: Vec<u8>,
     pub digest: [u8; 32],
     pub envelope: observation_domain::ImmutableBatchEnvelope,
 }

@@ -1,10 +1,10 @@
 use crate::batch_budget::{AggregateUsage, CandidateUsage};
+use crate::batch_canonical::CanonicalBatch;
 use crate::candidate_limits::AcceptedVersions;
 use crate::completion_types::{Candidate, StagedBatch};
 use crate::model::AcceptedProjection;
 use crate::{GenerationLimits, ReceiverDisposition};
 use observation_domain::{BatchId, ImmutableBatchEnvelope, SectionKey, SectionStartEnvelope};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 pub struct GenerationStager {
     pub(crate) accepted: AcceptedProjection,
@@ -110,13 +110,13 @@ impl GenerationStager {
     pub fn stage_section_batch(
         &mut self,
         batch: ImmutableBatchEnvelope,
-        canonical_bytes: &[u8],
-        decoded_bytes: usize,
         work: usize,
         now: u64,
     ) -> ReceiverDisposition {
         let key = batch.section_key.clone();
-        let digest: [u8; 32] = Sha256::digest(canonical_bytes).into();
+        let Some(canonical) = CanonicalBatch::from_envelope(&batch) else {
+            return self.reject_candidate(&key);
+        };
         let Some(candidate) = self.candidates.get(&key) else {
             return ReceiverDisposition::PermanentlyRejected;
         };
@@ -133,7 +133,7 @@ impl GenerationStager {
         match candidate
             .batches
             .get(&batch.batch_id)
-            .map(|prior| prior.digest == digest)
+            .map(|prior| prior.canonical_bytes == canonical.bytes)
         {
             Some(true) => return ReceiverDisposition::Received,
             Some(false) => return self.reject_candidate(&key),
@@ -143,8 +143,8 @@ impl GenerationStager {
             return self.reject_candidate(&key);
         }
         let delta = CandidateUsage {
-            raw_bytes: canonical_bytes.len(),
-            decoded_bytes,
+            raw_bytes: canonical.bytes.len(),
+            decoded_bytes: canonical.decoded_bytes,
             records: batch.records.len(),
             batches: 1,
             work,
@@ -160,7 +160,8 @@ impl GenerationStager {
             batch.batch_id.clone(),
             StagedBatch {
                 ordinal,
-                digest,
+                canonical_bytes: canonical.bytes,
+                digest: canonical.digest,
                 envelope: batch,
             },
         );
@@ -178,7 +179,6 @@ impl GenerationStager {
         self.drop_candidate(key);
         ReceiverDisposition::PermanentlyRejected
     }
-
     fn checked_charge(
         &self,
         candidate: &Candidate,

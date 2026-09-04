@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 mod batch;
 mod batch_budget;
+mod batch_canonical;
 mod candidate_limits;
 mod completion;
 mod completion_digest;

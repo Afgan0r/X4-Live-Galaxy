@@ -98,14 +98,14 @@ fn stale_batch_session_is_fenced_without_consuming_current_candidate() {
         optional_detail: None,
     };
     assert_eq!(
-        stager.stage_section_batch(batch.clone(), b"batch", 5, 1, 2),
+        stager.stage_section_batch(batch.clone(), 1, 2),
         ReceiverDisposition::StaleEpoch
     );
     assert_eq!(stager.candidate_count(), 1);
     batch.producer_incarnation = id("producer:1", ProducerIncarnationId::new);
     batch.transport_epoch = TransportEpoch::new(2).expect("epoch is positive");
     assert_eq!(
-        stager.stage_section_batch(batch, b"batch", 5, 1, 3),
+        stager.stage_section_batch(batch, 1, 3),
         ReceiverDisposition::StaleEpoch
     );
     assert_eq!(stager.candidate_count(), 1);
