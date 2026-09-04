@@ -6,9 +6,8 @@
 use std::{cell::Cell, rc::Rc};
 
 use observation_ingest::{
-    CollectionClass, CollectionIntent, CollectionIntentId, CollectionPolicyLimits,
-    DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerSafetyLimits,
-    TransportPolicyLimits, WorkKind,
+    CollectionClass, CollectionIntent, CollectionIntentId, CollectionPolicyLimits, DeliveredPulse,
+    MonotonicClock, ObservationScheduler, SchedulerSafetyLimits, TransportPolicyLimits, WorkKind,
 };
 
 #[derive(Clone)]
@@ -29,11 +28,7 @@ fn scheduler() -> ObservationScheduler<FakeClock> {
     )
 }
 
-fn intent(
-    id: &str,
-    class: CollectionClass,
-    urgency: u64,
-) -> CollectionIntent {
+fn intent(id: &str, class: CollectionClass, urgency: u64) -> CollectionIntent {
     CollectionIntent::new(
         CollectionIntentId::new(id).expect("intent identity is non-empty"),
         class,
@@ -47,18 +42,51 @@ fn intent(
 #[test]
 fn urgency_orders_without_increasing_allowance() {
     let mut ranked = scheduler();
-    assert!(ranked.enqueue(intent("detail", CollectionClass::Detail, u64::MAX)).is_ok());
-    assert!(ranked.enqueue(intent("core-low", CollectionClass::Core, 1)).is_ok());
-    assert!(ranked.enqueue(intent("core-high", CollectionClass::Core, 9)).is_ok());
+    assert!(
+        ranked
+            .enqueue(intent("detail", CollectionClass::Detail, u64::MAX))
+            .is_ok()
+    );
+    assert!(
+        ranked
+            .enqueue(intent("core-low", CollectionClass::Core, 1))
+            .is_ok()
+    );
+    assert!(
+        ranked
+            .enqueue(intent("core-high", CollectionClass::Core, 9))
+            .is_ok()
+    );
     let selected = ranked.deliver_pulse(DeliveredPulse::new(3));
     assert_eq!(
-        selected.admission().map(|admission| admission.intent_id().as_str()),
+        selected
+            .admission()
+            .map(|admission| admission.intent_id().as_str()),
         Some("core-high")
+    );
+
+    let mut tied = scheduler();
+    assert!(
+        tied.enqueue(intent("first", CollectionClass::Core, 4))
+            .is_ok()
+    );
+    assert!(
+        tied.enqueue(intent("second", CollectionClass::Core, 4))
+            .is_ok()
+    );
+    assert_eq!(
+        tied.deliver_pulse(DeliveredPulse::new(3))
+            .admission()
+            .map(|admission| admission.intent_id().as_str()),
+        Some("first")
     );
 
     let mut low = scheduler();
     let mut high = scheduler();
-    assert!(low.enqueue(intent("same", CollectionClass::Core, 1)).is_ok());
+    assert!(
+        low.enqueue(intent("same", CollectionClass::Core, 1))
+            .is_ok()
+    );
     assert!(
         high.enqueue(intent("same", CollectionClass::Core, u64::MAX))
             .is_ok()
@@ -67,8 +95,14 @@ fn urgency_orders_without_increasing_allowance() {
     let high = high.deliver_pulse(DeliveredPulse::new(3));
     assert_eq!(low.remaining_permits(), high.remaining_permits());
     assert_eq!(low.admitted_work(), high.admitted_work());
-    assert_eq!(low.remaining_heavy_permits(), high.remaining_heavy_permits());
-    assert_eq!(low.terminal_reserved_bytes(), high.terminal_reserved_bytes());
+    assert_eq!(
+        low.remaining_heavy_permits(),
+        high.remaining_heavy_permits()
+    );
+    assert_eq!(
+        low.terminal_reserved_bytes(),
+        high.terminal_reserved_bytes()
+    );
     assert_eq!(low.overrun_debt(), high.overrun_debt());
 
     let mut pump_first = scheduler();

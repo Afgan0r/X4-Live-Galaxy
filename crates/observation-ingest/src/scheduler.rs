@@ -1,4 +1,9 @@
-use crate::feedback::{CollectionPolicyLimits, TransportPolicyLimits};
+use crate::{
+    feedback::{CollectionPolicyLimits, TransportPolicyLimits},
+    scheduler_queue::{
+        CollectionIntent, IntentQueue, SchedulerAdmission, SchedulerSafetyLimits, WorkKind,
+    },
+};
 
 pub trait MonotonicClock {
     fn now_millis(&self) -> u64;
@@ -7,34 +12,55 @@ pub trait MonotonicClock {
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DeliveredPulse {
-    _game_time_urgency: u64,
-    downstream_capacity: bool,
+    available_bytes: usize,
 }
 
 impl DeliveredPulse {
-    pub const fn new(game_time_urgency: u64, downstream_capacity: bool) -> Self {
-        Self {
-            _game_time_urgency: game_time_urgency,
-            downstream_capacity,
-        }
+    pub const fn new(available_bytes: usize) -> Self {
+        Self { available_bytes }
     }
 }
 
 #[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SchedulerOutcome {
     pumped_bytes: usize,
-    collection_started: bool,
+    terminal_reserved_bytes: usize,
+    admission: Option<SchedulerAdmission>,
+    remaining_permits: usize,
+    remaining_heavy_permits: usize,
+    overrun_debt: usize,
 }
 
 impl SchedulerOutcome {
     #[must_use]
-    pub const fn pumped_bytes(self) -> usize {
+    pub const fn pumped_bytes(&self) -> usize {
         self.pumped_bytes
     }
     #[must_use]
-    pub const fn collection_started(self) -> bool {
-        self.collection_started
+    pub const fn terminal_reserved_bytes(&self) -> usize {
+        self.terminal_reserved_bytes
+    }
+    pub const fn admission(&self) -> Option<&SchedulerAdmission> {
+        self.admission.as_ref()
+    }
+    pub const fn collection_started(&self) -> bool {
+        self.admission.is_some()
+    }
+    pub const fn admitted_work(&self) -> usize {
+        match &self.admission {
+            Some(admission) => admission.declared_work,
+            None => 0,
+        }
+    }
+    pub const fn remaining_permits(&self) -> usize {
+        self.remaining_permits
+    }
+    pub const fn remaining_heavy_permits(&self) -> usize {
+        self.remaining_heavy_permits
+    }
+    pub const fn overrun_debt(&self) -> usize {
+        self.overrun_debt
     }
 }
 
@@ -44,7 +70,10 @@ pub struct ObservationScheduler<C> {
     transport: TransportPolicyLimits,
     last_refill: u64,
     permits: usize,
+    heavy_permits: usize,
+    debt: usize,
     pending: Option<Vec<u8>>,
+    queue: IntentQueue,
 }
 
 impl<C: MonotonicClock> ObservationScheduler<C> {
@@ -52,6 +81,7 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
         clock: C,
         collection: CollectionPolicyLimits,
         transport: TransportPolicyLimits,
+        safety: SchedulerSafetyLimits,
     ) -> Self {
         let last_refill = clock.now_millis();
         Self {
@@ -60,8 +90,15 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
             transport,
             last_refill,
             permits: collection.burst.get(),
+            heavy_permits: collection.heavy_permits.get(),
+            debt: 0,
             pending: None,
+            queue: IntentQueue::new(safety.queue_capacity),
         }
+    }
+
+    pub fn enqueue(&mut self, intent: CollectionIntent) -> Result<(), CollectionIntent> {
+        self.queue.enqueue(intent)
     }
 
     pub fn stage_pending(&mut self, bytes: Vec<u8>) -> Result<(), Vec<u8>> {
@@ -77,33 +114,66 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
 
     pub fn deliver_pulse(&mut self, pulse: DeliveredPulse) -> SchedulerOutcome {
         self.refill();
-        if self.pending.is_some() && !pulse.downstream_capacity {
-            return SchedulerOutcome {
-                pumped_bytes: 0,
-                collection_started: false,
+        let reserve = self
+            .transport
+            .terminal_reserve
+            .get()
+            .min(pulse.available_bytes);
+        let bulk_capacity = pulse
+            .available_bytes
+            .saturating_sub(reserve)
+            .min(self.transport.max_pump_bytes.get());
+        if let Some(pending) = self.pending.as_ref() {
+            let pumped_bytes = if pending.len() <= bulk_capacity {
+                self.pending.take().map_or(0, |bytes| bytes.len())
+            } else {
+                0
             };
+            return self.outcome(pumped_bytes, reserve, None);
         }
-        if let Some(bytes) = self.pending.take() {
-            return SchedulerOutcome {
-                pumped_bytes: bytes.len(),
-                collection_started: false,
-            };
-        }
-        let finite_policy = self.collection.step_work.get() > 0
-            && self.collection.heavy_permits.get() > 0
-            && self.transport.terminal_reserve.get() > 0;
-        let collection_started = pulse.downstream_capacity && self.permits > 0 && finite_policy;
-        if collection_started {
+        let can_admit = bulk_capacity > 0 && self.permits > 0 && self.debt == 0;
+        let step_work = self.collection.step_work.get();
+        let heavy_permits = self.heavy_permits;
+        let admission = can_admit
+            .then(|| {
+                self.queue.take_best_where(|intent| {
+                    intent.declared_work() <= step_work
+                        && (intent.work_kind() == WorkKind::Light || heavy_permits > 0)
+                })
+            })
+            .flatten()
+            .map(|intent| SchedulerAdmission {
+                intent_id: intent.id().clone(),
+                work_kind: intent.work_kind(),
+                declared_work: intent.declared_work(),
+            });
+        if let Some(admission) = &admission {
             self.permits -= 1;
+            if admission.work_kind == WorkKind::Heavy {
+                self.heavy_permits -= 1;
+            }
         }
-        SchedulerOutcome {
-            pumped_bytes: 0,
-            collection_started,
-        }
+        self.outcome(0, reserve, admission)
     }
 
     pub fn pending_bytes(&self) -> Option<&[u8]> {
         self.pending.as_deref()
+    }
+
+    fn outcome(
+        &self,
+        pumped_bytes: usize,
+        terminal_reserved_bytes: usize,
+        admission: Option<SchedulerAdmission>,
+    ) -> SchedulerOutcome {
+        SchedulerOutcome {
+            pumped_bytes,
+            terminal_reserved_bytes,
+            admission,
+            remaining_permits: self.permits,
+            remaining_heavy_permits: self.heavy_permits,
+            overrun_debt: self.debt,
+        }
     }
 
     fn refill(&mut self) {
@@ -119,81 +189,5 @@ impl<C: MonotonicClock> ObservationScheduler<C> {
             .saturating_add(refill)
             .min(self.collection.burst.get());
         self.last_refill = now;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{cell::Cell, rc::Rc};
-
-    use super::{DeliveredPulse, MonotonicClock, ObservationScheduler};
-    use crate::{CollectionPolicyLimits, TransportPolicyLimits};
-
-    #[derive(Clone)]
-    struct FakeClock(Rc<Cell<u64>>);
-
-    impl MonotonicClock for FakeClock {
-        fn now_millis(&self) -> u64 {
-            self.0.get()
-        }
-    }
-
-    fn scheduler(clock: FakeClock) -> ObservationScheduler<FakeClock> {
-        ObservationScheduler::new(
-            clock,
-            CollectionPolicyLimits::new(10, 1, 2, 1).expect("finite collection limits"),
-            TransportPolicyLimits::new(64, 1).expect("finite transport limits"),
-        )
-    }
-
-    #[test]
-    fn pulse_pumps_pending_bytes_before_starting_collection() {
-        let clock = FakeClock(Rc::new(Cell::new(0)));
-        let mut scheduler = scheduler(clock);
-        scheduler
-            .stage_pending(b"immutable".to_vec())
-            .expect("empty slot accepts bytes");
-
-        let pumped = scheduler.deliver_pulse(DeliveredPulse::new(900, true));
-        assert_eq!(pumped.pumped_bytes(), b"immutable".len());
-        assert!(!pumped.collection_started());
-        assert_eq!(scheduler.pending_bytes(), None);
-    }
-
-    #[test]
-    fn urgency_never_refills_without_monotonic_real_time() {
-        let clock = FakeClock(Rc::new(Cell::new(0)));
-        let mut scheduler = scheduler(clock.clone());
-        assert!(
-            scheduler
-                .deliver_pulse(DeliveredPulse::new(1, true))
-                .collection_started()
-        );
-        assert!(
-            !scheduler
-                .deliver_pulse(DeliveredPulse::new(u64::MAX, true))
-                .collection_started()
-        );
-        clock.0.set(10);
-        assert!(
-            scheduler
-                .deliver_pulse(DeliveredPulse::new(1, true))
-                .collection_started()
-        );
-    }
-
-    #[test]
-    fn capacity_loss_retains_exact_pending_bytes_and_blocks_collection() {
-        let clock = FakeClock(Rc::new(Cell::new(0)));
-        let mut scheduler = scheduler(clock);
-        scheduler
-            .stage_pending(b"retain-me".to_vec())
-            .expect("empty slot accepts bytes");
-
-        let outcome = scheduler.deliver_pulse(DeliveredPulse::new(u64::MAX, false));
-
-        assert_eq!(outcome.pumped_bytes(), 0);
-        assert!(!outcome.collection_started());
-        assert_eq!(scheduler.pending_bytes(), Some(&b"retain-me"[..]));
     }
 }

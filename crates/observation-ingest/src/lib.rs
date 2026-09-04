@@ -14,6 +14,7 @@ mod legacy_generation;
 mod model;
 mod runtime_facts;
 mod scheduler;
+mod scheduler_queue;
 mod snapshot;
 mod validated_revision;
 mod wire;
@@ -53,6 +54,10 @@ pub use runtime_facts::{
     RuntimeOwnership, RuntimeSector,
 };
 pub use scheduler::{DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome};
+pub use scheduler_queue::{
+    CollectionClass, CollectionIntent, CollectionIntentId, SchedulerAdmission,
+    SchedulerSafetyLimits, WorkKind,
+};
 pub use snapshot::ProjectionSnapshot;
 pub use validated_revision::ValidatedSectionRevision;
 use wire::TracerObservation;
