@@ -8,11 +8,14 @@ mod support;
 
 use std::collections::BTreeMap;
 
+use observation_domain::{SectionCoverage, SectionQuality};
 use observation_persistence::{
     ObservationRepository, PublicationFailpoint, PublicationLimits, PublishOutcome, PublishRequest,
     ReconciliationOutcome, RetentionPolicy, SqliteObservationRepository,
 };
-use support::{TempDatabase, decision_set, key, revision, validated};
+use support::{
+    RevisionFixture, TempDatabase, decision_set, key, revision, validated, validated_with,
+};
 
 const fn limits() -> PublicationLimits {
     PublicationLimits::new(4, 256).expect("limits are non-zero")
@@ -86,6 +89,63 @@ fn reconciliation_proves_an_absent_attempt_retryable() {
         repository.publish(request),
         PublishOutcome::CommittedNew(_)
     ));
+}
+
+#[test]
+fn reconciliation_rejects_same_content_with_changed_authority() {
+    let database = TempDatabase::new("authority-mismatch");
+    let original = PublishRequest::from_revision(validated("ships", 1, None, BTreeMap::default()));
+    let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
+    assert!(matches!(
+        repository.publish(original),
+        PublishOutcome::CommittedNew(_)
+    ));
+    let mut variants = vec![
+        validated("ships", 1, Some(revision(9)), BTreeMap::default()),
+        validated(
+            "ships",
+            1,
+            None,
+            BTreeMap::from([(key("missing"), revision(9))]),
+        ),
+    ];
+    for fixture in [
+        RevisionFixture {
+            source_scope: "scope:other",
+            ..RevisionFixture::default()
+        },
+        RevisionFixture {
+            coverage: SectionCoverage::Partial,
+            ..RevisionFixture::default()
+        },
+        RevisionFixture {
+            quality: SectionQuality::Partial,
+            ..RevisionFixture::default()
+        },
+        RevisionFixture {
+            capture_start: 11,
+            ..RevisionFixture::default()
+        },
+        RevisionFixture {
+            batch_id: Some("batch:different-manifest"),
+            ..RevisionFixture::default()
+        },
+    ] {
+        variants.push(validated_with(
+            "ships",
+            1,
+            None,
+            BTreeMap::default(),
+            fixture,
+        ));
+    }
+    for revision in variants {
+        let request = PublishRequest::from_revision(revision);
+        assert!(matches!(
+            repository.reconcile_publication(&request),
+            ReconciliationOutcome::Ambiguous(_)
+        ));
+    }
 }
 
 #[test]

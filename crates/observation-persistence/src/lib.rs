@@ -10,6 +10,7 @@ mod sqlite;
 mod sqlite_pins;
 mod sqlite_read;
 mod sqlite_receipt;
+mod sqlite_reconcile;
 mod sqlite_write;
 mod sqlite_write_rows;
 mod types;

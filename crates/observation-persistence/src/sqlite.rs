@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
     PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    UnpinOutcome, record, retention, schema, sqlite_pins, sqlite_read, sqlite_receipt,
+    UnpinOutcome, retention, schema, sqlite_pins, sqlite_read, sqlite_receipt, sqlite_reconcile,
     sqlite_write,
 };
 use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
@@ -78,27 +78,11 @@ impl SqliteObservationRepository {
         {
             return ambiguous("reconciliation-corrupt");
         }
-        let Some(candidate) = record::normalize(request, self.limits) else {
-            return ambiguous("reconciliation-invalid");
-        };
-        let identity = (candidate.section_key.clone(), candidate.revision);
-        let receipt =
-            sqlite_receipt::load(&self.connection, &candidate.section_key, candidate.revision);
-        let current = sqlite_read::current_pointer(&self.connection, &candidate.section_key);
-        let outcome = match (receipt, current) {
-            (Ok(Some(receipt)), Ok(Some(current)))
-                if current == candidate.revision
-                    && receipt.content_digest == candidate.content_digest =>
-            {
-                ReconciliationOutcome::CommittedReplay(receipt)
-            }
-            (Ok(None), Ok(current))
-                if current == candidate.expected_current && self.dependencies_match(request) =>
-            {
-                ReconciliationOutcome::ProvenNotCommitted
-            }
-            _ => ambiguous("reconciliation-ambiguous"),
-        };
+        let identity = (
+            request.revision.section_key().clone(),
+            request.revision.section_revision(),
+        );
+        let outcome = sqlite_reconcile::classify(&self.connection, request, self.limits);
         if !matches!(outcome, ReconciliationOutcome::Ambiguous(_)) {
             self.ambiguous.remove(&identity);
         }
@@ -110,12 +94,6 @@ impl SqliteObservationRepository {
         policy: RetentionPolicy,
     ) -> Result<RetentionReport, RepositoryError> {
         retention::run(&mut self.connection, policy)
-    }
-
-    fn dependencies_match(&self, request: &PublishRequest) -> bool {
-        request.frozen_dependencies.iter().all(|(key, expected)| {
-            sqlite_read::current_pointer(&self.connection, key) == Ok(Some(*expected))
-        })
     }
 
     fn validate_stored_revisions(&self) -> Result<(), RepositoryError> {
