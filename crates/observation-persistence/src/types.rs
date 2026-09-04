@@ -141,3 +141,33 @@ pub enum PublishOutcome {
     PermanentRejection(RepositoryDiagnostic),
     Ambiguous(RepositoryDiagnostic),
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_support::validated;
+    use observation_ingest::DecisionRevisionIndex;
+
+    use super::{PublishRequest, PublishAttemptIdentity};
+
+    #[test]
+    fn publish_attempt_identity_and_retained_bytes_are_exact() {
+        let revision = validated(7, Some(crate::test_support::revision(6)));
+        let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
+        let accepted = index
+            .prepare_publication(revision.clone(), 1)
+            .expect("publication prepares");
+        let request = PublishRequest::from_accepted(accepted);
+        let expected = PublishAttemptIdentity::new(
+            revision.source_scope().clone(),
+            revision.source_session().clone(),
+            revision.section_key().clone(),
+            revision.section_revision(),
+            *revision.content_digest(),
+            revision.context().expected_current(),
+            revision.context().dependencies().clone(),
+        );
+
+        assert_eq!(request.attempt_identity(), &expected);
+        assert_eq!(request.retained_bytes(), Some(159));
+    }
+}

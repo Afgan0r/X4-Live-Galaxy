@@ -33,3 +33,45 @@ fn eligible_revision_becomes_stale_then_history_only_under_uncertainty() {
             if blockers == &[EligibilityBlocker::Uncertain(value("scope:x4", SourceScopeId::new))]
     ));
 }
+
+#[test]
+fn preparation_is_non_mutating_and_finalization_requires_live_authority() {
+    let mut index = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
+    index.record_current_pointer(key("ships"), revision(6));
+    index.record_current_pointer(key("sectors"), revision(4));
+    let accepted = index
+        .prepare_publication(finish(&mut staged()), 4)
+        .expect("current session prepares");
+
+    assert_eq!(index.current_count(), 0);
+    assert_eq!(index.history_count(), 0);
+    assert!(matches!(
+        index.eligibility(&[key("ships")], 4, 10),
+        DecisionEligibility::Blocked(_)
+    ));
+    assert_eq!(
+        index.finalize_committed(&accepted, 4),
+        FinalizationOutcome::Finalized
+    );
+    assert_eq!(
+        index.finalize_committed(&accepted, 4),
+        FinalizationOutcome::AlreadyFinalized
+    );
+    assert_eq!(index.current_count(), 1);
+
+    let pending = index
+        .prepare_publication(finish(&mut staged()), 5)
+        .expect("same session prepares");
+    index.mark_scope_uncertain(
+        &value("scope:x4", SourceScopeId::new),
+        SourceSessionIdentity::new(
+            value("producer:2", ProducerIncarnationId::new),
+            TransportEpoch::new(2).expect("epoch is positive"),
+        ),
+    );
+    assert_eq!(
+        index.finalize_committed(&pending, 5),
+        FinalizationOutcome::AuthorityChanged
+    );
+    assert_eq!(index.current_count(), 0);
+}
