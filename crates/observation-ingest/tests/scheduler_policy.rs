@@ -3,13 +3,12 @@
     reason = "test fixtures fail immediately when their invariants are invalid"
 )]
 
-use std::{cell::Cell, rc::Rc};
-
 use observation_ingest::{
     CollectionClass, CollectionIntent, CollectionIntentId, CollectionPolicyLimits,
-    CompletionDisposition, DeliveredPulse, MonotonicClock, ObservationScheduler, SchedulerOutcome,
-    SchedulerSafetyLimits, TransportPolicyLimits, WorkKind,
+    CompletionDisposition, DeliveredPulse, MonotonicClock, ObservationScheduler,
+    SchedulerAdmission, SchedulerOutcome, SchedulerSafetyLimits, TransportPolicyLimits, WorkKind,
 };
+use std::{cell::Cell, rc::Rc};
 
 #[derive(Clone)]
 struct FakeClock(Rc<Cell<u64>>);
@@ -66,14 +65,18 @@ fn assert_priority_order() {
     assert!(enq!(ranked, "core-low", Core, Light, 4, 1));
     assert!(enq!(ranked, "core-high", Core, Light, 4, 9));
     assert_eq!(
-        pulse(&mut ranked).admission().map(|a| a.intent_id()),
+        pulse(&mut ranked)
+            .admission()
+            .map(SchedulerAdmission::intent_id),
         Some(&id("core-high"))
     );
     let (mut tied, _) = scheduler();
     assert!(enq!(tied, "first", Core, Light, 4, 4));
     assert!(enq!(tied, "second", Core, Light, 4, 4));
     assert_eq!(
-        pulse(&mut tied).admission().map(|a| a.intent_id()),
+        pulse(&mut tied)
+            .admission()
+            .map(SchedulerAdmission::intent_id),
         Some(&id("first"))
     );
 }
@@ -176,11 +179,9 @@ fn policy_dimensions_reject_one_over_without_state_change() {
         assert!(enq!(value, &format!("q{number}"), Detail, Light, 4, 0));
     }
     assert!(!enq!(value, "queue-over", Core, Light, 4, 0));
-    let before = pulse(&mut value);
-    assert_eq!(
-        (before.queued_intents(), before.remaining_permits()),
-        (3, 1)
-    );
+    assert_eq!(pulse(&mut value).queued_intents(), 3);
+    assert!(pulse(&mut value).admission().is_some());
+    assert!(pulse(&mut value).admission().is_none());
     assert_eq!(
         value.complete(&id("q0"), 13),
         CompletionDisposition::CollectorRejected
@@ -192,6 +193,6 @@ fn policy_dimensions_reject_one_over_without_state_change() {
             after.queued_intents(),
             after.remaining_permits()
         ),
-        (8, 3, 1)
+        (8, 2, 0)
     );
 }
