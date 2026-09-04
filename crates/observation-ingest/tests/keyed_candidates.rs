@@ -28,6 +28,8 @@ fn start(section: &str, revision: u64, expected: usize) -> SectionStartEnvelope 
 fn batch(section: &str, revision: u64, identity: &str, version: u64) -> ImmutableBatchEnvelope {
     ImmutableBatchEnvelope {
         source_scope: id("scope:x4", SourceScopeId::new),
+        producer_incarnation: id("producer:1", ProducerIncarnationId::new),
+        transport_epoch: TransportEpoch::new(1).expect("epoch is positive"),
         section_key: id(section, SectionKey::new),
         section_revision: SectionRevisionId::new(revision).expect("revision is positive"),
         batch_id: id(identity, BatchId::new),

@@ -8,6 +8,7 @@ mod completion_types;
 mod eligibility;
 mod feedback;
 mod generation;
+mod legacy_candidate;
 mod legacy_generation;
 mod model;
 mod runtime_facts;

@@ -125,7 +125,7 @@ impl GenerationStager {
         let keys: Vec<_> = self
             .candidates
             .iter()
-            .filter(|(_, candidate)| &candidate.source_scope == scope)
+            .filter(|(_, candidate)| &candidate.start.source_scope == scope)
             .map(|(key, _)| key.clone())
             .collect();
         for key in &keys {

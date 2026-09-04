@@ -158,9 +158,11 @@ envelope_struct!(EnvelopeRecord {
     observation_version: ObservationVersion,
     content: String
 });
-envelope_struct!(ImmutableBatchEnvelope { source_scope: SourceScopeId, section_key: SectionKey, section_revision: SectionRevisionId, batch_id: BatchId, records: Vec<EnvelopeRecord>, optional_detail: Option<String> });
+envelope_struct!(ImmutableBatchEnvelope { source_scope: SourceScopeId, producer_incarnation: ProducerIncarnationId, transport_epoch: TransportEpoch, section_key: SectionKey, section_revision: SectionRevisionId, batch_id: BatchId, records: Vec<EnvelopeRecord>, optional_detail: Option<String> });
 envelope_struct!(SectionCompletionEnvelope {
     source_scope: SourceScopeId,
+    producer_incarnation: ProducerIncarnationId,
+    transport_epoch: TransportEpoch,
     section_key: SectionKey,
     section_revision: SectionRevisionId,
     record_count: usize,

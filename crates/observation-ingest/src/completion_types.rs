@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use observation_domain::{
     BatchId, CanonicalizationVersion, CaptureWindow, CompletionCoverage, DigestAlgorithmVersion,
     EnvelopeRecord, ObservationPolicyVersion, ObservationSchemaVersion, SectionCompletionEnvelope,
-    SectionKey, SectionRevisionId, SectionState, SourceScopeId,
+    SectionKey, SectionRevisionId, SectionStartEnvelope, SectionState, SourceScopeId,
 };
 
 use crate::CandidateUsage;
@@ -18,9 +18,7 @@ pub struct StagedBatch {
 }
 
 pub struct Candidate {
-    pub source_scope: SourceScopeId,
-    pub revision: SectionRevisionId,
-    pub expected_records: usize,
+    pub start: SectionStartEnvelope,
     pub usage: CandidateUsage,
     pub started_at: u64,
     pub last_progress_at: u64,

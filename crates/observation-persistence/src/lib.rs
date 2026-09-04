@@ -92,6 +92,9 @@ pub(crate) mod test_support {
         );
         let envelope = SectionCompletionEnvelope {
             source_scope,
+            producer_incarnation: ProducerIncarnationId::new("producer:1")
+                .expect("test producer is valid"),
+            transport_epoch: TransportEpoch::new(1).expect("epoch is non-zero"),
             section_key,
             section_revision: revision(value),
             record_count: 0,

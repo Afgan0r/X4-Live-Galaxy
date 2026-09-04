@@ -59,7 +59,7 @@ impl GenerationStager {
     pub fn candidate_expected_records(&self, key: &SectionKey) -> Option<usize> {
         self.candidates
             .get(key)
-            .map(|candidate| candidate.expected_records)
+            .map(|candidate| candidate.start.expected_records)
     }
     #[must_use]
     pub fn candidate_manifest(&self, key: &SectionKey) -> Vec<(usize, &BatchId)> {
@@ -75,11 +75,10 @@ impl GenerationStager {
     }
     pub fn start_section(&mut self, start: SectionStartEnvelope, now: u64) -> ReceiverDisposition {
         let key = start.section_key.clone();
-        let existing = self.candidates.get(&key).map(|current| {
-            let scope_matches = current.source_scope == start.source_scope;
-            let revision_matches = current.revision == start.section_revision;
-            scope_matches && revision_matches
-        });
+        let existing = self
+            .candidates
+            .get(&key)
+            .map(|current| current.start == start);
         match existing {
             Some(true) => return ReceiverDisposition::Received,
             Some(false) => return self.reject_candidate(&key),
@@ -95,9 +94,7 @@ impl GenerationStager {
         self.candidates.insert(
             key,
             Candidate {
-                source_scope: start.source_scope,
-                revision: start.section_revision,
-                expected_records: start.expected_records,
+                start,
                 usage: CandidateUsage::default(),
                 started_at: now,
                 last_progress_at: now,
@@ -123,9 +120,14 @@ impl GenerationStager {
         let Some(candidate) = self.candidates.get(&key) else {
             return ReceiverDisposition::PermanentlyRejected;
         };
-        let scope_matches = candidate.source_scope == batch.source_scope;
-        let revision_matches = candidate.revision == batch.section_revision;
-        if !scope_matches || !revision_matches {
+        if candidate.start.producer_incarnation != batch.producer_incarnation
+            || candidate.start.transport_epoch != batch.transport_epoch
+        {
+            return ReceiverDisposition::StaleEpoch;
+        }
+        if candidate.start.source_scope != batch.source_scope
+            || candidate.start.section_revision != batch.section_revision
+        {
             return self.reject_candidate(&key);
         }
         match candidate
@@ -167,13 +169,11 @@ impl GenerationStager {
         self.aggregate = aggregate;
         ReceiverDisposition::Received
     }
-
     pub(crate) fn drop_candidate(&mut self, key: &SectionKey) -> Option<Candidate> {
         let candidate = self.candidates.remove(key)?;
         self.aggregate = self.aggregate.release(candidate.usage)?;
         Some(candidate)
     }
-
     fn reject_candidate(&mut self, key: &SectionKey) -> ReceiverDisposition {
         self.drop_candidate(key);
         ReceiverDisposition::PermanentlyRejected

@@ -13,6 +13,8 @@ use observation_ingest::{
     EligibilityBlocker, GenerationLimits, GenerationStager, ReceiverDisposition, RejectionReason,
 };
 use std::collections::BTreeMap;
+#[path = "completion_contract/rejections.rs"]
+mod rejections;
 fn value<T>(raw: &str, make: impl FnOnce(String) -> Option<T>) -> T {
     make(raw.to_owned()).expect("fixture identity is valid")
 }
@@ -65,6 +67,8 @@ fn context() -> CandidateContext {
 fn batch(identity: &str, entity: &str, record: &str) -> ImmutableBatchEnvelope {
     ImmutableBatchEnvelope {
         source_scope: value("scope:x4", SourceScopeId::new),
+        producer_incarnation: value("producer:1", ProducerIncarnationId::new),
+        transport_epoch: TransportEpoch::new(1).expect("epoch is positive"),
         section_key: key("ships"),
         section_revision: revision(7),
         batch_id: value(identity, BatchId::new),
@@ -80,6 +84,8 @@ fn batch(identity: &str, entity: &str, record: &str) -> ImmutableBatchEnvelope {
 fn completion() -> SectionCompletionEnvelope {
     SectionCompletionEnvelope {
         source_scope: value("scope:x4", SourceScopeId::new),
+        producer_incarnation: value("producer:1", ProducerIncarnationId::new),
+        transport_epoch: TransportEpoch::new(1).expect("epoch is positive"),
         section_key: key("ships"),
         section_revision: revision(7),
         record_count: 2,
@@ -135,20 +141,6 @@ fn exact_completion_yields_one_immutable_unpublished_revision() {
     );
     assert!(!revision.is_published());
     assert_eq!(stager.candidate_count(), 0);
-}
-#[test]
-fn any_count_length_digest_or_version_mismatch_discards_candidate() {
-    let mut stager = staged();
-    let mut certificate = stager
-        .completion_certificate(completion())
-        .expect("candidate exists");
-    certificate.record_count += 1;
-    assert_eq!(
-        stager.complete_section(&certificate, &current(), 4),
-        CompletionOutcome::Rejected(RejectionReason::CompletionMismatch)
-    );
-    assert_eq!(stager.candidate_count(), 0);
-    assert_eq!(stager.aggregate_usage().candidate_count, 0);
 }
 #[test]
 fn frozen_dependency_mismatch_discards_and_arms_finite_cooldown() {

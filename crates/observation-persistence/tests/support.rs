@@ -82,6 +82,9 @@ pub fn validated(
     );
     let envelope = SectionCompletionEnvelope {
         source_scope,
+        producer_incarnation: ProducerIncarnationId::new("producer:1")
+            .expect("fixture producer is valid"),
+        transport_epoch: TransportEpoch::new(1).expect("epoch is non-zero"),
         section_key,
         section_revision: revision(value),
         record_count: 0,

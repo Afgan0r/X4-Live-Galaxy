@@ -1,12 +1,11 @@
 use crate::batch::{apply_observation, apply_reconciliation_with_limit, complete_marker};
-use crate::completion_types::Candidate;
+use crate::legacy_candidate::build_legacy_candidate;
 use crate::wire::{FrameHeader, WireCompleteMarker, WireFrame};
 use crate::{
     AcceptedProjection, AdmissionError, CandidateUsage, GenerationProgress, GenerationStager,
     RejectionReason,
 };
-use observation_domain::{SectionKey, SectionRevisionId, SourceScopeId};
-use std::collections::BTreeMap;
+use observation_domain::SectionKey;
 type LegacyResult = Result<GenerationProgress, AdmissionError>;
 type HeaderResult = Result<(SectionKey, u64, u64, u64), AdmissionError>;
 impl GenerationStager {
@@ -75,26 +74,9 @@ impl GenerationStager {
             .add_candidate()
             .filter(|usage| usage.within(self.limits.aggregate))
             .ok_or(AdmissionError::CollectionLimitExceeded)?;
-        let source_scope =
-            SourceScopeId::new(key.as_str().to_owned()).ok_or(AdmissionError::InvalidScope)?;
-        let revision = SectionRevisionId::new(version).ok_or(AdmissionError::InvalidVersion)?;
         self.aggregate = aggregate;
-        self.candidates.insert(
-            key.clone(),
-            Candidate {
-                source_scope,
-                revision,
-                expected_records: 0,
-                usage: CandidateUsage::default(),
-                started_at: receipt,
-                last_progress_at: receipt,
-                batches: BTreeMap::new(),
-                legacy_identity: Some((key.as_str().to_owned(), version, generation)),
-                next_sequence: 1,
-                legacy_frames: Vec::new(),
-                context: None,
-            },
-        );
+        let candidate = build_legacy_candidate(key, version, generation, receipt)?;
+        self.candidates.insert(key.clone(), candidate);
         Ok(())
     }
     fn stage_legacy_payload(
@@ -111,7 +93,7 @@ impl GenerationStager {
             .ok_or(AdmissionError::InvalidFixture)?;
         let identity = (
             key.as_str().to_owned(),
-            candidate.revision.get(),
+            candidate.start.section_revision.get(),
             generation,
         );
         if candidate.legacy_identity != Some(identity) || candidate.next_sequence != sequence {

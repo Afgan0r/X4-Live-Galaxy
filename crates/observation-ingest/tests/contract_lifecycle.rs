@@ -144,8 +144,8 @@ fn strict_whole_message_decode_rejects_invalid_contracts_before_staging() {
 
 #[test]
 fn ship_and_known_empty_station_use_the_same_strict_envelopes() {
-    let ship = br#"{"type":"immutable_batch","contract_version":1,"source_scope":"scope:ships","section_key":"ships","section_revision":3,"batch_id":"batch:ships:3","records":[{"record_id":"record:ship:1","entity_id":"ship:1","observation_version":4,"content":"core"},{"record_id":"record:ship:2","entity_id":"ship:2","observation_version":2,"content":"core"}],"optional_detail":"detail_unavailable"}"#;
-    let station = br#"{"type":"section_completion","contract_version":1,"source_scope":"scope:stations","section_key":"stations","section_revision":8,"record_count":0,"coverage":"known_empty"}"#;
+    let ship = br#"{"type":"immutable_batch","contract_version":1,"source_scope":"scope:ships","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"ships","section_revision":3,"batch_id":"batch:ships:3","records":[{"record_id":"record:ship:1","entity_id":"ship:1","observation_version":4,"content":"core"},{"record_id":"record:ship:2","entity_id":"ship:2","observation_version":2,"content":"core"}],"optional_detail":"detail_unavailable"}"#;
+    let station = br#"{"type":"section_completion","contract_version":1,"source_scope":"scope:stations","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"stations","section_revision":8,"record_count":0,"coverage":"known_empty"}"#;
 
     let CompleteMessage::ImmutableBatch(ship) =
         decode_complete_message(ship, 1024).expect("ship fixture is valid")

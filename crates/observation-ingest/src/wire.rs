@@ -1,3 +1,4 @@
+use crate::runtime_facts::RuntimeFacts;
 pub use observation_domain::FrameHeader;
 use observation_domain::{
     BatchId, CompleteMessage, ControlEnvelope, EntityId, EnvelopeDecodeError, EnvelopeRecord,
@@ -6,9 +7,6 @@ use observation_domain::{
     TransportEpoch,
 };
 use serde::Deserialize;
-
-use crate::runtime_facts::RuntimeFacts;
-
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WireFrame {
@@ -18,7 +16,6 @@ pub enum WireFrame {
     Observation(WireObservation),
     CompleteMarker(WireCompleteMarker),
 }
-
 macro_rules! wire_struct {
     ($name:ident { $($field:ident: $ty:ty),* $(,)? }) => {
         #[derive(Deserialize)]
@@ -37,7 +34,6 @@ wire_struct!(TracerObservation {
     version: u64,
     quality: TracerQuality
 });
-
 #[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TracerQuality {
@@ -60,7 +56,6 @@ impl From<TracerQuality> for observation_domain::SectionQuality {
         }
     }
 }
-
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum RawEnvelope {
@@ -83,10 +78,12 @@ wire_struct!(RawSectionStart {
     section_revision: u64,
     expected_records: usize
 });
-wire_struct!(RawBatch { contract_version: u64, source_scope: String, section_key: String, section_revision: u64, batch_id: String, records: Vec<RawRecord>, optional_detail: Option<String> });
+wire_struct!(RawBatch { contract_version: u64, source_scope: String, producer_incarnation: String, transport_epoch: u64, section_key: String, section_revision: u64, batch_id: String, records: Vec<RawRecord>, optional_detail: Option<String> });
 wire_struct!(RawCompletion {
     contract_version: u64,
     source_scope: String,
+    producer_incarnation: String,
+    transport_epoch: u64,
     section_key: String,
     section_revision: u64,
     record_count: usize,
@@ -101,7 +98,6 @@ wire_struct!(RawRecord {
     observation_version: u64,
     content: String
 });
-
 pub fn decode_complete_message(
     bytes: &[u8],
     limit: usize,
@@ -112,7 +108,6 @@ pub fn decode_complete_message(
     let raw = serde_json::from_slice(bytes).map_err(|_| EnvelopeDecodeError::InvalidShape)?;
     decode_raw(raw)
 }
-
 macro_rules! identity {
     ($ty:ident, $value:expr) => {
         $ty::new($value).ok_or(EnvelopeDecodeError::InvalidIdentity)?
@@ -141,6 +136,8 @@ fn decode_raw(raw: RawEnvelope) -> Result<CompleteMessage, EnvelopeDecodeError> 
             EnvelopeDecodeError::require_contract(raw.contract_version)?;
             Ok(CompleteMessage::ImmutableBatch(ImmutableBatchEnvelope {
                 source_scope: identity!(SourceScopeId, raw.source_scope),
+                producer_incarnation: identity!(ProducerIncarnationId, raw.producer_incarnation),
+                transport_epoch: number!(TransportEpoch, raw.transport_epoch),
                 section_key: identity!(SectionKey, raw.section_key),
                 section_revision: number!(SectionRevisionId, raw.section_revision),
                 batch_id: identity!(BatchId, raw.batch_id),
@@ -153,6 +150,11 @@ fn decode_raw(raw: RawEnvelope) -> Result<CompleteMessage, EnvelopeDecodeError> 
             Ok(CompleteMessage::SectionCompletion(
                 SectionCompletionEnvelope {
                     source_scope: identity!(SourceScopeId, raw.source_scope),
+                    producer_incarnation: identity!(
+                        ProducerIncarnationId,
+                        raw.producer_incarnation
+                    ),
+                    transport_epoch: number!(TransportEpoch, raw.transport_epoch),
                     section_key: identity!(SectionKey, raw.section_key),
                     section_revision: number!(SectionRevisionId, raw.section_revision),
                     record_count: raw.record_count,

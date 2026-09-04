@@ -107,9 +107,9 @@ impl GenerationStager {
             return CompletionOutcome::Rejected(RejectionReason::CompletionMismatch);
         };
         CompletionOutcome::Validated(Box::new(ValidatedSectionRevision {
-            source_scope: candidate.source_scope,
+            source_scope: candidate.start.source_scope,
             section_key: key,
-            section_revision: candidate.revision,
+            section_revision: candidate.start.section_revision,
             records,
             coverage: certificate.envelope.coverage,
             context,
@@ -145,9 +145,11 @@ fn completion_is_exact(
     context: &CandidateContext,
     records: &[observation_domain::EnvelopeRecord],
 ) -> bool {
-    candidate.source_scope == certificate.envelope.source_scope
-        && candidate.revision == certificate.envelope.section_revision
-        && candidate.expected_records == records.len()
+    candidate.start.source_scope == certificate.envelope.source_scope
+        && candidate.start.producer_incarnation == certificate.envelope.producer_incarnation
+        && candidate.start.transport_epoch == certificate.envelope.transport_epoch
+        && candidate.start.section_revision == certificate.envelope.section_revision
+        && candidate.start.expected_records == records.len()
         && certificate.envelope.record_count == records.len()
         && certificate.batch_count == candidate.batches.len()
         && certificate.record_count == records.len()
