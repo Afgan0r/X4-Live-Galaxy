@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 05.3
 current_phase_name: Generic Observation Contracts and Durable Publication
 status: executing
-stopped_at: Gap-closure plans 05.3-04 and 05.3-05 verified
-last_updated: "2026-09-04T20:25:20.909Z"
-last_activity: 2026-09-04
-last_activity_desc: Phase 05.3 gap-closure planning completed
-state_head: e3495515d9c66565d7f438e68838e0aeaac716eb
+stopped_at: Completed 05.3-05-PLAN.md
+last_updated: "2026-09-04T22:23:20.078Z"
+last_activity: 2026-09-05
+last_activity_desc: Phase 05.3 Plan 05 completed
+state_head: e04fc4b7a4bf4faf0e8d21ddbc49997b228e2120
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 42
-  completed_plans: 40
+  completed_plans: 41
   percent: 36
 ---
 
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 
 ## Current Position
 
-Phase: 05.3 (Generic Observation Contracts and Durable Publication) — READY TO EXECUTE
-Plan: 3 of 5
+Phase: 05.3 (Generic Observation Contracts and Durable Publication) — EXECUTING
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-09-04 — Phase 05.3 gap-closure planning completed
+Last activity: 2026-09-05 — Phase 05.3 Plan 05 completed
 
-Progress: [████░░░░░░] 36% (5 of 14 phases historically complete; Phase 05.3 has 2 pending plans)
+Progress: [████░░░░░░] 36% (5 of 14 phases historically complete; Phase 05.3 has 1 pending plan)
 
 ## Performance Metrics
 
@@ -92,6 +92,7 @@ Progress: [████░░░░░░] 36% (5 of 14 phases historically comp
 | Phase 05.3 P01 | 27min | 3 tasks | 13 files |
 | Phase 05.3 P02 | 49min | 3 tasks | 19 files |
 | Phase 05.3 P03 | 17h 17m | 3 tasks | 19 files |
+| Phase 05.3 P05 | 33min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -187,6 +188,8 @@ Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md o
 - [Phase 05.3]: Durable publication uses one immediate transaction for immutable content, terminal receipt, and conditional current-pointer advancement.
 - [Phase 05.3]: Unknown commit results and post-commit response loss remain ambiguous until exact durable receipt and pointer reconciliation.
 - [Phase 05.3]: Retention preserves all current, dependency-reachable, and decision-pinned revisions; unpinning only removes reachability.
+- [Phase 05.3]: Game-time urgency affects deterministic ordering only; all admission resources remain monotonic-real-time state. — Preserves the accepted separation between urgency and capacity.
+- [Phase 05.3]: Exact in-flight completion identity owns heavy-permit release and bounded overrun debt. — Prevents duplicate release, wrapping, and unbounded collector overrun.
 
 ### Pending Todos
 
@@ -224,6 +227,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T15:52:48.489Z
-Stopped at: Completed 05.3-03-PLAN.md
+Last session: 2026-09-04T22:23:19.097Z
+Stopped at: Completed 05.3-05-PLAN.md
 Resume file: None

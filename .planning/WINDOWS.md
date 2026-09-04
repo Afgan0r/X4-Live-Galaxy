@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 11
+open_count: 12
 waived_count: 0
 fixed_count: 0
-total_count: 11
-last_updated: 2026-08-31T21:28:12.451Z
+total_count: 12
+last_updated: 2026-09-04T22:24:07.147Z
 ---
 
 # Broken Windows Ledger
@@ -26,6 +26,7 @@ last_updated: 2026-08-31T21:28:12.451Z
 | 9 | 05.2 | deviation | tools/x4-verification/build-candidate-extension.ps1 |  | Summed generated-file bytes explicitly for ordered dictionary entries. | open |  | 2026-08-30T00:28:28.726Z |  |
 | 10 | 05.1 | deviation | crates/observation-ingest/src/generation.rs |  | Explicit resume generation was added to preserve restart replay and stale-generation rejection. | open |  | 2026-08-31T21:28:12.067Z |  |
 | 11 | 05.1 | deviation | crates/observation-ingest/tests/batch_bounds.rs |  | Task 2 began green because the Task 1 tracer already supplied streamed legacy-bound isolation. | open |  | 2026-08-31T21:28:12.451Z |  |
+| 12 | 05.3 | deviation | .planning/STATE.md |  | Corrected stale out-of-order sequential plan counter after Plan 05 completion | open |  | 2026-09-04T22:24:07.147Z |  |
 
 ````json
 [
@@ -159,6 +160,18 @@ last_updated: 2026-08-31T21:28:12.451Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-08-31T21:28:12.451Z",
+    "resolved_at": null
+  },
+  {
+    "id": 12,
+    "kind": "deviation",
+    "phase": "05.3",
+    "file": ".planning/STATE.md",
+    "line": null,
+    "description": "Corrected stale out-of-order sequential plan counter after Plan 05 completion",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-04T22:24:07.147Z",
     "resolved_at": null
   }
 ]

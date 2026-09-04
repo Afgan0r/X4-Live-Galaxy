@@ -283,7 +283,7 @@ Plans:
 6. Local behavioral and persistence evidence proves the generic contracts without being reported as X4 integration proof. The owner approves research and checked plans before execution.
 
 **Research:** Required. Start from `05.3-CONTEXT.md`, `05.3-READINESS.md` and the closed Docs MCP admission evidence. Carrier A's measured limitation and the resulting Carrier B decision constrain the facade but do not pull production transport into this phase.
-**Plans:** 3/5 plans executed; two verified gap-closure plans are ready across Waves 4-5.
+**Plans:** 4/5 plans executed; one verified gap-closure plan remains ready in Wave 5.
 **Wave 1**
 
 - [x] 05.3-01-PLAN.md
@@ -298,7 +298,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05.3-05-PLAN.md — enforce bounded scheduler urgency, work admission, reserve and debt policy
+- [x] 05.3-05-PLAN.md — enforce bounded scheduler urgency, work admission, reserve and debt policy
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -429,7 +429,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 5. Bounded Shadow Deliberation | 5/5 | Complete    | 2026-08-29 |
 | 05.1. Bounded Real Component Discovery | 6 summarized | Remainder superseded/reassigned | - |
 | 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
-| 05.3. Generic Observation Contracts and Durable Publication | 3/3 | In Progress|  |
+| 05.3. Generic Observation Contracts and Durable Publication | 4/5 | In Progress|  |
 | 05.4. Owned Carrier B and Production Observation Path | 0/TBD | Awaiting dedicated owner discussion after 05.3 | - |
 | 05.5. Heavy Faction Ship Conformance | 0/TBD | Awaiting 05.4 and owner discussion | - |
 | 05.6. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.5 | - |
