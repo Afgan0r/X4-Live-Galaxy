@@ -33,8 +33,9 @@ pub use eligibility::{
     EligibilityBlocker,
 };
 pub use feedback::{
-    CollectionPolicyLimits, DeliveryStage, FeedbackError, ImmutableApplicationBatch,
-    ReceiverDisposition, SlotAdmission, StopAndWaitSlot, TransportPolicyLimits,
+    AmbiguityResolution, CollectionPolicyLimits, DeliveryStage, FeedbackError,
+    ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, SlotTurnover, StopAndWaitSlot,
+    TransportPolicyLimits,
 };
 pub use generation::GenerationStager;
 pub use model::{
@@ -64,7 +65,6 @@ pub use validated_revision::ValidatedSectionRevision;
 use wire::TracerObservation;
 pub use wire::decode_complete_message;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
-
 pub fn inspect_frame(payload: &str) -> Result<FrameHeader, AdmissionError> {
     if payload.len() > 2_048 {
         return Err(AdmissionError::FrameTooLarge);
