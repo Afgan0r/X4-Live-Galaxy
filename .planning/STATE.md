@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 05.3
 current_phase_name: Generic Observation Contracts and Durable Publication
-status: executing
-stopped_at: Completed 05.3-02-PLAN.md
-last_updated: "2026-09-03T22:25:58.972Z"
+status: verifying
+stopped_at: Completed 05.3-03-PLAN.md
+last_updated: "2026-09-04T15:52:49.400Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 05.3 execution started
-state_head: 03c1d91fae19fe9aeba7e88e130a5841a146a4ab
+state_head: c2a8226c4178a6801b2ead91fa6bf48edf3e3e52
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 40
-  completed_plans: 39
+  completed_plans: 40
   percent: 36
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 
 Phase: 05.3 (Generic Observation Contracts and Durable Publication) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-04 — Phase 05.3 execution started
 
 Progress: [████░░░░░░] 36% (5 of 14 phases historically complete; Phase 05.3 has 3 pending plans)
@@ -91,6 +91,7 @@ Progress: [████░░░░░░] 36% (5 of 14 phases historically comp
 | Phase 05.1 P08 | 41m | 2 tasks | 5 files |
 | Phase 05.3 P01 | 27min | 3 tasks | 13 files |
 | Phase 05.3 P02 | 49min | 3 tasks | 19 files |
+| Phase 05.3 P03 | 17h 17m | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -183,6 +184,9 @@ Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md o
 - [Phase 05.3]: Candidate and aggregate limits remain injected non-zero policy; no production numeric default was introduced.
 - [Phase 05.3]: Source uncertainty retires matching accepted revisions to history and drops matching volatile candidates without inventing authority.
 - [Phase 05.3]: Deletion requires two qualifying same-scope absences; weak evidence preserves the core entity.
+- [Phase 05.3]: Durable publication uses one immediate transaction for immutable content, terminal receipt, and conditional current-pointer advancement.
+- [Phase 05.3]: Unknown commit results and post-commit response loss remain ambiguous until exact durable receipt and pointer reconciliation.
+- [Phase 05.3]: Retention preserves all current, dependency-reachable, and decision-pinned revisions; unpinning only removes reachability.
 
 ### Pending Todos
 
@@ -220,6 +224,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-03T22:25:58.171Z
-Stopped at: Completed 05.3-02-PLAN.md
+Last session: 2026-09-04T15:52:48.489Z
+Stopped at: Completed 05.3-03-PLAN.md
 Resume file: None
