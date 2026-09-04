@@ -10,8 +10,9 @@ use observation_domain::{
     TransportEpoch,
 };
 use observation_ingest::{
-    CompleteMessage, DeliveryStage, EnvelopeDecodeError, ImmutableApplicationBatch,
-    ReceiverDisposition, SlotAdmission, StopAndWaitSlot, decode_complete_message,
+    AmbiguityResolution, CompleteMessage, DeliveryStage, EnvelopeDecodeError,
+    ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, SlotTurnover,
+    StopAndWaitSlot, decode_complete_message,
 };
 
 const fn epoch(value: u64) -> TransportEpoch {
@@ -162,4 +163,93 @@ fn ship_and_known_empty_station_use_the_same_strict_envelopes() {
     assert_eq!(ship.optional_detail.as_deref(), Some("detail_unavailable"));
     assert_eq!(station.record_count, 0);
     assert!(station.is_qualified_known_empty());
+}
+
+#[test]
+fn turnover_requires_confirmed_disposition_and_preserves_exact_replay() {
+    for disposition in [
+        ReceiverDisposition::Received,
+        ReceiverDisposition::Committed,
+        ReceiverDisposition::TimedOutOrSuperseded,
+        ReceiverDisposition::StaleEpoch,
+        ReceiverDisposition::PermanentlyRejected,
+    ] {
+        let mut slot = StopAndWaitSlot::empty();
+        let original = batch("batch:turnover", b"exact-owned-bytes");
+        let next = batch("batch:next", b"next");
+
+        assert_eq!(slot.stage_batch(original.clone()), SlotAdmission::Staged);
+        assert_eq!(slot.stage_batch(next.clone()), SlotAdmission::CapacityUnavailable);
+        assert_eq!(slot.mark_local_handoff(), Ok(DeliveryStage::LocalHandoff));
+        assert_eq!(slot.apply_disposition(disposition), Ok(slot.stage()));
+        assert_eq!(slot.stage_batch(next.clone()), SlotAdmission::CapacityUnavailable);
+        assert_eq!(slot.confirm_turnover(), Ok(SlotTurnover::Released));
+        assert_eq!(
+            slot.stage_batch(original.clone()),
+            SlotAdmission::ExactReplay(disposition)
+        );
+        assert_eq!(
+            slot.stage_batch(batch("batch:turnover", b"changed")),
+            SlotAdmission::IdentityConflict
+        );
+        assert_eq!(slot.stage_batch(next), SlotAdmission::Staged);
+        assert_eq!(slot.pending_bytes(), Some(&b"next"[..]));
+    }
+
+    let mut retained = StopAndWaitSlot::empty();
+    let pending = batch("batch:retry", b"same-retry-bytes");
+    assert_eq!(retained.stage_batch(pending.clone()), SlotAdmission::Staged);
+    assert_eq!(retained.mark_local_handoff(), Ok(DeliveryStage::LocalHandoff));
+    assert_eq!(
+        retained.apply_disposition(ReceiverDisposition::CapacityUnavailable),
+        Ok(DeliveryStage::CollectionProgress)
+    );
+    assert_eq!(
+        retained.confirm_turnover(),
+        Ok(SlotTurnover::RetainedExactRetry)
+    );
+    assert_eq!(retained.pending_bytes(), Some(pending.bytes()));
+    assert_eq!(retained.mark_retry_handoff(), Ok(DeliveryStage::LocalHandoff));
+}
+
+#[test]
+fn ambiguous_reconciliation_controls_retry_and_release() {
+    let mut slot = StopAndWaitSlot::empty();
+    let pending = batch("batch:ambiguous", b"one-uncertain-owner");
+    assert_eq!(slot.stage_batch(pending.clone()), SlotAdmission::Staged);
+    assert_eq!(slot.mark_local_handoff(), Ok(DeliveryStage::LocalHandoff));
+    assert_eq!(
+        slot.apply_disposition(ReceiverDisposition::AmbiguousCommit),
+        Ok(DeliveryStage::AmbiguousPublication)
+    );
+    assert_eq!(
+        slot.stage_batch(batch("batch:blocked", b"blocked")),
+        SlotAdmission::CapacityUnavailable
+    );
+    assert!(slot.mark_retry_handoff().is_err());
+    assert_eq!(slot.confirm_turnover(), Ok(SlotTurnover::BlockedAmbiguous));
+    assert_eq!(
+        slot.apply_reconciliation(AmbiguityResolution::StillAmbiguous),
+        Ok(SlotTurnover::BlockedAmbiguous)
+    );
+    assert_eq!(slot.pending_bytes(), Some(pending.bytes()));
+    assert_eq!(
+        slot.apply_reconciliation(AmbiguityResolution::ProvenNotCommitted),
+        Ok(SlotTurnover::RetainedExactRetry)
+    );
+    assert_eq!(slot.pending_bytes(), Some(pending.bytes()));
+    assert_eq!(slot.mark_retry_handoff(), Ok(DeliveryStage::LocalHandoff));
+
+    assert_eq!(
+        slot.apply_disposition(ReceiverDisposition::AmbiguousCommit),
+        Ok(DeliveryStage::AmbiguousPublication)
+    );
+    assert_eq!(
+        slot.apply_reconciliation(AmbiguityResolution::Committed),
+        Ok(SlotTurnover::Released)
+    );
+    assert_eq!(
+        slot.stage_batch(pending),
+        SlotAdmission::ExactReplay(ReceiverDisposition::Committed)
+    );
 }
