@@ -21,7 +21,6 @@ pub struct RetainedPublicationAttempt {
     pub(crate) request: PublishRequest,
     pub(crate) identity: PublishAttemptIdentity,
     pub(crate) authority: AcceptedPublication,
-    pub(crate) accepted_at: u64,
     pub(crate) started_at: u64,
     pub(crate) retained_bytes: usize,
     pub(crate) reconcile_count: usize,
@@ -32,15 +31,14 @@ impl RetainedPublicationAttempt {
     pub(crate) fn new(
         request: PublishRequest,
         authority: AcceptedPublication,
-        accepted_at: u64,
+        started_at: u64,
         retained_bytes: usize,
     ) -> Self {
         Self {
             identity: request.attempt_identity().clone(),
             request,
             authority,
-            accepted_at,
-            started_at: accepted_at,
+            started_at,
             retained_bytes,
             reconcile_count: 0,
             state: AttemptState::Ambiguous,

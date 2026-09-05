@@ -27,7 +27,9 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         }
         attempt.record_reconciliation();
         match self.repository.reconcile_publication(&attempt.request) {
-            ReconciliationOutcome::CommittedReplay(_) => self.finish_reconciliation(attempt),
+            ReconciliationOutcome::CommittedReplay(receipt) => {
+                self.finish_reconciliation(attempt, receipt.accepted_at)
+            }
             ReconciliationOutcome::ProvenNotCommitted => {
                 let _ = self
                     .slot
@@ -105,8 +107,8 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         attempt: RetainedPublicationAttempt,
     ) -> Result<LifecycleResult, LifecycleError> {
         match self.repository.publish(attempt.request.clone()) {
-            PublishOutcome::CommittedNew(_) | PublishOutcome::CommittedReplay(_) => {
-                self.finish_committed(attempt)
+            PublishOutcome::CommittedNew(receipt) | PublishOutcome::CommittedReplay(receipt) => {
+                self.finish_committed(attempt, receipt.accepted_at)
             }
             PublishOutcome::Ambiguous(_) => {
                 self.block_attempt(attempt, LifecycleError::BlockedAmbiguous)
@@ -123,10 +125,11 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
     fn finish_committed(
         &mut self,
         attempt: RetainedPublicationAttempt,
+        accepted_at: u64,
     ) -> Result<LifecycleResult, LifecycleError> {
         let outcome = self
             .index
-            .finalize_committed(&attempt.authority, attempt.accepted_at);
+            .finalize_committed(&attempt.authority, accepted_at);
         if RetainedPublicationAttempt::finalized(outcome) {
             self.stager
                 .record_committed_revision(attempt.authority.revision());
@@ -158,10 +161,11 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
     fn finish_reconciliation(
         &mut self,
         attempt: RetainedPublicationAttempt,
+        accepted_at: u64,
     ) -> Result<LifecycleResult, LifecycleError> {
         let outcome = self
             .index
-            .finalize_committed(&attempt.authority, attempt.accepted_at);
+            .finalize_committed(&attempt.authority, accepted_at);
         if !RetainedPublicationAttempt::finalized(outcome) {
             self.retained = Some(attempt);
             return Err(LifecycleError::FinalizationBlocked);
