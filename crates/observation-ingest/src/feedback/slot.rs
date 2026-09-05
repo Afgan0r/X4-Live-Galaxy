@@ -24,6 +24,7 @@ pub enum SlotTurnover {
 pub enum AmbiguityResolution {
     Committed,
     ProvenNotCommitted,
+    Superseded,
     StillAmbiguous,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -150,6 +151,9 @@ impl StopAndWaitSlot {
         }
         match resolution {
             AmbiguityResolution::Committed => self.release(ReceiverDisposition::Committed),
+            AmbiguityResolution::Superseded => {
+                self.release(ReceiverDisposition::TimedOutOrSuperseded)
+            }
             AmbiguityResolution::ProvenNotCommitted => {
                 let pending = self.pending.as_mut().ok_or(FeedbackError::NoPendingBatch)?;
                 pending.disposition = Some(ReceiverDisposition::CapacityUnavailable);

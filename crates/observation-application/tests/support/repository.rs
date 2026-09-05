@@ -25,6 +25,7 @@ pub struct RecordingRepository {
     inner: SqliteObservationRepository,
     log: AttemptLog,
     first: FirstPublish,
+    reconciliation: Option<ReconciliationOutcome>,
 }
 
 #[derive(Clone, Copy)]
@@ -40,7 +41,17 @@ impl RecordingRepository {
         log: AttemptLog,
         first: FirstPublish,
     ) -> Self {
-        Self { inner, log, first }
+        Self {
+            inner,
+            log,
+            first,
+            reconciliation: None,
+        }
+    }
+
+    pub fn with_reconciliation(mut self, outcome: ReconciliationOutcome) -> Self {
+        self.reconciliation = Some(outcome);
+        self
     }
 }
 
@@ -90,6 +101,8 @@ impl ObservationRepository for RecordingRepository {
 
 impl PublicationReconciler for RecordingRepository {
     fn reconcile_publication(&mut self, request: &PublishRequest) -> ReconciliationOutcome {
-        self.inner.reconcile_publication(request)
+        self.reconciliation
+            .take()
+            .unwrap_or_else(|| self.inner.reconcile_publication(request))
     }
 }
