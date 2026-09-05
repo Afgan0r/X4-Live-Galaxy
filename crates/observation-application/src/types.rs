@@ -1,7 +1,9 @@
 use std::num::{NonZeroU64, NonZeroUsize};
 
 use observation_domain::{BatchId, TransportEpoch};
-use observation_ingest::{CandidateContext, CompletionCurrent, ReceiverDisposition};
+use observation_ingest::{
+    ApplicationContextIdentity, CandidateContext, CompletionCurrent, ReceiverDisposition,
+};
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,6 +42,16 @@ pub enum LifecycleContext {
     Start(CandidateContext),
     Batch,
     Completion(CompletionCurrent),
+}
+
+impl LifecycleContext {
+    pub(crate) fn replay_identity(&self) -> ApplicationContextIdentity {
+        match self {
+            Self::Start(context) => ApplicationContextIdentity::Start(context.clone()),
+            Self::Batch => ApplicationContextIdentity::Batch,
+            Self::Completion(current) => ApplicationContextIdentity::Completion(current.clone()),
+        }
+    }
 }
 
 #[must_use]

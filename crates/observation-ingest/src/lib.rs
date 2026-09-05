@@ -33,9 +33,9 @@ pub use eligibility::{
     EligibilityBlocker, FinalizationOutcome,
 };
 pub use feedback::{
-    AmbiguityResolution, CollectionPolicyLimits, DeliveryStage, FeedbackError,
-    ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, SlotTurnover, StopAndWaitSlot,
-    TransportPolicyLimits,
+    AmbiguityResolution, ApplicationContextIdentity, CollectionPolicyLimits, DeliveryStage,
+    FeedbackError, ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, SlotTurnover,
+    StopAndWaitSlot, TransportPolicyLimits,
 };
 pub use generation::GenerationStager;
 pub use model::{

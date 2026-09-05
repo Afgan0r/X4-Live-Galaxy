@@ -7,9 +7,9 @@ use observation_domain::{
     TransportEpoch,
 };
 use observation_ingest::{
-    AmbiguityResolution, CompleteMessage, DeliveryStage, EnvelopeDecodeError,
-    ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission, SlotTurnover, StopAndWaitSlot,
-    decode_complete_message,
+    AmbiguityResolution, ApplicationContextIdentity, CompleteMessage, DeliveryStage,
+    EnvelopeDecodeError, ImmutableApplicationBatch, ReceiverDisposition, SlotAdmission,
+    SlotTurnover, StopAndWaitSlot, decode_complete_message,
 };
 use std::any::type_name;
 const fn epoch(value: u64) -> TransportEpoch {
@@ -17,8 +17,13 @@ const fn epoch(value: u64) -> TransportEpoch {
 }
 fn batch(identity: &str, bytes: &[u8]) -> ImmutableApplicationBatch {
     let identity = BatchId::new(identity).expect("test batch identity is non-empty");
-    ImmutableApplicationBatch::new(epoch(3), identity, bytes.to_vec())
-        .expect("test batch is non-empty")
+    ImmutableApplicationBatch::new(
+        epoch(3),
+        identity,
+        bytes.to_vec(),
+        ApplicationContextIdentity::Batch,
+    )
+    .expect("test batch is non-empty")
 }
 #[test]
 fn immutable_batch_distinguishes_progress_handoff_and_volatile_receipt() {

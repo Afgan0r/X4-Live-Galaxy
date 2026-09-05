@@ -4,8 +4,8 @@ mod slot;
 mod slot_transition;
 
 pub use slot::{
-    AmbiguityResolution, FeedbackError, ImmutableApplicationBatch, SlotAdmission, SlotTurnover,
-    StopAndWaitSlot,
+    AmbiguityResolution, ApplicationContextIdentity, FeedbackError, ImmutableApplicationBatch,
+    SlotAdmission, SlotTurnover, StopAndWaitSlot,
 };
 
 #[must_use]

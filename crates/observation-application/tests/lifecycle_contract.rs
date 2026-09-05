@@ -42,6 +42,47 @@ fn decode_first_ship_tracer() {
 }
 
 #[test]
+fn exact_replay_rejects_changed_semantic_context_without_dispatch() {
+    let (_database, repository) = repository("semantic-replay");
+    let mut lifecycle = ObservationLifecycle::new(
+        stager(),
+        DecisionRevisionIndex::new(4).expect("blocker limit is non-zero"),
+        repository,
+        limits(),
+    );
+    let bytes = start_bytes("stations", 0);
+    assert_eq!(
+        lifecycle.submit(input(
+            "outer:stations:start",
+            bytes.clone(),
+            LifecycleContext::Start(candidate_context(SectionCoverage::KnownEmpty)),
+            1,
+        )),
+        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
+    );
+    assert_eq!(
+        lifecycle.submit(input(
+            "outer:stations:start",
+            bytes.clone(),
+            LifecycleContext::Start(candidate_context(SectionCoverage::Complete)),
+            2,
+        )),
+        Ok(LifecycleResult::Disposition(
+            ReceiverDisposition::PermanentlyRejected
+        ))
+    );
+    assert_eq!(
+        lifecycle.submit(input(
+            "outer:stations:start",
+            bytes,
+            LifecycleContext::Start(candidate_context(SectionCoverage::KnownEmpty)),
+            3,
+        )),
+        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
+    );
+}
+
+#[test]
 fn ambiguous_attempt_reconciles_exact_request_without_reassembly() {
     let (_database, repository) = repository("ambiguous");
     let log = AttemptLog::default();

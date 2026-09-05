@@ -14,7 +14,7 @@ pub(super) fn classify(
             SlotAdmission::Staged
         };
     }
-    if held.bytes() != incoming.bytes() {
+    if held.bytes() != incoming.bytes() || held.context() != incoming.context() {
         return SlotAdmission::IdentityConflict;
     }
     disposition.map_or(SlotAdmission::AlreadyStaged, SlotAdmission::ExactReplay)

@@ -44,8 +44,14 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             decode_complete_message(&input.bytes, self.limits.complete_message_bytes.get())
                 .map_err(|_| LifecycleError::DecodeRejected)?;
         validate_context(&message, &input.context, input.epoch)?;
-        let batch = ImmutableApplicationBatch::new(input.epoch, input.identity, input.bytes)
-            .ok_or(LifecycleError::DecodeRejected)?;
+        let replay_identity = input.context.replay_identity();
+        let batch = ImmutableApplicationBatch::new(
+            input.epoch,
+            input.identity,
+            input.bytes,
+            replay_identity,
+        )
+        .ok_or(LifecycleError::DecodeRejected)?;
         match self.slot.stage_batch(batch) {
             SlotAdmission::Staged => {}
             SlotAdmission::ExactReplay(disposition) => {
