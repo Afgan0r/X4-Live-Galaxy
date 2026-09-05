@@ -25,7 +25,8 @@ use observation_persistence::{PublicationLimits, SqliteObservationRepository};
 pub mod flow;
 #[path = "support/repository.rs"]
 pub mod repository_support;
-
+#[path = "support/versioned.rs"]
+pub mod versioned;
 static NEXT_PATH: AtomicU64 = AtomicU64::new(1);
 
 pub fn key(value: &str) -> SectionKey {
@@ -170,8 +171,7 @@ pub fn completion_bytes(section: &str, records: &[(&str, &str)], coverage: &str)
     .into_bytes()
 }
 
-#[rustfmt::skip]
-fn digest_hex(digest: [u8; 32]) -> String { const HEX: &[u8; 16] = b"0123456789abcdef"; let mut encoded = String::with_capacity(64); for byte in digest { encoded.push(char::from(HEX[usize::from(byte >> 4)])); encoded.push(char::from(HEX[usize::from(byte & 0x0f)])); } encoded }
+#[rustfmt::skip] #[must_use] pub fn digest_hex(digest: [u8; 32]) -> String { const HEX: &[u8; 16] = b"0123456789abcdef"; let mut encoded = String::with_capacity(64); for byte in digest { encoded.push(char::from(HEX[usize::from(byte >> 4)])); encoded.push(char::from(HEX[usize::from(byte & 0x0f)])); } encoded }
 
 pub struct TempDatabase(PathBuf);
 

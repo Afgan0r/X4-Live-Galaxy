@@ -66,6 +66,14 @@ fn publish_in_transaction(
     {
         return Err(PublishOutcome::StalePointer(diagnostic("stale-pointer")));
     }
+    if request
+        .expected_current()
+        .is_some_and(|current| revision.revision <= current)
+    {
+        return Err(PublishOutcome::StalePointer(diagnostic(
+            "non-monotonic-revision",
+        )));
+    }
     for (key, expected) in request.frozen_dependencies() {
         if sqlite_read::current_pointer(connection, key).map_err(storage)? != Some(*expected) {
             return Err(PublishOutcome::StaleDependency(diagnostic(

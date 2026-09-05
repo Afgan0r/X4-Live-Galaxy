@@ -1,6 +1,6 @@
+use crate::accepted_versions::AcceptedVersions;
 use crate::batch_budget::{AggregateUsage, CandidateUsage};
 use crate::batch_canonical::CanonicalBatch;
-use crate::candidate_limits::AcceptedVersions;
 use crate::completion_types::{Candidate, StagedBatch};
 use crate::model::AcceptedProjection;
 use crate::{GenerationLimits, ReceiverDisposition};

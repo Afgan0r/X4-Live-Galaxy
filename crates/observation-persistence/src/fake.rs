@@ -62,6 +62,12 @@ impl ObservationRepository for FakeObservationRepository {
             return PublishOutcome::StalePointer(diagnostic("stale-pointer"));
         }
         if request
+            .expected_current()
+            .is_some_and(|current| record.revision <= current)
+        {
+            return PublishOutcome::StalePointer(diagnostic("non-monotonic-revision"));
+        }
+        if request
             .frozen_dependencies()
             .iter()
             .any(|(key, revision)| self.current.get(key) != Some(revision))

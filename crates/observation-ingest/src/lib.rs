@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod accepted_versions;
 mod batch;
 mod batch_budget;
 mod batch_canonical;

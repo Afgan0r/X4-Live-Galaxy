@@ -4,6 +4,8 @@
     reason = "contract-test setup and mismatches must fail immediately"
 )]
 
+#[path = "port_contract/monotonic.rs"]
+mod monotonic;
 mod support;
 
 use std::collections::BTreeMap;
@@ -122,6 +124,7 @@ fn cas_contract(repository: &mut dyn ObservationRepository) {
             .revision,
         revision(2)
     );
+    monotonic::contract(repository);
 }
 
 #[test]

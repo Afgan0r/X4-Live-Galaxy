@@ -130,6 +130,8 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             .index
             .finalize_committed(&attempt.authority, attempt.accepted_at);
         if RetainedPublicationAttempt::finalized(outcome) {
+            self.stager
+                .record_committed_revision(attempt.authority.revision());
             return self.finish_disposition(ReceiverDisposition::Committed);
         }
         self.block_attempt(attempt, LifecycleError::FinalizationBlocked)
@@ -166,6 +168,8 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             self.retained = Some(attempt);
             return Err(LifecycleError::FinalizationBlocked);
         }
+        self.stager
+            .record_committed_revision(attempt.authority.revision());
         let _ = self
             .slot
             .apply_reconciliation(AmbiguityResolution::Committed)
