@@ -29,7 +29,7 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 - [x] **Phase 5: Bounded Shadow Deliberation** - Arbitrate and admit provider proposals and institution initiatives only through deterministic validation, budgets, and exact replay contracts. (completed 2026-08-29)
 - [ ] **Phase 05.1: Bounded Real Component Discovery** - Historical partial implementation; do not execute the superseded remainder.
 - [x] **Phase 05.2: Layered Lua and X4 Verification Foundation** - Historical completed phase; obsolete research tooling was retired by quick 260903-06l and 260903-32k.
-- [ ] **Phase 05.3: Generic Observation Contracts and Durable Publication** - Build source-agnostic bounded observation assembly, feedback contracts and atomic publication without selecting a production X4 carrier.
+- [x] **Phase 05.3: Generic Observation Contracts and Durable Publication** - Build source-agnostic bounded observation assembly, feedback contracts and atomic publication without selecting a production X4 carrier. (completed 2026-09-05)
 - [ ] **Phase 05.4: Owned Carrier B and Production Observation Path** - Connect X4 to the shared contracts through a minimal Live Galaxy-owned carrier with explicit bounded outcomes and runtime proof.
 - [ ] **Phase 05.5: Heavy Faction Ship Conformance** - Prove the shared flow with heavy ship observations across X4 and Rust.
 - [ ] **Phase 05.6: Station-Specific Observation Remainder** - Close only station-specific gaps remaining after 05.5; conditional scope.
@@ -283,7 +283,7 @@ Plans:
 6. Local behavioral and persistence evidence proves the generic contracts without being reported as X4 integration proof. The owner approves research and checked plans before execution.
 
 **Research:** Required. Start from `05.3-CONTEXT.md`, `05.3-READINESS.md` and the closed Docs MCP admission evidence. Carrier A's measured limitation and the resulting Carrier B decision constrain the facade but do not pull production transport into this phase.
-**Plans:** 5/5 plans executed; one verified gap-closure plan remains ready in Wave 5.
+**Plans:** 5/5 plans complete
 **Wave 1**
 
 - [x] 05.3-01-PLAN.md
@@ -429,7 +429,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 5. Bounded Shadow Deliberation | 5/5 | Complete    | 2026-08-29 |
 | 05.1. Bounded Real Component Discovery | 6 summarized | Remainder superseded/reassigned | - |
 | 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
-| 05.3. Generic Observation Contracts and Durable Publication | 5/5 | In Progress|  |
+| 05.3. Generic Observation Contracts and Durable Publication | 5/5 | Complete    | 2026-09-05 |
 | 05.4. Owned Carrier B and Production Observation Path | 0/TBD | Awaiting dedicated owner discussion after 05.3 | - |
 | 05.5. Heavy Faction Ship Conformance | 0/TBD | Awaiting 05.4 and owner discussion | - |
 | 05.6. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.5 | - |
