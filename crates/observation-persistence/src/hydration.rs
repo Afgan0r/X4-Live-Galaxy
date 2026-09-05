@@ -24,12 +24,12 @@ impl CurrentRevision {
     pub fn hydrate(&self) -> Result<ValidatedSectionRevision, DurableRevisionError> {
         let receipt = &self.receipt;
         let revision = &self.revision;
-        if receipt.section_key != revision.section_key
-            || receipt.revision != revision.revision
-            || receipt.content_digest != revision.content_digest
-            || receipt.previous != revision.expected_current
-            || receipt.accepted_at != revision.accepted_at
-        {
+        let identity_matches = receipt.section_key == revision.section_key
+            && receipt.revision == revision.revision
+            && receipt.content_digest == revision.content_digest;
+        let publication_matches = (receipt.previous, receipt.accepted_at)
+            == (revision.expected_current, revision.accepted_at);
+        if !identity_matches || !publication_matches {
             return Err(DurableRevisionError::ReceiptBinding);
         }
         self.revision.hydrate()

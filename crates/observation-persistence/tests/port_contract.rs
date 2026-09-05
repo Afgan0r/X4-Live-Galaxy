@@ -118,15 +118,11 @@ fn cas_contract(repository: &mut dyn ObservationRepository) {
         ))),
         PublishOutcome::StaleDependency(_)
     ));
-    assert_eq!(
-        repository
-            .current(&key("ships"))
-            .expect("read succeeds")
-            .expect("current remains")
-            .receipt()
-            .revision,
-        revision(2)
-    );
+    let current = repository
+        .current(&key("ships"))
+        .expect("read succeeds")
+        .expect("current remains");
+    assert_eq!(current.receipt().revision, revision(2));
     monotonic::contract(repository);
 }
 

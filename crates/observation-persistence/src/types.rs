@@ -68,11 +68,9 @@ pub struct CurrentRevision {
     pub(crate) receipt: PublicationReceipt,
 }
 impl CurrentRevision {
-    #[must_use]
     pub const fn revision(&self) -> &RevisionRecord {
         &self.revision
     }
-    #[must_use]
     pub const fn receipt(&self) -> &PublicationReceipt {
         &self.receipt
     }
