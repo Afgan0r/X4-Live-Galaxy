@@ -33,19 +33,31 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         })) {
             return false;
         }
-        for current in &currents {
-            let Ok(revision) = current.hydrate() else {
-                return false;
-            };
-            if !index.restore_committed(revision.clone(), current.receipt().accepted_at) {
-                return false;
-            }
-            stager.record_committed_revision(&revision);
+        let Some(revisions) = hydrate_currents(&mut index, &currents) else {
+            return false;
+        };
+        if !stager.restore_committed_fence(&revisions) {
+            return false;
         }
         self.index = index;
         self.stager = stager;
         true
     }
+}
+
+fn hydrate_currents(
+    index: &mut observation_ingest::DecisionRevisionIndex,
+    currents: &[CurrentRevision],
+) -> Option<Vec<observation_ingest::ValidatedSectionRevision>> {
+    currents
+        .iter()
+        .map(|current| {
+            let revision = current.hydrate().ok()?;
+            index
+                .restore_committed(revision.clone(), current.receipt().accepted_at)
+                .then_some(revision)
+        })
+        .collect()
 }
 
 fn sessions_are_consistent(currents: &[CurrentRevision]) -> bool {

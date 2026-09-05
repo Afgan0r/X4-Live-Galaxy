@@ -18,6 +18,20 @@ impl GenerationStager {
         }
     }
 
+    pub fn restore_committed_fence<'a>(
+        &mut self,
+        revisions: impl IntoIterator<Item = &'a ValidatedSectionRevision>,
+    ) -> bool {
+        let mut restored = AcceptedVersions::new();
+        let valid = revisions
+            .into_iter()
+            .all(|revision| merge_revision(&mut restored, revision));
+        if valid {
+            self.accepted_versions = restored;
+        }
+        valid
+    }
+
     pub fn record_accepted_entity(
         &mut self,
         scope: SourceScopeId,
@@ -70,6 +84,33 @@ impl GenerationStager {
     }
 }
 
+fn merge_revision(restored: &mut AcceptedVersions, revision: &ValidatedSectionRevision) -> bool {
+    revision
+        .records()
+        .iter()
+        .all(|record| merge_restored(restored, revision.source_scope(), record))
+}
+
+fn merge_restored(
+    restored: &mut AcceptedVersions,
+    scope: &SourceScopeId,
+    record: &observation_domain::EnvelopeRecord,
+) -> bool {
+    let key = (scope.clone(), record.entity_id.clone());
+    let value = (
+        record.observation_version,
+        Sha256::digest(record.content.as_bytes()).into(),
+    );
+    match restored.get(&key) {
+        Some((version, digest)) if value.0 == *version => value.1 == *digest,
+        Some((version, _)) if value.0 < *version => true,
+        _ => {
+            restored.insert(key, value);
+            true
+        }
+    }
+}
+
 fn record_admits(
     accepted_versions: &AcceptedVersions,
     provisional: &mut AcceptedVersions,
@@ -113,3 +154,7 @@ fn version_digest_admits(
         _ => true,
     }
 }
+
+#[cfg(test)]
+#[path = "accepted_versions_tests.rs"]
+mod tests;
