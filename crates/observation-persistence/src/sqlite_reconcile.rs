@@ -33,6 +33,11 @@ fn committed(
         {
             ReconciliationOutcome::CommittedReplay(receipt)
         }
+        (Ok(_), Ok(Some(current))) if stored == candidate && current != candidate.revision => {
+            ReconciliationOutcome::Superseded(RepositoryDiagnostic {
+                code: "reconciliation-superseded",
+            })
+        }
         _ => ambiguous("reconciliation-ambiguous"),
     }
 }

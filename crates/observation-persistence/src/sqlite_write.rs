@@ -62,6 +62,13 @@ fn publish_in_transaction(
         if existing != *revision {
             return Err(PublishOutcome::Conflict(diagnostic("content-conflict")));
         }
+        if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?
+            != Some(revision.revision)
+        {
+            return Err(PublishOutcome::StalePointer(diagnostic(
+                "historical-replay",
+            )));
+        }
         let receipt = sqlite_receipt::load_validated(connection, revision).map_err(storage)?;
         return Ok(WriteOutcome::Replay(receipt));
     }

@@ -19,6 +19,7 @@ pub enum PublicationFailpoint {
 pub enum ReconciliationOutcome {
     CommittedReplay(PublicationReceipt),
     ProvenNotCommitted,
+    Superseded(RepositoryDiagnostic),
     Ambiguous(RepositoryDiagnostic),
 }
 

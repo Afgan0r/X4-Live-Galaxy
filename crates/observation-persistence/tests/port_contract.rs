@@ -50,8 +50,12 @@ fn shared_contract(repository: &mut dyn ObservationRepository) {
         ))),
         PublishOutcome::StalePointer(_)
     ));
-    pin_contract(repository, candidate);
+    pin_contract(repository, candidate.clone());
     cas_contract(repository);
+    assert!(matches!(
+        repository.publish(publish_request(candidate)),
+        PublishOutcome::StalePointer(_)
+    ));
 }
 
 fn pin_contract(

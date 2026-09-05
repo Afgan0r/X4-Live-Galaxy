@@ -36,11 +36,16 @@ impl FakeObservationRepository {
         record: &RevisionRecord,
     ) -> Option<PublishOutcome> {
         let existing = self.revisions.get(identity)?;
-        Some(if existing == record {
-            PublishOutcome::CommittedReplay(self.receipts[identity].clone())
-        } else {
-            PublishOutcome::Conflict(diagnostic("content-conflict"))
-        })
+        Some(
+            if existing == record && self.current.get(&record.section_key) == Some(&record.revision)
+            {
+                PublishOutcome::CommittedReplay(self.receipts[identity].clone())
+            } else if existing == record {
+                PublishOutcome::StalePointer(diagnostic("historical-replay"))
+            } else {
+                PublishOutcome::Conflict(diagnostic("content-conflict"))
+            },
+        )
     }
 }
 

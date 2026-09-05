@@ -39,6 +39,9 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
                     ReconcileResult::ProvenNotCommitted,
                 ))
             }
+            ReconciliationOutcome::Superseded(_) => {
+                self.finish_disposition(ReceiverDisposition::TimedOutOrSuperseded)
+            }
             ReconciliationOutcome::Ambiguous(_) => {
                 self.retained = Some(attempt);
                 Ok(RetainedPublicationAttempt::reconciled(
