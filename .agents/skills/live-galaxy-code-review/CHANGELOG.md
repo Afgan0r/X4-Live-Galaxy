@@ -7,6 +7,8 @@
 - Added shared rule routing, concrete convention findings, candidate
   disposition, and scoped re-review without mandatory extra infrastructure.
 - Added five synthetic cases and recorded a bounded three-lens evaluation.
+- Replaced the retired evolution gate with the owner-approved project skill
+  maintenance policy in root `AGENTS.md`.
 
 ## 2026-08-28
 

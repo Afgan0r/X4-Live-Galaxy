@@ -126,7 +126,6 @@
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-x4-integration",
       ".agents/skills/live-galaxy-x4-tests",
-      ".agents/skills/live-galaxy-skill-evolution",
       ".agents/skills/lua"
     ],
     "gsd-verifier": [
@@ -135,8 +134,7 @@
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-code-review",
       ".agents/skills/live-galaxy-x4-integration",
-      ".agents/skills/live-galaxy-x4-tests",
-      ".agents/skills/live-galaxy-skill-evolution"
+      ".agents/skills/live-galaxy-x4-tests"
     ],
     "gsd-nyquist-auditor": [
       ".agents/skills/live-galaxy-code-conventions",
@@ -144,8 +142,7 @@
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-code-review",
       ".agents/skills/live-galaxy-x4-integration",
-      ".agents/skills/live-galaxy-x4-tests",
-      ".agents/skills/live-galaxy-skill-evolution"
+      ".agents/skills/live-galaxy-x4-tests"
     ],
     "gsd-code-reviewer": [
       ".agents/skills/live-galaxy-code-conventions",
@@ -154,8 +151,7 @@
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-code-review",
       ".agents/skills/live-galaxy-x4-integration",
-      ".agents/skills/live-galaxy-x4-tests",
-      ".agents/skills/live-galaxy-skill-evolution"
+      ".agents/skills/live-galaxy-x4-tests"
     ],
     "gsd-code-fixer": [
       ".agents/skills/live-galaxy-code-conventions",
@@ -163,8 +159,7 @@
       ".agents/skills/live-galaxy-rust-conventions",
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-x4-integration",
-      ".agents/skills/live-galaxy-x4-tests",
-      ".agents/skills/live-galaxy-skill-evolution"
+      ".agents/skills/live-galaxy-x4-tests"
     ],
     "gsd-debugger": [
       ".agents/skills/live-galaxy-code-conventions",
@@ -172,8 +167,7 @@
       ".agents/skills/live-galaxy-rust-conventions",
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-x4-integration",
-      ".agents/skills/live-galaxy-x4-tests",
-      ".agents/skills/live-galaxy-skill-evolution"
+      ".agents/skills/live-galaxy-x4-tests"
     ],
     "gsd-security-auditor": [
       ".agents/skills/live-galaxy-code-conventions",
@@ -209,7 +203,6 @@
       ".agents/skills/live-galaxy-tests",
       ".agents/skills/live-galaxy-rust-tests",
       ".agents/skills/live-galaxy-code-review",
-      ".agents/skills/live-galaxy-skill-evolution",
       "global:openai-docs"
     ]
   },

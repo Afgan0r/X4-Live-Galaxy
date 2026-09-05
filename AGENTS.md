@@ -64,13 +64,6 @@ applicable rule references before acting:
 - `.agents/skills/live-galaxy-code-review/SKILL.md` for code review.
 - `.agents/skills/live-galaxy-x4-integration/SKILL.md` for X4 XML, Mission
   Director, Lua, game-data, installed-mod, or compatibility work.
-- `.agents/skills/live-galaxy-skill-evolution/SKILL.md` at the end of every
-  completed implementation, debugging, verification, or review task. The task
-  output must state `Skill learning: none` with the evidence considered, or a
-  candidate naming the evidence, single owning project skill, minimal proposed
-  rule, and approval status. Do not declare the task complete without this
-  gate. New behavioral rules require explicit owner approval; objective
-  corrections remain evidence-gated.
 
 Use the global `lua` skill for Lua changes, `mcp-builder` for MCP contract work,
 and `openai-docs` for current OpenAI API or model behavior. Current official
@@ -88,6 +81,30 @@ chain and name every required `SKILL.md` and reference file explicitly in its
 prompt. GSD `agent_skills` entries load entrypoints only; they do not replace
 this reference-expansion step. The review skill owns conditional specialist
 fan-out and lead adjudication; preserve the current GSD reviewer model/routing.
+
+## Maintaining Project Skills
+
+After a confirmed defect, failed approach, or review lesson, the task lead
+checks whether a project skill needs a concrete clarification. Automatically
+make useful, evidence-backed updates in the same task: a verified example,
+pitfall, verification technique, or correction of stale guidance. Specialists
+return evidence to the lead; they do not independently expand the ruleset.
+
+An existing general rule is not sufficient grounds for dismissal when the
+failure shows that its wording or examples leave a reusable gap. Improve that
+rule instead of duplicating it. Do not require a new lesson from every bug,
+invent universal restrictions from one case, or accumulate obvious advice.
+
+Preserve accepted behavior and scope. Ask before introducing product decisions,
+architectural restrictions, additional mandatory checks, or changes to approved
+requirements. This authorization covers grounded clarification, not new policy.
+
+Use one owning project skill, update its changelog with the source evidence,
+and adjust only necessary consumer links. Check formatting, metadata, and links
+as applicable; use behavioral validation when the change needs it. Do not edit
+global or vendored skills. Report actual changes or a concrete pending decision;
+omit empty learning-status boilerplate. This section replaces the retired
+`live-galaxy-skill-evolution` instructions referenced by historical plans.
 
 ## GSD Workflow
 

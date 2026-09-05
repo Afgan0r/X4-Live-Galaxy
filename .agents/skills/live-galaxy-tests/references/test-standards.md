@@ -77,6 +77,11 @@ State what was executed and what it proves. Separate locally verified behavior,
 runtime evidence still pending, and behavior observed in X4. A regression test
 must fail for the original defect, not merely execute the edited line.
 
+For a negative API test, attempt the forbidden capability through the current
+public API and check the intended rejection reason. Failure caused only by a
+removed method name or unrelated import error does not prove that the capability
+is inaccessible.
+
 Run focused checks during iteration and one final relevant full regression
 after review convergence. Record commands, outcomes, mutation disposition when
 applicable, and honest coverage gaps in the existing phase or review artifact.

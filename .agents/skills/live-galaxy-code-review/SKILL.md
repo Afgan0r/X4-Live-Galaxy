@@ -108,8 +108,9 @@ silently or claim full coverage from an incomplete pass.
 
 Use focused verification during fixes and the required final relevant
 regression once after convergence. Preserve GSD's completion gates and existing
-review artifact format. Finish with the
-[skill-evolution gate](../live-galaxy-skill-evolution/SKILL.md).
+review artifact format. Apply
+[project skill maintenance](../../../AGENTS.md#maintaining-project-skills)
+to confirmed review lessons.
 
 When maintaining this skill, use [evaluation inputs](evals/inputs.md) for a
 bounded independent behavioral pass and compare with
