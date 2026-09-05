@@ -19,12 +19,10 @@ use observation_ingest::{
 };
 use observation_persistence::{PublicationLimits, SqliteObservationRepository};
 
-#[path = "support/repository.rs"]
-mod repository_support;
-pub use repository_support::{AttemptLog, FirstPublish, RecordingRepository};
 #[path = "support/flow.rs"]
-mod flow;
-pub use flow::{input, limits, submit_empty, submit_section, submit_start_and_batch};
+pub mod flow;
+#[path = "support/repository.rs"]
+pub mod repository_support;
 
 static NEXT_PATH: AtomicU64 = AtomicU64::new(1);
 
