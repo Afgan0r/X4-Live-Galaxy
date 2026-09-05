@@ -16,7 +16,7 @@ const fn epoch(value: u64) -> TransportEpoch {
     TransportEpoch::new(value).expect("test epoch is positive")
 }
 #[rustfmt::skip]
-fn batch(identity: &str, bytes: &[u8]) -> ImmutableApplicationBatch { ImmutableApplicationBatch::new(epoch(3), BatchId::new(identity).expect("test batch identity is non-empty"), bytes.to_vec(), ApplicationContextIdentity::Batch).expect("test batch is non-empty") }
+fn batch(identity: &str, bytes: &[u8]) -> ImmutableApplicationBatch { ImmutableApplicationBatch::new(epoch(3), BatchId::new(identity).expect("test batch identity is non-empty"), bytes.to_vec(), ApplicationContextIdentity::Batch { work: 0 }).expect("test batch is non-empty") }
 #[test]
 fn immutable_batch_distinguishes_progress_handoff_and_volatile_receipt() {
     let mut slot = StopAndWaitSlot::empty();

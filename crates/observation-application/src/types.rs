@@ -45,10 +45,10 @@ pub enum LifecycleContext {
 }
 
 impl LifecycleContext {
-    pub(crate) fn replay_identity(&self) -> ApplicationContextIdentity {
+    pub(crate) fn replay_identity(&self, work: usize) -> ApplicationContextIdentity {
         match self {
             Self::Start(context) => ApplicationContextIdentity::Start(context.clone()),
-            Self::Batch => ApplicationContextIdentity::Batch,
+            Self::Batch => ApplicationContextIdentity::Batch { work },
             Self::Completion(current) => ApplicationContextIdentity::Completion(current.clone()),
         }
     }

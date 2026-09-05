@@ -4,6 +4,8 @@
 )]
 
 mod support;
+#[path = "lifecycle_contract/work_replay.rs"]
+mod work_replay;
 
 use observation_application::{
     LifecycleContext, LifecycleError, LifecycleResult, ObservationLifecycle, ReconcileResult,

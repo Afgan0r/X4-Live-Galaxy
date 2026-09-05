@@ -4,6 +4,6 @@ use crate::{CandidateContext, CompletionCurrent};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ApplicationContextIdentity {
     Start(CandidateContext),
-    Batch,
+    Batch { work: usize },
     Completion(CompletionCurrent),
 }
