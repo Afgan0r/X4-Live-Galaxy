@@ -58,6 +58,7 @@ pub fn publish(
     );
 }
 
+#[expect(clippy::panic, reason = "invalid fixture completion must fail")]
 pub fn validated_empty(
     section: &str,
     value: u64,
