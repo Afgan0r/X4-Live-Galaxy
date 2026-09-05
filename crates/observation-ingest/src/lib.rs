@@ -12,6 +12,7 @@ mod eligibility;
 mod feedback;
 mod generation;
 mod generation_inspect;
+mod hydration_validation;
 mod legacy_candidate;
 mod legacy_generation;
 mod model;
@@ -68,7 +69,9 @@ pub use scheduler_queue::{
     SchedulerAdmission, SchedulerSafetyLimits, WorkKind,
 };
 pub use snapshot::ProjectionSnapshot;
-pub use validated_revision::{DurableRevisionParts, ValidatedSectionRevision};
+pub use validated_revision::{
+    DurableRevisionError, DurableRevisionParts, ValidatedSectionRevision,
+};
 use wire::TracerObservation;
 pub use wire::decode_complete_message;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;

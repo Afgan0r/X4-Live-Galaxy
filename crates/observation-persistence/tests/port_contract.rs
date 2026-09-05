@@ -3,11 +3,11 @@
     clippy::panic,
     reason = "contract-test setup and mismatches must fail immediately"
 )]
-
+#[path = "port_contract/hydration.rs"]
+mod hydration;
 #[path = "port_contract/monotonic.rs"]
 mod monotonic;
 mod support;
-
 use std::collections::BTreeMap;
 
 use observation_domain::{ProducerIncarnationId, SourceSessionIdentity, TransportEpoch};

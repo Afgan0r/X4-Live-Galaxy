@@ -35,7 +35,9 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
     }
 
     fn restore_one(&mut self, current: &CurrentRevision) -> bool {
-        let revision = current.hydrate();
+        let Ok(revision) = current.hydrate() else {
+            return false;
+        };
         if !self
             .index
             .restore_committed(revision.clone(), current.receipt.accepted_at)

@@ -1,10 +1,10 @@
-use observation_ingest::{DurableRevisionParts, ValidatedSectionRevision};
+use observation_ingest::{DurableRevisionError, DurableRevisionParts, ValidatedSectionRevision};
 
 use crate::{CurrentRevision, RevisionRecord};
 
 impl RevisionRecord {
-    pub fn hydrate(&self) -> ValidatedSectionRevision {
-        ValidatedSectionRevision::from_durable_parts(DurableRevisionParts {
+    pub fn hydrate(&self) -> Result<ValidatedSectionRevision, DurableRevisionError> {
+        ValidatedSectionRevision::try_from_durable_parts(DurableRevisionParts {
             source_scope: self.source_scope.clone(),
             source_session: self.source_session.clone(),
             section_key: self.section_key.clone(),
@@ -21,7 +21,7 @@ impl RevisionRecord {
 }
 
 impl CurrentRevision {
-    pub fn hydrate(&self) -> ValidatedSectionRevision {
+    pub fn hydrate(&self) -> Result<ValidatedSectionRevision, DurableRevisionError> {
         self.revision.hydrate()
     }
 }

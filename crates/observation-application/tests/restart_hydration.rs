@@ -37,7 +37,7 @@ fn reopen_restores_typed_eligibility_and_entity_version_fences() {
         .expect("current read succeeds")
         .expect("current revision exists");
     assert_eq!(current.receipt.accepted_at, 1);
-    let hydrated = current.hydrate();
+    let hydrated = current.hydrate().expect("durable authority validates");
     assert_eq!(
         hydrated.context(),
         &candidate_context(observation_domain::SectionCoverage::Complete)

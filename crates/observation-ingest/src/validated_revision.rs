@@ -7,6 +7,14 @@ use crate::CandidateContext;
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Authority created only by live completion or validated hydration.
+///
+/// ```compile_fail
+/// use observation_ingest::{DurableRevisionParts, ValidatedSectionRevision};
+/// fn bypass(parts: DurableRevisionParts) -> ValidatedSectionRevision {
+///     ValidatedSectionRevision::from_durable_parts(parts)
+/// }
+/// ```
 pub struct ValidatedSectionRevision {
     pub(crate) source_scope: SourceScopeId,
     pub(crate) source_session: SourceSessionIdentity,
@@ -32,9 +40,23 @@ pub struct DurableRevisionParts {
     pub content_digest: [u8; 32],
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DurableRevisionError {
+    ContractVersion,
+    ContextEvidence,
+    Coverage,
+    RecordOrder,
+    EntityVersion,
+    ContentDigest,
+    RevisionOrder,
+}
+
 impl ValidatedSectionRevision {
-    pub fn from_durable_parts(parts: DurableRevisionParts) -> Self {
-        Self {
+    pub fn try_from_durable_parts(
+        parts: DurableRevisionParts,
+    ) -> Result<Self, DurableRevisionError> {
+        crate::hydration_validation::validate(&parts)?;
+        Ok(Self {
             source_scope: parts.source_scope,
             source_session: parts.source_session,
             section_key: parts.section_key,
@@ -44,7 +66,7 @@ impl ValidatedSectionRevision {
             context: parts.context,
             manifest_digest: parts.manifest_digest,
             content_digest: parts.content_digest,
-        }
+        })
     }
 
     pub const fn source_scope(&self) -> &SourceScopeId {
