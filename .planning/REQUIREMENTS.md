@@ -8,12 +8,12 @@
 ### Observation and Normalization
 
 - [ ] **OBS-01**: The system can ingest bounded, versioned observation envelopes from X4 without blocking the game thread on bridge or model work, and the X4 adapter and Rust bridge negotiate explicit transport/session capabilities before accepting traffic.
-- [ ] **OBS-02**: Every observed entity and event used by strategy has a stable typed identity, source, observation time, and monotonic state or event version.
-- [ ] **OBS-03**: Normalized world-state sections preserve freshness, coverage, quality, and explicit unknown or unsupported states instead of fabricating missing facts.
+- [x] **OBS-02**: Every observed entity and event used by strategy has a stable typed identity, source, observation time, and monotonic state or event version.
+- [x] **OBS-03**: Normalized world-state sections preserve freshness, coverage, quality, and explicit unknown or unsupported states instead of fabricating missing facts.
 - [x] **OBS-04**: The observation model provides the supported economic, military, territorial, and threat facts required by the ZYA and ARG minds.
 - [x] **OBS-05**: XEN is represented as the primary hostile pressure shared by ZYA and ARG, and KHK is recognized when authoritative observations contain it.
 - [ ] **OBS-06**: Runtime sectors, assets, capacity, and ownership are discovered from observed state rather than assumed from a fixed vanilla map or job count.
-- [ ] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
+- [x] **OBS-07**: Malformed, oversized, duplicate, stale, and out-of-order observation input is rejected or reconciled without corrupting the last accepted snapshot.
 - [ ] **OBS-08**: Milestone 0.1 X4 integration exposes no fleet, economy, diplomacy, institution, or other game-state mutation command.
 
 ### Faction Minds and Deterministic Strategy
@@ -126,12 +126,12 @@ Every milestone 0.1 requirement has one primary roadmap owner. Supporting eviden
 | Requirement | Phase | Status |
 | --- | --- | --- |
 | OBS-01 | Phase 05.4 | Historical local implementation; owned-carrier successor acceptance pending |
-| OBS-02 | Phase 05.3 | Historical local implementation; successor acceptance pending |
-| OBS-03 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-02 | Phase 05.3 | Complete — stable typed identity, canonical adjacency and replay verified through durable publication |
+| OBS-03 | Phase 05.3 | Complete — exact evidence axes and non-mutating publication preparation verified |
 | OBS-04 | Phase 3 | Complete |
 | OBS-05 | Phase 3 | Complete |
 | OBS-06 | Phase 05.5 | Historical local implementation; successor acceptance pending |
-| OBS-07 | Phase 05.3 | Historical local implementation; successor acceptance pending |
+| OBS-07 | Phase 05.3 | Complete — bounded rejection, turnover, ambiguity reconciliation and exact retry verified |
 | OBS-08 | Phase 05.4 | Historical local implementation; no-mutation proof pending on owned carrier |
 | MIND-01 | Phase 4 | Complete |
 | MIND-02 | Phase 3 | Complete |

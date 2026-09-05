@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 current_phase: 05.3
 current_phase_name: Generic Observation Contracts and Durable Publication
-status: executing
-stopped_at: Completed 05.3-05-PLAN.md
-last_updated: "2026-09-04T22:23:20.078Z"
+status: verifying
+stopped_at: Completed 05.3-04-PLAN.md
+last_updated: "2026-09-05T04:23:41.067Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 05.3 Plan 05 completed
-state_head: e04fc4b7a4bf4faf0e8d21ddbc49997b228e2120
+last_activity_desc: Phase 05.3 Plan 04 completed; all phase plans complete
+state_head: b769a29667b141c3892a92f0986e357c56eea4b0
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 42
-  completed_plans: 41
+  completed_plans: 42
   percent: 36
 ---
 
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-08-28)
 
 ## Current Position
 
-Phase: 05.3 (Generic Observation Contracts and Durable Publication) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute
-Last activity: 2026-09-05 — Phase 05.3 Plan 05 completed
+Phase: 05.3 (Generic Observation Contracts and Durable Publication) — VERIFYING
+Plan: 5 of 5
+Status: Phase complete — ready for verification
+Last activity: 2026-09-05 — Phase 05.3 Plan 04 completed; all phase plans complete
 
-Progress: [████░░░░░░] 36% (5 of 14 phases historically complete; Phase 05.3 has 1 pending plan)
+Progress: [████░░░░░░] 36% (5 of 14 phases historically complete; Phase 05.3 awaits verification)
 
 ## Performance Metrics
 
@@ -93,6 +93,7 @@ Progress: [████░░░░░░] 36% (5 of 14 phases historically comp
 | Phase 05.3 P02 | 49min | 3 tasks | 19 files |
 | Phase 05.3 P03 | 17h 17m | 3 tasks | 19 files |
 | Phase 05.3 P05 | 33min | 2 tasks | 5 files |
+| Phase 05.3 P04 | 28min | 3 tasks | 27 files |
 
 ## Accumulated Context
 
@@ -190,6 +191,9 @@ Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md o
 - [Phase 05.3]: Retention preserves all current, dependency-reachable, and decision-pinned revisions; unpinning only removes reachability.
 - [Phase 05.3]: Game-time urgency affects deterministic ordering only; all admission resources remain monotonic-real-time state. — Preserves the accepted separation between urgency and capacity.
 - [Phase 05.3]: Exact in-flight completion identity owns heavy-permit release and bounded overrun debt. — Prevents duplicate release, wrapping, and unbounded collector overrun.
+- [Phase 05.3]: The stop-and-wait slot remains the sole owner of raw replay bytes; ambiguous publication retains only typed authority and request state.
+- [Phase 05.3]: Decision-current state changes only after committed-new, committed-replay, or committed reconciliation evidence.
+- [Phase 05.3]: Reconciliation delegates to the existing SQLite classifier; the application layer adds no second durable classification algorithm.
 
 ### Pending Todos
 
@@ -227,6 +231,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-04T22:23:19.097Z
-Stopped at: Completed 05.3-05-PLAN.md
+Last session: 2026-09-05T04:23:40.233Z
+Stopped at: Completed 05.3-04-PLAN.md
 Resume file: None
