@@ -41,6 +41,7 @@ impl SqliteObservationRepository {
             ambiguous,
         };
         repository.validate_stored_revisions()?;
+        sqlite_pins::validate_all(&repository.connection)?;
         Ok(repository)
     }
 

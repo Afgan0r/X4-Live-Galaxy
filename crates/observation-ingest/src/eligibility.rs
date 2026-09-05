@@ -32,6 +32,10 @@ pub struct DecisionRevisionSet {
 }
 
 impl DecisionRevisionSet {
+    pub const fn from_revisions(revisions: BTreeMap<SectionKey, SectionRevisionId>) -> Self {
+        Self { revisions }
+    }
+
     #[must_use]
     pub const fn revisions(&self) -> &BTreeMap<SectionKey, SectionRevisionId> {
         &self.revisions
@@ -92,7 +96,7 @@ impl DecisionRevisionIndex {
         blockers.dedup();
         blockers.truncate(self.blocker_limit.get());
         if blockers.is_empty() {
-            DecisionEligibility::Eligible(DecisionRevisionSet { revisions })
+            DecisionEligibility::Eligible(DecisionRevisionSet::from_revisions(revisions))
         } else {
             DecisionEligibility::Blocked(blockers)
         }

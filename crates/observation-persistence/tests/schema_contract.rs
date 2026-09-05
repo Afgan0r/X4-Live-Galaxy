@@ -14,7 +14,7 @@ use observation_persistence::{
     SqliteObservationRepository,
 };
 use rusqlite::{Connection, params};
-use support::{TempDatabase, publish_request, validated};
+use support::{TempDatabase, decision_set, publish_request, validated};
 
 const fn limits() -> PublicationLimits {
     PublicationLimits::new(4, 256).expect("limits are non-zero")
@@ -113,6 +113,50 @@ fn open_rejects_tampered_digest_and_partial_row_set() {
             .unwrap();
         connection.execute(mutation, []).unwrap();
         drop(connection);
+        assert!(matches!(
+            SqliteObservationRepository::open(database.path(), limits()),
+            Err(RepositoryError::Corrupt(_))
+        ));
+    }
+}
+
+#[test]
+fn open_and_load_reject_corrupt_decision_pin_links() {
+    for (label, mutation) in [
+        (
+            "pin-missing-link",
+            "DELETE FROM decision_pin_revisions WHERE position=1",
+        ),
+        ("pin-zero-links", "DELETE FROM decision_pin_revisions"),
+        (
+            "pin-replaced-link",
+            "UPDATE decision_pin_revisions SET section_key='gamma' WHERE position=1",
+        ),
+    ] {
+        let database = TempDatabase::new(label);
+        let mut repository = SqliteObservationRepository::open(database.path(), limits()).unwrap();
+        let revisions =
+            ["alpha", "beta", "gamma"].map(|section| validated(section, 1, None, BTreeMap::new()));
+        for revision in revisions.clone() {
+            assert!(matches!(
+                repository.publish(publish_request(revision)),
+                PublishOutcome::CommittedNew(_)
+            ));
+        }
+        let pin = repository
+            .pin_decision(&decision_set(revisions[..2].to_vec()))
+            .expect("decision set pins");
+        let connection = Connection::open(database.path()).unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", true)
+            .unwrap();
+        connection.execute(mutation, []).unwrap();
+        drop(connection);
+        assert!(matches!(
+            repository.load_decision_pin(&pin.decision),
+            Err(RepositoryError::Corrupt(_))
+        ));
+        drop(repository);
         assert!(matches!(
             SqliteObservationRepository::open(database.path(), limits()),
             Err(RepositoryError::Corrupt(_))

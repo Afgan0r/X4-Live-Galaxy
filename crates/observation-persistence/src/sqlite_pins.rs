@@ -13,6 +13,9 @@ pub fn pin(
     connection: &mut Connection,
     set: &DecisionRevisionSet,
 ) -> Result<DecisionPinReceipt, RepositoryError> {
+    if set.revisions().is_empty() {
+        return Err(RepositoryError::PinConflict(diagnostic("pin-empty")));
+    }
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|_| storage("pin-transaction"))?;
@@ -103,7 +106,16 @@ pub fn load(
             .ok()
             .and_then(SectionRevisionId::new)
             .ok_or(corrupt("pin-revision"))?;
-        revisions.insert(key, value);
+        if revisions.insert(key, value).is_some() {
+            return Err(corrupt("pin-link-duplicate"));
+        }
+    }
+    if revisions.is_empty() {
+        return Err(corrupt("pin-links-empty"));
+    }
+    let set = DecisionRevisionSet::from_revisions(revisions.clone());
+    if record::decision_identity(&set).as_ref() != Some(decision) {
+        return Err(corrupt("pin-identity-mismatch"));
     }
     Ok(DecisionRevisionPin {
         receipt: DecisionPinReceipt {
@@ -112,6 +124,21 @@ pub fn load(
         },
         revisions,
     })
+}
+
+pub fn validate_all(connection: &Connection) -> Result<(), RepositoryError> {
+    let mut statement = connection
+        .prepare("SELECT decision_id FROM decision_pins ORDER BY decision_id")
+        .map_err(|_| storage("pin-scan"))?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|_| storage("pin-scan"))?;
+    for row in rows {
+        let decision = DecisionSnapshotId::new(row.map_err(|_| storage("pin-scan"))?)
+            .ok_or(corrupt("pin-identity"))?;
+        let _ = load(connection, &decision)?;
+    }
+    Ok(())
 }
 
 pub fn unpin(
