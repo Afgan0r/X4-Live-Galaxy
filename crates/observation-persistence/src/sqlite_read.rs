@@ -50,6 +50,7 @@ pub fn load_revision(
         String,
         String,
         i64,
+        i64,
         String,
         Vec<u8>,
         Vec<u8>,
@@ -58,14 +59,15 @@ pub fn load_revision(
         Option<i64>,
     );
     let header: Option<Header> = connection.query_row(
-        "SELECT source_scope, producer_incarnation, transport_epoch, coverage, manifest_digest, content_digest, integrity_digest, context_token, expected_current FROM revisions WHERE section_key=?1 AND revision=?2",
+        "SELECT source_scope, producer_incarnation, transport_epoch, accepted_at, coverage, manifest_digest, content_digest, integrity_digest, context_token, expected_current FROM revisions WHERE section_key=?1 AND revision=?2",
         params![key.as_str(), sql_u64(revision_id.get())?],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?)),
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?)),
     ).optional().map_err(|_| storage("revision-read"))?;
     let Some((
         source,
         producer,
         epoch,
+        accepted_at,
         coverage,
         manifest,
         content_bytes,
@@ -89,6 +91,7 @@ pub fn load_revision(
         ),
         section_key: key.clone(),
         revision: revision_id,
+        accepted_at: rust_u64(accepted_at)?,
         records,
         coverage: schema::parse_coverage(&coverage)?,
         dependencies: load_dependencies(connection, key, revision_id)?,

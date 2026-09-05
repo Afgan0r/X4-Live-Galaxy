@@ -8,10 +8,11 @@ use observation_ingest::{AcceptedPublication, ValidatedSectionRevision};
 pub struct PublishRequest {
     accepted: AcceptedPublication,
     attempt_identity: PublishAttemptIdentity,
+    accepted_at: u64,
 }
 
 impl PublishRequest {
-    pub fn from_accepted(accepted: AcceptedPublication) -> Self {
+    pub fn from_accepted(accepted: AcceptedPublication, accepted_at: u64) -> Self {
         let revision = accepted.revision();
         let attempt_identity = PublishAttemptIdentity::new(
             revision.source_scope().clone(),
@@ -25,6 +26,7 @@ impl PublishRequest {
         Self {
             accepted,
             attempt_identity,
+            accepted_at,
         }
     }
 
@@ -42,6 +44,10 @@ impl PublishRequest {
 
     pub(crate) fn is_authoritative(&self) -> bool {
         self.accepted.is_authoritative()
+    }
+
+    pub(crate) const fn accepted_at(&self) -> u64 {
+        self.accepted_at
     }
 
     pub const fn attempt_identity(&self) -> &PublishAttemptIdentity {

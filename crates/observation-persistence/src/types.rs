@@ -39,6 +39,7 @@ pub struct RevisionRecord {
     pub source_session: SourceSessionIdentity,
     pub section_key: SectionKey,
     pub revision: SectionRevisionId,
+    pub accepted_at: u64,
     pub records: Vec<EnvelopeRecord>,
     pub coverage: CompletionCoverage,
     pub dependencies: BTreeMap<SectionKey, SectionRevisionId>,
@@ -57,6 +58,7 @@ pub struct PublicationReceipt {
     pub content_digest: [u8; 32],
     pub previous: Option<SectionRevisionId>,
     pub ordinal: u64,
+    pub accepted_at: u64,
 }
 
 #[must_use]
@@ -130,7 +132,7 @@ mod tests {
         let accepted = index
             .prepare_publication(revision.clone())
             .expect("publication prepares");
-        let request = PublishRequest::from_accepted(accepted);
+        let request = PublishRequest::from_accepted(accepted, 11);
         let expected = PublishAttemptIdentity::new(
             revision.source_scope().clone(),
             revision.source_session().clone(),

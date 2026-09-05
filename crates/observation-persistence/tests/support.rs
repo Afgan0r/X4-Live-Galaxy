@@ -42,7 +42,7 @@ pub fn publish_request(revision: ValidatedSectionRevision) -> PublishRequest {
     let accepted = index
         .accept(revision, 1)
         .expect("fixture revision is authoritative");
-    PublishRequest::from_accepted(accepted)
+    PublishRequest::from_accepted(accepted, 3)
 }
 
 pub fn decision_set(revisions: Vec<ValidatedSectionRevision>) -> DecisionRevisionSet {
@@ -82,7 +82,7 @@ pub fn assert_durable_commit_precedes_index_finalization(limits: PublicationLimi
     let accepted = index
         .prepare_publication(validated("ships", 1, None, BTreeMap::new()))
         .expect("publication prepares");
-    let request = PublishRequest::from_accepted(accepted.clone());
+    let request = PublishRequest::from_accepted(accepted.clone(), 3);
     assert_eq!(index.current_count(), 0);
     let database = TempDatabase::new("durable-before-finalize");
     let mut repository = SqliteObservationRepository::open(database.path(), limits)

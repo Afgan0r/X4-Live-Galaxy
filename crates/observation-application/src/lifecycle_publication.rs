@@ -94,7 +94,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         let Some(authority) = self.index.prepare_publication(revision) else {
             return self.finish_disposition(ReceiverDisposition::PermanentlyRejected);
         };
-        let request = PublishRequest::from_accepted(authority.clone());
+        let request = PublishRequest::from_accepted(authority.clone(), now);
         let Some(retained_bytes) = request
             .retained_bytes()
             .and_then(|bytes| self.slot.pending_bytes()?.len().checked_add(bytes))

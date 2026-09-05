@@ -168,7 +168,7 @@ fn reconnect_keeps_a_delayed_validated_revision_history_only() {
     let accepted = index
         .accept(delayed.clone(), 3)
         .expect("session A starts authoritative");
-    let stale_request = PublishRequest::from_accepted(accepted);
+    let stale_request = PublishRequest::from_accepted(accepted, 3);
     index.mark_scope_uncertain(&scope, current_session);
     assert!(index.accept(delayed, 4).is_none());
     assert_eq!(index.current_count(), 0);

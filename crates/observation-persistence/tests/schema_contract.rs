@@ -22,10 +22,10 @@ const fn limits() -> PublicationLimits {
 
 #[test]
 fn schema_identity_and_dependency_pin_are_exact() {
-    assert_eq!(OBSERVATION_REPOSITORY_SCHEMA_VERSION, 3);
+    assert_eq!(OBSERVATION_REPOSITORY_SCHEMA_VERSION, 4);
     assert_eq!(
         OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY,
-        "live_galaxy.observation_repository.v3"
+        "live_galaxy.observation_repository.v4"
     );
     let manifest =
         fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml"))

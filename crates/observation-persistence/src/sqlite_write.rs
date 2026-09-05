@@ -101,11 +101,12 @@ fn publish_in_transaction(
         content_digest: revision.content_digest,
         previous: revision.expected_current,
         ordinal: u64::try_from(ordinal).map_err(|_| rejection("receipt-ordinal"))?,
+        accepted_at: revision.accepted_at,
     };
     let receipt_integrity = sqlite_receipt::integrity_digest(&receipt);
     connection.execute(
-        "INSERT INTO publication_receipts(section_key, revision, content_digest, previous_revision, ordinal, integrity_digest) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get()).map_err(storage)?, revision.content_digest.as_slice(), revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose().map_err(storage)?, ordinal, receipt_integrity.as_slice()],
+        "INSERT INTO publication_receipts(section_key, revision, content_digest, previous_revision, ordinal, accepted_at, integrity_digest) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get()).map_err(storage)?, revision.content_digest.as_slice(), revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose().map_err(storage)?, ordinal, sqlite_read::sql_u64(revision.accepted_at).map_err(storage)?, receipt_integrity.as_slice()],
     ).map_err(|_| rejection("receipt-insert"))?;
     if failpoint == Some(PublicationFailpoint::AfterReceipt) {
         return Err(rejection("failpoint-after-receipt"));
@@ -122,7 +123,10 @@ fn replay(
     revision: &RevisionRecord,
     existing: &RevisionRecord,
 ) -> Result<WriteOutcome, PublishOutcome> {
-    if existing != revision {
+    let mut expected = revision.clone();
+    expected.accepted_at = existing.accepted_at;
+    expected.integrity_digest = record::integrity_digest(&expected);
+    if existing != &expected {
         return Err(PublishOutcome::Conflict(diagnostic("content-conflict")));
     }
     if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?

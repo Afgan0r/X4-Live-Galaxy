@@ -19,7 +19,7 @@ fn reopen_restores_typed_eligibility_and_entity_version_fences() {
         limits(),
     );
     submit_revision_two(&mut lifecycle);
-    let before = lifecycle.decision_eligibility(&[key("ships")], 4, 100);
+    let before = lifecycle.decision_eligibility(&[key("ships")], 102, 100);
     drop(lifecycle);
 
     let repository = SqliteObservationRepository::open(
@@ -31,6 +31,7 @@ fn reopen_restores_typed_eligibility_and_entity_version_fences() {
         .current(&key("ships"))
         .expect("current read succeeds")
         .expect("current revision exists");
+    assert_eq!(current.receipt.accepted_at, 1);
     let hydrated = current.hydrate();
     assert_eq!(
         hydrated.context(),
@@ -43,9 +44,9 @@ fn reopen_restores_typed_eligibility_and_entity_version_fences() {
         repository,
         limits(),
     );
-    assert!(restored.restore_current(&current, 3));
+    assert!(restored.restore_current(&current));
     assert_eq!(
-        restored.decision_eligibility(&[key("ships")], 4, 100),
+        restored.decision_eligibility(&[key("ships")], 102, 100),
         before
     );
     let (start, context) = versioned::start(3, Some(revision(2)));

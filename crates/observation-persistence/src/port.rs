@@ -41,7 +41,7 @@ mod tests {
         let accepted = index
             .accept(revision, 1)
             .expect("test revision is authoritative");
-        PublishRequest::from_accepted(accepted)
+        PublishRequest::from_accepted(accepted, 3)
     }
 
     #[test]

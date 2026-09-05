@@ -32,6 +32,7 @@ pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<
         source_session: revision.source_session().clone(),
         section_key: revision.section_key().clone(),
         revision: revision.section_revision(),
+        accepted_at: request.accepted_at(),
         records: revision.records().to_vec(),
         coverage: revision.coverage(),
         dependencies: request.frozen_dependencies().clone(),
@@ -88,6 +89,7 @@ pub fn integrity_digest(record: &RevisionRecord) -> [u8; 32] {
     );
     hash(&mut digest, record.section_key.as_str().as_bytes());
     hash(&mut digest, &record.revision.get().to_be_bytes());
+    hash(&mut digest, &record.accepted_at.to_be_bytes());
     hash(&mut digest, &[coverage_byte(record.coverage)]);
     for (key, revision) in &record.dependencies {
         hash(&mut digest, key.as_str().as_bytes());

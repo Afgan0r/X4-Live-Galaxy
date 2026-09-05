@@ -36,11 +36,15 @@ impl FakeObservationRepository {
         record: &RevisionRecord,
     ) -> Option<PublishOutcome> {
         let existing = self.revisions.get(identity)?;
+        let mut expected = record.clone();
+        expected.accepted_at = existing.accepted_at;
+        expected.integrity_digest = record::integrity_digest(&expected);
         Some(
-            if existing == record && self.current.get(&record.section_key) == Some(&record.revision)
+            if existing == &expected
+                && self.current.get(&record.section_key) == Some(&record.revision)
             {
                 PublishOutcome::CommittedReplay(self.receipts[identity].clone())
-            } else if existing == record {
+            } else if existing == &expected {
                 PublishOutcome::StalePointer(diagnostic("historical-replay"))
             } else {
                 PublishOutcome::Conflict(diagnostic("content-conflict"))
@@ -80,6 +84,7 @@ impl ObservationRepository for FakeObservationRepository {
             content_digest: record.content_digest,
             previous: request.expected_current(),
             ordinal: self.next_publication,
+            accepted_at: record.accepted_at,
         };
         self.next_publication = self.next_publication.saturating_add(1);
         self.current

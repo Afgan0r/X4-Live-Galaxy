@@ -14,7 +14,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         self.index.eligibility(required, now, max_age)
     }
 
-    pub fn restore_current(&mut self, current: &CurrentRevision, accepted_at: u64) -> bool {
+    pub fn restore_current(&mut self, current: &CurrentRevision) -> bool {
         let revision = current.hydrate();
         for (key, value) in revision.context().dependencies() {
             self.index.record_current_pointer(key.clone(), *value);
@@ -27,7 +27,8 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             return false;
         };
         if !matches!(
-            self.index.finalize_committed(&authority, accepted_at),
+            self.index
+                .finalize_committed(&authority, current.receipt.accepted_at),
             FinalizationOutcome::Finalized | FinalizationOutcome::AlreadyFinalized
         ) {
             return false;
