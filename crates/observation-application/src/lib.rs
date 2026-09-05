@@ -2,6 +2,7 @@
 
 mod lifecycle;
 mod lifecycle_publication;
+mod lifecycle_restore;
 mod publication;
 mod types;
 

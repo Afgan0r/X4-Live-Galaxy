@@ -8,7 +8,7 @@ pub fn insert_revision(
 ) -> Result<(), RepositoryError> {
     connection.execute(
         "INSERT INTO revisions(section_key, revision, source_scope, producer_incarnation, transport_epoch, coverage, manifest_digest, content_digest, integrity_digest, context_token, expected_current) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get())?, revision.source_scope.as_str(), revision.source_session.producer_incarnation().as_str(), sqlite_read::sql_u64(revision.source_session.transport_epoch().get())?, schema::coverage_name(revision.coverage), revision.manifest_digest.as_slice(), revision.content_digest.as_slice(), revision.integrity_digest.as_slice(), &revision.context_token, revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose()?],
+        params![revision.section_key.as_str(), sqlite_read::sql_u64(revision.revision.get())?, revision.source_scope.as_str(), revision.source_session.producer_incarnation().as_str(), sqlite_read::sql_u64(revision.source_session.transport_epoch().get())?, schema::coverage_name(revision.coverage), revision.manifest_digest.as_slice(), revision.content_digest.as_slice(), revision.integrity_digest.as_slice(), revision.context.canonical_payload(), revision.expected_current.map(|value| sqlite_read::sql_u64(value.get())).transpose()?],
     ).map_err(|_| error("revision-insert"))?;
     for (position, item) in revision.records.iter().enumerate() {
         connection

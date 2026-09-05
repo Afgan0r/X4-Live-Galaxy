@@ -7,7 +7,7 @@ use observation_domain::{
 use observation_ingest::{ContractVersions, DecisionRevisionSet};
 use sha2::{Digest, Sha256};
 
-use crate::{PublicationLimits, PublishRequest, RevisionRecord};
+use crate::{PersistedContext, PublicationLimits, PublishRequest, RevisionRecord};
 
 pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<RevisionRecord> {
     let revision = request.revision();
@@ -39,7 +39,7 @@ pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<
         manifest_digest: *revision.manifest_digest(),
         content_digest: calculated,
         integrity_digest: [0; 32],
-        context_token: format!("{:?}", revision.context()),
+        context: PersistedContext::from_candidate(revision.context()),
     };
     record.integrity_digest = integrity_digest(&record);
     Some(record)
@@ -102,7 +102,7 @@ pub fn integrity_digest(record: &RevisionRecord) -> [u8; 32] {
     );
     hash(&mut digest, &record.manifest_digest);
     hash(&mut digest, &record.content_digest);
-    hash(&mut digest, record.context_token.as_bytes());
+    hash(&mut digest, record.context.canonical_payload().as_bytes());
     digest.finalize().into()
 }
 

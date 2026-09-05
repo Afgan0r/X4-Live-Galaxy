@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
+use crate::PersistedContext;
 use observation_domain::{
     CompletionCoverage, DecisionSnapshotId, EnvelopeRecord, SectionKey, SectionRevisionId,
     SourceScopeId, SourceSessionIdentity,
@@ -45,7 +46,7 @@ pub struct RevisionRecord {
     pub manifest_digest: [u8; 32],
     pub content_digest: [u8; 32],
     pub integrity_digest: [u8; 32],
-    pub context_token: String,
+    pub context: PersistedContext,
 }
 
 #[must_use]

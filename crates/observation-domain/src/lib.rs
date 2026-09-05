@@ -6,6 +6,7 @@ mod identity;
 mod observation;
 mod reconciliation;
 mod section;
+mod section_state;
 mod session;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
@@ -24,8 +25,9 @@ pub use reconciliation::{
     CanonicalObservationKey, CollectionLimit, CollectionSize, CountError, ReconciliationDecision,
     reconcile_membership,
 };
-pub use section::{
-    CaptureWindow, CompleteMarker, SectionAvailability, SectionCoverage, SectionDescriptor,
-    SectionFreshness, SectionQuality, SectionState, quality_for_empty_section,
+pub use section::{CompleteMarker, SectionDescriptor, quality_for_empty_section};
+pub use section_state::{
+    CaptureWindow, SectionAvailability, SectionCoverage, SectionFreshness, SectionQuality,
+    SectionState,
 };
 pub use session::SourceSessionIdentity;

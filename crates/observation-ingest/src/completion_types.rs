@@ -53,6 +53,22 @@ impl ContractVersions {
             digest,
         }
     }
+
+    pub const fn schema(self) -> ObservationSchemaVersion {
+        self.schema
+    }
+
+    pub const fn policy(self) -> ObservationPolicyVersion {
+        self.policy
+    }
+
+    pub const fn canonicalization(self) -> CanonicalizationVersion {
+        self.canonicalization
+    }
+
+    pub const fn digest(self) -> DigestAlgorithmVersion {
+        self.digest
+    }
 }
 
 #[must_use]

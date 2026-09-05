@@ -70,7 +70,7 @@ pub fn load_revision(
         manifest,
         content_bytes,
         integrity,
-        context_token,
+        context_payload,
         expected,
     )) = header
     else {
@@ -96,7 +96,8 @@ pub fn load_revision(
         manifest_digest: digest(&manifest)?,
         content_digest: stored_digest,
         integrity_digest: digest(&integrity)?,
-        context_token,
+        context: crate::PersistedContext::parse(&context_payload)
+            .ok_or(corrupt("context-invalid"))?,
     };
     if record::integrity_digest(&record) != record.integrity_digest {
         return Err(corrupt("integrity-digest-mismatch"));

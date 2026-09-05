@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod context;
 mod fake;
+mod hydration;
 mod port;
 mod record;
 mod recovery;
@@ -17,6 +19,7 @@ mod sqlite_write;
 mod sqlite_write_rows;
 mod types;
 
+pub use context::PersistedContext;
 pub use fake::FakeObservationRepository;
 pub use port::ObservationRepository;
 pub use recovery::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};

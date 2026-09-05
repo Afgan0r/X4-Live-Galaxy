@@ -19,7 +19,34 @@ pub struct ValidatedSectionRevision {
     pub(crate) content_digest: [u8; 32],
 }
 
+#[must_use]
+pub struct DurableRevisionParts {
+    pub source_scope: SourceScopeId,
+    pub source_session: SourceSessionIdentity,
+    pub section_key: SectionKey,
+    pub section_revision: SectionRevisionId,
+    pub records: Vec<EnvelopeRecord>,
+    pub coverage: CompletionCoverage,
+    pub context: CandidateContext,
+    pub manifest_digest: [u8; 32],
+    pub content_digest: [u8; 32],
+}
+
 impl ValidatedSectionRevision {
+    pub fn from_durable_parts(parts: DurableRevisionParts) -> Self {
+        Self {
+            source_scope: parts.source_scope,
+            source_session: parts.source_session,
+            section_key: parts.section_key,
+            section_revision: parts.section_revision,
+            records: parts.records,
+            coverage: parts.coverage,
+            context: parts.context,
+            manifest_digest: parts.manifest_digest,
+            content_digest: parts.content_digest,
+        }
+    }
+
     pub const fn source_scope(&self) -> &SourceScopeId {
         &self.source_scope
     }
