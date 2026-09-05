@@ -20,7 +20,7 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-28)
+See: .planning/PROJECT.md (updated 2026-09-05)
 
 **Core value:** Factions pursue coherent, distinct, long-lived strategies while X4 remains authoritative and every proposed effect stays observable, recoverable, and bounded by deterministic validation.
 **Current focus:** Phase 05.4 — Owned Carrier B and Production Observation Path
@@ -232,6 +232,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-05T04:23:40.233Z
+Last session: 2026-09-05T15:04:01.6836957+07:00
 Stopped at: Phase 05.3 complete, ready to discuss Phase 05.4
 Resume file: None
