@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-05
+
+- Added owner-approved conditional fan-out with up to three Luna/high lenses
+  while retaining a complete lead review and evidence-based adjudication.
+- Added shared rule routing, concrete convention findings, candidate
+  disposition, and scoped re-review without mandatory extra infrastructure.
+- Added five synthetic cases and recorded a bounded three-lens evaluation.
+
 ## 2026-08-28
 
 - Created the initial risk-first Live Galaxy review contract.

@@ -48,12 +48,16 @@ Before structural changes, game research, mod research, accumulated knowledge,
 or session outcomes, read the global `game-repo-standard` skill and every
 reference it routes for the task.
 
-Use the following project skills and read their entire `SKILL.md` files before
-acting:
+Use the following project skills and read their entire `SKILL.md` files and
+applicable rule references before acting:
 
+- `.agents/skills/live-galaxy-code-conventions/SKILL.md` for all engineering
+  design, implementation, refactoring, or review, including Lua/MD and tools.
+- `.agents/skills/live-galaxy-tests/SKILL.md` and its test-standards reference
+  for test design, implementation, review, or verification evidence.
 - `.agents/skills/live-galaxy-rust-conventions/SKILL.md` for Rust design,
   implementation, or review.
-- `.agents/skills/live-galaxy-rust-tests/SKILL.md` for test design,
+- `.agents/skills/live-galaxy-rust-tests/SKILL.md` for Rust test design,
   implementation, or review.
 - `.agents/skills/live-galaxy-x4-tests/SKILL.md` for Lua, Mission Director,
   adapter, in-game, or X4 mutation testing.
@@ -71,6 +75,19 @@ acting:
 Use the global `lua` skill for Lua changes, `mcp-builder` for MCP contract work,
 and `openai-docs` for current OpenAI API or model behavior. Current official
 documentation and repository evidence outrank memory.
+
+The common code skill owns shared engineering, detailed developer logging,
+and tooling rules; the common test skill owns scenario sufficiency and evidence
+rules. Language skills specialize them. Project Lua/MD rules take precedence
+over generic Lua optimization or OOP suggestions. Apply conventions to new or
+changed logic and necessary related fixes; current code and pattern maps are
+compatibility evidence, not a quality exemplar.
+
+Before dispatching a convention-bound subagent, resolve the applicable skill
+chain and name every required `SKILL.md` and reference file explicitly in its
+prompt. GSD `agent_skills` entries load entrypoints only; they do not replace
+this reference-expansion step. The review skill owns conditional specialist
+fan-out and lead adjudication; preserve the current GSD reviewer model/routing.
 
 ## GSD Workflow
 

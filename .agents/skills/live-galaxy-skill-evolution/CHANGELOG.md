@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-05
+
+- Recognized owner-approved prescriptive rules without requiring defect
+  history and named single owners for shared, language, test, and review rules.
+
 ## 2026-08-29
 
 - Made skill learning a completion gate with explicit none/candidate evidence,

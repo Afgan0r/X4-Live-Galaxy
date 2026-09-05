@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-05
+
+- Linked shared test sufficiency to `live-galaxy-tests` and retained X4-specific
+  package, Lua, adapter, cross-language, runtime, and mutation obligations.
+- Replaced the former normal-operation diagnostic restriction with the shared
+  code-conventions logging policy and semantic diagnostic assertions.
+
 ## 2026-08-29
 
 - Required bounded opt-in correlated developer diagnostics for multi-hop X4

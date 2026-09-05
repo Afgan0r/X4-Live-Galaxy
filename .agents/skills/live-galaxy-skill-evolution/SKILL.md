@@ -31,6 +31,11 @@ A lesson is durable only when it is supported by repository evidence, a
 reproduced failure, an accepted product decision, or verified runtime behavior.
 Do not persist guesses, one-off preferences, or unresolved alternatives.
 
+An owner-approved prescriptive engineering decision is also valid evidence;
+creating a quality standard does not require a prior production defect. Honor
+the current task's explicit authorization to design or revise rules without
+asking again for already-approved decisions.
+
 Before editing a skill:
 
 1. identify the exact recurring failure or missing rule;
@@ -49,6 +54,13 @@ Before editing a skill:
 - Do not patch global or vendored skills from this repository.
 - If the issue belongs upstream, record the local bridge needed now and route
   upstream feedback separately.
+
+Use a single rule owner: common engineering/logging/tooling belongs to
+`live-galaxy-code-conventions`; general test sufficiency and evidence to
+`live-galaxy-tests`; Rust and X4-specific rules to their specialized skills;
+review dispatch, adjudication, and verdicts to `live-galaxy-code-review`.
+Update only necessary consumer links when routing changes. Do not copy the
+same behavioral rule into tests, review, and language skills independently.
 
 ## Verify
 

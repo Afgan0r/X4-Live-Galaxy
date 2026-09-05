@@ -1,82 +1,74 @@
 ---
 name: live-galaxy-rust-conventions
-description: Rust architecture and correctness rules for the Live Galaxy bridge and strategic kernel.
+description: >-
+  Rust-specific correctness, ownership, and lint rules for Live Galaxy. Use for
+  Rust design, implementation, refactoring, or review (конвенции Rust,
+  написание и ревью Rust).
 ---
 
 # Live Galaxy Rust Conventions
 
-Use this skill for Rust design, implementation, refactoring, and review.
+Read [common code conventions](../live-galaxy-code-conventions/SKILL.md) and
+their applicable references first. They own common responsibility, errors,
+state, recovery, bounds, logging, and tooling. This skill adds Rust-specific
+obligations; it does not select dependencies or an async runtime.
 
-## Boundaries
+## RUST-01 — Typed boundaries
 
-- Keep game adapters, model providers, persistence, strategic domain logic, and
-  orchestration behind explicit interfaces.
-- Domain code consumes normalized typed state, not raw XML, JSON, transport
-  messages, or provider responses.
-- Model output remains untrusted until schema, semantic, safety, budget, and
-  current-state validation succeeds.
-- Only the deterministic application layer may convert an accepted strategic
-  primitive into a game command.
+Use distinct domain types where swapping identifiers, clocks, units, quantities,
+or states changes meaning. Keep raw external representations outside validated
+domain values until validation succeeds. Constructors, conversions, decoding,
+and mutation preserve the same invariants; private fields alone do not prove
+that every construction path is validated.
 
-## Correctness
+Use enums for meaningful closed alternatives and typed recoverable errors.
+`Option` means expected absence, not erased failure. Match relevant safety/state
+variants explicitly; a catch-all must not grant new variants silent success.
+Keep provider-specific shapes at their boundary. Preserve error causes without
+requiring one giant global error enum.
 
-- Represent identifiers, quantities, time, reputation, priorities, and state
-  transitions with domain types rather than interchangeable primitives.
-- Make invalid states difficult to construct. Prefer enums and explicit state
-  machines over boolean combinations and magic strings.
-- Preserve replay inputs and stable ordering wherever a decision must be
-  reproducible.
-- Make command acceptance and recovery idempotent. Retries must not duplicate
-  game effects.
-- Reject stale or invalid actions before persistence or game mutation. Avoid
-  partial success unless the contract explicitly models it.
+## RUST-02 — Ownership and cost
 
-## Errors and Safety
+Borrow for access; take ownership when the operation needs to retain the value.
+Prefer an honest ownership-taking signature over always borrowing and cloning.
+Copying for an independent immutable snapshot is valid; unexplained cloning
+or shared mutable containers used only to evade ownership design are not.
+Consider aliases, lifetime, and synchronization consequences.
 
-- Do not panic on game, model, storage, configuration, or transport input.
-- Do not use unchecked indexing or `unwrap`/`expect` across external or
-  recoverable boundaries.
-- Preserve actionable context while preventing secrets, private prompts, and
-  hidden reasoning from entering logs.
-- Bound payloads, collections, loops, retries, queues, and external calls.
-- Forbid unsafe Rust throughout the current workspace. A verified future need
-  requires an explicitly approved dedicated boundary crate with a safety
-  contract and focused tests.
+Choose traits, generics, trait objects, and smart pointers for actual boundary
+or ownership requirements. Do not impose an interface per type or genericize
+a local operation for hypothetical reuse. Check conversion/arithmetic range
+assumptions or justify them through the explicit contract.
 
-## Design
+## RUST-03 — Production safety
 
-- Prefer small cohesive modules and dependency inversion at external seams.
-- Separate pure decision logic from I/O so it can be replayed and tested.
-- Keep provider-specific behavior in adapters. Do not leak one model vendor's
-  response shape into the domain.
-- Avoid speculative abstractions. Add an interface when a real boundary or test
-  seam requires it.
-- Do not select crates or async architecture from convention alone; phase
-  research owns dependency and runtime choices.
+Forbid `unwrap`, `expect`, and panic paths in production, including tools.
+Do not panic on external/recoverable input or use unchecked indexing across
+those boundaries. Tests and test-only helpers may fail immediately when that
+expresses their contract; this must not create a production escape path.
 
-## Lint and Module Boundaries
+Forbid unsafe Rust throughout the current workspace. A verified future need
+requires an explicitly approved dedicated boundary crate with a safety
+contract and focused tests.
+
+## RUST-04 — Modules and lints
 
 - Keep every Rust source file at or below 200 physical lines, including blank
   lines, comments, documentation, and test-only sections.
-- Give each module one bounded responsibility. Split by domain or adapter
-  ownership before the size limit is reached; never satisfy the limit by moving
-  arbitrary chunks into vaguely named files.
-- Keep `lib.rs` and `mod.rs` focused on declarations, composition, and
-  re-exports. Do not accumulate unrelated implementation logic in them.
-- Apply the same Rust and Clippy policy to repository-owned tools as to product
-  crates. A tool is not an escape hatch from workspace quality gates.
-- Forbid `unwrap`, `expect`, and panic paths in production code. Tests and
-  test-only helpers may use them when immediate test failure expresses the
-  contract more directly than recoverable error handling.
-- Never weaken a lint, threshold, or lint command merely to make a task pass.
-  Use the narrowest possible `#[expect(..., reason = "...")]` only for a
-  verified false positive or behavior intrinsic to an explicit contract.
-- Treat stable `all` and `pedantic` lints as blocking except for individually
-  audited cosmetic or documentation-only checks. Enable `nursery` lints
-  individually, and re-audit that list whenever the pinned Rust version changes.
+- Split by cohesive responsibility before the limit. Do not use arbitrary
+  numbered chunks, source inclusion tricks, or renamed dumping grounds.
+- Keep `lib.rs` and `mod.rs` focused on declarations, composition, and exports.
+- Apply the same Rust/Clippy policy to repository tools.
+- Treat stable `all` and `pedantic` as blocking except individually audited
+  cosmetic/documentation-only checks. Enable `nursery` individually and
+  re-audit when the pinned Rust version changes.
+- Never weaken a lint or command to pass. Use the narrowest
+  `#[expect(..., reason = "...")]` only for a verified false positive or
+  behavior intrinsic to an explicit contract under the established policy.
 
-## Completion
+## Verification
 
-Once a Cargo workspace exists, run the repository-defined formatting, linting,
-focused tests, and full tests. Treat warnings as defects unless a documented
-exception owns them.
+Use [Rust tests](../live-galaxy-rust-tests/SKILL.md) and repository-defined
+formatting/lint commands for affected code. Follow focused iteration and one
+required final regression after review convergence. Instruction-only changes
+do not justify unrelated Rust runtime suites.

@@ -1,6 +1,8 @@
 ---
 name: live-galaxy-x4-integration
-description: Safe research, design, implementation, and verification for Live Galaxy X4 integration.
+description: >-
+  X4 integration research and Lua/MD engineering rules for Live Galaxy. Use for
+  game-facing design, implementation, or review (интеграция X4, код Lua и MD).
 ---
 
 # Live Galaxy X4 Integration
@@ -8,6 +10,13 @@ description: Safe research, design, implementation, and verification for Live Ga
 Use this skill for X4 XML, Mission Director, Lua, game-data, installed-mod,
 compatibility, or in-game verification work. Use the global `lua` skill for Lua
 implementation and review.
+
+Read [common code conventions](../live-galaxy-code-conventions/SKILL.md)
+and the [Lua/MD rules](references/lua-md-conventions.md) for code changes or
+review, including pure Lua modules. Read the common logging reference for
+diagnostics or changed decision/error paths. Its owner-approved developer
+history policy takes precedence over generic Lua advice. Research-only work
+loads only the relevant evidence and shared Docs MCP contract.
 
 ## Evidence
 

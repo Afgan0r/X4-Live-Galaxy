@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-05
+
+- Added the owner-approved Lua/MD coding reference and common code/logging
+  routing while retaining X4 research, package, and compatibility boundaries.
+
 ## 2026-09-03
 
 - Applied the owner's decision to drop More AI Economy Ships compatibility;
