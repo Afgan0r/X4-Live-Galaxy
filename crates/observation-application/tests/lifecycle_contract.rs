@@ -10,11 +10,9 @@ use observation_application::{
 };
 use observation_domain::SectionCoverage;
 use observation_ingest::{DecisionRevisionIndex, ReceiverDisposition};
-use support::{
-    AttemptLog, FirstPublish, RecordingRepository, candidate_context, completion_bytes, current,
-    input, limits, repository, stager, start_bytes, submit_empty, submit_section,
-    submit_start_and_batch,
-};
+use support::flow::{input, limits, submit_empty, submit_section, submit_start_and_batch};
+use support::repository_support::{AttemptLog, FirstPublish, RecordingRepository};
+use support::{candidate_context, completion_bytes, current, repository, stager, start_bytes};
 
 #[test]
 fn decode_first_ship_tracer() {
