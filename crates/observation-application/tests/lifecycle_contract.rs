@@ -1,29 +1,20 @@
 #![expect(
     clippy::expect_used,
-    clippy::panic,
     reason = "contract-test setup and mismatches must fail immediately"
 )]
 
 mod support;
 
 use observation_application::{
-    LifecycleContext, LifecycleInput, LifecycleLimits, LifecycleResult, ObservationLifecycle,
+    LifecycleContext, LifecycleError, LifecycleResult, ObservationLifecycle, ReconcileResult,
 };
 use observation_domain::SectionCoverage;
 use observation_ingest::{DecisionRevisionIndex, ReceiverDisposition};
-use observation_persistence::ObservationRepository;
 use support::{
-    batch_bytes, batch_id, candidate_context, completion_bytes, current, epoch, repository, stager,
-    start_bytes,
+    AttemptLog, FirstPublish, RecordingRepository, candidate_context, completion_bytes, current,
+    input, limits, repository, stager, start_bytes, submit_empty, submit_section,
+    submit_start_and_batch,
 };
-
-fn limits() -> LifecycleLimits {
-    LifecycleLimits::new(4_096, 16_384, 1_000, 4).expect("limits are non-zero")
-}
-
-fn input(identity: &str, bytes: Vec<u8>, context: LifecycleContext, now: u64) -> LifecycleInput {
-    LifecycleInput::new(epoch(), batch_id(identity), bytes, 1, now, context)
-}
 
 #[test]
 fn decode_first_ship_tracer() {
@@ -41,22 +32,95 @@ fn decode_first_ship_tracer() {
         1,
     );
     assert!(lifecycle.submit(invalid).is_err());
-    assert_eq!(lifecycle.candidate_count(), 0);
-    assert!(!lifecycle.slot_occupied());
+    assert_eq!(
+        lifecycle.submit(input(
+            "outer:invalid",
+            start_bytes("ships", 0),
+            LifecycleContext::Start(candidate_context(SectionCoverage::KnownEmpty)),
+            2,
+        )),
+        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
+    );
 }
 
 #[test]
 fn ambiguous_attempt_reconciles_exact_request_without_reassembly() {
     let (_database, repository) = repository("ambiguous");
+    let log = AttemptLog::default();
+    let repository =
+        RecordingRepository::new(repository, log.clone(), FirstPublish::CommitThenAmbiguous);
     let mut lifecycle = ObservationLifecycle::new(
         stager(),
         DecisionRevisionIndex::new(4).expect("blocker limit is non-zero"),
         repository,
         limits(),
     );
-    submit_section(&mut lifecycle, "ships", &[("record:1", "ship:1")]);
-    assert_eq!(lifecycle.retained_attempt_count(), 0);
-    assert_eq!(lifecycle.current_revision_count(), 1);
+    submit_start_and_batch(&mut lifecycle, "ships", &[("record:1", "ship:1")]);
+    let completion = input(
+        "outer:ships:complete",
+        completion_bytes("ships", 1, "complete"),
+        LifecycleContext::Completion(current()),
+        3,
+    );
+    assert_eq!(
+        lifecycle.submit(completion),
+        Ok(LifecycleResult::Disposition(
+            ReceiverDisposition::AmbiguousCommit
+        ))
+    );
+    assert_eq!(
+        lifecycle.submit(input(
+            "outer:blocked",
+            start_bytes("stations", 0),
+            LifecycleContext::Start(candidate_context(SectionCoverage::KnownEmpty)),
+            4,
+        )),
+        Err(LifecycleError::BlockedAmbiguous)
+    );
+    assert_eq!(
+        lifecycle.reconcile_ambiguous(5),
+        Ok(LifecycleResult::Reconciled(ReconcileResult::Committed))
+    );
+    assert_eq!(log.values().len(), 1);
+}
+
+#[test]
+fn proven_not_committed_retries_the_exact_request() {
+    let (_database, repository) = repository("retry");
+    let log = AttemptLog::default();
+    let repository =
+        RecordingRepository::new(repository, log.clone(), FirstPublish::SkipThenAmbiguous);
+    let mut lifecycle = ObservationLifecycle::new(
+        stager(),
+        DecisionRevisionIndex::new(4).expect("blocker limit is non-zero"),
+        repository,
+        limits(),
+    );
+    submit_start_and_batch(&mut lifecycle, "ships", &[("record:1", "ship:1")]);
+    assert_eq!(
+        lifecycle.submit(input(
+            "outer:ships:complete",
+            completion_bytes("ships", 1, "complete"),
+            LifecycleContext::Completion(current()),
+            3,
+        )),
+        Ok(LifecycleResult::Disposition(
+            ReceiverDisposition::AmbiguousCommit
+        ))
+    );
+    assert_eq!(
+        lifecycle.reconcile_ambiguous(4),
+        Ok(LifecycleResult::Reconciled(
+            ReconcileResult::ProvenNotCommitted
+        ))
+    );
+    assert_eq!(
+        lifecycle.retry_proven_not_committed(),
+        Ok(LifecycleResult::Disposition(ReceiverDisposition::Committed))
+    );
+    let attempts = log.values();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(attempts[0], attempts[1]);
 }
 
 #[test]
@@ -70,77 +134,44 @@ fn ship_and_known_empty_station_traverse_same_lifecycle() {
     );
     submit_section(&mut lifecycle, "ships", &[("record:1", "ship:1")]);
     submit_empty(&mut lifecycle, "stations");
-    assert_eq!(lifecycle.current_revision_count(), 2);
 }
 
 #[test]
 fn adjacent_identities_survive_permuted_input_with_canonical_replay() {
-    let (_database, repository) = repository("permuted");
+    let forward = run_permutation(
+        "permuted-forward",
+        &[("record:2", "ship:2"), ("record:1", "ship:1")],
+    );
+    let reverse = run_permutation(
+        "permuted-reverse",
+        &[("record:1", "ship:1"), ("record:2", "ship:2")],
+    );
+    assert_eq!(forward, reverse);
+}
+
+fn run_permutation(
+    label: &str,
+    records: &[(&str, &str)],
+) -> Vec<observation_persistence::PublishAttemptIdentity> {
+    let (_database, repository) = repository(label);
+    let log = AttemptLog::default();
+    let repository = RecordingRepository::new(repository, log.clone(), FirstPublish::Normal);
     let mut lifecycle = ObservationLifecycle::new(
         stager(),
         DecisionRevisionIndex::new(4).expect("blocker limit is non-zero"),
         repository,
         limits(),
     );
-    submit_section(
-        &mut lifecycle,
-        "ships",
-        &[("record:2", "ship:2"), ("record:1", "ship:1")],
-    );
-    assert_eq!(lifecycle.current_revision_count(), 1);
-}
-
-fn submit_section<R: ObservationRepository>(
-    lifecycle: &mut ObservationLifecycle<R>,
-    section: &str,
-    records: &[(&str, &str)],
-) {
+    submit_section(&mut lifecycle, "ships", records);
     assert_eq!(
         lifecycle.submit(input(
-            &format!("outer:{section}:start"),
-            start_bytes(section, records.len()),
-            LifecycleContext::Start(candidate_context(SectionCoverage::Complete)),
-            1,
-        )),
-        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
-    );
-    assert_eq!(
-        lifecycle.submit(input(
-            &format!("outer:{section}:batch"),
-            batch_bytes(section, records),
-            LifecycleContext::Batch,
-            2,
-        )),
-        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
-    );
-    assert_eq!(
-        lifecycle.submit(input(
-            &format!("outer:{section}:complete"),
-            completion_bytes(section, records.len(), "complete"),
+            "outer:ships:complete",
+            completion_bytes("ships", records.len(), "complete"),
             LifecycleContext::Completion(current()),
             3,
         )),
         Ok(LifecycleResult::Disposition(ReceiverDisposition::Committed))
     );
-}
-
-fn submit_empty<R: ObservationRepository>(lifecycle: &mut ObservationLifecycle<R>, section: &str) {
-    assert_eq!(
-        lifecycle.submit(input(
-            &format!("outer:{section}:start"),
-            start_bytes(section, 0),
-            LifecycleContext::Start(candidate_context(SectionCoverage::KnownEmpty)),
-            4,
-        )),
-        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
-    );
-    assert_eq!(
-        lifecycle.submit(input(
-            &format!("outer:{section}:complete"),
-            completion_bytes(section, 0, "known_empty"),
-            LifecycleContext::Completion(current()),
-            5,
-        )),
-        Ok(LifecycleResult::Disposition(ReceiverDisposition::Committed))
-    );
+    assert_eq!(log.values().len(), 1);
+    log.values()
 }

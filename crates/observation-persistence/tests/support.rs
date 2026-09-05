@@ -18,7 +18,10 @@ use observation_ingest::{
     DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet, FinalizationOutcome,
     ValidatedSectionRevision,
 };
-use observation_persistence::PublishRequest;
+use observation_persistence::{
+    ObservationRepository, PublicationLimits, PublishOutcome, PublishRequest,
+    SqliteObservationRepository,
+};
 
 #[path = "support/revisions.rs"]
 mod revisions;
@@ -72,6 +75,28 @@ pub fn decision_set(revisions: Vec<ValidatedSectionRevision>) -> DecisionRevisio
         DecisionEligibility::Eligible(set) => set,
         DecisionEligibility::Blocked(blockers) => panic!("fixture set blocked: {blockers:?}"),
     }
+}
+
+pub fn assert_durable_commit_precedes_index_finalization(limits: PublicationLimits) {
+    let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
+    let accepted = index
+        .prepare_publication(validated("ships", 1, None, BTreeMap::new()))
+        .expect("publication prepares");
+    let request = PublishRequest::from_accepted(accepted.clone());
+    assert_eq!(index.current_count(), 0);
+    let database = TempDatabase::new("durable-before-finalize");
+    let mut repository = SqliteObservationRepository::open(database.path(), limits)
+        .expect("SQLite repository opens");
+    assert!(matches!(
+        repository.publish(request),
+        PublishOutcome::CommittedNew(_)
+    ));
+    assert_eq!(index.current_count(), 0);
+    assert_eq!(
+        index.finalize_committed(&accepted, 2),
+        FinalizationOutcome::Finalized
+    );
+    assert_eq!(index.current_count(), 1);
 }
 
 pub struct TempDatabase(PathBuf);

@@ -19,6 +19,13 @@ use observation_ingest::{
 };
 use observation_persistence::{PublicationLimits, SqliteObservationRepository};
 
+#[path = "support/repository.rs"]
+mod repository_support;
+pub use repository_support::{AttemptLog, FirstPublish, RecordingRepository};
+#[path = "support/flow.rs"]
+mod flow;
+pub use flow::{input, limits, submit_empty, submit_section, submit_start_and_batch};
+
 static NEXT_PATH: AtomicU64 = AtomicU64::new(1);
 
 pub fn key(value: &str) -> SectionKey {
@@ -37,7 +44,7 @@ pub fn batch_id(value: &str) -> BatchId {
     BatchId::new(value).expect("fixture batch identity is valid")
 }
 
-pub fn candidate_context(coverage: SectionCoverage) -> CandidateContext {
+pub const fn candidate_context(coverage: SectionCoverage) -> CandidateContext {
     CandidateContext::new(
         ContractVersions::new(
             ObservationSchemaVersion::new(1).expect("version is non-zero"),
@@ -59,10 +66,11 @@ pub fn candidate_context(coverage: SectionCoverage) -> CandidateContext {
     )
 }
 
-pub fn current() -> CompletionCurrent {
+pub const fn current() -> CompletionCurrent {
     CompletionCurrent::new(BTreeMap::new(), None)
 }
 
+#[must_use]
 pub fn stager() -> GenerationStager {
     let candidate = CandidateLimits::new(4_096, 8_192, 16, 16, 32, 100, 10)
         .expect("candidate limits are non-zero");
@@ -74,6 +82,7 @@ pub fn stager() -> GenerationStager {
     )
 }
 
+#[must_use]
 pub fn repository(label: &str) -> (TempDatabase, SqliteObservationRepository) {
     let database = TempDatabase::new(label);
     let limits = PublicationLimits::new(16, 8_192).expect("publication limits are non-zero");
@@ -82,6 +91,7 @@ pub fn repository(label: &str) -> (TempDatabase, SqliteObservationRepository) {
     (database, repository)
 }
 
+#[must_use]
 pub fn start_bytes(section: &str, expected: usize) -> Vec<u8> {
     format!(
         "{{\"type\":\"section_start\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"expected_records\":{expected}}}"
@@ -89,6 +99,7 @@ pub fn start_bytes(section: &str, expected: usize) -> Vec<u8> {
     .into_bytes()
 }
 
+#[must_use]
 pub fn batch_bytes(section: &str, records: &[(&str, &str)]) -> Vec<u8> {
     let records = records
         .iter()
@@ -105,6 +116,7 @@ pub fn batch_bytes(section: &str, records: &[(&str, &str)]) -> Vec<u8> {
     .into_bytes()
 }
 
+#[must_use]
 pub fn completion_bytes(section: &str, count: usize, coverage: &str) -> Vec<u8> {
     format!(
         "{{\"type\":\"section_completion\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"record_count\":{count},\"coverage\":\"{coverage}\"}}"
@@ -123,6 +135,7 @@ impl TempDatabase {
         )))
     }
 
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.0
     }

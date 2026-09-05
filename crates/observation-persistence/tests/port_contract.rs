@@ -16,8 +16,8 @@ use observation_persistence::{
 };
 use rusqlite::Connection;
 use support::{
-    RevisionFixture, TempDatabase, decision_set, key, publish_request, revision, validated,
-    validated_with,
+    RevisionFixture, TempDatabase, assert_durable_commit_precedes_index_finalization, decision_set,
+    key, publish_request, revision, validated, validated_with,
 };
 
 const fn limits() -> PublicationLimits {
@@ -189,24 +189,5 @@ fn reconnect_keeps_a_delayed_validated_revision_history_only() {
 
 #[test]
 fn durable_commit_precedes_index_finalization() {
-    let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
-    let accepted = index
-        .prepare_publication(validated("ships", 1, None, BTreeMap::new()))
-        .expect("publication prepares");
-    let request = PublishRequest::from_accepted(accepted.clone());
-    assert_eq!(index.current_count(), 0);
-
-    let database = TempDatabase::new("durable-before-finalize");
-    let mut repository = SqliteObservationRepository::open(database.path(), limits())
-        .expect("SQLite repository opens");
-    assert!(matches!(
-        repository.publish(request),
-        PublishOutcome::CommittedNew(_)
-    ));
-    assert_eq!(index.current_count(), 0);
-    assert_eq!(
-        index.finalize_committed(&accepted, 2),
-        observation_ingest::FinalizationOutcome::Finalized
-    );
-    assert_eq!(index.current_count(), 1);
+    assert_durable_commit_precedes_index_finalization(limits());
 }
