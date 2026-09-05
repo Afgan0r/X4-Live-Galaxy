@@ -14,6 +14,15 @@ pub struct AcceptedPublication {
     accepted_generation: u64,
 }
 
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FinalizationOutcome {
+    Finalized,
+    AlreadyFinalized,
+    AuthorityChanged,
+    StateMismatch,
+}
+
 impl AcceptedPublication {
     pub const fn revision(&self) -> &ValidatedSectionRevision {
         &self.revision
@@ -48,10 +57,9 @@ impl SessionAuthority {
 }
 
 impl DecisionRevisionIndex {
-    pub fn accept(
+    pub fn prepare_publication(
         &mut self,
         revision: ValidatedSectionRevision,
-        accepted_at: u64,
     ) -> Option<AcceptedPublication> {
         let scope = revision.source_scope().clone();
         if self
@@ -59,24 +67,67 @@ impl DecisionRevisionIndex {
             .get(&scope)
             .is_some_and(|current| &current.identity != revision.source_session())
         {
-            self.history.push((revision, accepted_at));
             return None;
         }
-        let key = revision.section_key().clone();
         self.authoritative_sessions
             .entry(scope.clone())
             .or_insert_with(|| SessionAuthority::new(revision.source_session().clone()));
-        let accepted = self
-            .authoritative_sessions
+        self.authoritative_sessions
             .get(&scope)
-            .map(|authority| authority.accepted(revision.clone()))?;
-        self.uncertain_scopes.remove(&scope);
+            .map(|authority| authority.accepted(revision))
+    }
+
+    pub fn accept(
+        &mut self,
+        revision: ValidatedSectionRevision,
+        _accepted_at: u64,
+    ) -> Option<AcceptedPublication> {
+        self.prepare_publication(revision)
+    }
+
+    pub fn finalize_committed(
+        &mut self,
+        accepted: &AcceptedPublication,
+        accepted_at: u64,
+    ) -> FinalizationOutcome {
+        let revision = accepted.revision();
+        let scope = revision.source_scope();
+        if self
+            .authoritative_sessions
+            .get(scope)
+            .is_none_or(|current| &current.identity != revision.source_session())
+            || !accepted.is_authoritative()
+        {
+            return FinalizationOutcome::AuthorityChanged;
+        }
+        let key = revision.section_key();
+        if self
+            .current
+            .get(key)
+            .is_some_and(|(current, _)| current == revision)
+        {
+            return FinalizationOutcome::AlreadyFinalized;
+        }
+        let pointer_matches =
+            self.pointers.get(key).copied() == revision.context().expected_current();
+        let dependencies_match = revision
+            .context()
+            .dependencies()
+            .iter()
+            .all(|(dependency, expected)| self.pointers.get(dependency) == Some(expected));
+        if !pointer_matches || !dependencies_match {
+            return FinalizationOutcome::StateMismatch;
+        }
+        self.uncertain_scopes.remove(scope);
         self.pointers
             .insert(key.clone(), revision.section_revision());
-        if let Some(previous) = self.current.insert(key, (revision, accepted_at)) {
+        if let Some(previous) = self
+            .current
+            .insert(key.clone(), (revision.clone(), accepted_at))
+        {
             self.history.push(previous);
         }
-        Some(accepted)
+        FinalizationOutcome::Finalized
     }
 
     pub fn record_current_pointer(&mut self, key: SectionKey, revision: SectionRevisionId) {

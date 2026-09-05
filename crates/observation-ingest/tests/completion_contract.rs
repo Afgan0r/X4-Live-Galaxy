@@ -10,7 +10,8 @@ use observation_domain::{
 use observation_ingest::{
     AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent,
     CompletionOutcome, ContractVersions, DecisionEligibility, DecisionRevisionIndex,
-    EligibilityBlocker, GenerationLimits, GenerationStager, ReceiverDisposition, RejectionReason,
+    EligibilityBlocker, FinalizationOutcome, GenerationLimits, GenerationStager,
+    ReceiverDisposition, RejectionReason,
 };
 use std::collections::BTreeMap;
 #[path = "completion_contract/coverage.rs"]

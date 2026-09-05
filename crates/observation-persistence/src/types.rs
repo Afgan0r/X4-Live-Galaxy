@@ -5,7 +5,8 @@ use observation_domain::{
     CompletionCoverage, DecisionSnapshotId, EnvelopeRecord, SectionKey, SectionRevisionId,
     SourceScopeId, SourceSessionIdentity,
 };
-use observation_ingest::{AcceptedPublication, ValidatedSectionRevision};
+mod publication;
+pub use publication::{PublishAttemptIdentity, PublishRequest};
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,34 +28,6 @@ impl PublicationLimits {
                 None => return None,
             },
         })
-    }
-}
-
-#[must_use]
-#[derive(Clone, Debug)]
-pub struct PublishRequest {
-    accepted: AcceptedPublication,
-}
-
-impl PublishRequest {
-    pub const fn from_accepted(accepted: AcceptedPublication) -> Self {
-        Self { accepted }
-    }
-
-    pub(crate) const fn revision(&self) -> &ValidatedSectionRevision {
-        self.accepted.revision()
-    }
-
-    pub(crate) const fn expected_current(&self) -> Option<SectionRevisionId> {
-        self.revision().context().expected_current()
-    }
-
-    pub(crate) const fn frozen_dependencies(&self) -> &BTreeMap<SectionKey, SectionRevisionId> {
-        self.revision().context().dependencies()
-    }
-
-    pub(crate) fn is_authoritative(&self) -> bool {
-        self.accepted.is_authoritative()
     }
 }
 
@@ -147,14 +120,14 @@ mod tests {
     use crate::test_support::validated;
     use observation_ingest::DecisionRevisionIndex;
 
-    use super::{PublishRequest, PublishAttemptIdentity};
+    use super::{PublishAttemptIdentity, PublishRequest};
 
     #[test]
     fn publish_attempt_identity_and_retained_bytes_are_exact() {
         let revision = validated(7, Some(crate::test_support::revision(6)));
         let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
         let accepted = index
-            .prepare_publication(revision.clone(), 1)
+            .prepare_publication(revision.clone())
             .expect("publication prepares");
         let request = PublishRequest::from_accepted(accepted);
         let expected = PublishAttemptIdentity::new(

@@ -30,7 +30,7 @@ pub use completion_types::{
 };
 pub use eligibility::{
     AcceptedPublication, DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet,
-    EligibilityBlocker,
+    EligibilityBlocker, FinalizationOutcome,
 };
 pub use feedback::{
     AmbiguityResolution, CollectionPolicyLimits, DeliveryStage, FeedbackError,

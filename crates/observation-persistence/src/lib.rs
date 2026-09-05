@@ -24,8 +24,8 @@ pub use schema::{OBSERVATION_REPOSITORY_PROTOCOL_IDENTITY, OBSERVATION_REPOSITOR
 pub use sqlite::SqliteObservationRepository;
 pub use types::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, PublicationLimits,
-    PublicationReceipt, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    RevisionRecord, UnpinOutcome,
+    PublicationReceipt, PublishAttemptIdentity, PublishOutcome, PublishRequest,
+    RepositoryDiagnostic, RepositoryError, RevisionRecord, UnpinOutcome,
 };
 
 #[cfg(test)]
@@ -42,8 +42,8 @@ pub(crate) mod test_support {
     use observation_ingest::{
         AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent,
         CompletionOutcome, ContractVersions, DecisionEligibility, DecisionRevisionIndex,
-        DecisionRevisionSet, GenerationLimits, GenerationStager, ReceiverDisposition,
-        ValidatedSectionRevision,
+        DecisionRevisionSet, FinalizationOutcome, GenerationLimits, GenerationStager,
+        ReceiverDisposition, ValidatedSectionRevision,
     };
 
     pub fn key(value: &str) -> SectionKey {
@@ -120,9 +120,23 @@ pub(crate) mod test_support {
     pub fn decision_set(revision: ValidatedSectionRevision) -> DecisionRevisionSet {
         let mut index = DecisionRevisionIndex::new(1).expect("blocker limit is non-zero");
         let section = revision.section_key().clone();
-        let _accepted = index
+        revision
+            .context()
+            .dependencies()
+            .iter()
+            .for_each(|(key, value)| {
+                index.record_current_pointer(key.clone(), *value);
+            });
+        if let Some(current) = revision.context().expected_current() {
+            index.record_current_pointer(section.clone(), current);
+        }
+        let accepted = index
             .accept(revision, 1)
             .expect("test revision is authoritative");
+        assert_eq!(
+            index.finalize_committed(&accepted, 1),
+            FinalizationOutcome::Finalized
+        );
         match index.eligibility(&[section], 1, 1) {
             DecisionEligibility::Eligible(set) => set,
             DecisionEligibility::Blocked(blockers) => panic!("test set blocked: {blockers:?}"),

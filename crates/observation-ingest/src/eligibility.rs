@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use std::rc::Rc;
 
 mod authority;
-pub use authority::AcceptedPublication;
+pub use authority::{AcceptedPublication, FinalizationOutcome};
 
 use observation_domain::{
     CompletionCoverage, SectionAvailability, SectionFreshness, SectionKey, SectionQuality,

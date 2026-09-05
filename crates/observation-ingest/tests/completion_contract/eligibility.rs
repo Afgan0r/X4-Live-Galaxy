@@ -3,10 +3,15 @@ use super::*;
 #[test]
 fn eligible_revision_becomes_stale_then_history_only_under_uncertainty() {
     let mut index = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
-    let _accepted = index
+    index.record_current_pointer(key("ships"), revision(6));
+    index.record_current_pointer(key("sectors"), revision(4));
+    let accepted = index
         .accept(finish(&mut staged()), 4)
         .expect("current session is accepted");
-    index.record_current_pointer(key("sectors"), revision(4));
+    assert_eq!(
+        index.finalize_committed(&accepted, 4),
+        FinalizationOutcome::Finalized
+    );
     let set = match index.eligibility(&[key("ships")], 10, 10) {
         DecisionEligibility::Eligible(set) => Some(set),
         DecisionEligibility::Blocked(_) => None,
@@ -40,7 +45,7 @@ fn preparation_is_non_mutating_and_finalization_requires_live_authority() {
     index.record_current_pointer(key("ships"), revision(6));
     index.record_current_pointer(key("sectors"), revision(4));
     let accepted = index
-        .prepare_publication(finish(&mut staged()), 4)
+        .prepare_publication(finish(&mut staged()))
         .expect("current session prepares");
 
     assert_eq!(index.current_count(), 0);
@@ -60,7 +65,7 @@ fn preparation_is_non_mutating_and_finalization_requires_live_authority() {
     assert_eq!(index.current_count(), 1);
 
     let pending = index
-        .prepare_publication(finish(&mut staged()), 5)
+        .prepare_publication(finish(&mut staged()))
         .expect("same session prepares");
     index.mark_scope_uncertain(
         &value("scope:x4", SourceScopeId::new),

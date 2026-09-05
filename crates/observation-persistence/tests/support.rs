@@ -15,7 +15,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use observation_domain::{SectionKey, SectionRevisionId};
 use observation_ingest::{
-    DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet, ValidatedSectionRevision,
+    DecisionEligibility, DecisionRevisionIndex, DecisionRevisionSet, FinalizationOutcome,
+    ValidatedSectionRevision,
 };
 use observation_persistence::PublishRequest;
 
@@ -47,10 +48,25 @@ pub fn decision_set(revisions: Vec<ValidatedSectionRevision>) -> DecisionRevisio
         .map(|revision| revision.section_key().clone())
         .collect();
     let mut index = DecisionRevisionIndex::new(required.len()).expect("set is non-empty");
-    for revision in revisions {
-        let _accepted = index
-            .accept(revision, 1)
+    for item in &revisions {
+        item.context()
+            .dependencies()
+            .iter()
+            .for_each(|(key, value)| {
+                index.record_current_pointer(key.clone(), *value);
+            });
+        if let Some(current) = item.context().expected_current() {
+            index.record_current_pointer(item.section_key().clone(), current);
+        }
+    }
+    for item in revisions {
+        let accepted = index
+            .accept(item, 1)
             .expect("fixture revision is authoritative");
+        assert_eq!(
+            index.finalize_committed(&accepted, 1),
+            FinalizationOutcome::Finalized
+        );
     }
     match index.eligibility(&required, 1, 1) {
         DecisionEligibility::Eligible(set) => set,

@@ -165,7 +165,7 @@ fn reconnect_keeps_a_delayed_validated_revision_history_only() {
     index.mark_scope_uncertain(&scope, current_session);
     assert!(index.accept(delayed, 4).is_none());
     assert_eq!(index.current_count(), 0);
-    assert_eq!(index.history_count(), 2);
+    assert_eq!(index.history_count(), 0);
 
     let database = TempDatabase::new("delayed-session");
     let mut repository = SqliteObservationRepository::open(database.path(), limits())
