@@ -19,6 +19,10 @@ impl CanonicalBatch {
         framed(&mut bytes, batch.batch_id.as_str().as_bytes());
         framed(
             &mut bytes,
+            &u64::try_from(batch.section_ordinal).ok()?.to_be_bytes(),
+        );
+        framed(
+            &mut bytes,
             &u64::try_from(batch.records.len()).ok()?.to_be_bytes(),
         );
         for record in &batch.records {

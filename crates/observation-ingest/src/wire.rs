@@ -1,9 +1,9 @@
 use crate::runtime_facts::RuntimeFacts;
+use crate::wire_decode::{control, decode_completion, decode_records};
 pub use observation_domain::FrameHeader;
 use observation_domain::{
-    BatchId, CompleteMessage, ControlEnvelope, EntityId, EnvelopeDecodeError, EnvelopeRecord,
-    ImmutableBatchEnvelope, ObservationVersion, ProducerIncarnationId, RecordId,
-    SectionCompletionEnvelope, SectionKey, SectionRevisionId, SectionStartEnvelope, SourceScopeId,
+    BatchId, CompleteMessage, ControlEnvelope, EnvelopeDecodeError, ImmutableBatchEnvelope,
+    ProducerIncarnationId, SectionKey, SectionRevisionId, SectionStartEnvelope, SourceScopeId,
     TransportEpoch,
 };
 use serde::Deserialize;
@@ -78,7 +78,7 @@ wire_struct!(RawSectionStart {
     section_revision: u64,
     expected_records: usize
 });
-wire_struct!(RawBatch { contract_version: u64, source_scope: String, producer_incarnation: String, transport_epoch: u64, section_key: String, section_revision: u64, batch_id: String, records: Vec<RawRecord>, optional_detail: Option<String> });
+wire_struct!(RawBatch { contract_version: u64, source_scope: String, producer_incarnation: String, transport_epoch: u64, section_key: String, section_revision: u64, batch_id: String, section_ordinal: usize, records: Vec<RawRecord>, optional_detail: Option<String> });
 wire_struct!(RawCompletion {
     contract_version: u64,
     source_scope: String,
@@ -86,7 +86,16 @@ wire_struct!(RawCompletion {
     transport_epoch: u64,
     section_key: String,
     section_revision: u64,
+    batch_count: usize,
     record_count: usize,
+    raw_bytes: usize,
+    decoded_bytes: usize,
+    ordered_batch_manifest_digest: String,
+    canonical_content_digest: String,
+    schema_version: u64,
+    policy_version: u64,
+    canonicalization_version: u64,
+    digest_version: u64,
     coverage: String
 });
 wire_struct!(RawControl {
@@ -141,28 +150,12 @@ fn decode_raw(raw: RawEnvelope) -> Result<CompleteMessage, EnvelopeDecodeError> 
                 section_key: identity!(SectionKey, raw.section_key),
                 section_revision: number!(SectionRevisionId, raw.section_revision),
                 batch_id: identity!(BatchId, raw.batch_id),
+                section_ordinal: raw.section_ordinal,
                 records: decode_records(raw.records)?,
                 optional_detail: raw.optional_detail,
             }))
         }
-        RawEnvelope::SectionCompletion(raw) => {
-            EnvelopeDecodeError::require_contract(raw.contract_version)?;
-            Ok(CompleteMessage::SectionCompletion(
-                SectionCompletionEnvelope {
-                    source_scope: identity!(SourceScopeId, raw.source_scope),
-                    producer_incarnation: identity!(
-                        ProducerIncarnationId,
-                        raw.producer_incarnation
-                    ),
-                    transport_epoch: number!(TransportEpoch, raw.transport_epoch),
-                    section_key: identity!(SectionKey, raw.section_key),
-                    section_revision: number!(SectionRevisionId, raw.section_revision),
-                    record_count: raw.record_count,
-                    coverage: SectionCompletionEnvelope::coverage_from_wire(&raw.coverage)
-                        .ok_or(EnvelopeDecodeError::InvalidShape)?,
-                },
-            ))
-        }
+        RawEnvelope::SectionCompletion(raw) => decode_completion(raw),
         RawEnvelope::Handshake(raw) => control(&raw, ControlEnvelope::Handshake),
         RawEnvelope::Demand(raw) => control(&raw, ControlEnvelope::Demand),
         RawEnvelope::Disposition(raw) => control(&raw, ControlEnvelope::Disposition),
@@ -170,30 +163,4 @@ fn decode_raw(raw: RawEnvelope) -> Result<CompleteMessage, EnvelopeDecodeError> 
         RawEnvelope::Health(raw) => control(&raw, ControlEnvelope::Health),
         RawEnvelope::Reset(raw) => control(&raw, ControlEnvelope::Reset),
     }
-}
-
-fn control(
-    raw: &RawControl,
-    control: ControlEnvelope,
-) -> Result<CompleteMessage, EnvelopeDecodeError> {
-    EnvelopeDecodeError::require_contract(raw.contract_version)?;
-    Ok(CompleteMessage::Control(control))
-}
-fn decode_records(records: Vec<RawRecord>) -> Result<Vec<EnvelopeRecord>, EnvelopeDecodeError> {
-    records
-        .into_iter()
-        .map(|record| {
-            Ok(EnvelopeRecord {
-                record_id: RecordId::new(record.record_id)
-                    .ok_or(EnvelopeDecodeError::InvalidIdentity)?,
-                entity_id: EntityId::new(record.entity_id)
-                    .ok_or(EnvelopeDecodeError::InvalidIdentity)?,
-                observation_version: ObservationVersion::new(record.observation_version)
-                    .ok_or(EnvelopeDecodeError::InvalidVersion)?,
-                content: (!record.content.is_empty())
-                    .then_some(record.content)
-                    .ok_or(EnvelopeDecodeError::InvalidShape)?,
-            })
-        })
-        .collect()
 }

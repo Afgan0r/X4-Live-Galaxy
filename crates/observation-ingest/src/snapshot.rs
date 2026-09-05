@@ -4,7 +4,7 @@ use observation_domain::{
     CanonicalObservationKey, EntityId, ObservationRecord, ObservationVersion, SectionQuality,
 };
 
-use crate::completion::CompletedScope;
+use crate::completed_scope::CompletedScope;
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]

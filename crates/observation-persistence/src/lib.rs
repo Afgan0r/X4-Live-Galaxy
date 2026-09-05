@@ -54,6 +54,10 @@ pub(crate) mod test_support {
         SectionRevisionId::new(value).expect("test revision is non-zero")
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "test fixture assembles the complete publication contract"
+    )]
     pub fn validated(value: u64, expected: Option<SectionRevisionId>) -> ValidatedSectionRevision {
         let section_key = key("ships");
         let source_scope = SourceScopeId::new("scope:x4").expect("test scope is valid");
@@ -101,9 +105,29 @@ pub(crate) mod test_support {
             transport_epoch: TransportEpoch::new(1).expect("epoch is non-zero"),
             section_key,
             section_revision: revision(value),
+            batch_count: 0,
             record_count: 0,
+            raw_bytes: 0,
+            decoded_bytes: 0,
+            ordered_batch_manifest_digest: [0; 32],
+            canonical_content_digest: [0; 32],
+            schema_version: ObservationSchemaVersion::new(1).expect("version is non-zero"),
+            policy_version: ObservationPolicyVersion::new(2).expect("version is non-zero"),
+            canonicalization_version: CanonicalizationVersion::new(3).expect("version is non-zero"),
+            digest_version: DigestAlgorithmVersion::new(1).expect("version is non-zero"),
             coverage: CompletionCoverage::KnownEmpty,
         };
+        let envelope = observation_ingest::bind_completion_certificate(
+            envelope,
+            &[],
+            ContractVersions::new(
+                ObservationSchemaVersion::new(1).expect("version is non-zero"),
+                ObservationPolicyVersion::new(2).expect("version is non-zero"),
+                CanonicalizationVersion::new(3).expect("version is non-zero"),
+                DigestAlgorithmVersion::new(1).expect("version is non-zero"),
+            ),
+        )
+        .expect("producer certificate binds");
         let certificate = stager
             .completion_certificate(envelope)
             .expect("test candidate exists");

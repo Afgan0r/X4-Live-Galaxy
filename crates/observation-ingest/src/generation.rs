@@ -4,7 +4,7 @@ use crate::candidate_limits::AcceptedVersions;
 use crate::completion_types::{Candidate, StagedBatch};
 use crate::model::AcceptedProjection;
 use crate::{GenerationLimits, ReceiverDisposition};
-use observation_domain::{BatchId, ImmutableBatchEnvelope, SectionKey, SectionStartEnvelope};
+use observation_domain::{ImmutableBatchEnvelope, SectionKey, SectionStartEnvelope};
 use std::collections::BTreeMap;
 pub struct GenerationStager {
     pub(crate) accepted: AcceptedProjection,
@@ -54,21 +54,6 @@ impl GenerationStager {
     #[must_use]
     pub fn candidate_usage(&self, key: &SectionKey) -> Option<CandidateUsage> {
         self.candidates.get(key).map(|candidate| candidate.usage)
-    }
-    #[must_use]
-    pub fn candidate_expected_records(&self, key: &SectionKey) -> Option<usize> {
-        self.candidates
-            .get(key)
-            .map(|candidate| candidate.start.expected_records)
-    }
-    #[must_use]
-    pub fn candidate_manifest(&self, key: &SectionKey) -> Vec<(usize, &BatchId)> {
-        self.candidates
-            .get(key)
-            .into_iter()
-            .flat_map(|candidate| candidate.batches.values())
-            .map(|batch| (batch.ordinal, &batch.envelope.batch_id))
-            .collect()
     }
     pub const fn aggregate_usage(&self) -> AggregateUsage {
         self.aggregate
@@ -139,6 +124,9 @@ impl GenerationStager {
             Some(false) => return self.reject_candidate(&key),
             None => {}
         }
+        if batch.section_ordinal == 0 || batch.section_ordinal != candidate.batches.len() + 1 {
+            return self.reject_candidate(&key);
+        }
         if !self.versions_admit(&batch) {
             return self.reject_candidate(&key);
         }
@@ -155,7 +143,7 @@ impl GenerationStager {
         let Some(candidate) = self.candidates.get_mut(&key) else {
             return ReceiverDisposition::PermanentlyRejected;
         };
-        let ordinal = candidate.batches.len() + 1;
+        let ordinal = batch.section_ordinal;
         candidate.batches.insert(
             batch.batch_id.clone(),
             StagedBatch {

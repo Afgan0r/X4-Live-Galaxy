@@ -59,18 +59,7 @@ fn publish_in_transaction(
         sqlite_read::load_revision(connection, &revision.section_key, revision.revision)
             .map_err(storage)?
     {
-        if existing != *revision {
-            return Err(PublishOutcome::Conflict(diagnostic("content-conflict")));
-        }
-        if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?
-            != Some(revision.revision)
-        {
-            return Err(PublishOutcome::StalePointer(diagnostic(
-                "historical-replay",
-            )));
-        }
-        let receipt = sqlite_receipt::load_validated(connection, revision).map_err(storage)?;
-        return Ok(WriteOutcome::Replay(receipt));
+        return replay(connection, revision, &existing);
     }
     if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?
         != request.expected_current()
@@ -118,6 +107,26 @@ fn publish_in_transaction(
         return Err(rejection("failpoint-after-pointer"));
     }
     Ok(WriteOutcome::New(receipt))
+}
+
+fn replay(
+    connection: &Connection,
+    revision: &RevisionRecord,
+    existing: &RevisionRecord,
+) -> Result<WriteOutcome, PublishOutcome> {
+    if existing != revision {
+        return Err(PublishOutcome::Conflict(diagnostic("content-conflict")));
+    }
+    if sqlite_read::current_pointer(connection, &revision.section_key).map_err(storage)?
+        != Some(revision.revision)
+    {
+        return Err(PublishOutcome::StalePointer(diagnostic(
+            "historical-replay",
+        )));
+    }
+    sqlite_receipt::load_validated(connection, revision)
+        .map(WriteOutcome::Replay)
+        .map_err(storage)
 }
 
 const fn storage(_: RepositoryError) -> PublishOutcome {

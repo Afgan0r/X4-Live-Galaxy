@@ -1,6 +1,5 @@
 use observation_domain::{
-    CanonicalObservationKey, CompletionCoverage, ObservationVersion, SectionCompletionEnvelope,
-    SectionCoverage, SourceSessionIdentity,
+    CompletionCoverage, SectionCompletionEnvelope, SectionCoverage, SourceSessionIdentity,
 };
 
 use crate::completion_digest::{candidate_material, content_digest};
@@ -8,31 +7,6 @@ use crate::completion_types::{
     CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome,
 };
 use crate::{GenerationStager, ReceiverDisposition, RejectionReason, ValidatedSectionRevision};
-
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CompletedScope {
-    version: ObservationVersion,
-    members: Vec<CanonicalObservationKey>,
-}
-
-impl CompletedScope {
-    pub fn new(version: ObservationVersion, mut members: Vec<CanonicalObservationKey>) -> Self {
-        members.sort();
-        members.dedup();
-        Self { version, members }
-    }
-    pub const fn version(&self) -> ObservationVersion {
-        self.version
-    }
-    pub fn is_exact_replay(
-        &self,
-        version: ObservationVersion,
-        members: &[CanonicalObservationKey],
-    ) -> bool {
-        Self::new(version, members.to_vec()) == *self
-    }
-}
 
 impl GenerationStager {
     pub fn start_section_with_context(
@@ -169,6 +143,16 @@ fn completion_is_exact(
         && certificate.raw_bytes == candidate.usage.raw_bytes
         && certificate.decoded_bytes == candidate.usage.decoded_bytes
         && certificate.versions == context.versions
+        && certificate.envelope.batch_count == certificate.batch_count
+        && certificate.envelope.raw_bytes == certificate.raw_bytes
+        && certificate.envelope.decoded_bytes == certificate.decoded_bytes
+        && certificate.envelope.ordered_batch_manifest_digest
+            == certificate.ordered_batch_manifest_digest
+        && certificate.envelope.canonical_content_digest == certificate.canonical_content_digest
+        && certificate.envelope.schema_version == certificate.versions.schema
+        && certificate.envelope.policy_version == certificate.versions.policy
+        && certificate.envelope.canonicalization_version == certificate.versions.canonicalization
+        && certificate.envelope.digest_version == certificate.versions.digest
         && coverage_is_consistent(context, certificate.envelope.coverage, records.len())
         && certificate.ordered_batch_manifest_digest == candidate_material(candidate).0
         && certificate.canonical_content_digest == content_digest(records)

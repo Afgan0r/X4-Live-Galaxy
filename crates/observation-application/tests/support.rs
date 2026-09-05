@@ -9,9 +9,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use observation_domain::{
-    BatchId, CanonicalizationVersion, CaptureWindow, DigestAlgorithmVersion,
-    ObservationPolicyVersion, ObservationSchemaVersion, SectionAvailability, SectionCoverage,
-    SectionFreshness, SectionKey, SectionQuality, SectionRevisionId, SectionState, TransportEpoch,
+    BatchId, CanonicalizationVersion, CaptureWindow, CompleteMessage, CompletionCoverage,
+    DigestAlgorithmVersion, ObservationPolicyVersion, ObservationSchemaVersion,
+    ProducerIncarnationId, SectionAvailability, SectionCompletionEnvelope, SectionCoverage,
+    SectionFreshness, SectionKey, SectionQuality, SectionRevisionId, SectionState, SourceScopeId,
+    TransportEpoch,
 };
 use observation_ingest::{
     AcceptedProjection, AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent,
@@ -109,18 +111,67 @@ pub fn batch_bytes(section: &str, records: &[(&str, &str)]) -> Vec<u8> {
         .collect::<Vec<_>>()
         .join(",");
     format!(
-        "{{\"type\":\"immutable_batch\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_id\":\"inner:{section}\",\"records\":[{records}],\"optional_detail\":null}}"
+        "{{\"type\":\"immutable_batch\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_id\":\"inner:{section}\",\"section_ordinal\":1,\"records\":[{records}],\"optional_detail\":null}}"
     )
     .into_bytes()
 }
 
 #[must_use]
-pub fn completion_bytes(section: &str, count: usize, coverage: &str) -> Vec<u8> {
+pub fn completion_bytes(section: &str, records: &[(&str, &str)], coverage: &str) -> Vec<u8> {
+    let batches = if records.is_empty() {
+        Vec::new()
+    } else {
+        match observation_ingest::decode_complete_message(&batch_bytes(section, records), 4_096)
+            .expect("producer batch decodes")
+        {
+            CompleteMessage::ImmutableBatch(batch) => vec![batch],
+            _ => unreachable!("fixture bytes are an immutable batch"),
+        }
+    };
+    let envelope = SectionCompletionEnvelope {
+        source_scope: SourceScopeId::new("scope:x4").expect("scope is valid"),
+        producer_incarnation: ProducerIncarnationId::new("producer:1").expect("producer is valid"),
+        transport_epoch: epoch(),
+        section_key: key(section),
+        section_revision: revision(1),
+        batch_count: 0,
+        record_count: records.len(),
+        raw_bytes: 0,
+        decoded_bytes: 0,
+        ordered_batch_manifest_digest: [0; 32],
+        canonical_content_digest: [0; 32],
+        schema_version: ObservationSchemaVersion::new(1).expect("version is non-zero"),
+        policy_version: ObservationPolicyVersion::new(2).expect("version is non-zero"),
+        canonicalization_version: CanonicalizationVersion::new(3).expect("version is non-zero"),
+        digest_version: DigestAlgorithmVersion::new(1).expect("version is non-zero"),
+        coverage: match coverage {
+            "complete" => CompletionCoverage::Complete,
+            "known_empty" => CompletionCoverage::KnownEmpty,
+            _ => unreachable!("fixture coverage is supported"),
+        },
+    };
+    let envelope = observation_ingest::bind_completion_certificate(
+        envelope,
+        &batches,
+        candidate_context(if records.is_empty() {
+            SectionCoverage::KnownEmpty
+        } else {
+            SectionCoverage::Complete
+        })
+        .versions(),
+    )
+    .expect("producer certificate binds");
+    let manifest = digest_hex(envelope.ordered_batch_manifest_digest);
+    let content = digest_hex(envelope.canonical_content_digest);
     format!(
-        "{{\"type\":\"section_completion\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"record_count\":{count},\"coverage\":\"{coverage}\"}}"
+        "{{\"type\":\"section_completion\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_count\":{},\"record_count\":{},\"raw_bytes\":{},\"decoded_bytes\":{},\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"{coverage}\"}}",
+        envelope.batch_count, envelope.record_count, envelope.raw_bytes, envelope.decoded_bytes
     )
     .into_bytes()
 }
+
+#[rustfmt::skip]
+fn digest_hex(digest: [u8; 32]) -> String { const HEX: &[u8; 16] = b"0123456789abcdef"; let mut encoded = String::with_capacity(64); for byte in digest { encoded.push(char::from(HEX[usize::from(byte >> 4)])); encoded.push(char::from(HEX[usize::from(byte & 0x0f)])); } encoded }
 
 pub struct TempDatabase(PathBuf);
 

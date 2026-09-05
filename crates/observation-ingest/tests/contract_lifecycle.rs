@@ -15,16 +15,8 @@ use std::any::type_name;
 const fn epoch(value: u64) -> TransportEpoch {
     TransportEpoch::new(value).expect("test epoch is positive")
 }
-fn batch(identity: &str, bytes: &[u8]) -> ImmutableApplicationBatch {
-    let identity = BatchId::new(identity).expect("test batch identity is non-empty");
-    ImmutableApplicationBatch::new(
-        epoch(3),
-        identity,
-        bytes.to_vec(),
-        ApplicationContextIdentity::Batch,
-    )
-    .expect("test batch is non-empty")
-}
+#[rustfmt::skip]
+fn batch(identity: &str, bytes: &[u8]) -> ImmutableApplicationBatch { ImmutableApplicationBatch::new(epoch(3), BatchId::new(identity).expect("test batch identity is non-empty"), bytes.to_vec(), ApplicationContextIdentity::Batch).expect("test batch is non-empty") }
 #[test]
 fn immutable_batch_distinguishes_progress_handoff_and_volatile_receipt() {
     let mut slot = StopAndWaitSlot::empty();
@@ -134,8 +126,8 @@ fn strict_whole_message_decode_rejects_invalid_contracts_before_staging() {
 }
 #[test]
 fn ship_and_known_empty_station_use_the_same_strict_envelopes() {
-    let ship = br#"{"type":"immutable_batch","contract_version":1,"source_scope":"scope:ships","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"ships","section_revision":3,"batch_id":"batch:ships:3","records":[{"record_id":"record:ship:1","entity_id":"ship:1","observation_version":4,"content":"core"},{"record_id":"record:ship:2","entity_id":"ship:2","observation_version":2,"content":"core"}],"optional_detail":"detail_unavailable"}"#;
-    let station = br#"{"type":"section_completion","contract_version":1,"source_scope":"scope:stations","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"stations","section_revision":8,"record_count":0,"coverage":"known_empty"}"#;
+    let ship = br#"{"type":"immutable_batch","contract_version":1,"source_scope":"scope:ships","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"ships","section_revision":3,"batch_id":"batch:ships:3","section_ordinal":1,"records":[{"record_id":"record:ship:1","entity_id":"ship:1","observation_version":4,"content":"core"},{"record_id":"record:ship:2","entity_id":"ship:2","observation_version":2,"content":"core"}],"optional_detail":"detail_unavailable"}"#;
+    let station = br#"{"type":"section_completion","contract_version":1,"source_scope":"scope:stations","producer_incarnation":"producer:1","transport_epoch":1,"section_key":"stations","section_revision":8,"batch_count":0,"record_count":0,"raw_bytes":0,"decoded_bytes":0,"ordered_batch_manifest_digest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","canonical_content_digest":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","schema_version":1,"policy_version":1,"canonicalization_version":1,"digest_version":1,"coverage":"known_empty"}"#;
     let CompleteMessage::ImmutableBatch(ship) =
         decode_complete_message(ship, 1024).expect("ship fixture is valid")
     else {

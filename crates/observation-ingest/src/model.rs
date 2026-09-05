@@ -137,6 +137,32 @@ pub enum AdmissionOutcome {
     },
 }
 
+#[must_use]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GenerationProgress {
+    Staged,
+    Admitted,
+    Replay,
+    Rejected(RejectionReason),
+}
+
+pub trait ReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError>;
+}
+
+pub struct SystemReceiptClock;
+
+impl ReceiptClock for SystemReceiptClock {
+    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+            .filter(|value| *value > 0)
+            .ok_or(AdmissionError::ReceiptClockUnavailable)
+    }
+}
+
 impl AdmissionOutcome {
     pub const fn projection(&self) -> &AcceptedProjection {
         match self {

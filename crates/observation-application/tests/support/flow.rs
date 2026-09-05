@@ -31,7 +31,7 @@ pub fn submit_section<R: ObservationRepository>(
     assert_eq!(
         lifecycle.submit(input(
             &format!("outer:{section}:complete"),
-            completion_bytes(section, records.len(), "complete"),
+            completion_bytes(section, records, "complete"),
             LifecycleContext::Completion(current()),
             3,
         )),
@@ -80,7 +80,7 @@ pub fn submit_empty<R: ObservationRepository>(
     assert_eq!(
         lifecycle.submit(input(
             &format!("outer:{section}:complete"),
-            completion_bytes(section, 0, "known_empty"),
+            completion_bytes(section, &[], "known_empty"),
             LifecycleContext::Completion(current()),
             5,
         )),

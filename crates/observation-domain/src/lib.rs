@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod absence;
+mod completion_envelope;
 mod identity;
 mod observation;
 mod reconciliation;

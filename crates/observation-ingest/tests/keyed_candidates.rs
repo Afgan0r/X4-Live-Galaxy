@@ -9,6 +9,8 @@ use observation_ingest::{
     AcceptedProjection, AggregateLimits, CandidateLimits, GenerationLimits, GenerationStager,
     ReceiverDisposition,
 };
+#[path = "keyed_candidates/ordinals.rs"]
+mod ordinals;
 
 fn id<T>(value: &str, make: impl FnOnce(String) -> Option<T>) -> T {
     make(value.to_owned()).expect("fixture identity is valid")
@@ -33,6 +35,7 @@ fn batch(section: &str, revision: u64, identity: &str, version: u64) -> Immutabl
         section_key: id(section, SectionKey::new),
         section_revision: SectionRevisionId::new(revision).expect("revision is positive"),
         batch_id: id(identity, BatchId::new),
+        section_ordinal: 1,
         records: vec![EnvelopeRecord {
             record_id: id(&format!("record:{section}"), RecordId::new),
             entity_id: id(&format!("entity:{section}"), EntityId::new),

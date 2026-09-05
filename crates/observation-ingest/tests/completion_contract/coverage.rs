@@ -50,6 +50,9 @@ fn terminal_coverage_must_exactly_match_frozen_source_evidence() {
             let mut envelope = completion();
             envelope.record_count = 0;
             envelope.coverage = matching_terminal(terminal_source);
+            let envelope =
+                observation_ingest::bind_completion_certificate(envelope, &[], versions())
+                    .expect("producer certificate binds");
             let certificate = stager
                 .completion_certificate(envelope)
                 .expect("candidate exists");
@@ -65,11 +68,8 @@ fn terminal_coverage_must_exactly_match_frozen_source_evidence() {
 #[test]
 fn known_empty_rejects_non_empty_content_even_with_stable_identity() {
     let mut stager = staged();
-    let mut envelope = completion();
-    envelope.coverage = CompletionCoverage::KnownEmpty;
-    let certificate = stager
-        .completion_certificate(envelope)
-        .expect("candidate exists");
+    let mut certificate = exact_certificate(&stager);
+    certificate.envelope.coverage = CompletionCoverage::KnownEmpty;
     assert_eq!(
         stager.complete_section(&certificate, &current(), 4),
         CompletionOutcome::Rejected(RejectionReason::CompletionMismatch)

@@ -3,15 +3,18 @@ mod batch;
 mod batch_budget;
 mod batch_canonical;
 mod candidate_limits;
+mod completed_scope;
 mod completion;
 mod completion_digest;
 mod completion_types;
 mod eligibility;
 mod feedback;
 mod generation;
+mod generation_inspect;
 mod legacy_candidate;
 mod legacy_generation;
 mod model;
+mod producer_completion;
 mod runtime_facts;
 mod scheduler;
 mod scheduler_budget;
@@ -19,12 +22,14 @@ mod scheduler_queue;
 mod snapshot;
 mod validated_revision;
 mod wire;
+mod wire_decode;
 pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
     admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
 pub use batch_budget::{AggregateUsage, CandidateUsage};
 pub use candidate_limits::{AggregateLimits, CandidateLimits, GenerationLimits};
+pub use completed_scope::CompletedScope;
 pub use completion_types::{
     CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome, ContractVersions,
 };
@@ -39,8 +44,8 @@ pub use feedback::{
 };
 pub use generation::GenerationStager;
 pub use model::{
-    AcceptedProjection, AdmissionError, AdmissionOutcome, MAX_REJECTION_EVIDENCE,
-    RejectionEvidence, RejectionReason,
+    AcceptedProjection, AdmissionError, AdmissionOutcome, GenerationProgress,
+    MAX_REJECTION_EVIDENCE, ReceiptClock, RejectionEvidence, RejectionReason, SystemReceiptClock,
 };
 pub use observation_domain::{
     CompleteMessage, CompletionCoverage, ControlEnvelope, EnvelopeDecodeError, EnvelopeRecord,
@@ -51,6 +56,7 @@ use observation_domain::{
     EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
     SectionQuality,
 };
+pub use producer_completion::bind_completion_certificate;
 pub use runtime_facts::{
     RuntimeAsset, RuntimeCapacity, RuntimeFactAvailability, RuntimeFactQuality, RuntimeFacts,
     RuntimeOwnership, RuntimeSector,
@@ -121,28 +127,6 @@ fn frame_header(
         generation: generation.ok_or(AdmissionError::InvalidFixture)?,
         sequence: sequence.ok_or(AdmissionError::InvalidFixture)?,
     })
-}
-#[must_use]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum GenerationProgress {
-    Staged,
-    Admitted,
-    Replay,
-    Rejected(RejectionReason),
-}
-pub trait ReceiptClock {
-    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError>;
-}
-pub struct SystemReceiptClock;
-impl ReceiptClock for SystemReceiptClock {
-    fn receipt_unix_millis(&self) -> Result<u64, AdmissionError> {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-            .filter(|value| *value > 0)
-            .ok_or(AdmissionError::ReceiptClockUnavailable)
-    }
 }
 fn validate_telemetry(scope: String, version: u64) -> Result<(), AdmissionError> {
     let _ = EntityId::new(scope).ok_or(AdmissionError::InvalidScope)?;

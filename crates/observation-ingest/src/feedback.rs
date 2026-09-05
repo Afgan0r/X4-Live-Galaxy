@@ -1,12 +1,13 @@
 use std::num::{NonZeroU64, NonZeroUsize};
 
+mod application_batch;
+mod context;
 mod slot;
 mod slot_transition;
 
-pub use slot::{
-    AmbiguityResolution, ApplicationContextIdentity, FeedbackError, ImmutableApplicationBatch,
-    SlotAdmission, SlotTurnover, StopAndWaitSlot,
-};
+pub use application_batch::ImmutableApplicationBatch;
+pub use context::ApplicationContextIdentity;
+pub use slot::{AmbiguityResolution, FeedbackError, SlotAdmission, SlotTurnover, StopAndWaitSlot};
 
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

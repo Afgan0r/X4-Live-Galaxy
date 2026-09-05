@@ -51,6 +51,10 @@ pub fn validated(
     )
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "test fixture assembles the complete publication contract"
+)]
 pub fn validated_with(
     section: &str,
     value: u64,
@@ -81,6 +85,7 @@ pub fn validated_with(
         stager.start_section_with_context(start, context, 1),
         ReceiverDisposition::Received
     );
+    let mut batches = Vec::new();
     if let Some(batch_id) = fixture.batch_id {
         let batch = ImmutableBatchEnvelope {
             source_scope: source_scope.clone(),
@@ -89,13 +94,15 @@ pub fn validated_with(
             section_key: section_key.clone(),
             section_revision: revision(value),
             batch_id: BatchId::new(batch_id).expect("batch identity is valid"),
+            section_ordinal: 1,
             records: Vec::new(),
             optional_detail: None,
         };
         assert_eq!(
-            stager.stage_section_batch(batch, 1, 2),
+            stager.stage_section_batch(batch.clone(), 1, 2),
             ReceiverDisposition::Received
         );
+        batches.push(batch);
     }
     let envelope = SectionCompletionEnvelope {
         source_scope,
@@ -103,9 +110,24 @@ pub fn validated_with(
         transport_epoch: epoch,
         section_key,
         section_revision: revision(value),
+        batch_count: 0,
         record_count: 0,
+        raw_bytes: 0,
+        decoded_bytes: 0,
+        ordered_batch_manifest_digest: [0; 32],
+        canonical_content_digest: [0; 32],
+        schema_version: ObservationSchemaVersion::new(1).expect("version is non-zero"),
+        policy_version: ObservationPolicyVersion::new(2).expect("version is non-zero"),
+        canonicalization_version: CanonicalizationVersion::new(3).expect("version is non-zero"),
+        digest_version: DigestAlgorithmVersion::new(1).expect("version is non-zero"),
         coverage: terminal_coverage(fixture.coverage),
     };
+    let envelope = observation_ingest::bind_completion_certificate(
+        envelope,
+        &batches,
+        fixture_context(fixture, dependencies.clone(), expected).versions(),
+    )
+    .expect("producer certificate binds");
     let certificate = stager
         .completion_certificate(envelope)
         .expect("fixture candidate exists");

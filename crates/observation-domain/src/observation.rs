@@ -1,7 +1,8 @@
 use crate::{
-    BatchId, CompletionCoverage, ControlEnvelope, EntityId, ObservationSource, ObservationTime,
-    ObservationVersion, ProducerIncarnationId, RecordId, SectionKey, SectionRevisionId,
-    SourceScopeId, TransportEpoch,
+    BatchId, CanonicalizationVersion, CompletionCoverage, ControlEnvelope, DigestAlgorithmVersion,
+    EntityId, ObservationPolicyVersion, ObservationSchemaVersion, ObservationSource,
+    ObservationTime, ObservationVersion, ProducerIncarnationId, RecordId, SectionKey,
+    SectionRevisionId, SourceScopeId, TransportEpoch,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -158,35 +159,25 @@ envelope_struct!(EnvelopeRecord {
     observation_version: ObservationVersion,
     content: String
 });
-envelope_struct!(ImmutableBatchEnvelope { source_scope: SourceScopeId, producer_incarnation: ProducerIncarnationId, transport_epoch: TransportEpoch, section_key: SectionKey, section_revision: SectionRevisionId, batch_id: BatchId, records: Vec<EnvelopeRecord>, optional_detail: Option<String> });
+envelope_struct!(ImmutableBatchEnvelope { source_scope: SourceScopeId, producer_incarnation: ProducerIncarnationId, transport_epoch: TransportEpoch, section_key: SectionKey, section_revision: SectionRevisionId, batch_id: BatchId, section_ordinal: usize, records: Vec<EnvelopeRecord>, optional_detail: Option<String> });
 envelope_struct!(SectionCompletionEnvelope {
     source_scope: SourceScopeId,
     producer_incarnation: ProducerIncarnationId,
     transport_epoch: TransportEpoch,
     section_key: SectionKey,
     section_revision: SectionRevisionId,
+    batch_count: usize,
     record_count: usize,
+    raw_bytes: usize,
+    decoded_bytes: usize,
+    ordered_batch_manifest_digest: [u8; 32],
+    canonical_content_digest: [u8; 32],
+    schema_version: ObservationSchemaVersion,
+    policy_version: ObservationPolicyVersion,
+    canonicalization_version: CanonicalizationVersion,
+    digest_version: DigestAlgorithmVersion,
     coverage: CompletionCoverage
 });
-
-impl SectionCompletionEnvelope {
-    #[must_use]
-    pub fn coverage_from_wire(value: &str) -> Option<CompletionCoverage> {
-        match value {
-            "complete" => Some(CompletionCoverage::Complete),
-            "known_empty" => Some(CompletionCoverage::KnownEmpty),
-            "partial" => Some(CompletionCoverage::Partial),
-            "unknown" => Some(CompletionCoverage::Unknown),
-            "unsupported" => Some(CompletionCoverage::Unsupported),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub const fn is_qualified_known_empty(&self) -> bool {
-        self.record_count == 0 && matches!(self.coverage, CompletionCoverage::KnownEmpty)
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompleteMessage {

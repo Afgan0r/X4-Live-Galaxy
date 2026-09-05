@@ -1,5 +1,4 @@
-use super::slot::{ImmutableApplicationBatch, SlotAdmission};
-use super::{DeliveryStage, ReceiverDisposition};
+use super::{DeliveryStage, ImmutableApplicationBatch, ReceiverDisposition, slot::SlotAdmission};
 
 pub(super) fn classify(
     held: &ImmutableApplicationBatch,

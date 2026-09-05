@@ -94,6 +94,7 @@ fn stale_batch_session_is_fenced_without_consuming_current_candidate() {
         section_key: start.section_key,
         section_revision: start.section_revision,
         batch_id: id("batch:1", observation_domain::BatchId::new),
+        section_ordinal: 1,
         records: Vec::new(),
         optional_detail: None,
     };
@@ -125,9 +126,21 @@ fn stale_completion_session_cannot_validate_current_candidate() {
         transport_epoch: start.transport_epoch,
         section_key: start.section_key,
         section_revision: start.section_revision,
+        batch_count: 0,
         record_count: 0,
+        raw_bytes: 0,
+        decoded_bytes: 0,
+        ordered_batch_manifest_digest: [0; 32],
+        canonical_content_digest: [0; 32],
+        schema_version: ObservationSchemaVersion::new(1).expect("version is positive"),
+        policy_version: ObservationPolicyVersion::new(1).expect("version is positive"),
+        canonicalization_version: CanonicalizationVersion::new(1).expect("version is positive"),
+        digest_version: DigestAlgorithmVersion::new(1).expect("version is positive"),
         coverage: CompletionCoverage::Complete,
     };
+    let envelope =
+        observation_ingest::bind_completion_certificate(envelope, &[], context().versions())
+            .expect("producer certificate binds");
     let certificate = stager
         .completion_certificate(envelope)
         .expect("candidate exists");

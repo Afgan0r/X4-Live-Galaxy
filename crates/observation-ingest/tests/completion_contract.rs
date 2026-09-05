@@ -69,7 +69,7 @@ fn context() -> CandidateContext {
         true,
     )
 }
-fn batch(identity: &str, entity: &str, record: &str) -> ImmutableBatchEnvelope {
+fn batch(identity: &str, ordinal: usize, entity: &str, record: &str) -> ImmutableBatchEnvelope {
     ImmutableBatchEnvelope {
         source_scope: value("scope:x4", SourceScopeId::new),
         producer_incarnation: value("producer:1", ProducerIncarnationId::new),
@@ -77,6 +77,7 @@ fn batch(identity: &str, entity: &str, record: &str) -> ImmutableBatchEnvelope {
         section_key: key("ships"),
         section_revision: revision(7),
         batch_id: value(identity, BatchId::new),
+        section_ordinal: ordinal,
         records: vec![EnvelopeRecord {
             record_id: value(record, RecordId::new),
             entity_id: value(entity, EntityId::new),
@@ -93,7 +94,16 @@ fn completion() -> SectionCompletionEnvelope {
         transport_epoch: TransportEpoch::new(1).expect("epoch is positive"),
         section_key: key("ships"),
         section_revision: revision(7),
+        batch_count: 0,
         record_count: 2,
+        raw_bytes: 0,
+        decoded_bytes: 0,
+        ordered_batch_manifest_digest: [0; 32],
+        canonical_content_digest: [0; 32],
+        schema_version: ObservationSchemaVersion::new(1).expect("version is positive"),
+        policy_version: ObservationPolicyVersion::new(2).expect("version is positive"),
+        canonicalization_version: CanonicalizationVersion::new(3).expect("version is positive"),
+        digest_version: DigestAlgorithmVersion::new(1).expect("version is positive"),
         coverage: CompletionCoverage::Complete,
     }
 }
@@ -110,8 +120,8 @@ fn staged() -> GenerationStager {
         ReceiverDisposition::Received
     );
     let batches = [
-        (batch("batch:1", "ship:2", "record:2"), 2),
-        (batch("batch:2", "ship:1", "record:1"), 3),
+        (batch("batch:1", 1, "ship:2", "record:2"), 2),
+        (batch("batch:2", 2, "ship:1", "record:1"), 3),
     ];
     for (batch, now) in batches {
         assert_eq!(
@@ -121,10 +131,20 @@ fn staged() -> GenerationStager {
     }
     stager
 }
+fn exact_certificate(stager: &GenerationStager) -> observation_ingest::CompletionCertificate {
+    let batches = [
+        batch("batch:1", 1, "ship:2", "record:2"),
+        batch("batch:2", 2, "ship:1", "record:1"),
+    ];
+    let envelope =
+        observation_ingest::bind_completion_certificate(completion(), &batches, versions())
+            .expect("producer certificate binds");
+    stager
+        .completion_certificate(envelope)
+        .expect("candidate exists")
+}
 fn finish(stager: &mut GenerationStager) -> observation_ingest::ValidatedSectionRevision {
-    let certificate = stager
-        .completion_certificate(completion())
-        .expect("candidate exists");
+    let certificate = exact_certificate(stager);
     let revision = match stager.complete_section(&certificate, &current(), 4) {
         CompletionOutcome::Validated(revision) => Some(revision),
         CompletionOutcome::Rejected(_) => None,
@@ -150,9 +170,7 @@ fn exact_completion_yields_one_immutable_unpublished_revision() {
 #[test]
 fn frozen_dependency_mismatch_discards_and_arms_finite_cooldown() {
     let mut stager = staged();
-    let certificate = stager
-        .completion_certificate(completion())
-        .expect("candidate exists");
+    let certificate = exact_certificate(&stager);
     let changed = CompletionCurrent::new(
         BTreeMap::from([(key("sectors"), revision(5))]),
         Some(revision(6)),

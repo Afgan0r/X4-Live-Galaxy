@@ -27,7 +27,7 @@ fn ambiguity_limits_preserve_the_blocked_attempt() {
     assert_eq!(
         lifecycle.submit(input(
             "outer:ships:complete",
-            completion_bytes("ships", 1, "complete"),
+            completion_bytes("ships", &[("record:1", "ship:1")], "complete"),
             LifecycleContext::Completion(current()),
             3,
         )),
