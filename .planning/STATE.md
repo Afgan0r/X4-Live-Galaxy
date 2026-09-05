@@ -100,6 +100,20 @@ Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 0
 
 ### Decisions
 
+Phase 05.4 planner trial (owner-approved 2026-09-05): use GPT-6 Astra
+with high reasoning for `gsd-planner`, including plan revisions. Other
+agent routing remains unchanged. Evaluate plan quality and substantial
+rework: missed cross-component constraints, unjustified complexity,
+plan-check revision rounds, and execution rework attributable to plan gaps.
+Distinguish new research findings and implementation defects from plan defects;
+a checker PASS alone is not the success criterion. Record the outcome in the
+existing phase review/summary. This is a one-phase trial, not a permanent
+model choice. Before planning another phase, remove only the trial's
+`model_overrides.gsd-planner` and `effort.agent_overrides.gsd-planner` entries
+and regenerate project routing to restore the previous Sol High baseline,
+unless the owner explicitly extends the trial. The config override is
+project-wide until removed; it has no automatic phase expiry.
+
 Decisions are logged in PROJECT.md Key Decisions table.
 Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md override conflicting numerical, transport and retired research-platform policies:
 

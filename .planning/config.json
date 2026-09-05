@@ -2,7 +2,13 @@
   "mode": "interactive",
   "granularity": "standard",
   "model_profile": "quality",
+  "model_overrides": {
+    "gsd-planner": "gpt-6-astra"
+  },
   "effort": {
+    "agent_overrides": {
+      "gsd-planner": "high"
+    },
     "routing_tier_defaults": {
       "heavy": "high",
       "standard": "medium",
