@@ -88,6 +88,7 @@ impl GenerationStager {
                 next_sequence: 1,
                 legacy_frames: Vec::new(),
                 context: None,
+                provisional_versions: BTreeMap::new(),
             },
         );
         ReceiverDisposition::Received
@@ -127,9 +128,9 @@ impl GenerationStager {
         if batch.section_ordinal == 0 || batch.section_ordinal != candidate.batches.len() + 1 {
             return self.reject_candidate(&key);
         }
-        if !self.versions_admit(&batch) {
+        let Some(provisional_versions) = self.provisional_versions(candidate, &batch) else {
             return self.reject_candidate(&key);
-        }
+        };
         let delta = CandidateUsage {
             raw_bytes: canonical.bytes.len(),
             decoded_bytes: canonical.decoded_bytes,
@@ -154,6 +155,7 @@ impl GenerationStager {
             },
         );
         candidate.usage = candidate_usage;
+        candidate.provisional_versions = provisional_versions;
         candidate.last_progress_at = now;
         self.aggregate = aggregate;
         ReceiverDisposition::Received

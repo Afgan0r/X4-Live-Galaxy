@@ -28,6 +28,7 @@ pub struct Candidate {
     pub next_sequence: u64,
     pub legacy_frames: Vec<(WireObservation, u64)>,
     pub context: Option<CandidateContext>,
+    pub provisional_versions: crate::accepted_versions::AcceptedVersions,
 }
 
 #[must_use]

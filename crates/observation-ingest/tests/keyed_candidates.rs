@@ -9,6 +9,8 @@ use observation_ingest::{
     AcceptedProjection, AggregateLimits, CandidateLimits, GenerationLimits, GenerationStager,
     ReceiverDisposition,
 };
+#[path = "keyed_candidates/candidate_versions.rs"]
+mod candidate_versions;
 #[path = "keyed_candidates/ordinals.rs"]
 mod ordinals;
 

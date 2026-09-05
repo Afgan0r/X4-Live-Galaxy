@@ -3,18 +3,17 @@ use std::collections::BTreeMap;
 use observation_domain::{EntityId, ImmutableBatchEnvelope, ObservationVersion, SourceScopeId};
 use sha2::{Digest, Sha256};
 
-use crate::{GenerationStager, ValidatedSectionRevision};
+use crate::{GenerationStager, ValidatedSectionRevision, completion_types::Candidate};
 
 pub type AcceptedVersions = BTreeMap<(SourceScopeId, EntityId), (ObservationVersion, [u8; 32])>;
 
 impl GenerationStager {
     pub fn record_committed_revision(&mut self, revision: &ValidatedSectionRevision) {
         for record in revision.records() {
-            let _ = self.record_accepted_entity(
-                revision.source_scope().clone(),
-                record.entity_id.clone(),
-                record.observation_version,
-                record.content.as_bytes(),
+            let digest = Sha256::digest(record.content.as_bytes()).into();
+            self.accepted_versions.insert(
+                (revision.source_scope().clone(), record.entity_id.clone()),
+                (record.observation_version, digest),
             );
         }
     }
@@ -38,18 +37,47 @@ impl GenerationStager {
         }
     }
 
-    pub(crate) fn versions_admit(&self, batch: &ImmutableBatchEnvelope) -> bool {
-        batch.records.iter().all(|record| {
-            let accepted = self
-                .accepted_versions
-                .get(&(batch.source_scope.clone(), record.entity_id.clone()));
-            version_admits(
-                accepted,
-                record.observation_version,
-                record.content.as_bytes(),
-            )
-        })
+    pub(crate) fn provisional_versions(
+        &self,
+        candidate: &Candidate,
+        batch: &ImmutableBatchEnvelope,
+    ) -> Option<AcceptedVersions> {
+        batch.records.iter().try_fold(
+            candidate.provisional_versions.clone(),
+            |mut provisional, record| {
+                record_admits(
+                    &self.accepted_versions,
+                    &mut provisional,
+                    &batch.source_scope,
+                    record,
+                )
+                .then_some(provisional)
+            },
+        )
     }
+}
+
+fn record_admits(
+    accepted_versions: &AcceptedVersions,
+    provisional: &mut AcceptedVersions,
+    scope: &SourceScopeId,
+    record: &observation_domain::EnvelopeRecord,
+) -> bool {
+    let key = (scope.clone(), record.entity_id.clone());
+    if !version_admits(
+        accepted_versions.get(&key),
+        record.observation_version,
+        record.content.as_bytes(),
+    ) {
+        return false;
+    }
+    let value = (
+        record.observation_version,
+        Sha256::digest(record.content.as_bytes()).into(),
+    );
+    provisional
+        .insert(key, value)
+        .is_none_or(|prior| prior == value)
 }
 
 fn version_admits(

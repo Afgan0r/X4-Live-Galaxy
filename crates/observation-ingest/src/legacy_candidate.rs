@@ -35,5 +35,6 @@ pub fn build_legacy_candidate(
         next_sequence: 1,
         legacy_frames: Vec::new(),
         context: None,
+        provisional_versions: BTreeMap::new(),
     })
 }
