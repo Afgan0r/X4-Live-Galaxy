@@ -1,11 +1,16 @@
 mod support;
 
+use std::collections::BTreeMap;
+
 use observation_application::{LifecycleContext, LifecycleResult, ObservationLifecycle};
-use observation_ingest::{DecisionRevisionIndex, ReceiverDisposition};
+use observation_ingest::{
+    DecisionEligibility, DecisionRevisionIndex, EligibilityBlocker, ReceiverDisposition,
+};
 use observation_persistence::{
     ObservationRepository, PublicationLimits, SqliteObservationRepository,
 };
 use support::flow::{input, limits};
+use support::hydration::{publish, restored_eligibility, validated_empty};
 use support::versioned;
 use support::{candidate_context, key, repository, revision, stager};
 
@@ -44,7 +49,7 @@ fn reopen_restores_typed_eligibility_and_entity_version_fences() {
         repository,
         limits(),
     );
-    assert!(restored.restore_current(&current));
+    assert!(restored.restore_current_snapshot(std::slice::from_ref(&current)));
     assert_eq!(
         restored.decision_eligibility(&[key("ships")], 102, 100),
         before
@@ -63,6 +68,49 @@ fn reopen_restores_typed_eligibility_and_entity_version_fences() {
         versioned::batch(3, 1, "content:v1"),
         LifecycleContext::Batch,
         ReceiverDisposition::PermanentlyRejected,
+    );
+}
+
+#[test]
+fn two_phase_restore_is_order_independent_and_keeps_advanced_dependency_current() {
+    let (database, mut repository) = repository("restart-current-snapshot");
+    let mut authority = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
+    publish(
+        &mut repository,
+        &mut authority,
+        validated_empty("beta", 1, None, BTreeMap::new()),
+        1,
+    );
+    publish(
+        &mut repository,
+        &mut authority,
+        validated_empty(
+            "alpha",
+            1,
+            None,
+            BTreeMap::from([(key("beta"), revision(1))]),
+        ),
+        2,
+    );
+    publish(
+        &mut repository,
+        &mut authority,
+        validated_empty("beta", 2, Some(revision(1)), BTreeMap::new()),
+        3,
+    );
+    let snapshot = repository
+        .current_snapshot()
+        .expect("canonical current snapshot loads");
+    drop(repository);
+
+    let forward = restored_eligibility(database.path(), &snapshot);
+    let mut reverse_snapshot = snapshot;
+    reverse_snapshot.reverse();
+    let reverse = restored_eligibility(database.path(), &reverse_snapshot);
+    assert_eq!(forward, reverse);
+    assert_eq!(
+        forward,
+        DecisionEligibility::Blocked(vec![EligibilityBlocker::DependencyMismatch(key("alpha"))])
     );
 }
 

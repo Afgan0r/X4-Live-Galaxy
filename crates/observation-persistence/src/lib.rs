@@ -10,6 +10,7 @@ mod retention;
 mod schema;
 mod sqlite;
 mod sqlite_ambiguity;
+mod sqlite_current;
 mod sqlite_pins;
 mod sqlite_publish;
 mod sqlite_read;

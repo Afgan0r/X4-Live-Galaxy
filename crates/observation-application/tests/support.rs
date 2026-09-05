@@ -1,9 +1,8 @@
 #![allow(dead_code, reason = "contract cases use focused fixture subsets")]
 #![expect(
     clippy::expect_used,
-    reason = "invalid integration fixtures must fail immediately"
+    reason = "invalid integration fixtures fail immediately"
 )]
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -23,12 +22,13 @@ use observation_persistence::{PublicationLimits, SqliteObservationRepository};
 
 #[path = "support/flow.rs"]
 pub mod flow;
+#[path = "support/hydration.rs"]
+pub mod hydration;
 #[path = "support/repository.rs"]
 pub mod repository_support;
 #[path = "support/versioned.rs"]
 pub mod versioned;
 static NEXT_PATH: AtomicU64 = AtomicU64::new(1);
-
 pub fn key(value: &str) -> SectionKey {
     SectionKey::new(value).expect("fixture key is valid")
 }

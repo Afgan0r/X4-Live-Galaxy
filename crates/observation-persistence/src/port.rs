@@ -9,6 +9,7 @@ use crate::{
 pub trait ObservationRepository {
     fn publish(&mut self, request: PublishRequest) -> PublishOutcome;
     fn current(&self, key: &SectionKey) -> Result<Option<CurrentRevision>, RepositoryError>;
+    fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError>;
     fn pin_decision(
         &mut self,
         set: &DecisionRevisionSet,

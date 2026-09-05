@@ -49,6 +49,7 @@ impl RecordingRepository {
         }
     }
 
+    #[must_use]
     pub fn with_reconciliation(mut self, outcome: ReconciliationOutcome) -> Self {
         self.reconciliation = Some(outcome);
         self
@@ -75,6 +76,10 @@ impl ObservationRepository for RecordingRepository {
 
     fn current(&self, key: &SectionKey) -> Result<Option<CurrentRevision>, RepositoryError> {
         self.inner.current(key)
+    }
+
+    fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
+        self.inner.current_snapshot()
     }
 
     fn pin_decision(

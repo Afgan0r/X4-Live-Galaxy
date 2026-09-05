@@ -39,19 +39,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
                     ReconcileResult::ProvenNotCommitted,
                 ))
             }
-            ReconciliationOutcome::Superseded(_) => {
-                if self
-                    .slot
-                    .apply_reconciliation(AmbiguityResolution::Superseded)
-                    .is_err()
-                {
-                    self.retained = Some(attempt);
-                    return Err(LifecycleError::SlotInvariant);
-                }
-                Ok(LifecycleResult::Disposition(
-                    ReceiverDisposition::TimedOutOrSuperseded,
-                ))
-            }
+            ReconciliationOutcome::Superseded(_) => self.finish_superseded(attempt),
             ReconciliationOutcome::Ambiguous(_) => {
                 self.retained = Some(attempt);
                 Ok(RetainedPublicationAttempt::reconciled(

@@ -4,6 +4,7 @@ use std::num::NonZeroUsize;
 use std::rc::Rc;
 
 mod authority;
+mod restore;
 pub use authority::{AcceptedPublication, FinalizationOutcome};
 
 use observation_domain::{
@@ -54,7 +55,7 @@ pub struct DecisionRevisionIndex {
 }
 
 pub struct SessionAuthority {
-    identity: SourceSessionIdentity,
+    pub(super) identity: SourceSessionIdentity,
     generation: Rc<Cell<u64>>,
 }
 

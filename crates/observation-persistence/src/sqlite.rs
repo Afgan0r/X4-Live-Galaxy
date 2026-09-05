@@ -7,8 +7,8 @@ use rusqlite::Connection;
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
     PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    UnpinOutcome, retention, schema, sqlite_ambiguity, sqlite_pins, sqlite_publish, sqlite_read,
-    sqlite_receipt, sqlite_reconcile,
+    UnpinOutcome, retention, schema, sqlite_ambiguity, sqlite_current, sqlite_pins, sqlite_publish,
+    sqlite_read, sqlite_receipt, sqlite_reconcile,
 };
 use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 
@@ -131,6 +131,10 @@ impl ObservationRepository for SqliteObservationRepository {
 
     fn current(&self, key: &SectionKey) -> Result<Option<CurrentRevision>, RepositoryError> {
         sqlite_read::current(&self.connection, key)
+    }
+
+    fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
+        sqlite_current::snapshot(&self.connection)
     }
 
     fn pin_decision(

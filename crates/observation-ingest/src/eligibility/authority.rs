@@ -35,7 +35,7 @@ impl AcceptedPublication {
 }
 
 impl SessionAuthority {
-    fn new(identity: SourceSessionIdentity) -> Self {
+    pub(super) fn new(identity: SourceSessionIdentity) -> Self {
         Self {
             identity,
             generation: Rc::new(Cell::new(0)),

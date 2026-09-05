@@ -105,6 +105,16 @@ impl ObservationRepository for FakeObservationRepository {
         }))
     }
 
+    fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
+        self.current
+            .keys()
+            .map(|key| {
+                self.current(key)?
+                    .ok_or(RepositoryError::Corrupt(diagnostic("dangling-current")))
+            })
+            .collect()
+    }
+
     fn pin_decision(
         &mut self,
         set: &DecisionRevisionSet,

@@ -95,14 +95,7 @@ fn publish_in_transaction(
     if failpoint == Some(PublicationFailpoint::AfterContent) {
         return Err(rejection("failpoint-after-content"));
     }
-    let receipt = PublicationReceipt {
-        section_key: revision.section_key.clone(),
-        revision: revision.revision,
-        content_digest: revision.content_digest,
-        previous: revision.expected_current,
-        ordinal: u64::try_from(ordinal).map_err(|_| rejection("receipt-ordinal"))?,
-        accepted_at: revision.accepted_at,
-    };
+    let receipt = publication_receipt(revision, ordinal)?;
     let receipt_integrity = sqlite_receipt::integrity_digest(&receipt);
     connection.execute(
         "INSERT INTO publication_receipts(section_key, revision, content_digest, previous_revision, ordinal, accepted_at, integrity_digest) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -116,6 +109,20 @@ fn publish_in_transaction(
         return Err(rejection("failpoint-after-pointer"));
     }
     Ok(WriteOutcome::New(receipt))
+}
+
+fn publication_receipt(
+    revision: &RevisionRecord,
+    ordinal: i64,
+) -> Result<PublicationReceipt, PublishOutcome> {
+    Ok(PublicationReceipt {
+        section_key: revision.section_key.clone(),
+        revision: revision.revision,
+        content_digest: revision.content_digest,
+        previous: revision.expected_current,
+        ordinal: u64::try_from(ordinal).map_err(|_| rejection("receipt-ordinal"))?,
+        accepted_at: revision.accepted_at,
+    })
 }
 
 fn replay(
