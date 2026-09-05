@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/observation-application",
     "crates/observation-domain",
     "crates/observation-ingest",
     "crates/observation-persistence",

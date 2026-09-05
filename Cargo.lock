@@ -176,6 +176,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "observation-application"
+version = "0.1.0"
+dependencies = [
+ "observation-domain",
+ "observation-ingest",
+ "observation-persistence",
+ "rusqlite",
+]
+
+[[package]]
 name = "observation-domain"
 version = "0.1.0"
 
