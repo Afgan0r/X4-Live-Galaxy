@@ -76,7 +76,10 @@ impl GenerationStager {
         let pointer_matches = context.expected_current == current.current_pointer;
         let dependency_changed = !dependencies_match || !pointer_matches;
         let (manifest, records) = candidate_material(candidate);
-        if dependency_changed || !completion_is_exact(candidate, certificate, &context, &records) {
+        if dependency_changed
+            || !self.candidate_versions_still_admit(candidate)
+            || !completion_is_exact(candidate, certificate, &context, &records)
+        {
             return self.reject_completion(key, dependency_changed, now);
         }
         let Some(candidate) = self.drop_candidate(&key) else {

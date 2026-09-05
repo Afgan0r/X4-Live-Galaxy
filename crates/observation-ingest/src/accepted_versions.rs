@@ -55,6 +55,19 @@ impl GenerationStager {
             },
         )
     }
+
+    pub(crate) fn candidate_versions_still_admit(&self, candidate: &Candidate) -> bool {
+        candidate
+            .provisional_versions
+            .iter()
+            .all(|(key, (observed_version, observed_digest))| {
+                version_digest_admits(
+                    self.accepted_versions.get(key),
+                    *observed_version,
+                    *observed_digest,
+                )
+            })
+    }
 }
 
 fn record_admits(
@@ -85,12 +98,18 @@ fn version_admits(
     observed_version: ObservationVersion,
     content: &[u8],
 ) -> bool {
+    let observed_digest = Sha256::digest(content).into();
+    version_digest_admits(accepted, observed_version, observed_digest)
+}
+
+fn version_digest_admits(
+    accepted: Option<&(ObservationVersion, [u8; 32])>,
+    observed_version: ObservationVersion,
+    observed_digest: [u8; 32],
+) -> bool {
     match accepted {
         Some((version, _)) if observed_version < *version => false,
-        Some((version, digest)) if observed_version == *version => {
-            let observed: [u8; 32] = Sha256::digest(content).into();
-            observed == *digest
-        }
+        Some((version, digest)) if observed_version == *version => observed_digest == *digest,
         _ => true,
     }
 }
