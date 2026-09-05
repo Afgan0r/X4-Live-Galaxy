@@ -192,7 +192,7 @@ fn retention_preserves_current_and_pinned_history_until_unpinned() {
             .current(&key("ships"))
             .unwrap()
             .unwrap()
-            .receipt
+            .receipt()
             .revision,
         revision(4)
     );

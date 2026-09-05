@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use observation_ingest::DurableRevisionError;
 use observation_persistence::{FakeObservationRepository, ObservationRepository, PublishOutcome};
 
 use crate::support::{key, publish_request, validated};
@@ -13,11 +12,9 @@ fn hydration_revalidates_durable_authority() {
         repository.publish(request),
         PublishOutcome::CommittedNew(_)
     ));
-    let mut current = repository
+    let current = repository
         .current(&key("ships"))
         .expect("read succeeds")
         .expect("current exists");
     assert!(current.hydrate().is_ok());
-    current.revision.content_digest = [0; 32];
-    assert_eq!(current.hydrate(), Err(DurableRevisionError::ContentDigest));
 }

@@ -64,8 +64,18 @@ pub struct PublicationReceipt {
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CurrentRevision {
-    pub revision: RevisionRecord,
-    pub receipt: PublicationReceipt,
+    pub(crate) revision: RevisionRecord,
+    pub(crate) receipt: PublicationReceipt,
+}
+impl CurrentRevision {
+    #[must_use]
+    pub const fn revision(&self) -> &RevisionRecord {
+        &self.revision
+    }
+    #[must_use]
+    pub const fn receipt(&self) -> &PublicationReceipt {
+        &self.receipt
+    }
 }
 
 #[must_use]

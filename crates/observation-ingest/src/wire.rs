@@ -18,7 +18,7 @@ pub enum WireFrame {
 }
 macro_rules! wire_struct {
     ($name:ident { $($field:ident: $ty:ty),* $(,)? }) => {
-        #[derive(Deserialize)]
+        #[derive(Clone, Deserialize)]
         #[serde(deny_unknown_fields)]
         pub struct $name { $(pub $field: $ty),* }
     };
@@ -34,7 +34,7 @@ wire_struct!(TracerObservation {
     version: u64,
     quality: TracerQuality
 });
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TracerQuality {
     Fresh,

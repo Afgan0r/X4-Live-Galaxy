@@ -18,6 +18,7 @@ pub struct StagedBatch {
     pub envelope: observation_domain::ImmutableBatchEnvelope,
 }
 
+#[derive(Clone)]
 pub struct Candidate {
     pub start: SectionStartEnvelope,
     pub usage: CandidateUsage,

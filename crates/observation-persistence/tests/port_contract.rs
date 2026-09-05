@@ -41,8 +41,11 @@ fn shared_contract(repository: &mut dyn ObservationRepository) {
         .current(&key("ships"))
         .expect("read succeeds")
         .expect("current exists");
-    assert_eq!(current.revision.content_digest, *candidate.content_digest());
-    assert_eq!(current.receipt, receipt);
+    assert_eq!(
+        current.revision().content_digest,
+        *candidate.content_digest()
+    );
+    assert_eq!(current.receipt(), &receipt);
     assert!(matches!(
         repository.publish(publish_request(validated(
             "ships",
@@ -120,7 +123,7 @@ fn cas_contract(repository: &mut dyn ObservationRepository) {
             .current(&key("ships"))
             .expect("read succeeds")
             .expect("current remains")
-            .receipt
+            .receipt()
             .revision,
         revision(2)
     );

@@ -45,6 +45,7 @@ pub enum DecisionEligibility {
     Blocked(Vec<EligibilityBlocker>),
 }
 
+#[derive(Clone)]
 pub struct DecisionRevisionIndex {
     blocker_limit: NonZeroUsize,
     current: BTreeMap<SectionKey, (ValidatedSectionRevision, u64)>,
@@ -54,6 +55,7 @@ pub struct DecisionRevisionIndex {
     authoritative_sessions: BTreeMap<SourceScopeId, SessionAuthority>,
 }
 
+#[derive(Clone)]
 pub struct SessionAuthority {
     pub(super) identity: SourceSessionIdentity,
     generation: Rc<Cell<u64>>,

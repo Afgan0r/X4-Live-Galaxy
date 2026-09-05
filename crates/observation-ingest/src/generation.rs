@@ -6,6 +6,7 @@ use crate::model::AcceptedProjection;
 use crate::{GenerationLimits, ReceiverDisposition};
 use observation_domain::{ImmutableBatchEnvelope, SectionKey, SectionStartEnvelope};
 use std::collections::BTreeMap;
+#[derive(Clone)]
 pub struct GenerationStager {
     pub(crate) accepted: AcceptedProjection,
     pub(crate) limits: GenerationLimits,

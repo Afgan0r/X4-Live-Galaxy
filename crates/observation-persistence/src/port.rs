@@ -109,6 +109,6 @@ mod tests {
             .current(&key("ships"))
             .expect("fake read succeeds")
             .expect("current remains");
-        assert_eq!(current.receipt.revision, first);
+        assert_eq!(current.receipt().revision, first);
     }
 }

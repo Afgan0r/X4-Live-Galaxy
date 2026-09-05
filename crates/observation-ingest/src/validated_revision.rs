@@ -49,6 +49,7 @@ pub enum DurableRevisionError {
     EntityVersion,
     ContentDigest,
     RevisionOrder,
+    ReceiptBinding,
 }
 
 impl ValidatedSectionRevision {

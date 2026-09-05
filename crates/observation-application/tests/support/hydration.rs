@@ -10,17 +10,14 @@ use observation_ingest::{
     FinalizationOutcome, ReceiverDisposition, ValidatedSectionRevision,
 };
 use observation_persistence::{
-    CurrentRevision, ObservationRepository, PublicationLimits, PublishOutcome, PublishRequest,
+    ObservationRepository, PublicationLimits, PublishOutcome, PublishRequest,
     SqliteObservationRepository,
 };
 
 use super::flow::limits;
 use super::{candidate_context, epoch, key, revision, stager};
 
-pub fn restored_eligibility(
-    path: &std::path::Path,
-    snapshot: &[CurrentRevision],
-) -> DecisionEligibility {
+pub fn restored_eligibility(path: &std::path::Path) -> DecisionEligibility {
     let repository = SqliteObservationRepository::open(
         path,
         PublicationLimits::new(16, 8_192).expect("publication limits are non-zero"),
@@ -32,7 +29,7 @@ pub fn restored_eligibility(
         repository,
         limits(),
     );
-    assert!(lifecycle.restore_current_snapshot(snapshot));
+    assert!(lifecycle.restore_current_snapshot());
     lifecycle.decision_eligibility(&[key("alpha")], 3, 100)
 }
 
