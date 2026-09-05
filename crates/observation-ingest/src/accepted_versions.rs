@@ -3,7 +3,10 @@ use std::collections::BTreeMap;
 use observation_domain::{EntityId, ImmutableBatchEnvelope, ObservationVersion, SourceScopeId};
 use sha2::{Digest, Sha256};
 
-use crate::{GenerationStager, ValidatedSectionRevision, completion_types::Candidate};
+use crate::{
+    GenerationStager, HydratedSectionRevision, ValidatedSectionRevision,
+    completion_types::Candidate,
+};
 
 pub type AcceptedVersions = BTreeMap<(SourceScopeId, EntityId), (ObservationVersion, [u8; 32])>;
 
@@ -26,6 +29,20 @@ impl GenerationStager {
         let valid = revisions
             .into_iter()
             .all(|revision| merge_revision(&mut restored, revision));
+        if valid {
+            self.accepted_versions = restored;
+        }
+        valid
+    }
+
+    pub fn restore_hydrated_fence<'a>(
+        &mut self,
+        revisions: impl IntoIterator<Item = &'a HydratedSectionRevision>,
+    ) -> bool {
+        let mut restored = AcceptedVersions::new();
+        let valid = revisions.into_iter().all(|revision| {
+            merge_records(&mut restored, revision.source_scope(), revision.records())
+        });
         if valid {
             self.accepted_versions = restored;
         }
@@ -85,10 +102,17 @@ impl GenerationStager {
 }
 
 fn merge_revision(restored: &mut AcceptedVersions, revision: &ValidatedSectionRevision) -> bool {
-    revision
-        .records()
+    merge_records(restored, revision.source_scope(), revision.records())
+}
+
+fn merge_records(
+    restored: &mut AcceptedVersions,
+    scope: &SourceScopeId,
+    records: &[observation_domain::EnvelopeRecord],
+) -> bool {
+    records
         .iter()
-        .all(|record| merge_restored(restored, revision.source_scope(), record))
+        .all(|record| merge_restored(restored, scope, record))
 }
 
 fn merge_restored(

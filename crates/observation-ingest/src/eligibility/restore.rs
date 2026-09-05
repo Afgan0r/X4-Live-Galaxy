@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use observation_domain::{SectionKey, SectionRevisionId};
 
 use super::{DecisionRevisionIndex, SessionAuthority};
-use crate::ValidatedSectionRevision;
+use crate::HydratedSectionRevision;
 
 impl DecisionRevisionIndex {
     pub fn install_current_snapshot(
@@ -24,7 +24,7 @@ impl DecisionRevisionIndex {
 
     pub fn restore_committed(
         &mut self,
-        revision: ValidatedSectionRevision,
+        revision: HydratedSectionRevision,
         accepted_at: u64,
     ) -> bool {
         if self.pointers.get(revision.section_key()) != Some(&revision.section_revision()) {
@@ -43,7 +43,10 @@ impl DecisionRevisionIndex {
             .or_insert_with(|| SessionAuthority::new(revision.source_session().clone()));
         self.uncertain_scopes.remove(&scope);
         self.current
-            .insert(revision.section_key().clone(), (revision, accepted_at))
+            .insert(
+                revision.section_key().clone(),
+                (revision.into_validated(), accepted_at),
+            )
             .is_none()
     }
 }

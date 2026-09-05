@@ -1,10 +1,10 @@
-use observation_ingest::{DurableRevisionError, DurableRevisionParts, ValidatedSectionRevision};
+use observation_ingest::{DurableRevisionError, DurableRevisionParts, HydratedSectionRevision};
 
 use crate::{CurrentRevision, RevisionRecord};
 
 impl RevisionRecord {
-    pub fn hydrate(&self) -> Result<ValidatedSectionRevision, DurableRevisionError> {
-        ValidatedSectionRevision::try_from_durable_parts(DurableRevisionParts {
+    pub fn hydrate(&self) -> Result<HydratedSectionRevision, DurableRevisionError> {
+        HydratedSectionRevision::try_from_durable_parts(DurableRevisionParts {
             source_scope: self.source_scope.clone(),
             source_session: self.source_session.clone(),
             section_key: self.section_key.clone(),
@@ -21,7 +21,7 @@ impl RevisionRecord {
 }
 
 impl CurrentRevision {
-    pub fn hydrate(&self) -> Result<ValidatedSectionRevision, DurableRevisionError> {
+    pub fn hydrate(&self) -> Result<HydratedSectionRevision, DurableRevisionError> {
         let receipt = &self.receipt;
         let revision = &self.revision;
         let identity_matches = receipt.section_key == revision.section_key

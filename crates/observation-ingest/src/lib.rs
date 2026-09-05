@@ -70,7 +70,7 @@ pub use scheduler_queue::{
 };
 pub use snapshot::ProjectionSnapshot;
 pub use validated_revision::{
-    DurableRevisionError, DurableRevisionParts, ValidatedSectionRevision,
+    DurableRevisionError, DurableRevisionParts, HydratedSectionRevision, ValidatedSectionRevision,
 };
 use wire::TracerObservation;
 pub use wire::decode_complete_message;

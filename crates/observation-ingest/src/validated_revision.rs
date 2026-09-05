@@ -7,14 +7,7 @@ use crate::CandidateContext;
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// Authority created only by live completion or validated hydration.
-///
-/// ```compile_fail
-/// use observation_ingest::{DurableRevisionParts, ValidatedSectionRevision};
-/// fn bypass(parts: DurableRevisionParts) -> ValidatedSectionRevision {
-///     ValidatedSectionRevision::from_durable_parts(parts)
-/// }
-/// ```
+/// Authority created only by live completion.
 pub struct ValidatedSectionRevision {
     pub(crate) source_scope: SourceScopeId,
     pub(crate) source_session: SourceSessionIdentity,
@@ -26,6 +19,18 @@ pub struct ValidatedSectionRevision {
     pub(crate) manifest_digest: [u8; 32],
     pub(crate) content_digest: [u8; 32],
 }
+
+#[must_use]
+#[derive(Clone, Debug, Eq, PartialEq)]
+/// Validated durable state that can restore indexes but cannot be published.
+///
+/// ```compile_fail
+/// use observation_ingest::{DecisionRevisionIndex, HydratedSectionRevision};
+/// fn publish(index: &mut DecisionRevisionIndex, revision: HydratedSectionRevision) {
+///     index.prepare_publication(revision);
+/// }
+/// ```
+pub struct HydratedSectionRevision(ValidatedSectionRevision);
 
 #[must_use]
 pub struct DurableRevisionParts {
@@ -52,12 +57,12 @@ pub enum DurableRevisionError {
     ReceiptBinding,
 }
 
-impl ValidatedSectionRevision {
+impl HydratedSectionRevision {
     pub fn try_from_durable_parts(
         parts: DurableRevisionParts,
     ) -> Result<Self, DurableRevisionError> {
         crate::hydration_validation::validate(&parts)?;
-        Ok(Self {
+        Ok(Self(ValidatedSectionRevision {
             source_scope: parts.source_scope,
             source_session: parts.source_session,
             section_key: parts.section_key,
@@ -67,9 +72,35 @@ impl ValidatedSectionRevision {
             context: parts.context,
             manifest_digest: parts.manifest_digest,
             content_digest: parts.content_digest,
-        })
+        }))
     }
 
+    pub(crate) fn into_validated(self) -> ValidatedSectionRevision {
+        self.0
+    }
+
+    pub const fn source_scope(&self) -> &SourceScopeId {
+        self.0.source_scope()
+    }
+    pub const fn source_session(&self) -> &SourceSessionIdentity {
+        self.0.source_session()
+    }
+    pub const fn section_key(&self) -> &SectionKey {
+        self.0.section_key()
+    }
+    pub const fn section_revision(&self) -> SectionRevisionId {
+        self.0.section_revision()
+    }
+    #[must_use]
+    pub fn records(&self) -> &[EnvelopeRecord] {
+        self.0.records()
+    }
+    pub const fn context(&self) -> &CandidateContext {
+        self.0.context()
+    }
+}
+
+impl ValidatedSectionRevision {
     pub const fn source_scope(&self) -> &SourceScopeId {
         &self.source_scope
     }

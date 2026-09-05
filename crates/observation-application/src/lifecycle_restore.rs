@@ -36,7 +36,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         let Some(revisions) = hydrate_currents(&mut index, &currents) else {
             return false;
         };
-        if !stager.restore_committed_fence(&revisions) {
+        if !stager.restore_hydrated_fence(&revisions) {
             return false;
         }
         self.index = index;
@@ -48,7 +48,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
 fn hydrate_currents(
     index: &mut observation_ingest::DecisionRevisionIndex,
     currents: &[CurrentRevision],
-) -> Option<Vec<observation_ingest::ValidatedSectionRevision>> {
+) -> Option<Vec<observation_ingest::HydratedSectionRevision>> {
     currents
         .iter()
         .map(|current| {
