@@ -2,6 +2,16 @@
 
 use core::ffi::{c_char, c_int, c_void};
 
+mod abi;
+mod handle;
+mod types;
+
+pub use handle::HandleRegistry;
+pub use types::{
+    CarrierError, CarrierLimits, CloseOutcome, ControlPollOutcome, HandleToken, OpenConfig,
+    SendOutcome,
+};
+
 pub const ABI_VERSION: u32 = 1;
 pub const OPERATION_UNAVAILABLE: i32 = -100;
 const OPERATIONS: [&str; 7] = [
