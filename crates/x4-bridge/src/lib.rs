@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod carrier_b;
+mod carrier_b_codec;
 mod facade;
 mod ingress;
 mod listener;

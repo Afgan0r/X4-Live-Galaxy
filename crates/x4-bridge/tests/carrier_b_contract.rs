@@ -26,6 +26,17 @@ fn config(name: &str) -> TransportConfig {
     }
 }
 
+fn await_control(facade: &mut CarrierBFacade) -> ControlPollOutcome {
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    loop {
+        let outcome = facade.poll_control(1);
+        if outcome != ControlPollOutcome::NoMessage || std::time::Instant::now() >= deadline {
+            return outcome;
+        }
+        std::thread::yield_now();
+    }
+}
+
 #[test]
 fn compatible_session_precedes_exact_local_exchange() {
     let config = config("carrier-b-contract");
@@ -44,7 +55,7 @@ fn compatible_session_precedes_exact_local_exchange() {
         .expect("compatible hello encodes");
     peer.send_control(&hello).expect("hello reaches carrier");
     assert_eq!(
-        facade.poll_control(1),
+        await_control(&mut facade),
         ControlPollOutcome::Message(ControlEnvelope::Handshake)
     );
     assert_eq!(
