@@ -9,6 +9,7 @@ members = [
     "crates/mind-persistence",
     "crates/mind-orchestration",
     "crates/x4-bridge",
+    "crates/x4-carrier-native",
     "tools/source-size-lint",
 ]
 resolver = "3"
