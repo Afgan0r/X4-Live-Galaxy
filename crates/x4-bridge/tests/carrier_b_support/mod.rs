@@ -1,4 +1,8 @@
-#![allow(dead_code, reason = "publication and recovery tests share fixtures")]
+#![allow(
+    dead_code,
+    unused_imports,
+    reason = "publication and recovery tests share fixture subsets"
+)]
 #![expect(clippy::expect_used, reason = "invalid fixtures must fail immediately")]
 
 use std::collections::BTreeMap;
@@ -7,17 +11,19 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use observation_application::{LifecycleContext, LifecycleInput, LifecycleLimits};
 use observation_domain::{
-    BatchId, CanonicalizationVersion, CaptureWindow, CompletionCoverage,
-    DigestAlgorithmVersion, ObservationPolicyVersion, ObservationSchemaVersion,
-    ProducerIncarnationId, SectionAvailability, SectionCompletionEnvelope, SectionCoverage,
-    SectionFreshness, SectionKey, SectionQuality, SectionRevisionId, SectionState, SourceScopeId,
-    TransportEpoch,
+    BatchId, CanonicalizationVersion, CaptureWindow, CompletionCoverage, DigestAlgorithmVersion,
+    ObservationPolicyVersion, ObservationSchemaVersion, ProducerIncarnationId, SectionAvailability,
+    SectionCompletionEnvelope, SectionCoverage, SectionFreshness, SectionKey, SectionQuality,
+    SectionRevisionId, SectionState, SourceScopeId, TransportEpoch,
 };
 use observation_ingest::{
     AggregateLimits, CandidateContext, CandidateLimits, CompletionCurrent, ContractVersions,
     GenerationLimits,
 };
 use observation_persistence::PublicationLimits;
+
+mod repository;
+pub use repository::{AmbiguousRepository, FirstPublish};
 
 static NEXT_PATH: AtomicU64 = AtomicU64::new(1);
 
@@ -32,7 +38,7 @@ pub fn generation_limits() -> GenerationLimits {
     )
 }
 
-pub fn publication_limits() -> PublicationLimits {
+pub const fn publication_limits() -> PublicationLimits {
     PublicationLimits::new(16, 8_192).expect("publication limits")
 }
 
@@ -40,7 +46,7 @@ pub fn lifecycle_limits() -> LifecycleLimits {
     LifecycleLimits::new(4_096, 16_384, 1_000, 4).expect("lifecycle limits")
 }
 
-pub fn context(coverage: SectionCoverage) -> CandidateContext {
+pub const fn context(coverage: SectionCoverage) -> CandidateContext {
     CandidateContext::new(
         versions(),
         CaptureWindow::new(10, 20).expect("capture window"),
@@ -57,7 +63,12 @@ pub fn context(coverage: SectionCoverage) -> CandidateContext {
     )
 }
 
-pub fn input(identity: &str, bytes: Vec<u8>, context: LifecycleContext, now: u64) -> LifecycleInput {
+pub fn input(
+    identity: &str,
+    bytes: Vec<u8>,
+    context: LifecycleContext,
+    now: u64,
+) -> LifecycleInput {
     LifecycleInput::new(
         TransportEpoch::new(1).expect("epoch"),
         BatchId::new(identity).expect("batch identity"),
@@ -114,11 +125,23 @@ fn digest_hex(digest: [u8; 32]) -> String {
     encoded
 }
 
-pub fn current() -> CompletionCurrent {
+pub const fn current() -> CompletionCurrent {
     CompletionCurrent::new(BTreeMap::new(), None)
 }
 
-fn versions() -> ContractVersions {
+pub fn session_with<R: observation_persistence::ObservationRepository>(
+    repository: R,
+) -> x4_bridge::ProductionObservationSession<R> {
+    x4_bridge::ProductionObservationSession::from_repository(
+        repository,
+        generation_limits(),
+        lifecycle_limits(),
+        4,
+    )
+    .expect("production session opens")
+}
+
+const fn versions() -> ContractVersions {
     ContractVersions::new(
         ObservationSchemaVersion::new(1).expect("schema"),
         ObservationPolicyVersion::new(2).expect("policy"),
