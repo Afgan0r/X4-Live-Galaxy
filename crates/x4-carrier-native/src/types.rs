@@ -11,6 +11,7 @@ pub struct CarrierLimits {
 }
 
 impl CarrierLimits {
+    #[must_use]
     pub const fn new(
         data_message_bytes: NonZeroUsize,
         control_message_bytes: NonZeroUsize,
@@ -30,6 +31,7 @@ pub struct OpenConfig {
 }
 
 impl OpenConfig {
+    #[must_use]
     pub const fn current(limits: CarrierLimits) -> Self {
         Self {
             abi_version: ABI_VERSION,
@@ -51,9 +53,29 @@ pub enum CarrierError {
     WrongRecordSize,
     MessageTooLarge,
     ControlTooLarge,
+    ControlCapacityUnavailable,
     InvalidOutputCapacity,
     StaleHandle,
     GenerationExhausted,
+}
+
+impl HandleToken {
+    #[must_use]
+    pub fn encode(self) -> String {
+        format!("{:08x}:{:08x}", self.generation, self.slot)
+    }
+
+    #[must_use]
+    pub fn decode(text: &str) -> Option<Self> {
+        let (generation, slot) = text.split_once(':')?;
+        if generation.len() != 8 || slot.len() != 8 {
+            return None;
+        }
+        Some(Self {
+            generation: u32::from_str_radix(generation, 16).ok()?,
+            slot: u32::from_str_radix(slot, 16).ok()?,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
