@@ -6,6 +6,7 @@ mod facade;
 mod ingress;
 mod listener;
 mod protocol;
+mod production;
 mod server;
 mod session;
 mod telemetry;
@@ -13,6 +14,7 @@ mod telemetry;
 pub use ingress::{BackpressureOutcome, BoundedIngress, FrameLimits, IngressSubmission};
 pub use listener::run_windows_listener;
 pub use protocol::{CapabilityDecision, RestartRequirement, SessionHello};
+pub use production::{ProductionError, ProductionObservationSession};
 pub use server::{
     AcceptAttempt, AcceptDisposition, MAX_ACCEPT_DELAY_MILLIS, MAX_CONSECUTIVE_ACCEPT_FAILURES,
     PIPE_ENDPOINT, PipeDisposition, PipeServer,

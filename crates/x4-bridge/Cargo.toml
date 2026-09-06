@@ -8,7 +8,10 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+observation-application = { path = "../observation-application" }
+observation-domain = { path = "../observation-domain" }
 observation-ingest = { path = "../observation-ingest" }
+observation-persistence = { path = "../observation-persistence" }
 x4-carrier-native = { path = "../x4-carrier-native" }
 
 [target.'cfg(windows)'.dependencies]

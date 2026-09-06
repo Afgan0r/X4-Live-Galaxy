@@ -386,7 +386,10 @@ name = "x4-bridge"
 version = "0.1.0"
 dependencies = [
  "interprocess",
+ "observation-application",
+ "observation-domain",
  "observation-ingest",
+ "observation-persistence",
  "recvmsg",
  "x4-carrier-native",
 ]
