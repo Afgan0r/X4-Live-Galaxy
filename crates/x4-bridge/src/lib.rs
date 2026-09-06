@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod carrier_b;
 mod facade;
 mod ingress;
 mod listener;
@@ -22,6 +23,10 @@ pub use telemetry::{BridgeError, TelemetryFrame, admit_tracer_frame};
 pub const fn is_telemetry_only() -> bool {
     true
 }
+pub use carrier_b::{
+    CarrierBFacade, CarrierCodecError, CarrierIdentity, decode_carrier_control,
+    encode_carrier_control,
+};
 pub use facade::{
     CompleteMessageSendOutcome, ConnectionState, ControlEnvelope, ControlPollOutcome, FacadeError,
     ObservationCarrierFacade, TransportEpoch,

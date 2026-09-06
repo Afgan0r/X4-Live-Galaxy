@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 observation-ingest = { path = "../observation-ingest" }
+x4-carrier-native = { path = "../x4-carrier-native" }
 
 [target.'cfg(windows)'.dependencies]
 interprocess = "=2.4.3"

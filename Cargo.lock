@@ -388,6 +388,7 @@ dependencies = [
  "interprocess",
  "observation-ingest",
  "recvmsg",
+ "x4-carrier-native",
 ]
 
 [[package]]
