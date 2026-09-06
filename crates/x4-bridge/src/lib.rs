@@ -2,6 +2,7 @@
 
 mod carrier_b;
 mod carrier_b_codec;
+mod diagnostics;
 mod facade;
 mod ingress;
 mod listener;
@@ -11,6 +12,7 @@ mod server;
 mod session;
 mod telemetry;
 
+pub use diagnostics::{DiagnosticError, readback_revision};
 pub use ingress::{BackpressureOutcome, BoundedIngress, FrameLimits, IngressSubmission};
 pub use listener::run_windows_listener;
 pub use production::{ProductionError, ProductionObservationSession};
