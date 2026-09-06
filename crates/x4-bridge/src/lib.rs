@@ -7,15 +7,17 @@ mod facade;
 mod ingress;
 mod listener;
 mod production;
+mod production_startup;
 mod protocol;
 mod server;
 mod session;
 mod telemetry;
 
-pub use diagnostics::{DiagnosticError, readback_revision};
+pub use diagnostics::{DiagnosticError, OperationalHistory, readback_revision};
 pub use ingress::{BackpressureOutcome, BoundedIngress, FrameLimits, IngressSubmission};
 pub use listener::run_windows_listener;
 pub use production::{ProductionError, ProductionObservationSession};
+pub use production_startup::{StartupError, run_production};
 pub use protocol::{CapabilityDecision, RestartRequirement, SessionHello};
 pub use server::{
     AcceptAttempt, AcceptDisposition, MAX_ACCEPT_DELAY_MILLIS, MAX_CONSECUTIVE_ACCEPT_FAILURES,

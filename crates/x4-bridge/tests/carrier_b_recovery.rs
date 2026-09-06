@@ -43,7 +43,9 @@ fn response_loss_reconciles_the_exact_committed_attempt() {
     submit_start(&mut session);
     assert_eq!(
         submit_completion(&mut session),
-        ReceiverDisposition::AmbiguousCommit
+        Ok(LifecycleResult::Disposition(
+            ReceiverDisposition::AmbiguousCommit
+        ))
     );
     assert_eq!(
         session.reconcile_ambiguous(3),
@@ -63,7 +65,9 @@ fn proven_absent_attempt_allows_only_retained_retry() {
     submit_start(&mut session);
     assert_eq!(
         submit_completion(&mut session),
-        ReceiverDisposition::AmbiguousCommit
+        Ok(LifecycleResult::Disposition(
+            ReceiverDisposition::AmbiguousCommit
+        ))
     );
     assert_eq!(
         session.reconcile_ambiguous(3),
@@ -120,14 +124,11 @@ fn submit_start<R: ObservationRepository>(session: &mut ProductionObservationSes
 
 fn submit_completion<R: ObservationRepository>(
     session: &mut ProductionObservationSession<R>,
-) -> ReceiverDisposition {
-    match session.submit(input(
+) -> Result<LifecycleResult, x4_bridge::ProductionError> {
+    session.submit(input(
         "outer:complete",
         completion_bytes("runtime-clock"),
         LifecycleContext::Completion(current()),
         2,
-    )) {
-        Ok(LifecycleResult::Disposition(value)) => value,
-        outcome => panic!("unexpected completion outcome: {outcome:?}"),
-    }
+    ))
 }
