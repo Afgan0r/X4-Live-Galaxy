@@ -156,8 +156,11 @@ receipt in chat. The consumer must not mutate Docs MCP directly.
 
 ## Memory
 
-Read `.agent-instructions/x4/MEMORY.md` before project-memory use. The main
-agent owns recall and capture for the top-level task. Specialists and
+Read `.agent-instructions/x4/MEMORY.md` before project-memory use, together
+with the global `game-repo-standard` skill and its shared family registry.
+The family is `x4`; `wing_x4_modding` is the primary engineering write owner,
+not the limit of recall. The main agent owns recall and capture for the
+top-level task. Specialists and
 subagents receive filtered context and do not independently query or mutate
 X4 project memory.
 
