@@ -6,9 +6,14 @@ mod abi;
 mod abi_windows;
 mod handle;
 mod lua_operations;
+mod transport;
 mod types;
 
 pub use handle::HandleRegistry;
+pub use transport::{
+    BridgePeer, CloseProgress, NativeTransport, SecurityEvidence, TransportConfig, TransportError,
+    TransportPoll, TransportSendOutcome, WorkerSnapshot,
+};
 pub use types::{
     CarrierError, CarrierLimits, CloseOutcome, ControlPollOutcome, HandleToken, OpenConfig,
     SendOutcome,
