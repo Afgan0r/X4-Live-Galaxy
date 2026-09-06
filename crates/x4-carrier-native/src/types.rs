@@ -57,6 +57,7 @@ pub enum CarrierError {
     InvalidOutputCapacity,
     StaleHandle,
     GenerationExhausted,
+    TransportUnavailable,
 }
 
 impl HandleToken {

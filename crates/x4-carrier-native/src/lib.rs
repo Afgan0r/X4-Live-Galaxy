@@ -4,14 +4,25 @@ use core::ffi::c_void;
 
 mod abi;
 mod abi_windows;
+mod abi_windows_access;
+mod abi_windows_io;
+mod abi_windows_peer;
+mod abi_windows_security;
+mod abi_windows_sid;
 mod handle;
 mod lua_operations;
+mod lua_transport;
 mod transport;
+mod transport_peer;
+mod transport_types;
+mod transport_worker;
 mod types;
 
 pub use handle::HandleRegistry;
-pub use transport::{
-    BridgePeer, CloseProgress, NativeTransport, SecurityEvidence, TransportConfig, TransportError,
+pub use transport::NativeTransport;
+pub use transport_peer::BridgePeer;
+pub use transport_types::{
+    CloseProgress, SecurityControl, SecurityEvidence, TransportConfig, TransportError,
     TransportPoll, TransportSendOutcome, WorkerSnapshot,
 };
 pub use types::{

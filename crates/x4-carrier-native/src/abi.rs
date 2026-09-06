@@ -2,7 +2,7 @@ use core::ffi::{c_int, c_void};
 use std::sync::{Mutex, OnceLock};
 
 use crate::{
-    CarrierError, HandleRegistry, HandleToken, InitializerError,
+    CarrierError, HandleRegistry, HandleToken, InitializerError, NativeTransport,
     abi_windows::{LuaApi, LuaFn},
 };
 
@@ -18,6 +18,7 @@ const REQUIRED: [&str; 7] = [
 
 pub(crate) static API: OnceLock<LuaApi> = OnceLock::new();
 pub(crate) static REGISTRY: Mutex<HandleRegistry> = Mutex::new(HandleRegistry::new());
+pub(crate) static TRANSPORT: Mutex<Option<NativeTransport>> = Mutex::new(None);
 
 pub fn require_lua_symbols(
     mut available: impl FnMut(&str) -> bool,
@@ -62,6 +63,7 @@ pub(crate) fn error_code(error: CarrierError) -> isize {
         CarrierError::InvalidOutputCapacity => -15,
         CarrierError::StaleHandle => -16,
         CarrierError::GenerationExhausted => -17,
+        CarrierError::TransportUnavailable => -18,
     }
 }
 

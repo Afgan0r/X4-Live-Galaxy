@@ -2,10 +2,11 @@ use core::ffi::{c_int, c_void};
 use std::num::NonZeroUsize;
 
 use crate::{
-    ABI_VERSION, CarrierError, CarrierLimits, CloseOutcome, ControlPollOutcome, HandleRegistry,
-    HandleToken, OpenConfig, SendOutcome,
-    abi::{API, REGISTRY, bytes, error_code, integer, push_code, token},
+    ABI_VERSION, CarrierLimits, NativeTransport, OpenConfig, TransportConfig, TransportError,
+    TransportPoll, TransportSendOutcome,
+    abi::{API, REGISTRY, TRANSPORT, bytes, integer, push_code, token},
     abi_windows::LuaFn,
+    lua_transport::{close_handle, error_code_for_transport},
 };
 
 pub const REGISTRATIONS: [(&[u8], LuaFn); 7] = [
@@ -17,6 +18,8 @@ pub const REGISTRATIONS: [(&[u8], LuaFn); 7] = [
     (b"reset\0", reset),
     (b"close\0", close),
 ];
+
+const PIPE_ENDPOINT: &str = r"\\.\pipe\live_galaxy";
 
 unsafe extern "C" fn abi_version(state: *mut c_void) -> c_int {
     let Some(api) = API.get().copied() else {
@@ -57,6 +60,23 @@ unsafe extern "C" fn open(state: *mut c_void) -> c_int {
     let Some(token) = result else {
         return unsafe { push_code(api, state, -17) };
     };
+    let transport = NativeTransport::start(
+        TransportConfig {
+            pipe_name: PIPE_ENDPOINT.to_owned(),
+            max_data_message_bytes: data.get(),
+            max_control_message_bytes: control.get(),
+        },
+        token,
+    );
+    let Ok(transport) = transport else {
+        let _closed = REGISTRY.lock().map(|mut registry| registry.close(token));
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Ok(mut active_transport) = TRANSPORT.lock() else {
+        let _closed = REGISTRY.lock().map(|mut registry| registry.close(token));
+        return unsafe { push_code(api, state, -18) };
+    };
+    *active_transport = Some(transport);
     // SAFETY: both values are pushed onto the active Lua stack.
     unsafe { (api.push_integer)(state, 0) };
     let encoded = token.encode();
@@ -72,6 +92,11 @@ unsafe extern "C" fn connection(state: *mut c_void) -> c_int {
         REGISTRY
             .lock()
             .is_ok_and(|registry| registry.is_active(value))
+            && TRANSPORT.lock().is_ok_and(|transport| {
+                transport
+                    .as_ref()
+                    .is_some_and(|item| !item.snapshot().closed && item.snapshot().connected)
+            })
     });
     unsafe { push_code(api, state, isize::from(active)) }
 }
@@ -85,14 +110,19 @@ unsafe extern "C" fn try_send(state: *mut c_void) -> c_int {
     }) else {
         return unsafe { push_code(api, state, -20) };
     };
-    let outcome = REGISTRY.lock().map_or(
-        SendOutcome::Rejected(CarrierError::StaleHandle),
-        |mut registry| registry.try_send(token, &message),
+    let outcome = TRANSPORT.lock().map_or(
+        TransportSendOutcome::Rejected(TransportError::StaleGeneration),
+        |transport| {
+            transport.as_ref().map_or(
+                TransportSendOutcome::Rejected(TransportError::Unavailable),
+                |item| item.try_send(token, &message),
+            )
+        },
     );
     let code = match outcome {
-        SendOutcome::LocalHandoff => 1,
-        SendOutcome::CapacityUnavailable => 2,
-        SendOutcome::Rejected(error) => error_code(error),
+        TransportSendOutcome::LocalHandoff => 1,
+        TransportSendOutcome::CapacityUnavailable => 2,
+        TransportSendOutcome::Rejected(error) => error_code_for_transport(error),
     };
     unsafe { push_code(api, state, code) }
 }
@@ -106,46 +136,35 @@ unsafe extern "C" fn poll(state: *mut c_void) -> c_int {
     }) else {
         return unsafe { push_code(api, state, -20) };
     };
-    let outcome = REGISTRY.lock().map_or(
-        ControlPollOutcome::Rejected(CarrierError::StaleHandle),
-        |mut registry| registry.poll_control(token, capacity),
+    let outcome = TRANSPORT.lock().map_or(
+        TransportPoll::Rejected(TransportError::StaleGeneration),
+        |transport| {
+            transport.as_ref().map_or(
+                TransportPoll::Rejected(TransportError::Unavailable),
+                |item| item.poll_control(token, capacity),
+            )
+        },
     );
     match outcome {
-        ControlPollOutcome::Message(message) => {
+        TransportPoll::Message(message) => {
             unsafe {
                 (api.push_integer)(state, 1);
                 (api.push_string)(state, message.as_ptr().cast(), message.len());
             }
             2
         }
-        ControlPollOutcome::NoMessage => unsafe { push_code(api, state, 0) },
-        ControlPollOutcome::Rejected(error) => unsafe { push_code(api, state, error_code(error)) },
+        TransportPoll::NoMessage => unsafe { push_code(api, state, 0) },
+        TransportPoll::Closed => unsafe { push_code(api, state, -18) },
+        TransportPoll::Rejected(error) => unsafe {
+            push_code(api, state, error_code_for_transport(error))
+        },
     }
 }
 
 unsafe extern "C" fn reset(state: *mut c_void) -> c_int {
-    mutate_handle(state, |registry, token| registry.reset(token).map(|()| 0))
+    close_handle(state, true)
 }
 
 unsafe extern "C" fn close(state: *mut c_void) -> c_int {
-    mutate_handle(state, |registry, token| match registry.close(token) {
-        CloseOutcome::Closed | CloseOutcome::AlreadyClosed => Ok(0),
-        CloseOutcome::Rejected(error) => Err(error),
-    })
-}
-
-fn mutate_handle(
-    state: *mut c_void,
-    operation: impl FnOnce(&mut HandleRegistry, HandleToken) -> Result<isize, CarrierError>,
-) -> c_int {
-    let Some(api) = API.get().copied() else {
-        return 0;
-    };
-    let Some(token) = (unsafe { token(api, state) }) else {
-        return unsafe { push_code(api, state, -20) };
-    };
-    let code = REGISTRY.lock().map_or(-16, |mut registry| {
-        operation(&mut registry, token).unwrap_or_else(error_code)
-    });
-    unsafe { push_code(api, state, code) }
+    close_handle(state, false)
 }
