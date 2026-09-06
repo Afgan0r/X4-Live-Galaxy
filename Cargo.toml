@@ -113,3 +113,6 @@ large_types_passed_by_value = "deny"
 [workspace.package]
 edition = "2024"
 rust-version = "1.97.1"
+
+[profile.release]
+panic = "unwind"
