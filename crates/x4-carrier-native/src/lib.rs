@@ -10,6 +10,7 @@ mod abi_windows_peer;
 mod abi_windows_security;
 mod abi_windows_sid;
 mod handle;
+mod lua_generation;
 mod lua_input;
 mod lua_open;
 mod lua_operations;

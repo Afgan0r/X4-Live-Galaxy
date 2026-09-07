@@ -1,4 +1,7 @@
-use observation_ingest::{ControlBody, complete_message_digest, decode_carrier_control};
+use observation_domain::CompleteMessage;
+use observation_ingest::{
+    ControlBody, complete_message_digest, decode_carrier_control, decode_complete_message,
+};
 
 use crate::producer::{Pending, Readiness, identity};
 use crate::{Producer, ProducerError, ProducerFeedback, ProducerOutcome, ProducerState};
@@ -108,7 +111,7 @@ impl Producer {
         let next = match self.state {
             ProducerState::PendingStart if feedback == ProducerFeedback::Received => Some((
                 messages.batch.clone(),
-                format!("carrier-b:{}:1", self.revision),
+                batch_identity(&messages.batch, self.limits.data_message_bytes)?,
                 ProducerState::PendingBatch,
             )),
             ProducerState::PendingBatch if feedback == ProducerFeedback::Received => Some((
@@ -151,6 +154,15 @@ impl Producer {
         pending.handed_off = false;
         ProducerOutcome::CapacityUnavailable
     }
+}
+
+fn batch_identity(bytes: &[u8], limit: usize) -> Result<String, ProducerError> {
+    let CompleteMessage::ImmutableBatch(batch) =
+        decode_complete_message(bytes, limit).map_err(|_| ProducerError::InvalidInput)?
+    else {
+        return Err(ProducerError::InvalidInput);
+    };
+    Ok(batch.batch_id.as_str().to_owned())
 }
 
 fn disposition(value: &str) -> Result<ProducerFeedback, ProducerError> {

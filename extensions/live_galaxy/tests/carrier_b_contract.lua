@@ -139,6 +139,27 @@ describe("owned Carrier B adapter", function()
         assert.is_false(context.reentry_guard)
     end)
 
+    it("closes exactly once through explicit close or Lua state collection", function()
+        local function close_count(calls)
+            local count = 0
+            for _, call in ipairs(calls) do if call == "close" then count = count + 1 end end
+            return count
+        end
+        local explicit = native()
+        local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = explicit.loadlib }))
+        assert.equals(0, carrier:close())
+        carrier = nil
+        collectgarbage("collect")
+        assert.equals(1, close_count(explicit.calls))
+
+        local finalized = native()
+        carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = finalized.loadlib }))
+        carrier = nil
+        collectgarbage("collect")
+        collectgarbage("collect")
+        assert.equals(1, close_count(finalized.calls))
+    end)
+
     it("initializes once through normal require and registers one callback", function()
         local env, init, tick = native(), nil, nil
         package.loadlib = env.loadlib

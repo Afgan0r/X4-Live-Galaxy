@@ -18,7 +18,7 @@ if mode == "reload" then
         ".\\extensions\\live_galaxy\\ui_c_library_live_galaxy_carrier_64.txt",
         "luaopen_live_galaxy_carrier"))
     local api = assert(initializer())
-    local stale = api.progress(assert(prior_token), 1)
+    local stale = api.close(assert(prior_token))
     local fresh = open_carrier()
     write(result_path, string.format("return {stale=%d,fresh=%q,token=%q,getter_calls=1}",
         stale, fresh.token, prior_token))

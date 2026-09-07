@@ -3,6 +3,8 @@ param(
     [switch]$SelfTest,
     [ValidateSet('actual-chain', 'pending-io-unload')]
     [string]$Scenario = 'actual-chain',
+    [ValidateSet('bridge-first', 'native-first')]
+    [string]$StartupOrder = 'bridge-first',
     [string]$LuaJitPath,
     [string]$LuaLibraryPath,
     [string]$LimitsFile
@@ -25,6 +27,12 @@ foreach ($path in @($LuaJitPath, $LuaLibraryPath, (Join-Path $luaSource 'lua.h')
 }
 $reported = (& $LuaJitPath -v 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $reported -notmatch '^Lua 5\.1\.5') { throw 'COMPATIBLE_LUA_ABI_MISMATCH' }
+if ($Scenario -eq 'actual-chain' -and $StartupOrder -eq 'bridge-first') {
+    cargo test --locked -p observation-ingest --test wire_v2_contract
+    if ($LASTEXITCODE -ne 0) { throw 'WIRE_VERSION_MATRIX_FAILED' }
+    cargo test --locked -p x4-bridge --test carrier_b_contract --test carrier_b_recovery --test carrier_b_publication
+    if ($LASTEXITCODE -ne 0) { throw 'BRIDGE_RECOVERY_MATRIX_FAILED' }
+}
 
 function Write-CalibrationLimits([string]$Path) {
     $json = '{"complete_message_bytes":2048,"control_message_bytes":512,"max_candidate_raw_bytes":2048,"max_candidate_records":1,"max_candidate_batches":1,"max_candidate_work":2048,"max_message_age_millis":5000,"max_message_inactivity_millis":5000,"max_candidates":2,"max_aggregate_bytes":4096,"max_aggregate_records":2,"max_aggregate_batches":2,"max_aggregate_work":4096,"max_publication_records":1,"max_publication_content_bytes":2048,"max_pending_bytes":4096,"max_total_bytes":8192,"max_lifecycle_work":8192,"max_delivery_attempts":2,"max_blockers":4,"reconnect_attempts":2,"reconnect_delay_millis":25,"availability_interval_millis":5000}'
@@ -156,8 +164,14 @@ $result = Join-Path $run 'result.lua'; $marker = Join-Path $run 'kill.marker'
 $bridge = $null
 $timer = [Diagnostics.Stopwatch]::StartNew()
 try {
-    $bridge = Start-Owned (Join-Path $repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $limits) $run
-    $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $Scenario) $run $true
+    if ($StartupOrder -eq 'bridge-first') {
+        $bridge = Start-Owned (Join-Path $repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $limits) $run
+        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $Scenario) $run $true
+    } else {
+        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $Scenario) $run $true
+        Start-Sleep -Milliseconds 25
+        $bridge = Start-Owned (Join-Path $repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $limits) $run
+    }
     if ($Scenario -eq 'pending-io-unload') {
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         while (-not (Test-Path -LiteralPath $marker) -and -not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10 }
@@ -184,8 +198,8 @@ try {
     $timer.Stop()
     $nativeHash = (Get-FileHash (Join-Path $run 'extensions/live_galaxy/ui_c_library_live_galaxy_carrier_64.txt') -Algorithm SHA256).Hash.ToLowerInvariant()
     $configHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
-    Write-Output "MEASUREMENT scenario=$Scenario elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) native_sha256=$nativeHash config_sha256=$configHash"
-    Write-Output "PASS scenario=$Scenario actual_native=true durable=$($Scenario -ne 'pending-io-unload')"
+    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) native_sha256=$nativeHash config_sha256=$configHash"
+    Write-Output "PASS scenario=$Scenario startup_order=$StartupOrder actual_native=true durable=$($Scenario -ne 'pending-io-unload')"
 } finally {
     Stop-Owned $bridge
 }

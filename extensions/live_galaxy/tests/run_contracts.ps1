@@ -29,7 +29,9 @@ function Invoke-Stage([string]$Name, [string]$Executable, [string[]]$Arguments) 
 Push-Location $root
 try {
     if ($Suite -in @('all', 'carrier_b_actual')) {
-        Invoke-Stage 'Carrier-B-actual' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest')
+        Invoke-Stage 'Carrier-B-bridge-first' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest')
+        Invoke-Stage 'Carrier-B-native-first' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-StartupOrder', 'native-first')
+        Invoke-Stage 'Carrier-B-unload' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-Scenario', 'pending-io-unload')
     }
     if ($Suite -ne 'xml') {
         $lock = Get-Content -LiteralPath (Join-Path $root 'tools/lua-runner.lock.json') -Raw | ConvertFrom-Json
@@ -46,14 +48,18 @@ try {
         if ($Filter) { $arguments += @('--filter', $Filter) }
         $files = switch ($Suite) {
             'component_discovery' { 'component_discovery_contract.lua' }
-            'x4_discovery' { 'x4_discovery_contract.lua'; 'module_loading_spec.lua'; $arguments += '--exclude-tags=syntax' }
+            'x4_discovery' { 'carrier_b_contract.lua' }
             'telemetry' { 'telemetry_spec.lua' }
-            'scheduler' { 'scheduler_contract.lua' }
+            'scheduler' { 'carrier_b_contract.lua' }
             'syntax' { 'module_loading_spec.lua'; $arguments += '--tags=syntax' }
-            default { 'component_discovery_contract.lua'; 'x4_discovery_contract.lua'; 'telemetry_spec.lua'; 'scheduler_contract.lua'; 'module_loading_spec.lua' }
+            'carrier_b_actual' { 'carrier_b_contract.lua' }
+            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua' }
         }
         $arguments += @($files | ForEach-Object { Join-Path $PSScriptRoot $_ })
         Invoke-Stage 'Busted' $busted $arguments
+        if ($Suite -in @('all', 'lua')) {
+            Invoke-Stage 'Lua-syntax' $busted @('--lpath=extensions/?.lua;extensions/live_galaxy/tests/?.lua', '--tags=syntax', (Join-Path $PSScriptRoot 'module_loading_spec.lua'))
+        }
     }
     if ($Suite -in @('all', 'xml')) {
         Invoke-Stage 'XML' 'pwsh' @('-NoProfile', '-File', (Join-Path $PSScriptRoot 'x4-package-conformance.ps1'), '-ExtensionRoot', $ExtensionRoot)

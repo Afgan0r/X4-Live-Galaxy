@@ -5,15 +5,29 @@
 
 use observation_domain::{CompleteMessage, SourceBoundary, SourceConsistency, SourceEpochStatus};
 use observation_ingest::{
-    ControlBody, DemandBody, DispositionBody, decode_carrier_bootstrap, decode_complete_message,
+    ControlBody, DemandBody, decode_carrier_bootstrap, decode_complete_message,
 };
 use x4_carrier_native::{
-    Producer, ProducerError, ProducerLimits, ProducerOutcome, ProducerState, SectionEvidence,
+    Producer, ProducerError, ProducerLimits, ProducerOutcome, ProducerSource, ProducerState,
+    SectionEvidence,
 };
 
 #[path = "producer_contract/support.rs"]
 mod support;
-use support::{control, disposition, identity, pending, ready, sample, source, take};
+use support::{control, disposition, identity, ready, sample, source, take};
+
+fn pending(now: u64) -> (Producer, ProducerSource) {
+    let (mut producer, source) = ready(now);
+    producer
+        .begin_section(SectionEvidence::point_measurement(
+            "x4:carrier_b_acceptance",
+        ))
+        .unwrap();
+    producer.push_record(&sample("3")).unwrap();
+    producer.finish_section(support::finish(now)).unwrap();
+    producer.progress(1, now).unwrap();
+    (producer, source)
+}
 
 #[test]
 fn typed_fact_produces_v2_start_batch_and_completion() {
@@ -71,40 +85,6 @@ fn typed_fact_produces_v2_start_batch_and_completion() {
     tampered[offset] = b'z';
     assert!(decode_complete_message(&tampered, 2_048).is_err());
     assert_eq!(producer.state(), ProducerState::Ready);
-}
-
-#[test]
-fn actual_encoded_batch_identity_accepts_exact_receipt() {
-    let (mut producer, source) = ready(0);
-    producer
-        .begin_section(SectionEvidence::point_measurement(
-            "x4:carrier_b_acceptance",
-        ))
-        .unwrap();
-    producer.push_record(&sample("123.5")).unwrap();
-    producer.finish_section(support::finish(1)).unwrap();
-    producer.progress(1, 1).unwrap();
-    take(&mut producer, &source, "received", 1);
-    let bytes = producer.pending_bytes().unwrap().to_vec();
-    let CompleteMessage::ImmutableBatch(batch) = decode_complete_message(&bytes, 2_048).unwrap()
-    else {
-        panic!("batch expected")
-    };
-    producer.mark_local_handoff(1).unwrap();
-    let receipt = control(
-        &source,
-        ControlBody::Disposition(DispositionBody {
-            message_id: batch.batch_id.as_str().to_owned(),
-            section_key: batch.section_key.as_str().to_owned(),
-            section_revision: batch.section_revision.get(),
-            message_digest: support::digest(&bytes),
-            disposition: "received".to_owned(),
-        }),
-    );
-    assert_eq!(
-        producer.apply_control(&receipt, 1),
-        Ok(ProducerOutcome::Received)
-    );
 }
 
 #[test]

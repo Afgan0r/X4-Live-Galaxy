@@ -62,8 +62,22 @@ function wrapper:reset(reason) return invoke(self, "reset", reason) end
 function wrapper:close()
     if self.closed then return 0 end
     local code, detail = invoke(self, "close")
-    if code == 0 then self.closed = true end
+    if code == 0 then
+        self.closed = true
+        self.guard_state.active = false
+    end
     return code, detail
+end
+
+local function close_guard(api, token)
+    local state = { active = true }
+    local guard = newproxy(true)
+    getmetatable(guard).__gc = function()
+        if not state.active then return end
+        state.active = false
+        pcall(api.close, token)
+    end
+    return guard, state
 end
 
 function carrier.new(options)
@@ -81,7 +95,11 @@ function carrier.new(options)
     if code ~= 0 or type(token) ~= "string" or not token:match("^%d+:%d+$") then
         return nil, "open_failure", code
     end
-    return setmetatable({ api = api, token = token, closed = false }, wrapper)
+    local guard, guard_state = close_guard(api, token)
+    return setmetatable({
+        api = api, token = token, closed = false,
+        close_guard = guard, guard_state = guard_state,
+    }, wrapper)
 end
 
 carrier.dll_path = DLL_PATH

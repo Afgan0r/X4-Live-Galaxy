@@ -70,10 +70,10 @@ unsafe fn open_inner(state: *mut c_void) -> c_int {
         return unsafe { push_code(api, state, -20) };
     };
     let config = OpenConfig::current(CarrierLimits::new(data, control));
-    let result = REGISTRY
-        .lock()
-        .ok()
-        .and_then(|mut registry| registry.open(config).ok());
+    let result = REGISTRY.lock().ok().and_then(|mut registry| {
+        crate::lua_generation::initialize(&mut registry).ok()?;
+        registry.open(config).ok()
+    });
     let Some(token) = result else {
         return unsafe { push_code(api, state, -17) };
     };

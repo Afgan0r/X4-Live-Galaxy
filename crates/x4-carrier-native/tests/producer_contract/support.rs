@@ -3,7 +3,7 @@ use observation_ingest::{
     DispositionBody, complete_message_digest, encode_carrier_control,
 };
 use x4_carrier_native::{
-    Producer, ProducerLimits, ProducerSource, SectionEvidence, SectionFinishEvidence, TypedFact,
+    Producer, ProducerLimits, ProducerSource, SectionFinishEvidence, TypedFact,
 };
 
 pub fn ready(now: u64) -> (Producer, ProducerSource) {
@@ -19,19 +19,6 @@ pub fn ready(now: u64) -> (Producer, ProducerSource) {
             .apply_control(&control(&source, body), now)
             .unwrap();
     }
-    (producer, source)
-}
-
-pub fn pending(now: u64) -> (Producer, ProducerSource) {
-    let (mut producer, source) = ready(now);
-    producer
-        .begin_section(SectionEvidence::point_measurement(
-            "x4:carrier_b_acceptance",
-        ))
-        .unwrap();
-    producer.push_record(&sample("3")).unwrap();
-    producer.finish_section(finish(now)).unwrap();
-    producer.progress(1, now).unwrap();
     (producer, source)
 }
 
@@ -52,7 +39,7 @@ pub fn take(
 pub fn disposition(source: &ProducerSource, bytes: &[u8], result: &str, ordinal: usize) -> Vec<u8> {
     let id = match ordinal {
         1 => "message:start:carrier_b_realtime_sample:1".to_owned(),
-        2 => "carrier-b:1:1".to_owned(),
+        2 => format!("carrier-b:1:{}:1", source.transport_epoch),
         _ => "message:complete:carrier_b_realtime_sample:1".to_owned(),
     };
     control(
