@@ -20,7 +20,11 @@ describe("owned Carrier B adapter", function()
                 if name == "begin_section" then begin = value end
                 if name == "finish_section" then finish = value end
                 if options.throw == name then error("injected " .. name) end
-                return result or 0
+                if result == nil then result = 0 end
+                if name == "progress" then
+                    return result, "ready", "connected", "10001", "available", "producer:1"
+                end
+                return result
             end
         end
         local api = {
@@ -86,6 +90,65 @@ describe("owned Carrier B adapter", function()
         assert.equals("game_time_millis", env.begin().capture_clock)
         assert.equals("11", env.finish().capture_end_millis)
     end)
+
+    for _, value in ipairs({ false, "0", 1.5 }) do
+        it("rejects malformed native result " .. tostring(value), function()
+            local env = native({ progress_code = value })
+            local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+            local code, reason = carrier:progress(1)
+            assert.is_nil(code)
+            assert.equals("result_shape", reason)
+        end)
+    end
+
+    it("drives the registered callback with the actual event arguments", function()
+        local env, init, tick, getter_calls = native(), nil, nil, 0
+        package.loadlib = env.loadlib
+        package.preload.ffi = function()
+            return { C = { GetCurRealTime = function()
+                getter_calls = getter_calls + 1
+                return 2
+            end } }
+        end
+        _G.Register_OnLoad_Init = function(callback) init = callback end
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        fixture.runtime()
+        init()
+        assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.equals(1, getter_calls)
+        assert.equals("10001", env.begin().capture_start_millis)
+        assert.equals("10001", env.finish().capture_end_millis)
+    end)
+
+    it("redacts callback paths and control characters", function()
+        local env, init, tick, diagnostic = native({ throw = "progress" }), nil, nil, nil
+        package.loadlib = env.loadlib
+        package.preload.ffi = function()
+            return { C = { GetCurRealTime = function() return 2 end } }
+        end
+        _G.DebugError = function(value) diagnostic = value end
+        _G.Register_OnLoad_Init = function(callback) init = callback end
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        fixture.runtime()
+        init()
+        tick("live_galaxy_observation", "telemetry_tick")
+        assert.equals("Live Galaxy Carrier B: event=transition detail=operation_failure", diagnostic)
+        assert.is_nil(diagnostic:match("[A-Z]:\\"))
+        assert.is_nil(diagnostic:match("[%c]"))
+    end)
+
+    for code, reason in pairs({
+        [6] = "permanently_rejected", [7] = "ambiguous_commit",
+        [8] = "retry_exhausted", [9] = "disconnected", [10] = "restart_required",
+    }) do
+        it("keeps terminal status " .. reason, function()
+            local env = native({ progress_code = code })
+            local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+            local observation = assert(fixture.load("live_galaxy_observation").new({ getter = function() return 1 end }))
+            local result = fixture.load("live_galaxy_scheduler").tick("telemetry_tick", carrier, observation)
+            assert.equals(reason, result.disposition)
+        end)
+    end
 
     it("does not call the getter while immutable retry is pending", function()
         local env, getter_calls = native({ progress_code = 2, begin_code = -21 }), 0

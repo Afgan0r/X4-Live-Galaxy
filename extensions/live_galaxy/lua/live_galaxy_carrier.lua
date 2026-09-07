@@ -44,10 +44,27 @@ end
 
 local function invoke(self, name, ...)
     if self.closed then return nil, "closed" end
-    local ok, code, detail = pcall(self.api[name], self.token, ...)
+    local ok, code, producer_state, transport_state, monotonic, capacity, incarnation =
+        pcall(self.api[name], self.token, ...)
     if not ok then return nil, "operation_failure" end
     if type(code) ~= "number" or code % 1 ~= 0 then return nil, "result_shape" end
-    return code, detail
+    local status
+    if name == "progress" then
+        if type(producer_state) ~= "string" or #producer_state > 32
+            or type(transport_state) ~= "string" or #transport_state > 16
+            or type(monotonic) ~= "string" or not monotonic:match("^%d+$") or #monotonic > 20
+            or type(capacity) ~= "string" or #capacity > 16
+            or type(incarnation) ~= "string" or #incarnation > 64 then
+            return nil, "result_shape"
+        end
+        status = {
+            producer_state = producer_state, transport_state = transport_state,
+            monotonic_millis = monotonic, capacity = capacity,
+            producer_incarnation = incarnation,
+        }
+        self.current_status = status
+    end
+    return code, status
 end
 
 local wrapper = {}
@@ -58,7 +75,14 @@ function wrapper:finish_section(value) return invoke(self, "finish_section", val
 function wrapper:fail_section(reason) return invoke(self, "fail_section", reason) end
 function wrapper:progress(work) return invoke(self, "progress", work) end
 function wrapper:poll_control() return invoke(self, "poll_control") end
-function wrapper:reset(reason) return invoke(self, "reset", reason) end
+function wrapper:reset(reason)
+    local code, detail = invoke(self, "reset", reason)
+    if code == 0 then
+        self.closed = true
+        self.guard_state.active = false
+    end
+    return code, detail
+end
 function wrapper:close()
     if self.closed then return 0 end
     local code, detail = invoke(self, "close")

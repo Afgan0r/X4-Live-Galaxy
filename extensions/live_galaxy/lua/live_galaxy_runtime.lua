@@ -7,24 +7,39 @@ local scheduler = require(prefix .. "live_galaxy_scheduler")
 local active_carrier, active_observation
 local initialized, callback_active = false, false
 local last_diagnostic
+local safe_details = {
+    already_initialized = true, initialized = true, sampled = true,
+    producer_busy = true, reentry_suppressed = true, adapter_unavailable = true,
+    loader_unavailable = true, loader_failure = true, initializer_failure = true,
+    initializer_shape = true, operation_shape = true, operation_missing = true,
+    operation_failure = true, abi_mismatch = true, open_failure = true,
+    getter_loader_failure = true, getter_unavailable = true, callback_failure = true,
+    invalid_result = true, exception = true, permanently_rejected = true,
+    ambiguous_commit = true, retry_exhausted = true, disconnected = true,
+    restart_required = true, clock_unavailable = true, source_failure = true,
+    invalid_fact = true, fact_rejected = true, finish_rejected = true,
+    reservation_failed = true, result_shape = true,
+}
 
 local function diagnostic(event, detail)
-    local value = event .. ":" .. tostring(detail):sub(1, 64)
+    local safe = safe_details[detail] and detail or "unknown"
+    local value = event .. ":" .. safe
     if value == last_diagnostic then return end
     last_diagnostic = value
     if type(DebugError) == "function" then
-        DebugError("Live Galaxy Carrier B: event=" .. event .. " detail=" .. tostring(detail):sub(1, 64))
+        DebugError("Live Galaxy Carrier B: event=" .. event .. " detail=" .. safe)
     end
 end
 
-function runtime.handle_tick(context)
+function runtime.handle_tick(_, event_parameter)
     if callback_active then return false, "reentry_suppressed" end
     if active_carrier == nil or active_observation == nil then return false, "adapter_unavailable" end
+    if event_parameter ~= "telemetry_tick" then return false, "event_ignored" end
     callback_active = true
-    local ok, result = pcall(scheduler.tick, context, active_carrier, active_observation)
+    local ok, result = pcall(scheduler.tick, event_parameter, active_carrier, active_observation)
     callback_active = false
     if not ok or type(result) ~= "table" then
-        diagnostic("callback_failure", ok and "invalid_result" or result)
+        diagnostic("callback_failure", ok and "invalid_result" or "exception")
         return false, "callback_failure"
     end
     if result.disposition ~= "producer_busy" then

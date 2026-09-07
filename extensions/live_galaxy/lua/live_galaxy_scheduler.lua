@@ -1,6 +1,9 @@
 local scheduler = {}
 
-local terminal = { [6] = true, [7] = true, [8] = true, [9] = true, [10] = true }
+local terminal = {
+    [6] = "permanently_rejected", [7] = "ambiguous_commit",
+    [8] = "retry_exhausted", [9] = "disconnected", [10] = "restart_required",
+}
 
 local function call(target, name, ...)
     if type(target) ~= "table" or type(target[name]) ~= "function" then
@@ -10,6 +13,7 @@ local function call(target, name, ...)
 end
 
 function scheduler.tick(context, carrier, observation)
+    if context == "telemetry_tick" then context = {} end
     if type(context) ~= "table" then return { disposition = "clock_unavailable" } end
     if context.reentry_guard then return { disposition = "reentry_suppressed" } end
     context.reentry_guard = true
@@ -18,12 +22,16 @@ function scheduler.tick(context, carrier, observation)
         return { disposition = disposition, code = code }
     end
 
-    local progress, progress_error = call(carrier, "progress", 1)
-    if progress == nil then return finish(progress_error, nil) end
-    if terminal[progress] then return finish("producer_terminal", progress) end
+    local progress, progress_status = call(carrier, "progress", 1)
+    if progress == nil then return finish(progress_status, nil) end
+    if terminal[progress] then return finish(terminal[progress], progress) end
+    if context.capture_start_millis == nil and type(progress_status) == "table" then
+        context.capture_start_millis = progress_status.monotonic_millis
+        context.capture_end_millis = progress_status.monotonic_millis
+    end
     local control, control_error = call(carrier, "poll_control")
     if control == nil then return finish(control_error, nil) end
-    if terminal[control] then return finish("producer_terminal", control) end
+    if terminal[control] then return finish(terminal[control], control) end
 
     local begin, begin_error = observation.begin_evidence(context)
     if begin == nil then return finish(begin_error, nil) end
