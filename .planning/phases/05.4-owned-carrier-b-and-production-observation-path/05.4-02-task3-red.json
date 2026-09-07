@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-bridge --test production_startup production_limits_require_exact_bounded_json_shape -- --exact",
+  "exitCode": 1,
+  "targetTest": "production_limits_require_exact_bounded_json_shape",
+  "targetFile": "production_startup.rs",
+  "expected": "legacy, missing, unknown, and duplicate limit fields reject",
+  "actual": "legacy key=value limits were accepted",
+  "output": "TAP version 13\nnot ok 1 - production_limits_require_exact_bounded_json_shape\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n"
+}

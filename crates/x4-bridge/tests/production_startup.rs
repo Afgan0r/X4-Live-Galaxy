@@ -99,6 +99,29 @@ fn invalid_limits_and_unwritable_journal_block_startup() {
 }
 
 #[test]
+fn production_limits_require_exact_bounded_json_shape() {
+    let directory = TempDirectory::new("strict-limits");
+    let limits = directory.path().join("limits.json");
+    for invalid in [
+        "max_records=16\n",
+        r#"{"max_records":16}"#,
+        r#"{"max_records":16,"max_content_bytes":4096,"max_message_bytes":2048,"max_pending":4,"reconnect_attempts":2,"reconnect_delay_millis":5,"message_expiry_millis":1000,"control_message_bytes":512,"extra":1}"#,
+        r#"{"max_records":16,"max_records":17,"max_content_bytes":4096,"max_message_bytes":2048,"max_pending":4,"reconnect_attempts":2,"reconnect_delay_millis":5,"message_expiry_millis":1000,"control_message_bytes":512}"#,
+    ] {
+        std::fs::write(&limits, invalid).expect("invalid limits written");
+        assert!(matches!(
+            run_production([
+                "--data-dir".into(),
+                directory.path().as_os_str().into(),
+                "--limits-file".into(),
+                limits.as_os_str().into(),
+            ]),
+            Err(StartupError::InvalidLimits)
+        ));
+    }
+}
+
+#[test]
 fn accepted_journal_precedes_durable_startup_and_waiting_state() {
     let directory = TempDirectory::new("startup-ready");
     let limits = directory.path().join("limits.conf");
