@@ -161,7 +161,7 @@ if ($LimitsFile) { Copy-Item -LiteralPath (Resolve-Path $LimitsFile) -Destinatio
 $hostExecutable = Build-Host $run
 $data = Join-Path $run 'data'; [IO.Directory]::CreateDirectory($data) | Out-Null
 $result = Join-Path $run 'result.lua'; $marker = Join-Path $run 'kill.marker'
-$bridge = $null
+$bridge = $null; $bridgePeak = 0L; $hostPeak = 0L
 $timer = [Diagnostics.Stopwatch]::StartNew()
 try {
     if ($StartupOrder -eq 'bridge-first') {
@@ -176,9 +176,20 @@ try {
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         while (-not (Test-Path -LiteralPath $marker) -and -not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10 }
         if (-not (Test-Path -LiteralPath $marker)) { throw 'PENDING_OPERATION_MARKER_MISSING' }
+        $bridge.Refresh(); $bridgePeak = $bridge.WorkingSet64
         Stop-Owned $bridge
     }
-    if (-not $process.WaitForExit(30000)) { Stop-Owned $process; throw 'LUA_HOST_WATCHDOG' }
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    while (-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+        $process.Refresh()
+        $hostPeak = [Math]::Max($hostPeak, $process.WorkingSet64)
+        Start-Sleep -Milliseconds 5
+    }
+    if (-not $process.HasExited) { Stop-Owned $process; throw 'LUA_HOST_WATCHDOG' }
+    $process.WaitForExit()
+    if (-not $bridge.HasExited) {
+        $bridge.Refresh(); $bridgePeak = [Math]::Max($bridgePeak, $bridge.WorkingSet64)
+    }
     if ($process.ExitCode -ne 0) { throw "LUA_HOST_FAILED:$($process.ExitCode):$($process.StandardError.ReadToEnd())" }
     $resultText = Get-Content -LiteralPath $result -Raw
     $luaResult = [pscustomobject]@{
@@ -196,9 +207,14 @@ try {
         if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne 1) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
     }
     $timer.Stop()
+    $effective = Get-Content -LiteralPath $limits -Raw | ConvertFrom-Json
+    $store = Join-Path $data 'observations.sqlite3'
+    $history = Join-Path $data 'operational-history.jsonl'
+    $storeBytes = if (Test-Path -LiteralPath $store) { (Get-Item -LiteralPath $store).Length } else { 0 }
+    $historyBytes = if (Test-Path -LiteralPath $history) { (Get-Item -LiteralPath $history).Length } else { 0 }
     $nativeHash = (Get-FileHash (Join-Path $run 'extensions/live_galaxy/ui_c_library_live_galaxy_carrier_64.txt') -Algorithm SHA256).Hash.ToLowerInvariant()
     $configHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
-    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) native_sha256=$nativeHash config_sha256=$configHash"
+    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) host_peak_bytes=$hostPeak bridge_peak_bytes=$bridgePeak store_bytes=$storeBytes history_bytes=$historyBytes data_limit=$($effective.complete_message_bytes) control_limit=$($effective.control_message_bytes) pending_limit=$($effective.max_pending_bytes) lifecycle_work=$($effective.max_lifecycle_work) delivery_attempts=$($effective.max_delivery_attempts) reconnect_attempts=$($effective.reconnect_attempts) availability_millis=$($effective.availability_interval_millis) native_sha256=$nativeHash config_sha256=$configHash"
     Write-Output "PASS scenario=$Scenario startup_order=$StartupOrder actual_native=true durable=$($Scenario -ne 'pending-io-unload')"
 } finally {
     Stop-Owned $bridge
