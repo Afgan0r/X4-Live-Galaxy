@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -Command wrapper around tests/carrier-b-local.ps1 -SelfTest -Scenario pending-io-unload",
+  "exitCode": 1,
+  "targetTest": "pending lua_close reaches terminal I/O and unload",
+  "targetFile": "tests/carrier-b-local.ps1",
+  "expected": "real lua_close requests bounded terminal cancellation and releases the worker-owned DLL lease",
+  "actual": "the actual package.loadlib image remained loaded after lua_close because no close guardian ran",
+  "output": "LUA_HOST_FAILED:21:native image remained loaded\nTAP version 13\nnot ok 1 - pending lua_close reaches terminal I/O and unload\n# tests 1\n# pass 0\n# fail 1\n"
+}
