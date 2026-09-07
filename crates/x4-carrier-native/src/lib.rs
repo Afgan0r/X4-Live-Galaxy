@@ -10,7 +10,11 @@ mod abi_windows_peer;
 mod abi_windows_security;
 mod abi_windows_sid;
 mod handle;
+mod lua_input;
+mod lua_open;
 mod lua_operations;
+mod lua_producer_operations;
+mod lua_table;
 mod lua_transport;
 mod producer;
 mod producer_collection;
@@ -27,7 +31,7 @@ pub use handle::HandleRegistry;
 pub use producer::Producer;
 pub use producer_types::{
     ProducerError, ProducerFeedback, ProducerLimits, ProducerOutcome, ProducerSource,
-    ProducerState, SectionEvidence, TypedFact,
+    ProducerState, SectionEvidence, SectionFinishEvidence, TypedFact,
 };
 pub use transport::NativeTransport;
 pub use transport_peer::BridgePeer;
@@ -40,14 +44,17 @@ pub use types::{
     SendOutcome,
 };
 
-pub const ABI_VERSION: u32 = 1;
+pub const ABI_VERSION: u32 = 2;
 pub const OPERATION_UNAVAILABLE: i32 = -100;
-const OPERATIONS: [&str; 7] = [
+const OPERATIONS: [&str; 10] = [
     "abi_version",
     "open",
-    "connection",
-    "try_send",
-    "poll",
+    "begin_section",
+    "push_record",
+    "finish_section",
+    "fail_section",
+    "progress",
+    "poll_control",
     "reset",
     "close",
 ];
@@ -75,6 +82,14 @@ pub enum InitializerError {
 
 pub fn require_lua_symbols(available: impl FnMut(&str) -> bool) -> Result<(), InitializerError> {
     abi::require_lua_symbols(available)
+}
+
+#[must_use]
+pub fn registered_operations() -> Vec<&'static str> {
+    lua_operations::REGISTRATIONS
+        .iter()
+        .filter_map(|(name, _)| core::str::from_utf8(&name[..name.len() - 1]).ok())
+        .collect()
 }
 
 #[must_use]

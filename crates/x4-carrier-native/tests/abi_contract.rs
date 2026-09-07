@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 use x4_carrier_native::{
     ABI_VERSION, CarrierError, CarrierLimits, CloseOutcome, ControlPollOutcome, HandleRegistry,
     InitializerError, OPERATION_UNAVAILABLE, OpenConfig, SendOutcome, contained_status,
-    luaopen_live_galaxy_carrier, module_contract, require_lua_symbols,
+    luaopen_live_galaxy_carrier, module_contract, registered_operations, require_lua_symbols,
 };
 
 const EXPECTED_OPERATIONS: [&str; 10] = [
@@ -27,6 +27,7 @@ fn initializer_contract_exposes_exact_typed_abi_two() {
         "the typed producer ABI must be frozen at two"
     );
     assert_eq!(contract.operations, EXPECTED_OPERATIONS);
+    assert_eq!(registered_operations(), EXPECTED_OPERATIONS);
     assert_eq!(ABI_VERSION, contract.abi_version);
 }
 
@@ -45,6 +46,10 @@ fn initializer_failure_is_distinct_from_operation_unavailable() {
     );
     assert_ne!(OPERATION_UNAVAILABLE, 0);
     assert_eq!(luaopen_live_galaxy_carrier(core::ptr::null_mut()), 0);
+    assert_eq!(
+        require_lua_symbols(|name| name != "lua_rawget"),
+        Err(InitializerError::MissingHostSymbol("lua_rawget"))
+    );
 }
 
 fn limits() -> CarrierLimits {
@@ -92,7 +97,7 @@ fn accepted_bytes_are_owned_and_capacity_is_one_complete_message() {
 fn versions_generations_and_close_are_checked_without_aliasing() {
     let mut registry = HandleRegistry::new();
     let wrong = OpenConfig {
-        abi_version: 2,
+        abi_version: 1,
         ..OpenConfig::current(limits())
     };
     assert_eq!(registry.open(wrong), Err(CarrierError::WrongVersion));

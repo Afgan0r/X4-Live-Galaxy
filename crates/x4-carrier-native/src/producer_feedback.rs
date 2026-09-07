@@ -64,6 +64,8 @@ impl Producer {
             .ok_or(ProducerError::InvalidTransition)?;
         if !pending.handed_off
             || value.message_id != pending.id
+            || value.section_key != "carrier_b_realtime_sample"
+            || value.section_revision != self.revision
             || value.message_digest != hex(complete_message_digest(&pending.bytes))
         {
             return Err(ProducerError::InvalidInput);

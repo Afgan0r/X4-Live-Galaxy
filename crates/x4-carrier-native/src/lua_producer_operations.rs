@@ -1,0 +1,193 @@
+use core::ffi::{c_int, c_void};
+
+use crate::abi::{API, PRODUCER, REGISTRY, TRANSPORT, bytes, integer, push_code, token};
+use crate::lua_transport::error_code_for_transport;
+use crate::{ProducerError, ProducerOutcome, TransportError, TransportPoll, TransportSendOutcome};
+
+pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
+    let Some((api, handle)) = (unsafe { context(state) }) else {
+        return invalid(state);
+    };
+    let source = PRODUCER
+        .lock()
+        .ok()
+        .and_then(|producer| producer.as_ref().map(|value| value.source().clone()));
+    let Some(evidence) =
+        source.and_then(|source| unsafe { crate::lua_input::begin(api, state, &source) })
+    else {
+        return unsafe { push_code(api, state, -20) };
+    };
+    let result = with_producer(handle, |producer| producer.begin_section(evidence));
+    unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
+}
+
+pub unsafe extern "C" fn push_record(state: *mut c_void) -> c_int {
+    let Some((api, handle)) = (unsafe { context(state) }) else {
+        return invalid(state);
+    };
+    let Some(fact) = (unsafe { crate::lua_input::fact(api, state) }) else {
+        return unsafe { push_code(api, state, -20) };
+    };
+    let result = with_producer(handle, |producer| producer.push_record(&fact));
+    unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
+}
+
+pub unsafe extern "C" fn finish_section(state: *mut c_void) -> c_int {
+    let Some((api, handle)) = (unsafe { context(state) }) else {
+        return invalid(state);
+    };
+    let Some(evidence) = (unsafe { crate::lua_input::finish(api, state) }) else {
+        return unsafe { push_code(api, state, -20) };
+    };
+    let result = with_producer(handle, |producer| producer.finish_section(evidence));
+    unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
+}
+
+pub unsafe extern "C" fn fail_section(state: *mut c_void) -> c_int {
+    let Some((api, handle)) = (unsafe { context(state) }) else {
+        return invalid(state);
+    };
+    let Some(reason) = (unsafe { bytes(api, state, 2, 64) }) else {
+        return unsafe { push_code(api, state, -20) };
+    };
+    if reason.is_empty() {
+        return unsafe { push_code(api, state, -20) };
+    }
+    let result = with_producer(handle, |producer| {
+        producer.fail_section();
+        Ok(())
+    });
+    unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
+}
+
+pub unsafe extern "C" fn progress(state: *mut c_void) -> c_int {
+    let Some((api, handle)) = (unsafe { context(state) }) else {
+        return invalid(state);
+    };
+    let Some(work) = (unsafe { integer(api, state, 2) }) else {
+        return unsafe { push_code(api, state, -20) };
+    };
+    let Ok(mut producer_guard) = PRODUCER.lock() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Some(producer) = producer_guard.as_mut() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Ok(transport_guard) = TRANSPORT.lock() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Some(transport) = transport_guard.as_ref() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Some(now) = transport.snapshot().monotonic_millis else {
+        return unsafe { push_code(api, state, -22) };
+    };
+    if producer.pending_bytes().is_none() {
+        match producer.progress(work, now) {
+            Ok(ProducerOutcome::Progress) => {}
+            Ok(outcome) => return unsafe { push_code(api, state, outcome_code(outcome)) },
+            Err(error) => return unsafe { push_code(api, state, error_code(error)) },
+        }
+    }
+    let Some(message) = producer.pending_bytes() else {
+        return unsafe { push_code(api, state, 0) };
+    };
+    let code = match transport.try_send(handle, message) {
+        TransportSendOutcome::LocalHandoff => producer
+            .mark_local_handoff(now)
+            .map_or_else(error_code, |()| 1),
+        TransportSendOutcome::CapacityUnavailable => 2,
+        TransportSendOutcome::Rejected(error) => error_code_for_transport(error),
+    };
+    unsafe { push_code(api, state, code) }
+}
+
+pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {
+    let Some((api, handle)) = (unsafe { context(state) }) else {
+        return invalid(state);
+    };
+    let Ok(mut producer_guard) = PRODUCER.lock() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Some(producer) = producer_guard.as_mut() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Ok(transport_guard) = TRANSPORT.lock() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let Some(transport) = transport_guard.as_ref() else {
+        return unsafe { push_code(api, state, -18) };
+    };
+    let code = match transport.poll_control(handle, 512) {
+        TransportPoll::Message(bytes) => {
+            let now = transport.snapshot().monotonic_millis.unwrap_or(0);
+            producer
+                .apply_control(&bytes, now)
+                .map_or_else(error_code, outcome_code)
+        }
+        TransportPoll::NoMessage => 3,
+        TransportPoll::Closed => 9,
+        TransportPoll::Rejected(error) => error_code_for_transport(error),
+    };
+    unsafe { push_code(api, state, code) }
+}
+
+fn with_producer<T>(
+    handle: crate::HandleToken,
+    operation: impl FnOnce(&mut crate::Producer) -> Result<T, ProducerError>,
+) -> Result<T, ProducerError> {
+    if !REGISTRY
+        .lock()
+        .is_ok_and(|registry| registry.is_active(handle))
+    {
+        return Err(ProducerError::StaleEpoch);
+    }
+    PRODUCER
+        .lock()
+        .map_err(|_| ProducerError::InvalidTransition)?
+        .as_mut()
+        .ok_or(ProducerError::InvalidTransition)
+        .and_then(operation)
+}
+
+unsafe fn context(state: *mut c_void) -> Option<(crate::abi_windows::LuaApi, crate::HandleToken)> {
+    let api = API.get().copied()?;
+    let handle = unsafe { token(api, state) }?;
+    Some((api, handle))
+}
+
+fn invalid(state: *mut c_void) -> c_int {
+    API.get()
+        .copied()
+        .map_or(0, |api| unsafe { push_code(api, state, -20) })
+}
+
+const fn error_code(error: ProducerError) -> isize {
+    match error {
+        ProducerError::DataLimit => -12,
+        ProducerError::ControlLimit => -13,
+        ProducerError::StaleEpoch => -16,
+        ProducerError::Incompatible => 10,
+        ProducerError::ClockUnavailable => -22,
+        ProducerError::InvalidInput => -20,
+        ProducerError::InvalidTransition => -21,
+    }
+}
+
+const fn outcome_code(outcome: ProducerOutcome) -> isize {
+    match outcome {
+        ProducerOutcome::Accepted => 0,
+        ProducerOutcome::Progress => 1,
+        ProducerOutcome::CapacityUnavailable => 2,
+        ProducerOutcome::NoControl => 3,
+        ProducerOutcome::Received => 4,
+        ProducerOutcome::Committed => 5,
+        ProducerOutcome::PermanentlyRejected => 6,
+        ProducerOutcome::Ambiguous => 7,
+        ProducerOutcome::PausedAfterFailure => 8,
+        ProducerOutcome::Disconnected => 9,
+        ProducerOutcome::RestartRequired => 10,
+    }
+}
+
+const _: Option<TransportError> = None;

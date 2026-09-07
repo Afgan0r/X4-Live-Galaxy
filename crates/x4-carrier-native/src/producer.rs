@@ -78,6 +78,10 @@ impl Producer {
         self.state
     }
 
+    pub(crate) const fn source(&self) -> &ProducerSource {
+        &self.source
+    }
+
     #[must_use]
     pub fn pending_bytes(&self) -> Option<&[u8]> {
         self.pending

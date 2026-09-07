@@ -1,4 +1,7 @@
-use observation_domain::{SectionCoverage, SenderEvidence};
+use observation_domain::{
+    SectionAvailability, SectionCoverage, SectionQuality, SenderEvidence, SourceBoundary,
+    SourceConsistency, SourceEpochStatus,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ProducerLimits {
@@ -20,7 +23,7 @@ impl ProducerLimits {
             max_records: 1,
             max_raw_bytes: 96,
             max_batches: 1,
-            max_work: 2_048,
+            max_work: 1,
             max_retry_age_millis: 5_000,
         }
     }
@@ -42,12 +45,26 @@ pub struct ProducerSource {
     pub session_id: String,
     pub producer_incarnation: String,
     pub transport_epoch: u64,
+    pub source_scope: String,
+    pub source_epoch_status: SourceEpochStatus,
+    pub source_boundary: SourceBoundary,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SectionEvidence {
     pub source_scope: String,
     pub sender: SenderEvidence,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SectionFinishEvidence {
+    pub capture_end_millis: u64,
+    pub succeeded: bool,
+    pub quality: SectionQuality,
+    pub availability: SectionAvailability,
+    pub coverage: SectionCoverage,
+    pub consistency: SourceConsistency,
+    pub stable_identity: bool,
 }
 
 impl SectionEvidence {

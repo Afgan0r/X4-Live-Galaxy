@@ -1,6 +1,9 @@
 use crate::producer::{Pending, Readiness};
 use crate::producer_message::assemble;
-use crate::{Producer, ProducerError, ProducerOutcome, ProducerState, SectionEvidence, TypedFact};
+use crate::{
+    Producer, ProducerError, ProducerOutcome, ProducerState, SectionEvidence,
+    SectionFinishEvidence, TypedFact,
+};
 
 impl Producer {
     pub fn begin_section(&mut self, evidence: SectionEvidence) -> Result<(), ProducerError> {
@@ -24,10 +27,38 @@ impl Producer {
         Ok(())
     }
 
-    pub fn finish_section(&mut self) -> Result<(), ProducerError> {
+    pub fn finish_section(&mut self, finish: SectionFinishEvidence) -> Result<(), ProducerError> {
         if self.state != ProducerState::Collecting {
             return Err(ProducerError::InvalidTransition);
         }
+        let evidence = self
+            .evidence
+            .as_mut()
+            .ok_or(ProducerError::InvalidTransition)?;
+        let state = evidence.sender.section_state;
+        if !finish.succeeded
+            || finish.capture_end_millis < state.capture_window().start_millis()
+            || finish.quality != state.quality()
+            || finish.availability != state.availability()
+            || finish.coverage != state.coverage()
+            || finish.consistency != evidence.sender.source_consistency
+            || finish.stable_identity != evidence.sender.stable_identity
+        {
+            self.fail_section();
+            return Err(ProducerError::InvalidInput);
+        }
+        let window = observation_domain::CaptureWindow::new(
+            state.capture_window().start_millis(),
+            finish.capture_end_millis,
+        )
+        .ok_or(ProducerError::InvalidInput)?;
+        evidence.sender.section_state = observation_domain::SectionState::with_evidence(
+            window,
+            state.freshness(),
+            state.quality(),
+            state.availability(),
+            state.coverage(),
+        );
         self.finished = true;
         Ok(())
     }

@@ -2,7 +2,9 @@ use observation_ingest::{
     CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody, DemandBody,
     DispositionBody, complete_message_digest, encode_carrier_control,
 };
-use x4_carrier_native::{Producer, ProducerLimits, ProducerSource, SectionEvidence, TypedFact};
+use x4_carrier_native::{
+    Producer, ProducerLimits, ProducerSource, SectionEvidence, SectionFinishEvidence, TypedFact,
+};
 
 pub fn ready(now: u64) -> (Producer, ProducerSource) {
     let source = source(7);
@@ -27,7 +29,7 @@ pub fn pending(now: u64) -> (Producer, ProducerSource) {
         ))
         .unwrap();
     producer.push_record(&sample("3")).unwrap();
-    producer.finish_section().unwrap();
+    producer.finish_section(finish(now)).unwrap();
     producer.progress(1, now).unwrap();
     (producer, source)
 }
@@ -69,6 +71,9 @@ pub fn source(epoch: u64) -> ProducerSource {
         session_id: "session:acceptance".to_owned(),
         producer_incarnation: "producer:acceptance".to_owned(),
         transport_epoch: epoch,
+        source_scope: "x4:carrier_b_acceptance".to_owned(),
+        source_epoch_status: observation_domain::SourceEpochStatus::Unknown,
+        source_boundary: observation_domain::SourceBoundary::RuntimeStart,
     }
 }
 
@@ -98,6 +103,18 @@ pub fn sample(value: &str) -> TypedFact {
         getter: "GetCurRealTime".to_owned(),
         semantics: "opaque_runtime_number".to_owned(),
         raw_value: value.to_owned(),
+    }
+}
+
+pub const fn finish(end: u64) -> SectionFinishEvidence {
+    SectionFinishEvidence {
+        capture_end_millis: end,
+        succeeded: true,
+        quality: observation_domain::SectionQuality::Unknown,
+        availability: observation_domain::SectionAvailability::Available,
+        coverage: observation_domain::SectionCoverage::PointMeasurement,
+        consistency: observation_domain::SourceConsistency::Unknown,
+        stable_identity: false,
     }
 }
 

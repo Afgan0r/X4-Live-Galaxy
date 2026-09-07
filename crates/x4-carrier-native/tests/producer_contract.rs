@@ -26,7 +26,7 @@ fn typed_fact_produces_v2_start_batch_and_completion() {
     let mut fact = sample("123.5");
     producer.push_record(&fact).unwrap();
     fact.raw_value = "mutated-after-admission".to_owned();
-    producer.finish_section().unwrap();
+    producer.finish_section(support::finish(0)).unwrap();
     assert_eq!(producer.progress(1, 0), Ok(ProducerOutcome::Progress));
     let start = take(&mut producer, &source, "received", 1);
     let batch = take(&mut producer, &source, "received", 2);
@@ -37,11 +37,11 @@ fn typed_fact_produces_v2_start_batch_and_completion() {
     );
     assert_eq!(
         support::digest(&batch),
-        "17aae5b571e64200337d9675477d4e402de13f3ca37712d6aea3c06bfa21eae0"
+        "0c1dcd8dd9fee02222660d68aeb8e1018dcc32ae64bf994d7e1762a273592d3f"
     );
     assert_eq!(
         support::digest(&completion),
-        "f223cbfd8a1e83bb7d891b829244b89bc90c83c8abd249bf6e6db6233e89f64d"
+        "9b006db7a8c4a54be415ac3af8b76d099c1583408028fbb92f6a363d09526739"
     );
     let CompleteMessage::SectionStart(start) = decode_complete_message(&start, 2_048).unwrap()
     else {

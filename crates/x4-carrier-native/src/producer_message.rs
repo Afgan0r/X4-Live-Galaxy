@@ -37,8 +37,8 @@ pub fn assemble(
         sender_evidence: evidence.sender.clone(),
     };
     let content = format!(
-        "getter={}\nsemantics={}\nraw_value={}",
-        fact.getter, fact.semantics, fact.raw_value
+        "getter={}\nraw_value={}\nsemantics={}",
+        fact.getter, fact.raw_value, fact.semantics
     );
     let batch_id = BatchId::new(format!("carrier-b:{}:{}:1", revision.get(), epoch.get()))
         .ok_or(ProducerError::InvalidInput)?;

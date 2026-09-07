@@ -13,6 +13,15 @@ pub type PushString = unsafe extern "C" fn(*mut c_void, *const c_char, usize);
 pub type SetField = unsafe extern "C" fn(*mut c_void, c_int, *const c_char);
 pub type ToInteger = unsafe extern "C" fn(*mut c_void, c_int) -> isize;
 pub type ToString = unsafe extern "C" fn(*mut c_void, c_int, *mut usize) -> *const c_char;
+pub type GetTop = unsafe extern "C" fn(*mut c_void) -> c_int;
+pub type GetMetatable = unsafe extern "C" fn(*mut c_void, c_int) -> c_int;
+pub type LuaType = unsafe extern "C" fn(*mut c_void, c_int) -> c_int;
+pub type Next = unsafe extern "C" fn(*mut c_void, c_int) -> c_int;
+pub type PushNil = unsafe extern "C" fn(*mut c_void);
+pub type RawGet = unsafe extern "C" fn(*mut c_void, c_int);
+pub type SetTop = unsafe extern "C" fn(*mut c_void, c_int);
+pub type ToBoolean = unsafe extern "C" fn(*mut c_void, c_int) -> c_int;
+pub type ToNumber = unsafe extern "C" fn(*mut c_void, c_int) -> f64;
 
 #[derive(Clone, Copy)]
 pub struct LuaApi {
@@ -23,6 +32,15 @@ pub struct LuaApi {
     pub set_field: SetField,
     pub to_integer: ToInteger,
     pub to_string: ToString,
+    pub get_top: GetTop,
+    pub get_metatable: GetMetatable,
+    pub lua_type: LuaType,
+    pub next: Next,
+    pub push_nil: PushNil,
+    pub raw_get: RawGet,
+    pub set_top: SetTop,
+    pub to_boolean: ToBoolean,
+    pub to_number: ToNumber,
 }
 
 #[cfg(windows)]
@@ -51,6 +69,15 @@ pub unsafe fn resolve() -> Result<LuaApi, InitializerError> {
         set_field: get!("lua_setfield", SetField),
         to_integer: get!("lua_tointeger", ToInteger),
         to_string: get!("lua_tolstring", ToString),
+        get_top: get!("lua_gettop", GetTop),
+        get_metatable: get!("lua_getmetatable", GetMetatable),
+        lua_type: get!("lua_type", LuaType),
+        next: get!("lua_next", Next),
+        push_nil: get!("lua_pushnil", PushNil),
+        raw_get: get!("lua_rawget", RawGet),
+        set_top: get!("lua_settop", SetTop),
+        to_boolean: get!("lua_toboolean", ToBoolean),
+        to_number: get!("lua_tonumber", ToNumber),
     })
 }
 
