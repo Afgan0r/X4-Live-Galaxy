@@ -1,0 +1,5 @@
+describe("owned Carrier B adapter", function()
+    it("loads ABI 2 and samples one reserved realtime fact", function()
+        assert.is_true(false, "RED: the typed Carrier B Lua adapter is not implemented")
+    end)
+end)

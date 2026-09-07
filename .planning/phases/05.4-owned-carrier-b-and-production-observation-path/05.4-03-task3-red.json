@@ -1,0 +1,9 @@
+{
+  "command": "tools/.cache/luarocks-tree/bin/busted.bat --lpath=extensions/?.lua;extensions/live_galaxy/tests/?.lua extensions/live_galaxy/tests/carrier_b_contract.lua",
+  "exitCode": 1,
+  "targetTest": "loads ABI 2 and samples one reserved realtime fact",
+  "targetFile": "carrier_b_contract.lua",
+  "expected": "the thin Lua adapter reserves capacity before one GetCurRealTime sample",
+  "actual": "intentional RED assertion reports that the typed Carrier B adapter is absent",
+  "output": "TAP version 13\nnot ok 1 - loads ABI 2 and samples one reserved realtime fact\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n"
+}
