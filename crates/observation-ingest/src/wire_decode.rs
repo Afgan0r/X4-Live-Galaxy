@@ -74,8 +74,12 @@ pub fn decode_completion(raw: RawCompletion) -> Result<CompleteMessage, Envelope
                 .ok_or(EnvelopeDecodeError::InvalidVersion)?,
             digest_version: DigestAlgorithmVersion::new(raw.digest_version)
                 .ok_or(EnvelopeDecodeError::InvalidVersion)?,
-            coverage: SectionCompletionEnvelope::coverage_from_wire(&raw.coverage)
-                .ok_or(EnvelopeDecodeError::InvalidShape)?,
+            coverage: if raw.coverage == "point_measurement" {
+                observation_domain::CompletionCoverage::PointMeasurement
+            } else {
+                SectionCompletionEnvelope::coverage_from_wire(&raw.coverage)
+                    .ok_or(EnvelopeDecodeError::InvalidShape)?
+            },
             sender_evidence: crate::sender_evidence::decode_raw_sender_evidence(
                 raw.sender_evidence,
             )?,

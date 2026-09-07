@@ -3,7 +3,7 @@ use observation_ingest::{
     DecisionRevisionIndex, GenerationStager, ImmutableApplicationBatch, ReceiverDisposition,
     SlotAdmission, StopAndWaitSlot, decode_complete_message,
 };
-use observation_persistence::ObservationRepository;
+use observation_persistence::{CurrentRevision, ObservationRepository, RepositoryError};
 
 use crate::{
     LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
@@ -76,6 +76,26 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         self.dispatch(message, input.context, input.work, input.now)
     }
 
+    pub const fn complete_message_limit(&self) -> usize {
+        self.limits.complete_message_bytes.get()
+    }
+
+    pub fn current_revision(
+        &self,
+        key: &observation_domain::SectionKey,
+    ) -> Result<Option<CurrentRevision>, RepositoryError> {
+        self.repository.current(key)
+    }
+
+    pub fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
+        self.repository.current_snapshot()
+    }
+
+    pub fn invalidate_source_scope(&mut self, scope: &observation_domain::SourceScopeId) {
+        let _ = self.stager.invalidate_source_scope(scope);
+        self.slot = StopAndWaitSlot::empty();
+    }
+
     fn dispatch(
         &mut self,
         message: CompleteMessage,
@@ -118,8 +138,12 @@ fn validate_context(
     epoch: observation_domain::TransportEpoch,
 ) -> Result<(), LifecycleError> {
     let valid = match (message, context) {
-        (CompleteMessage::SectionStart(value), LifecycleContext::Start(_)) => {
+        (CompleteMessage::SectionStart(value), LifecycleContext::Start(context)) => {
             value.transport_epoch == epoch
+                && (!matches!(
+                    value.sender_evidence.section_state.coverage(),
+                    observation_domain::SectionCoverage::PointMeasurement
+                ) || sender_context_matches(&value.sender_evidence, context))
         }
         (CompleteMessage::ImmutableBatch(value), LifecycleContext::Batch) => {
             value.transport_epoch == epoch
@@ -130,4 +154,17 @@ fn validate_context(
         _ => false,
     };
     valid.then_some(()).ok_or(LifecycleError::ContextMismatch)
+}
+
+fn sender_context_matches(
+    evidence: &observation_domain::SenderEvidence,
+    context: &observation_ingest::CandidateContext,
+) -> bool {
+    evidence.section_state == context.state()
+        && evidence.section_state.capture_window() == context.capture_window()
+        && evidence.stable_identity == context.stable_identity()
+        && evidence.schema_version == context.versions().schema()
+        && evidence.policy_version == context.versions().policy()
+        && evidence.canonicalization_version == context.versions().canonicalization()
+        && evidence.digest_version == context.versions().digest()
 }

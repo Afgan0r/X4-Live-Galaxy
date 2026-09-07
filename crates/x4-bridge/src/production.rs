@@ -20,6 +20,11 @@ pub enum ProductionError {
 
 pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     lifecycle: ObservationLifecycle<R>,
+    last_received: Option<(
+        observation_domain::BatchId,
+        Vec<u8>,
+        observation_application::LifecycleContext,
+    )>,
 }
 
 impl ProductionObservationSession {
@@ -50,20 +55,70 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     ) -> Result<Self, ProductionError> {
         let index =
             DecisionRevisionIndex::new(blocker_limit).ok_or(ProductionError::InvalidLimits)?;
-        Ok(Self {
+        let mut session = Self {
             lifecycle: ObservationLifecycle::new(
                 GenerationStager::new(AcceptedProjection::empty(), generation_limits),
                 index,
                 repository,
                 lifecycle_limits,
             ),
-        })
+            last_received: None,
+        };
+        session
+            .restore_current_snapshot()
+            .then_some(session)
+            .ok_or(ProductionError::Storage)
     }
 
     pub fn submit(&mut self, input: LifecycleInput) -> Result<LifecycleResult, ProductionError> {
         self.lifecycle
             .submit(input)
             .map_err(ProductionError::Lifecycle)
+    }
+
+    pub fn submit_received(
+        &mut self,
+        epoch: observation_domain::TransportEpoch,
+        identity: observation_domain::BatchId,
+        bytes: Vec<u8>,
+        work: usize,
+        now: u64,
+    ) -> Result<LifecycleResult, ProductionError> {
+        let context = if let Some((prior_identity, prior_bytes, prior_context)) =
+            &self.last_received
+            && prior_identity == &identity
+            && prior_bytes == &bytes
+        {
+            prior_context.clone()
+        } else {
+            self.receiver_context(&bytes)?
+        };
+        let input = LifecycleInput::new(
+            epoch,
+            identity.clone(),
+            bytes.clone(),
+            work,
+            now,
+            context.clone(),
+        );
+        let result = self
+            .lifecycle
+            .submit(input)
+            .map_err(ProductionError::Lifecycle)?;
+        self.last_received = Some((identity, bytes, context));
+        Ok(result)
+    }
+
+    fn receiver_context(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<observation_application::LifecycleContext, ProductionError> {
+        let message = observation_ingest::decode_complete_message(
+            bytes,
+            self.lifecycle.complete_message_limit(),
+        )
+        .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
+        crate::receiver_context::assemble(&mut self.lifecycle, &message)
     }
 
     #[must_use]
