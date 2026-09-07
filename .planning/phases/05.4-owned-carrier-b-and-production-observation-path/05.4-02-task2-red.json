@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-bridge --test receiver_context_contract sender_evidence_cannot_be_replaced_by_forged_receiver_context",
+  "exitCode": 1,
+  "targetTest": "sender_evidence_cannot_be_replaced_by_forged_receiver_context",
+  "targetFile": "receiver_context_contract.rs",
+  "expected": "forged receiver context cannot replace decoded sender evidence",
+  "actual": "legacy production submit accepted the forged context",
+  "output": "TAP version 13\nnot ok 1 - sender_evidence_cannot_be_replaced_by_forged_receiver_context\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n"
+}
