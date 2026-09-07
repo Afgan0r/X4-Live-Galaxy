@@ -136,3 +136,46 @@ fn invalid_capacity_failure_and_stale_epoch_never_complete() {
         Err(ProducerError::StaleEpoch)
     );
 }
+
+#[test]
+fn exact_limits_conflicting_feedback_and_reset_fail_closed() {
+    let (mut producer, _) = ready(10);
+    producer
+        .begin_section(SectionEvidence::point_measurement(
+            "x4:carrier_b_acceptance",
+        ))
+        .unwrap();
+    assert_eq!(
+        producer.push_record(&sample("")),
+        Err(ProducerError::DataLimit)
+    );
+    producer
+        .push_record(&sample(&format!("1.{}", "0".repeat(94))))
+        .unwrap();
+    producer.finish_section(support::finish(10)).unwrap();
+    producer.progress(1, 10).unwrap();
+    let original = source(7);
+    let bytes = producer.pending_bytes().unwrap().to_vec();
+    producer.mark_local_handoff(10).unwrap();
+    assert_eq!(
+        producer.apply_control(&disposition(&original, &bytes, "received", 2), 10),
+        Err(ProducerError::InvalidInput)
+    );
+    assert_eq!(
+        producer.apply_control(
+            &disposition(&original, &bytes, "permanently_rejected", 1),
+            10
+        ),
+        Ok(ProducerOutcome::PermanentlyRejected)
+    );
+    assert_eq!(producer.state(), ProducerState::PausedAfterFailure);
+    assert_eq!(producer.pending_bytes(), None);
+
+    let fresh = source(8);
+    producer.reset(fresh.clone(), 11).unwrap();
+    assert_eq!(producer.state(), ProducerState::AwaitingCompatibility);
+    assert_eq!(
+        decode_carrier_bootstrap(producer.pending_bytes().unwrap(), 512),
+        Ok(identity(&fresh))
+    );
+}
