@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -Command wrapper around cargo test actual_encoded_batch_identity_accepts_exact_receipt",
+  "exitCode": 1,
+  "targetTest": "actual_encoded_batch_identity_accepts_exact_receipt",
+  "targetFile": "crates/x4-carrier-native/tests/producer_contract.rs",
+  "expected": "the exact batch_id decoded from DLL-produced bytes advances the producer to the completion message",
+  "actual": "the observed exact bridge receipt was rejected as InvalidInput because pending identity omitted transport epoch",
+  "output": "left: Err(InvalidInput)\nright: Ok(Received)\nTAP version 13\nnot ok 1 - actual_encoded_batch_identity_accepts_exact_receipt\n# tests 1\n# pass 0\n# fail 1\n"
+}
