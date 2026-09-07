@@ -14,16 +14,16 @@ function Read-ProductXml([string]$Text) {
 function Assert-Registration([xml]$Content, [xml]$Ui, [string]$Root) {
     $contentDependencies = @($Content.DocumentElement.SelectNodes('./dependency'))
     if ($Content.DocumentElement.LocalName -cne 'content' -or
-        $Content.DocumentElement.GetAttribute('id') -cne 'live_galaxy' -or
-        @($contentDependencies | Where-Object { $_.GetAttribute('id') -ceq 'ws_2042901274' }).Count -ne 1) {
+        $Content.DocumentElement.GetAttribute('id') -cne 'live_galaxy') {
         throw 'INVALID_PACKAGE_IDENTITY'
     }
+    if ($contentDependencies.Count -ne 0) { throw 'CARRIER_A_DEPENDENCY_FORBIDDEN' }
     if ($Ui.DocumentElement.LocalName -cne 'addon' -or
         $Ui.DocumentElement.GetAttribute('name') -cne 'live_galaxy') { throw 'INVALID_ADDON_IDENTITY' }
     $menus = @($Ui.DocumentElement.SelectNodes('./environment') | Where-Object { $_.GetAttribute('type') -ceq 'menus' })
     if ($menus.Count -ne 1) { throw 'MISSING_MENUS_ENVIRONMENT' }
-    $dependencies = @($menus[0].SelectNodes('./dependency') | Where-Object { $_.GetAttribute('name') -ceq 'sn_mod_support_apis' })
-    if ($dependencies.Count -ne 1) { throw 'MISSING_UI_DEPENDENCY' }
+    $dependencies = @($menus[0].SelectNodes('./dependency'))
+    if ($dependencies.Count -ne 0) { throw 'CARRIER_A_UI_DEPENDENCY_FORBIDDEN' }
     $files = @($menus[0].SelectNodes('./file'))
     if ($files.Count -ne 1 -or $files[0].GetAttribute('name') -cne 'lua/live_galaxy_runtime.lua') {
         throw 'WRONG_ENTRYPOINT'
@@ -55,7 +55,9 @@ $invalid = $content.CloneNode($true)
 $invalid.DocumentElement.SetAttribute('id', 'wrong')
 Assert-Rejected { Assert-Registration $invalid $ui $ExtensionRoot } '^INVALID_PACKAGE_IDENTITY$'
 $invalid = $ui.CloneNode($true)
-$invalid.DocumentElement.SelectSingleNode('./environment/dependency').SetAttribute('name', 'wrong')
-Assert-Rejected { Assert-Registration $content $invalid $ExtensionRoot } '^MISSING_UI_DEPENDENCY$'
+$dependency = $invalid.CreateElement('dependency')
+$dependency.SetAttribute('name', 'sn_mod_support_apis')
+[void]$invalid.DocumentElement.SelectSingleNode('./environment').AppendChild($dependency)
+Assert-Rejected { Assert-Registration $content $invalid $ExtensionRoot } '^CARRIER_A_UI_DEPENDENCY_FORBIDDEN$'
 Assert-Rejected { Assert-Registration $content $ui (Join-Path $ExtensionRoot 'missing-entrypoint-fixture') } '^MISSING_ENTRYPOINT$'
 Write-Output "XML package: $($xmlFiles.Count) well-formed files, registration and 4 rejection checks passed."

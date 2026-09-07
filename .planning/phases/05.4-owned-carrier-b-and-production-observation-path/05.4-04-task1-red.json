@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -Command wrapper around extensions/live_galaxy/tests/x4-package-conformance.ps1",
+  "exitCode": 1,
+  "targetTest": "production package rejects the retired Carrier A dependency",
+  "targetFile": "extensions/live_galaxy/tests/x4-package-conformance.ps1",
+  "expected": "the production content and UI registrations contain no sn_mod_support_apis dependency",
+  "actual": "intentional RED assertion returned CARRIER_A_DEPENDENCY_FORBIDDEN for the historical content.xml registration",
+  "output": "CARRIER_A_DEPENDENCY_FORBIDDEN\nTAP version 13\nnot ok 1 - production package rejects the retired Carrier A dependency\n# tests 1\n# pass 0\n# fail 1\n"
+}
