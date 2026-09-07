@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mdscript name="live_galaxy_observation">
   <!--
-    Runtime event syntax, cadence, and save-sensitive detection remain pending
-    a disposable X4 probe. This cue remains telemetry-only: it declares no
-    actions, reports, acknowledgements, or game-state effect path.
+    X4 owns this bounded callback seam. Lua owns collection and co-operative
+    progress; this cue declares no mutation or support-API dependency.
   -->
   <cues>
     <cue name="live_galaxy_root">

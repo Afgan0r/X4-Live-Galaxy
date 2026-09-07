@@ -3,6 +3,5 @@
     xsi:noNamespaceSchemaLocation="../../ui/core/addon.xsd">
   <environment type="menus">
     <file name="lua/live_galaxy_runtime.lua" />
-    <dependency name="sn_mod_support_apis" />
   </environment>
 </addon>
