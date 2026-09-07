@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-carrier-native --test producer_contract",
+  "exitCode": 1,
+  "targetTest": "typed_fact_produces_v2_start_batch_and_completion",
+  "targetFile": "producer_contract.rs",
+  "expected": "the native producer owns exact v2 start, batch, and completion assembly",
+  "actual": "intentional RED assertion reports that native producer assembly is absent",
+  "output": "TAP version 13\nnot ok 1 - typed_fact_produces_v2_start_batch_and_completion\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n"
+}
