@@ -46,16 +46,21 @@ renumbering the ledger.
 - **Context:** an external process cannot independently call the inspected X4
   getter surface, while complex processing inside X4 increases hitch and crash
   risk.
-- **Accepted rule:** keep the in-X4 layer minimal: X4 getters, bounded resumable
-  continuations, X4-specific normalization, local frame-safety admission, and a
-  carrier facade. Rust owns global collection policy, candidate assembly,
-  validation, persistence, publication, diagnostics aggregation, and model
-  logic.
+- **Accepted rule:** keep the in-X4 Lua layer minimal: X4 getters, bounded
+  resumable continuations, X4-specific normalization, local frame-safety
+  admission, and typed fact/capture-evidence calls. The loaded Rust DLL owns
+  bounded producer assembly: protocol identities and envelopes, canonical
+  bytes, digests, completion certificates, and immutable retry material. The
+  independent external Rust bridge owns global collection policy, receiver
+  candidate assembly and admission, validation, persistence, publication,
+  diagnostics aggregation, and model logic.
 - **Rationale:** this minimizes dependence on work performed inside X4 without
   pretending that changing the transport removes Lua from source collection.
-- **Consequences:** Rust sends logical collection intent and bounded control,
+- **Consequences:** the bridge sends only bounded collection/control traffic,
   not remote calls for individual getters. Lua retains final authority over
-  whether another native step is safe in the current callback.
+  whether another native step is safe in the current callback. The DLL may
+  preserve supplied source evidence but cannot strengthen it, and receiver
+  admission remains independent of sender claims.
 - **Supersedes:** designs that place the complete scheduler, snapshot database,
   or LLM pipeline inside X4, and designs that treat getters as remote RPC.
 
@@ -124,7 +129,8 @@ renumbering the ledger.
   diagnostic stream has independent finite byte, work, count, memory, and age
   bounds as applicable. Per-candidate bounds coexist with aggregate bounds.
 - **Rationale:** one finite queue can still hide an unsafe native allocation,
-  one huge message, decoded-memory expansion, or unbounded accepted history.
+  one huge message, an unbounded receiver-local retained allocation, or
+  unbounded accepted history.
 - **Consequences:** work is admitted only after downstream capacity is reserved;
   terminal and control traffic retains capacity that data cannot consume.
   Numerical values are configurable and evidence-derived, beginning generous
@@ -152,21 +158,26 @@ renumbering the ledger.
 ## ADR-LG-008: Carrier-neutral application protocol
 
 - **Status:** accepted
-- **Context:** `sn_mod_support_apis` is the only locally proven X4 named-pipe
-  carrier, but its wrapper and lifecycle limitations must not define the whole
-  application protocol.
-- **Accepted rule:** start with `sn_mod_support_apis` behind Live Galaxy-owned
-  `try_send`, `poll_control`, connection-status, message-identity, and bounded
-  error semantics. Collector and Rust snapshot state machines remain unaware of
-  carrier-specific error names and buffer assumptions.
-- **Rationale:** this yields the fastest real duplex proof while keeping a
-  deliberate migration path to a minimal owned native carrier.
-- **Consequences:** carrier A is implemented first. A Live Galaxy-owned Rust/C
-  Lua module is the expected carrier B only after executable or measured
-  evidence proves an A-side correctness, reconnect, callback-time, binary-copy,
-  payload, or packaging limitation.
-- **Supersedes:** making `sn_mod_support_apis` part of semantic snapshot identity
-  and implementing a custom DLL speculatively.
+- **Context:** `sn_mod_support_apis` is comparison evidence only: its wrapper
+  cannot establish the required bounded nonblocking and typed-result behavior.
+  The production path needs a carrier whose producer and transport boundaries
+  are owned by Live Galaxy.
+- **Accepted rule:** use Carrier B: a Rust Lua C module loaded with
+  `package.loadlib` and `luaopen_live_galaxy_carrier`, followed by bounded local
+  IPC to an independent external Rust bridge. Lua supplies typed X4 facts and
+  capture evidence; the DLL owns producer assembly and the immutable message
+  retained for retry. Session negotiation admits only the exact native ABI,
+  envelope, and control-contract versions selected for the production pair.
+- **Rationale:** one owned boundary makes the cross-language producer state,
+  copied-memory lifetime, retry identity, and bounded IPC explicit without
+  moving X4 authority or receiver admission into the DLL.
+- **Consequences:** Carrier A is not a production dependency or automatic
+  fallback. The DLL synchronously copies accepted Lua input, never retains
+  LuaJIT/X4 pointers, and its background work calls neither Lua nor X4. A
+  compatible bridge may restart independently; changing loaded Lua/DLL code or
+  an incompatible game-facing protocol revision remains restart-required.
+- **Supersedes:** making `sn_mod_support_apis` part of semantic snapshot identity,
+  treating Carrier B as future-only, and treating the DLL as a transport shim.
 
 ## ADR-LG-009: Protected UI and online features
 
@@ -196,8 +207,7 @@ renumbering the ledger.
 - **Consequences:** the current `2,048`-byte support-module receive buffer is not
   copied into protocol policy. The protocol selects a smaller complete-message
   ceiling with headroom and tests exact-boundary and oversize behavior. A future
-  large inbound feature requires a separate action/data-plane decision or
-  carrier B.
+  large inbound feature requires a separate action/data-plane decision.
 - **Supersedes:** symmetric bulk duplex transport as a baseline requirement.
 
 ## ADR-LG-011: Stop-and-wait receiver feedback
@@ -211,10 +221,11 @@ renumbering the ledger.
   atomic publication. Negative dispositions preserve retryability distinctions.
 - **Rationale:** demand `1` is the smallest complete backpressure contract and
   bounds sender ambiguity while the duplex seam is being proven.
-- **Consequences:** Lua releases a batch only after its exact `received` or
-  terminal disposition. Rust loss or reconnect discards incomplete candidates
-  and requires recollection under a new identity. Control and terminal traffic
-  has reserved capacity.
+- **Consequences:** the DLL releases its producer-owned immutable bytes only
+  after the exact `received` or terminal disposition; Lua advances or polls that
+  state only from an admitted callback. Bridge loss or reconnect discards
+  incomplete candidates and requires recollection under a new identity. Control
+  and terminal traffic has reserved capacity.
 - **Supersedes:** calling write success acceptance and starting with a sliding
   window merely because the OS pipe can buffer more.
 
@@ -310,10 +321,14 @@ renumbering the ledger.
 - **Context:** a marker-shaped message proves only that a marker arrived. It
   cannot prove ordered batch membership, record counts, content, dependencies,
   capture time, or source coverage.
-- **Accepted rule:** use a lightweight start envelope and a content-bound end
-  certificate. Rust recomputes ordered batch and canonical content evidence,
-  verifies contiguous ordinals, versions, frozen dependencies, capture window,
-  coverage, and quality, then commits or rejects the candidate atomically.
+- **Accepted rule:** the DLL binds a lightweight start envelope and a
+  content-bound end certificate from producer-owned canonical content. The
+  external bridge independently recomputes ordered-batch and canonical-content
+  evidence, verifies contiguous ordinals, versions, receiver-owned dependencies,
+  capture window, coverage, and quality, then commits or rejects the candidate
+  atomically. The production certificate uses exact envelope contract v2 and
+  contains no sender claim about receiver allocation layout, including no
+  `decoded_bytes` field.
 - **Rationale:** section publication needs an explicit semantic completion
   boundary independent of pipe writes.
 - **Consequences:** an exact upfront membership manifest is optional and

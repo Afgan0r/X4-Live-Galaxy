@@ -100,24 +100,27 @@ the core identity and location of faction ships. Other jobs may refresh cargo,
 crew, or loadout details. Each job remembers exactly where it stopped. The next
 pulse resumes from that point instead of starting the entire scan again.
 
-When complete semantic records are ready, a batch builder packs several records
-into one bounded message. A transport pump, separate from the collection
-scheduler, moves that immutable message through the named pipe. Rust decodes
-messages into private per-section candidate state. The candidate is not
-authoritative while it is still being built. Only a verified completion proof
-may publish a new accepted section revision.
+Lua supplies bounded typed X4 facts and capture evidence to the loaded Rust
+DLL. The DLL's producer state machine packs complete semantic records into
+canonical bounded messages, binds their identities/digests/certificates, and
+retains one immutable message for retry. Its transport worker moves that message
+through the named pipe. The independent external bridge decodes messages into
+private per-section candidate state. The candidate is not authoritative while
+it is still being built. Only a bridge-verified completion proof may publish a
+new accepted section revision.
 
 The last complete accepted revision remains authoritative while its replacement
 is being collected or transported. If replacement attempts keep failing, the old
 revision remains stored, but decisions that need fresh data eventually fail
 closed.
 
-The important rate condition is not merely "Lua wrote the bytes." Over a
-sustained window, Rust must accept work at least as fast as Lua produces it, or
-upstream work must slow down before bounded memory is exhausted:
+The important rate condition is not merely "Lua supplied a typed fact." Over a
+sustained window, the external bridge must admit work at least as fast as the
+DLL produces it, or upstream work must slow down before bounded memory is
+exhausted:
 
 ```text
-accepted rate >= produced rate
+bridge-admitted rate >= DLL-produced rate
 ```
 
 If this cannot be demonstrated, the stream is not stable even when every
@@ -131,8 +134,9 @@ flowchart LR
     Native[Indivisible native calls]
     Collectors[Persistent section collectors]
     Records[Complete semantic records]
-    Builder[One bounded batch builder]
-    Pending[Bounded immutable pending message]
+    LuaFacts[Lua typed facts and capture evidence]
+    Producer[DLL bounded producer]
+    Pending[DLL-owned immutable pending message]
     Pipe[Windows named pipe]
     Lifecycle[Hello, capability, health and control]
     Receive[Rust whole-message receive]
@@ -147,9 +151,9 @@ flowchart LR
 
     X4 --> Native
     Native --> Collectors
-    Collectors --> Records
-    Records --> Builder
-    Builder --> Pending
+    Collectors --> LuaFacts
+    LuaFacts --> Producer
+    Producer --> Pending
     Lifecycle --> Pending
     Pending --> Pipe
     Pipe --> Receive
@@ -163,7 +167,7 @@ flowchart LR
     Projection --> Decision
 
     Scheduler[Global collection scheduler] -. permits work .-> Collectors
-    Pump[Transport pump] -. owns writes and retries .-> Pending
+    Pump[DLL transport worker] -. owns writes and retries .-> Pending
     Flow[Backpressure or future credit] -. slows production .-> Scheduler
     Stage -. receiver state .-> Flow
 ```
@@ -179,13 +183,17 @@ candidate.
 ## Authority boundaries
 
 - X4 owns authoritative game state.
-- Lua observes X4 and constructs source records. It does not make
-  an incomplete scan authoritative.
+- Lua observes X4, performs callback-local admission, and supplies typed facts
+  plus source/capture/coverage evidence. It does not construct protocol records
+  or make an incomplete scan authoritative.
+- The loaded Rust DLL owns producer identities, envelopes, canonicalization,
+  digests, completion certificates, and immutable retry bytes. It may preserve
+  supplied evidence but never strengthen it.
 - The named pipe transports messages. Pipe success is not
   semantic acceptance.
-- Rust owns schema validation, semantic validation, private
-  staging, persistence, reconciliation, recovery, and publication to decision
-  readers.
+- The independent external Rust bridge owns receiver-side schema and semantic
+  validation, private staging, receiver-context assembly, persistence,
+  reconciliation, recovery, and publication to decision readers.
 - Model-facing decision state is created only from accepted,
   compatible section revisions frozen into an immutable decision snapshot.
 - Pending Lua work, kernel-buffered messages,
@@ -495,9 +503,10 @@ Decision references: [ADR-LG-003], [ADR-LG-004], and [ADR-LG-005].
   cadence is never interpreted as an exact scheduling guarantee.
 
 The scheduler entry must be idempotently registered and guarded by
-`in_callback`. It samples real time and game time once, applies the save gate,
-pumps pending transport, and only then admits collection work. High-churn
-`Schedule_Write` use is not part of the baseline.
+`in_callback`. It samples real time and game time once, advances bounded DLL
+producer/transport progress, and only then admits collection work. Automatic
+save pause/resume is unsupported: no save gate or cooldown is inferred from
+the callback seam. High-churn `Schedule_Write` use is not part of the baseline.
 
 The exact normal, SETA, pause, menu, minimize, save, load, and `/reloadui`
 semantics determine whether the callback seam is admitted.
@@ -507,18 +516,19 @@ semantics determine whether the callback seam is admitted.
 The collection scheduler and transport pump must remain separate even if one
 callback invokes both.
 
-The collection scheduler owns:
+The bridge-owned collection policy and Lua callback admission together own:
 
 - Section urgency and fairness;
 - Work permits and cost accounting;
 - Collector state transitions;
 - Native-call admission;
-- Dependencies and staleness;
+- Global dependencies and staleness, with the bridge supplying receiver-owned
+  admission context;
 - Output-memory reservations before producing records.
 
-The transport pump owns:
+The DLL producer and transport worker own:
 
-- Batch sealing;
+- Batch sealing, canonical bytes, digests, and completion certificates;
 - Immutable pending bytes;
 - Named-pipe write attempts;
 - Retry, cooldown, and reconnect policy;
@@ -695,9 +705,10 @@ The following work may remain indivisible:
 A large population is admitted through measured allocation, work, memory, and
 age bounds rather than a fixture-derived entity count.
 
-- Bound native allocation bytes, canonical bytes, decoded-memory
-  estimate, records or work units, capture duration, real/game age, and total
-  staged state independently.
+- Bound native allocation bytes, canonical bytes, records or work units,
+  capture duration, real/game age, and total staged state independently. A
+  sender never reports a receiver-layout or `decoded_bytes` estimate; any
+  receiver-local allocation estimate needs a demonstrated remaining risk.
 
 If a single native allocation or fill for the supported workload exceeds the
 safe envelope, the collector needs a proven event/delta source or true paging
@@ -731,10 +742,10 @@ while all other memory owners remain bounded.
 | Native source | Maximum allocation/result bytes and measured indivisible-call cost |
 | Collector continuation | Maximum IDs, tables, cursors, retained fields, and age |
 | Semantic record | Maximum canonical bytes and decode work |
-| Batch builder | Target bytes, hard bytes, records, and maximum held age |
+| DLL producer batch builder | Target bytes, hard bytes, records, and maximum held age |
 | Pending transport | Message count, bytes, retry count, and retry age |
 | Pipe receive | Whole-message quota with explicit oversize classification |
-| Rust candidate | Records/work, raw and decoded bytes, duration, and inactivity |
+| Rust candidate | Records, canonical bytes, batches/work, duration, inactivity, and aggregate queue limits |
 | Accepted storage | Retention, compaction, decision pins, and total disk/memory policy |
 | Diagnostics | Event rate, cardinality, payload omission, and retention |
 
@@ -744,7 +755,7 @@ No single counter can substitute for this table.
 
 ### Target size and hard ceiling
 
-The batch builder needs two size concepts:
+The DLL producer batch builder needs two size concepts:
 
 - `T_batch`: a lower performance target. Adding another complete record above
   this target seals the current batch.
@@ -789,26 +800,31 @@ isolated behind a Live Galaxy facade
 ([ADR-LG-008](architecture-decisions.md#adr-lg-008-carrier-neutral-application-protocol)).
 
 ```text
-X4 getters and bounded producer continuations
-  -> UI Lua
-  -> Live Galaxy carrier facade
+X4 getters and callback-local continuation admission
+  -> UI Lua typed facts and capture evidence
+  -> loaded Rust DLL producer and bounded transport worker
   -> local IPC carrier
-  -> external Rust ingestion, staging, persistence, publication, and LLM work
+  -> external Rust bridge admission, staging, persistence, publication,
+     and LLM work
 ```
 
-The initial carrier adapter targets `sn_mod_support_apis`. A future owned
-native carrier must implement the same complete-message, nonblocking,
-connection-status, and bounded-error contract without changing collector or
-Rust section state machines.
+Carrier B is the selected production carrier. Its owned Rust Lua C module loads
+through a source-resolved `package.loadlib` call and the
+`luaopen_live_galaxy_carrier` initializer. Carrier A
+(`sn_mod_support_apis`) remains research/comparison evidence only: it is not a
+production dependency or automatic fallback. Carrier B negotiates the exact
+native ABI, complete-message envelope, and control-contract versions before
+the bridge admits observation data.
 
 - No external language independently invokes the inspected X4 getter surface.
-- Rust-to-X4 messages express bounded demand, disposition, collection intent,
-  health, or separately validated action commands; they do not turn getters
-  into remote RPC calls.
+- Bridge-to-Lua messages express bounded demand, disposition, collection intent,
+  health, or session reset; they do not turn getters into remote RPC calls.
 - Lua owns the cooperative local scheduler and final native-step admission.
-- An owned DLL may retain only memory it owns after a synchronous copy. It
-  never retains LuaJIT or X4 pointers after return, calls X4 or Lua from a
-  background thread, or unwinds a panic or exception into X4.
+- The DLL synchronously copies accepted inputs, owns producer identities,
+  envelopes, canonicalization, digests, completion certificates, and retry
+  bytes, and never retains LuaJIT/X4 pointers after return. Background work
+  calls neither X4 nor Lua, and the FFI boundary catches every failure/panic
+  before it could unwind into X4.
 
 ### Inbound control-plane size
 
@@ -820,8 +836,11 @@ Inbound messages carry bounded control, not collected game state:
 - `received`, `committed`, rejection, abort, and retry-after dispositions;
 - Section collection intent, logical scope, policy identity, and urgency;
 - Bounded health and session-reset signals;
-- Later, one or a small bounded batch of already validated typed X4 action
-  primitives.
+
+Phase 05.4 permits observations and bounded collection/control traffic only.
+Any future game-state mutation primitive needs a separately admitted action
+contract and may be applied only by an admitted Lua game callback after final
+validation.
 
 Inbound does not carry full snapshots, raw LLM output, prompts, complete faction
 plans, large schemas, bulk diagnostics, or a list of every entity to read. Rust
@@ -831,25 +850,19 @@ and executes a resumable local continuation.
 - Inbound control uses an independently bounded complete-message hard ceiling
   with envelope headroom and explicit oversize handling.
 - A future feature that genuinely needs large Rust-to-X4 payloads
-  must open a separate bounded action/data-plane decision or promote carrier B.
+  must open a separate bounded action/data-plane decision.
   It must not silently enlarge the observation control plane.
 
 The present inbound buffer is therefore an error-handling and future-extension
 risk, not an expected-volume bottleneck for stop-and-wait observation feedback.
 
-A Live Galaxy-owned DLL, if ever promoted, remains a transport/encoding shim:
-
-- It may synchronously copy a caller-owned buffer and perform bounded IPC;
-- A worker thread may use only memory the DLL owns after the copy;
-- It must not retain LuaJIT/X4 pointers after return;
-- It must not call X4 getters or Lua APIs from a background thread;
-- Every FFI boundary catches panics/exceptions and fails closed without unwinding
-  into X4.
-
-Moving JSON or binary encoding into native code is a measured optimization, not
-the admission reason for a custom DLL. First test whether a compact Lua-produced
-wire buffer and the existing carrier meet the callback, throughput, and
-freshness envelope.
+The DLL is not a transport/encoding shim. It owns bounded producer state from
+typed facts through complete protocol messages and exact immutable retry; Lua
+does not construct raw wire bytes, SHA-256 values, canonical framing, or a
+completion certificate. The external bridge remains a separate trust boundary:
+it reconstructs its candidate from received sender evidence plus its own current
+state, dependencies, clocks, and resource limits, then independently recomputes
+all certificate evidence before publication.
 
 ### Message-boundary facts
 
@@ -904,14 +917,15 @@ source_epoch = null
 source_epoch_status = unknown | boundary_uncertain
 source_boundary = new_campaign | game_loaded | lua_reload |
                   transport_reconnect | unknown
-producer_incarnation = local opaque token per Lua initialization
+producer_incarnation = DLL-owned opaque protocol token bound to Lua-supplied
+                       source-boundary evidence
 transport_epoch = local monotonic connection epoch
 ```
 
-`producer_incarnation` distinguishes Lua lifetimes but is never relabeled as
-campaign identity. A bridge reconnect changes only `transport_epoch`. A game,
-load, or reload boundary aborts private work and starts a new producer
-incarnation.
+`producer_incarnation` distinguishes producer lifetimes but is never relabeled
+as campaign identity. A bridge reconnect changes only `transport_epoch`. A
+game, load, or reload boundary aborts private work and starts a new DLL-owned
+producer incarnation.
 
 While source identity is unknown or boundary-uncertain:
 
@@ -922,11 +936,9 @@ While source identity is unknown or boundary-uncertain:
 - A fresh baseline is required before decisions resume;
 - Incomplete work is always discarded rather than resumed.
 
-An ordinary save window pauses the collection scheduler and transport pump
-together. Persistent cursors, bounded private candidates, and the one pending
-immutable transport frame may remain in RAM and resume only after the
-evidence-derived cooldown and revalidation policy. Load and reload use the
-stricter invalidation path.
+Automatic save pause/resume is unsupported. Load and reload always use the
+strict invalidation path; no numeric cooldown or retained-candidate resume rule
+is inferred from save behavior.
 
 ## End-to-end flow control
 
@@ -936,7 +948,8 @@ Decision references: [ADR-LG-011] and [ADR-LG-012].
 
 Let:
 
-- `P(t)` be cumulative records or canonical bytes produced by Lua;
+- `P(t)` be cumulative records or canonical bytes produced by the DLL from
+  Lua-supplied typed facts;
 - `S(t)` be cumulative records or bytes semantically staged by Rust;
 - `C(t)` be cumulative complete section revisions atomically committed by Rust;
 - `B_total` be the independently bounded sum of native worksets, continuation
@@ -951,7 +964,7 @@ supremum over t of (P(t) - S(t)) <= B_total
 Steady transport requires, over the longest sustained production window:
 
 ```text
-Rust staged rate >= Lua produced rate
+bridge staged rate >= DLL produced rate
 ```
 
 Product freshness additionally requires:
@@ -967,16 +980,17 @@ Local pipe-write counters cannot provide `S(t)` or `C(t)`.
 
 The control plane begins with stop-and-wait and implicit credit `1`:
 
-1. Lua retains one immutable message.
-2. Rust decodes it, validates the message-local contract, and places it in the
-   current volatile candidate in RAM.
+1. The DLL retains one immutable producer-owned message.
+2. The external bridge decodes it, validates the message-local contract, and
+   places it in the current volatile candidate in RAM.
 3. Rust returns `received` for the exact epoch, revision, and sequence.
-4. `received` allows Lua to release the immutable message and grants the next
-   slot. It is explicitly not durable acceptance or publication.
-5. Rust loss, disconnect, or transport-epoch change discards the incomplete
-   candidate. Lua starts a new complete collection under a new identity rather
-   than resuming the lost candidate.
-6. After every batch and the completion certificate validate, Rust atomically
+4. `received` allows the DLL to release the immutable message and grants the
+   next slot. Lua only polls/advances this state from an admitted callback. It
+   is explicitly not durable acceptance or publication.
+5. Bridge loss, disconnect, or transport-epoch change discards the incomplete
+   candidate. The DLL discards incomplete producer state; Lua starts a new
+   collection under a new identity rather than resuming the lost candidate.
+6. After every batch and the completion certificate validate, the bridge atomically
    persists and publishes the accepted section revision, then returns
    `committed`.
 7. Exact duplicate input returns the same applicable disposition without
@@ -1118,9 +1132,13 @@ frozen dependency revision identities
 quality result
 ```
 
-Rust recomputes the certificate inputs from the private candidate and rejects
-missing ordinals, count or digest mismatches, stale dependencies, incompatible
-versions, and invalid quality or coverage before publication.
+The DLL creates this certificate using complete-message envelope contract v2.
+It includes no `decoded_bytes` or other sender claim about receiver allocation
+layout. The bridge independently recomputes certificate inputs from its private
+candidate and enforces its own message, record, batch, in-flight, and aggregate
+queue limits incrementally; the certificate is not a capacity reservation. It
+rejects missing ordinals, count or digest mismatches, stale dependencies,
+incompatible versions, and invalid quality or coverage before publication.
 
 `transport_epoch` binds the terminal message to its volatile candidate; it does
 not prove that the semantic section belongs to one globally atomic X4 instant.
@@ -1217,7 +1235,7 @@ observed.
 | Missing completion proof | Candidate eventually expires | Discard candidate | Last complete retained |
 | Verified completion proof | Finish attempt | Durable commit, then publish | New section revision authoritative |
 | Disconnect mid-generation | New epoch; restart whole scan | Discard candidate | Last complete retained |
-| Rust restart after local write | Without ACK, Lua cannot know admission | Recover durable accepted state; discard non-durable candidate | Last durable complete retained |
+| Bridge restart after local write | Without ACK, the DLL cannot know admission | Recover durable accepted state; discard non-durable candidate | Last durable complete retained |
 | Save/load during scan | Abort old source epoch | Reject pre-epoch candidate | New campaign state remains isolated |
 | Dependency revision changes | Continue private candidate, then compare frozen dependencies at completion | Discard stale candidate; schedule a fresh attempt after cooldown | Last complete accepted revision remains until stale |
 | Event gap or overflow | Invalidate event-derived freshness; request rebase | Mark coverage invalid | Absence disabled until rebase |
@@ -1340,7 +1358,8 @@ true:
 - The collector retains only bounded continuation state;
 - One bounded batch is built at a time;
 - Pending transport remains bounded;
-- Rust candidate bytes, decoded expansion, work, and age are bounded;
+- Rust candidate canonical bytes, records, batches, work, age, and aggregate
+  queue limits are bounded;
 - Accepted storage is incremental or otherwise measured safe;
 - Sustained staged throughput prevents backlog growth;
 - Section freshness still meets the decision contract.
@@ -1363,21 +1382,21 @@ Record bounded sanitized metrics for:
 - Section due, overdue, stale, and blocked counts;
 - Maximum capture and accepted-section age;
 - Dependency invalidation and decision-block reasons;
-- Lua memory estimate and garbage-collection pause evidence.
+- Lua typed-input/callback cost and garbage-collection pause evidence.
 
 ### Batch and transport
 
 Record:
 
-- Records and UTF-8 bytes produced;
+- Lua typed-input counts and bytes supplied;
+- DLL-produced records and canonical bytes;
 - Batch target and hard-ceiling configuration identities;
-- Batch record count, bytes, held age, and seal reason;
-- Pending message identity, bytes, age, and retry count;
+- DLL batch record count, bytes, held age, and seal reason;
+- DLL pending-message identity, bytes, age, and retry count;
 - Raw attempts, local pipe handoffs, failures, cooldowns, and halts;
 - Queue or slot high water;
 - Reconnect and abandoned-generation counts.
-- Save-pause entries, duration, retained candidate size, and post-save resume or
-  invalidation outcome.
+- Source-boundary invalidation and abandoned producer-generation counts.
 
 "Offered to pipe" must never be labeled "accepted by Rust."
 
@@ -1386,13 +1405,13 @@ boundaries remain visible. Preserve counters and latency histograms for:
 
 1. native collection;
 2. Lua normalization;
-3. serialization, allocation, and concatenation;
-4. local pipe handoff;
-5. Rust whole-message receive;
-6. decode and semantic validation;
-7. private candidate staging;
-8. durable persistence;
-9. atomic publication.
+3. Lua typed-input copy;
+4. DLL producer assembly, canonicalization, and certificate binding;
+5. local pipe handoff;
+6. bridge whole-message receive;
+7. decode and semantic validation;
+8. private candidate staging;
+9. durable persistence and atomic publication.
 
 Rolling averages do not replace burst, longest-consecutive-backpressure, tail
 latency, backlog-slope, retry-amplification, and capture-to-commit freshness
@@ -1405,8 +1424,8 @@ Record:
 
 - Receive result: full message, quota overflow, EOF, or error;
 - Decode, validation, stage, persistence, and commit latency;
-- Private candidate section, revision, records, raw bytes, decoded estimate,
-  age, and expected sequence;
+- Private candidate section, revision, records, canonical bytes, batches/work,
+  age, expected sequence, and aggregate-queue usage;
 - Exact replay and conflicting duplicate counts;
 - Rejection and abort class;
 - Accepted section revision and last completion time;
