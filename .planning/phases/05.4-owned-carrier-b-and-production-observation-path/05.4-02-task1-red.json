@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p observation-ingest --test wire_v2_contract exact_v2_start_decodes_with_sender_evidence",
+  "exitCode": 1,
+  "targetTest": "exact_v2_start_decodes_with_sender_evidence",
+  "targetFile": "wire_v2_contract.rs",
+  "expected": "exact envelope contract v2 decodes with strict sender evidence",
+  "actual": "decoder returned InvalidShape",
+  "output": "TAP version 13\nnot ok 1 - exact_v2_start_decodes_with_sender_evidence\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n"
+}
