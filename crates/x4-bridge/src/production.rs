@@ -109,6 +109,11 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         Ok(result)
     }
 
+    pub fn invalidate_source_scope(&mut self, scope: &observation_domain::SourceScopeId) {
+        self.lifecycle.invalidate_source_scope(scope);
+        self.last_received = None;
+    }
+
     fn receiver_context(
         &mut self,
         bytes: &[u8],

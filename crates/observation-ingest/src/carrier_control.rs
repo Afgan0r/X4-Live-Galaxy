@@ -1,9 +1,8 @@
-use observation_domain::ControlEnvelope;
 use serde::{Deserialize, Serialize};
 
 use crate::carrier_control_types::{
     CarrierCodecError, CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody,
-    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody,
+    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody, validate_carrier_identity,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -21,7 +20,7 @@ pub fn encode_carrier_control(
     control: &CarrierControl,
     limit: usize,
 ) -> Result<Vec<u8>, CarrierCodecError> {
-    validate_identity(&control.identity)?;
+    validate_carrier_identity(&control.identity)?;
     validate_body(&control.body)?;
     let (kind, body) = encode_body(&control.body)?;
     let raw = RawControl {
@@ -46,7 +45,7 @@ pub fn decode_carrier_control(
     if bytes.len() > limit {
         return Err(CarrierCodecError::MessageTooLarge);
     }
-    validate_identity(expected)?;
+    validate_carrier_identity(expected)?;
     let raw: RawControl = serde_json::from_slice(bytes).map_err(|error| classify_shape(&error))?;
     if raw.control_version != 2 {
         return Err(CarrierCodecError::RestartRequired);
@@ -65,16 +64,6 @@ pub fn decode_carrier_control(
     })
 }
 
-pub fn validate_identity(identity: &CarrierIdentity) -> Result<(), CarrierCodecError> {
-    let invalid = identity.session_id.trim().is_empty()
-        || identity.producer_incarnation.trim().is_empty()
-        || identity.session_id.len() > 128
-        || identity.producer_incarnation.len() > 128;
-    (!invalid)
-        .then_some(())
-        .ok_or(CarrierCodecError::InvalidIdentity)
-}
-
 fn validate_body(body: &ControlBody) -> Result<(), CarrierCodecError> {
     match body {
         ControlBody::Handshake(value) if *value != exact_handshake() => {
@@ -88,7 +77,13 @@ fn validate_body(body: &ControlBody) -> Result<(), CarrierCodecError> {
                 || value.message_digest.len() != 64
                 || !matches!(
                     value.disposition.as_str(),
-                    "received" | "committed" | "retryable_rejection" | "permanent_rejection"
+                    "capacity_unavailable"
+                        | "received"
+                        | "committed"
+                        | "timed_out_or_superseded"
+                        | "stale_epoch"
+                        | "permanently_rejected"
+                        | "ambiguous_commit"
                 ) =>
         {
             Err(CarrierCodecError::InvalidShape)
@@ -119,16 +114,6 @@ pub const fn exact_handshake() -> HandshakeBody {
         policy_version: 2,
         canonicalization_version: 3,
         digest_version: 1,
-    }
-}
-pub const fn kind(body: &ControlBody) -> ControlEnvelope {
-    match body {
-        ControlBody::Handshake(_) => ControlEnvelope::Handshake,
-        ControlBody::Demand(_) => ControlEnvelope::Demand,
-        ControlBody::Disposition(_) => ControlEnvelope::Disposition,
-        ControlBody::CollectionIntent(_) => ControlEnvelope::CollectionIntent,
-        ControlBody::Health(_) => ControlEnvelope::Health,
-        ControlBody::Reset(_) => ControlEnvelope::Reset,
     }
 }
 fn encode_body(body: &ControlBody) -> Result<(&'static str, serde_json::Value), CarrierCodecError> {

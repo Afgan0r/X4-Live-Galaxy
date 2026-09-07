@@ -7,6 +7,9 @@ mod facade;
 mod ingress;
 mod listener;
 mod production;
+mod production_limits;
+mod production_runtime;
+mod production_runtime_message;
 mod production_startup;
 mod protocol;
 mod receiver_context;
@@ -18,6 +21,7 @@ pub use diagnostics::{DiagnosticError, OperationalHistory, readback_revision};
 pub use ingress::{BackpressureOutcome, BoundedIngress, FrameLimits, IngressSubmission};
 pub use listener::run_windows_listener;
 pub use production::{ProductionError, ProductionObservationSession};
+pub use production_limits::ProductionLimits;
 pub use production_startup::{StartupError, run_production};
 pub use protocol::{CapabilityDecision, RestartRequirement, SessionHello};
 pub use server::{

@@ -3,16 +3,16 @@
     reason = "invalid test setup must fail immediately"
 )]
 
+#[path = "production_startup/actual_pipe.rs"]
+mod actual_pipe;
 mod carrier_b_support;
+#[path = "production_startup/support.rs"]
+mod startup_support;
 
 use observation_application::{LifecycleContext, LifecycleResult};
 use observation_ingest::ReceiverDisposition;
+use startup_support::{TempDirectory, valid_limits};
 use x4_bridge::{DiagnosticError, StartupError, readback_revision, run_production};
-
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-
-static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
 
 #[test]
 fn offline_readback_returns_exact_durable_revision_and_receipt() {
@@ -46,11 +46,8 @@ fn offline_readback_returns_exact_durable_revision_and_receipt() {
         result,
         LifecycleResult::Disposition(ReceiverDisposition::Committed)
     );
-
-    let output = readback_revision(database.path(), "economy.stations", 1);
-
     assert_eq!(
-        output,
+        readback_revision(database.path(), "economy.stations", 1),
         Ok(String::from(
             "{\"section_key\":\"economy.stations\",\"section_revision\":1,\"records\":[],\"receipt\":{\"ordinal\":1,\"accepted_at\":101}}"
         ))
@@ -83,8 +80,7 @@ fn invalid_limits_and_unwritable_journal_block_startup() {
         ]),
         Err(StartupError::InvalidLimits)
     ));
-
-    std::fs::write(&limits, "max_records=16\n").expect("valid limits written");
+    std::fs::write(&limits, valid_limits()).expect("valid limits written");
     let occupied = directory.path().join("occupied");
     std::fs::write(&occupied, "not a directory").expect("occupied path written");
     assert!(matches!(
@@ -104,9 +100,14 @@ fn production_limits_require_exact_bounded_json_shape() {
     let limits = directory.path().join("limits.json");
     for invalid in [
         "max_records=16\n",
-        r#"{"max_records":16}"#,
-        r#"{"max_records":16,"max_content_bytes":4096,"max_message_bytes":2048,"max_pending":4,"reconnect_attempts":2,"reconnect_delay_millis":5,"message_expiry_millis":1000,"control_message_bytes":512,"extra":1}"#,
-        r#"{"max_records":16,"max_records":17,"max_content_bytes":4096,"max_message_bytes":2048,"max_pending":4,"reconnect_attempts":2,"reconnect_delay_millis":5,"message_expiry_millis":1000,"control_message_bytes":512}"#,
+        r#"{"complete_message_bytes":8192}"#,
+        r#"{"complete_message_bytes":8192,"complete_message_bytes":8192}"#,
+        &valid_limits().replacen('}', ",\"extra\":1}", 1),
+        &valid_limits().replacen(
+            "\"max_pending_bytes\":8192",
+            "\"max_pending_bytes\":4096",
+            1,
+        ),
     ] {
         std::fs::write(&limits, invalid).expect("invalid limits written");
         assert!(matches!(
@@ -118,51 +119,6 @@ fn production_limits_require_exact_bounded_json_shape() {
             ]),
             Err(StartupError::InvalidLimits)
         ));
-    }
-}
-
-#[test]
-fn accepted_journal_precedes_durable_startup_and_waiting_state() {
-    let directory = TempDirectory::new("startup-ready");
-    let limits = directory.path().join("limits.conf");
-    std::fs::write(&limits, "max_records=16\n").expect("limits written");
-    assert!(matches!(
-        run_production([
-            "--data-dir".into(),
-            directory.path().as_os_str().into(),
-            "--limits-file".into(),
-            limits.as_os_str().into(),
-        ]),
-        Ok(None)
-    ));
-    let history = std::fs::read_to_string(directory.path().join("operational-history.jsonl"))
-        .expect("history readable");
-    assert!(history.contains("journal-accepted"));
-    assert!(history.contains("peer-absent"));
-    assert!(directory.path().join("observations.sqlite3").is_file());
-}
-
-struct TempDirectory(PathBuf);
-
-impl TempDirectory {
-    fn new(label: &str) -> Self {
-        let ordinal = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "live-galaxy-production-{label}-{}-{ordinal}",
-            std::process::id()
-        ));
-        std::fs::create_dir_all(&path).expect("temporary directory");
-        Self(path)
-    }
-
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for TempDirectory {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

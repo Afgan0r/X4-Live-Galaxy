@@ -36,12 +36,10 @@ pub use batch::{
 pub use batch_budget::{AggregateUsage, CandidateUsage};
 pub use candidate_limits::{AggregateLimits, CandidateLimits, GenerationLimits};
 pub use carrier_control::{decode_carrier_control, encode_carrier_control};
-pub use carrier_control::{
-    kind as carrier_control_kind, validate_identity as validate_carrier_identity,
-};
 pub use carrier_control_types::{
     CarrierCodecError, CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody,
-    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody,
+    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody, carrier_control_kind,
+    complete_message_digest, decode_carrier_bootstrap, validate_carrier_identity,
 };
 pub use completed_scope::CompletedScope;
 pub use completion_types::{

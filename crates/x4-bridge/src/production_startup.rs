@@ -1,13 +1,13 @@
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use observation_application::LifecycleLimits;
 use observation_ingest::GenerationLimits;
 use observation_persistence::PublicationLimits;
 
 use crate::{
-    DiagnosticError, OperationalHistory, ProductionError, ProductionObservationSession,
-    readback_revision,
+    DiagnosticError, OperationalHistory, ProductionError, ProductionLimits,
+    ProductionObservationSession, readback_revision,
 };
 
 #[derive(Debug)]
@@ -41,20 +41,28 @@ pub fn run_production(
             .map_err(StartupError::Diagnostic);
     }
     let limits_file = parsed.limits_file.ok_or(StartupError::MissingArgument)?;
-    validate_limits(&limits_file)?;
+    let limits = ProductionLimits::read(&limits_file).ok_or(StartupError::InvalidLimits)?;
     let mut history =
         OperationalHistory::open(&parsed.data_dir).map_err(StartupError::Diagnostic)?;
-    let _session = ProductionObservationSession::open(
+    let mut session = ProductionObservationSession::open(
         &parsed.data_dir.join("observations.sqlite3"),
-        default_generation_limits()?,
-        PublicationLimits::new(4_096, 16 * 1_024 * 1_024).ok_or(StartupError::InvalidLimits)?,
-        LifecycleLimits::new(16 * 1_024 * 1_024, 32 * 1_024 * 1_024, 5_000, 8)
-            .ok_or(StartupError::InvalidLimits)?,
-        64,
+        generation_limits(&limits)?,
+        PublicationLimits::new(
+            limits.max_publication_records,
+            limits.max_publication_content_bytes,
+        )
+        .ok_or(StartupError::InvalidLimits)?,
+        LifecycleLimits::new(
+            limits.max_pending_bytes,
+            limits.max_total_bytes,
+            u64::try_from(limits.max_lifecycle_work).map_err(|_| StartupError::InvalidLimits)?,
+            limits.max_delivery_attempts,
+        )
+        .ok_or(StartupError::InvalidLimits)?,
+        limits.max_blockers,
     )
     .map_err(StartupError::Production)?;
-    let _ = history.record("waiting", "peer-absent");
-    Ok(None)
+    crate::production_runtime::run(&limits, &mut history, &mut session)
 }
 
 struct StartupArguments {
@@ -112,36 +120,24 @@ fn revision(value: &OsString) -> Result<u64, StartupError> {
         .map_err(|_| StartupError::UnknownArgument)
 }
 
-fn validate_limits(path: &Path) -> Result<(), StartupError> {
-    let contents = std::fs::read_to_string(path).map_err(|_| StartupError::InvalidLimits)?;
-    if contents.is_empty() || contents.len() > 4_096 {
-        return Err(StartupError::InvalidLimits);
-    }
-    for line in contents.lines() {
-        let (name, value) = line.split_once('=').ok_or(StartupError::InvalidLimits)?;
-        if !matches!(
-            name,
-            "max_records" | "max_content_bytes" | "max_message_bytes" | "max_pending"
-        ) || value.parse::<usize>().ok().is_none_or(|value| value == 0)
-        {
-            return Err(StartupError::InvalidLimits);
-        }
-    }
-    Ok(())
-}
-
-fn default_generation_limits() -> Result<GenerationLimits, StartupError> {
+fn generation_limits(limits: &ProductionLimits) -> Result<GenerationLimits, StartupError> {
     let candidate = observation_ingest::CandidateLimits::new(
-        16 * 1_024 * 1_024,
-        4_096,
-        4_096,
-        8_192,
-        5_000,
-        64,
+        limits.max_candidate_raw_bytes,
+        limits.max_candidate_records,
+        limits.max_candidate_batches,
+        limits.max_candidate_work,
+        u64::try_from(limits.max_message_age_millis).map_err(|_| StartupError::InvalidLimits)?,
+        u64::try_from(limits.max_message_inactivity_millis)
+            .map_err(|_| StartupError::InvalidLimits)?,
     )
     .ok_or(StartupError::InvalidLimits)?;
-    let aggregate =
-        observation_ingest::AggregateLimits::new(128, 64 * 1_024 * 1_024, 16_384, 16_384, 32_768)
-            .ok_or(StartupError::InvalidLimits)?;
+    let aggregate = observation_ingest::AggregateLimits::new(
+        limits.max_candidates,
+        limits.max_aggregate_bytes,
+        limits.max_aggregate_records,
+        limits.max_aggregate_batches,
+        limits.max_aggregate_work,
+    )
+    .ok_or(StartupError::InvalidLimits)?;
     Ok(GenerationLimits::bounded(candidate, aggregate))
 }
