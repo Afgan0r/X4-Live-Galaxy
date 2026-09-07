@@ -5,6 +5,7 @@ mod batch_budget;
 mod batch_canonical;
 mod candidate_limits;
 mod carrier_control;
+mod carrier_control_types;
 mod completed_scope;
 mod completion;
 mod completion_digest;
@@ -34,11 +35,13 @@ pub use batch::{
 };
 pub use batch_budget::{AggregateUsage, CandidateUsage};
 pub use candidate_limits::{AggregateLimits, CandidateLimits, GenerationLimits};
+pub use carrier_control::{decode_carrier_control, encode_carrier_control};
 pub use carrier_control::{
+    kind as carrier_control_kind, validate_identity as validate_carrier_identity,
+};
+pub use carrier_control_types::{
     CarrierCodecError, CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody,
-    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody, decode_carrier_control,
-    encode_carrier_control, kind as carrier_control_kind,
-    validate_identity as validate_carrier_identity,
+    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody,
 };
 pub use completed_scope::CompletedScope;
 pub use completion_types::{
@@ -108,7 +111,6 @@ pub fn inspect_frame(payload: &str) -> Result<FrameHeader, AdmissionError> {
         wire::WireFrame::CompleteMarker(frame) => frame_header("complete_marker", frame),
     }
 }
-
 trait HeaderFields {
     fn into_fields(self) -> (String, u64, Option<u64>, Option<u64>);
 }
@@ -127,7 +129,6 @@ header_fields!(
     wire::WireObservation,
     wire::WireCompleteMarker
 );
-
 fn frame_header(
     kind: &'static str,
     frame: impl HeaderFields,
