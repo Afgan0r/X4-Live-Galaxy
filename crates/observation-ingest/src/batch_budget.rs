@@ -12,23 +12,15 @@ use super::batch::{
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CandidateUsage {
     pub raw_bytes: usize,
-    pub decoded_bytes: usize,
     pub records: usize,
     pub batches: usize,
     pub work: usize,
 }
 
 impl CandidateUsage {
-    pub(crate) fn charged(
-        self,
-        raw: usize,
-        decoded: usize,
-        records: usize,
-        work: usize,
-    ) -> Option<Self> {
+    pub(crate) fn charged(self, raw: usize, records: usize, work: usize) -> Option<Self> {
         Some(Self {
             raw_bytes: self.raw_bytes.checked_add(raw)?,
-            decoded_bytes: self.decoded_bytes.checked_add(decoded)?,
             records: self.records.checked_add(records)?,
             batches: self.batches.checked_add(1)?,
             work: self.work.checked_add(work)?,
@@ -36,7 +28,6 @@ impl CandidateUsage {
     }
     pub(crate) const fn within(self, limits: CandidateLimits) -> bool {
         self.raw_bytes <= limits.raw_bytes.get()
-            && self.decoded_bytes <= limits.decoded_bytes.get()
             && self.records <= limits.records.get()
             && self.batches <= limits.batches.get()
             && self.work <= limits.work.get()
@@ -48,7 +39,6 @@ impl CandidateUsage {
 pub struct AggregateUsage {
     pub candidate_count: usize,
     pub raw_bytes: usize,
-    pub decoded_bytes: usize,
     pub records: usize,
     pub batches: usize,
     pub work: usize,
@@ -58,7 +48,6 @@ impl AggregateUsage {
     pub(crate) const ZERO: Self = Self {
         candidate_count: 0,
         raw_bytes: 0,
-        decoded_bytes: 0,
         records: 0,
         batches: 0,
         work: 0,
@@ -74,7 +63,6 @@ impl AggregateUsage {
         Some(Self {
             candidate_count: self.candidate_count,
             raw_bytes: self.raw_bytes.checked_add(charge.raw_bytes)?,
-            decoded_bytes: self.decoded_bytes.checked_add(charge.decoded_bytes)?,
             records: self.records.checked_add(charge.records)?,
             batches: self.batches.checked_add(charge.batches)?,
             work: self.work.checked_add(charge.work)?,
@@ -84,7 +72,6 @@ impl AggregateUsage {
         Some(Self {
             candidate_count: self.candidate_count.checked_sub(1)?,
             raw_bytes: self.raw_bytes.checked_sub(charge.raw_bytes)?,
-            decoded_bytes: self.decoded_bytes.checked_sub(charge.decoded_bytes)?,
             records: self.records.checked_sub(charge.records)?,
             batches: self.batches.checked_sub(charge.batches)?,
             work: self.work.checked_sub(charge.work)?,
@@ -93,7 +80,6 @@ impl AggregateUsage {
     pub(crate) const fn within(self, limits: AggregateLimits) -> bool {
         self.candidate_count <= limits.candidates.get()
             && self.raw_bytes <= limits.raw_bytes.get()
-            && self.decoded_bytes <= limits.decoded_bytes.get()
             && self.records <= limits.records.get()
             && self.batches <= limits.batches.get()
             && self.work <= limits.work.get()

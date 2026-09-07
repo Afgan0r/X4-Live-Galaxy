@@ -33,8 +33,8 @@ pub fn database(label: &str) -> TempDatabase {
 
 pub fn generation_limits() -> GenerationLimits {
     GenerationLimits::bounded(
-        CandidateLimits::new(4_096, 8_192, 16, 16, 32, 100, 10).expect("candidate limits"),
-        AggregateLimits::new(4, 16_384, 32_768, 64, 64, 128).expect("aggregate limits"),
+        CandidateLimits::new(4_096, 16, 16, 32, 100, 10).expect("candidate limits"),
+        AggregateLimits::new(4, 16_384, 64, 64, 128).expect("aggregate limits"),
     )
 }
 
@@ -81,7 +81,7 @@ pub fn input(
 
 pub fn start_bytes(section: &str) -> Vec<u8> {
     format!(
-        "{{\"type\":\"section_start\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"expected_records\":0}}"
+        "{{\"type\":\"section_start\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"expected_records\":0,\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
     )
     .into_bytes()
 }
@@ -96,7 +96,6 @@ pub fn completion_bytes(section: &str) -> Vec<u8> {
         batch_count: 0,
         record_count: 0,
         raw_bytes: 0,
-        decoded_bytes: 0,
         ordered_batch_manifest_digest: [0; 32],
         canonical_content_digest: [0; 32],
         schema_version: ObservationSchemaVersion::new(1).expect("schema"),
@@ -104,13 +103,14 @@ pub fn completion_bytes(section: &str) -> Vec<u8> {
         canonicalization_version: CanonicalizationVersion::new(3).expect("canonicalization"),
         digest_version: DigestAlgorithmVersion::new(1).expect("digest"),
         coverage: CompletionCoverage::KnownEmpty,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     let bound = observation_ingest::bind_completion_certificate(envelope, &[], versions())
         .expect("completion binds");
     let manifest = digest_hex(bound.ordered_batch_manifest_digest);
     let content = digest_hex(bound.canonical_content_digest);
     format!(
-        "{{\"type\":\"section_completion\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_count\":0,\"record_count\":0,\"raw_bytes\":0,\"decoded_bytes\":0,\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"known_empty\"}}"
+        "{{\"type\":\"section_completion\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_count\":0,\"record_count\":0,\"raw_bytes\":0,\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"known_empty\",\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
     )
     .into_bytes()
 }

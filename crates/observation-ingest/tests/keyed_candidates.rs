@@ -26,6 +26,7 @@ fn start(section: &str, revision: u64, expected: usize) -> SectionStartEnvelope 
         section_key: id(section, SectionKey::new),
         section_revision: SectionRevisionId::new(revision).expect("revision is positive"),
         expected_records: expected,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     }
 }
 
@@ -50,8 +51,8 @@ fn batch(section: &str, revision: u64, identity: &str, version: u64) -> Immutabl
 
 fn limits() -> GenerationLimits {
     GenerationLimits::bounded(
-        CandidateLimits::new(4_096, 8_192, 2, 2, 4, 10, 5).expect("limits are non-zero"),
-        AggregateLimits::new(2, 8_192, 16_384, 4, 4, 8).expect("limits are non-zero"),
+        CandidateLimits::new(4_096, 2, 2, 4, 10, 5).expect("limits are non-zero"),
+        AggregateLimits::new(2, 8_192, 4, 4, 8).expect("limits are non-zero"),
     )
 }
 

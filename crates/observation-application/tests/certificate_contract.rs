@@ -16,7 +16,7 @@ fn wire_completion_certificate_fields_are_sender_bound() {
         ("\"batch_count\":1", "\"batch_count\":2"),
         ("\"record_count\":1", "\"record_count\":2"),
         ("\"raw_bytes\":", "\"raw_bytes\":"),
-        ("\"decoded_bytes\":", "\"decoded_bytes\":"),
+        ("\"stable_identity\":false", "\"stable_identity\":true"),
         ("\"schema_version\":1", "\"schema_version\":9"),
         ("\"policy_version\":2", "\"policy_version\":9"),
         (
@@ -37,7 +37,7 @@ fn wire_completion_certificate_fields_are_sender_bound() {
         submit_start_and_batch(&mut lifecycle, "ships", &records);
         let valid = String::from_utf8(completion_bytes("ships", &records, "complete"))
             .expect("fixture JSON is UTF-8");
-        let changed = if matches!(index, 2 | 3) {
+        let changed = if index == 2 {
             replace_number(&valid, from, 9)
         } else {
             valid.replacen(from, to, 1)

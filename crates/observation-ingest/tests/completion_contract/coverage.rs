@@ -4,6 +4,7 @@ const fn matching_terminal(coverage: SectionCoverage) -> CompletionCoverage {
     match coverage {
         SectionCoverage::Complete => CompletionCoverage::Complete,
         SectionCoverage::KnownEmpty => CompletionCoverage::KnownEmpty,
+        SectionCoverage::PointMeasurement => CompletionCoverage::PointMeasurement,
         SectionCoverage::Partial => CompletionCoverage::Partial,
         SectionCoverage::Unknown => CompletionCoverage::Unknown,
         SectionCoverage::Unsupported => CompletionCoverage::Unsupported,
@@ -40,6 +41,7 @@ fn terminal_coverage_must_exactly_match_frozen_source_evidence() {
     let coverages = [
         SectionCoverage::Complete,
         SectionCoverage::KnownEmpty,
+        SectionCoverage::PointMeasurement,
         SectionCoverage::Partial,
         SectionCoverage::Unknown,
         SectionCoverage::Unsupported,

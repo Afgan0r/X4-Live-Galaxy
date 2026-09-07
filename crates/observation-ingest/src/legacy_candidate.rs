@@ -26,6 +26,7 @@ pub fn build_legacy_candidate(
             section_key: key.clone(),
             section_revision,
             expected_records: 0,
+            sender_evidence: observation_domain::SenderEvidence::legacy_default(),
         },
         usage: CandidateUsage::default(),
         started_at: receipt,

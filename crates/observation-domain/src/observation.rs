@@ -2,7 +2,7 @@ use crate::{
     BatchId, CanonicalizationVersion, CompletionCoverage, ControlEnvelope, DigestAlgorithmVersion,
     EntityId, ObservationPolicyVersion, ObservationSchemaVersion, ObservationSource,
     ObservationTime, ObservationVersion, ProducerIncarnationId, RecordId, SectionKey,
-    SectionRevisionId, SourceScopeId, TransportEpoch,
+    SectionRevisionId, SenderEvidence, SourceScopeId, TransportEpoch,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -151,7 +151,8 @@ envelope_struct!(SectionStartEnvelope {
     transport_epoch: TransportEpoch,
     section_key: SectionKey,
     section_revision: SectionRevisionId,
-    expected_records: usize
+    expected_records: usize,
+    sender_evidence: SenderEvidence
 });
 envelope_struct!(EnvelopeRecord {
     record_id: RecordId,
@@ -169,14 +170,14 @@ envelope_struct!(SectionCompletionEnvelope {
     batch_count: usize,
     record_count: usize,
     raw_bytes: usize,
-    decoded_bytes: usize,
     ordered_batch_manifest_digest: [u8; 32],
     canonical_content_digest: [u8; 32],
     schema_version: ObservationSchemaVersion,
     policy_version: ObservationPolicyVersion,
     canonicalization_version: CanonicalizationVersion,
     digest_version: DigestAlgorithmVersion,
-    coverage: CompletionCoverage
+    coverage: CompletionCoverage,
+    sender_evidence: SenderEvidence
 });
 
 #[derive(Clone, Debug, Eq, PartialEq)]

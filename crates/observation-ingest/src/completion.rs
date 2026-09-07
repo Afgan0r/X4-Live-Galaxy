@@ -51,7 +51,6 @@ impl GenerationStager {
             batch_count: candidate.batches.len(),
             record_count: records.len(),
             raw_bytes: candidate.usage.raw_bytes,
-            decoded_bytes: candidate.usage.decoded_bytes,
             ordered_batch_manifest_digest: manifest,
             canonical_content_digest: content_digest(&records),
             versions: context.versions,
@@ -132,16 +131,15 @@ fn completion_is_exact(
         && candidate.start.producer_incarnation == certificate.envelope.producer_incarnation
         && candidate.start.transport_epoch == certificate.envelope.transport_epoch
         && candidate.start.section_revision == certificate.envelope.section_revision
+        && candidate.start.sender_evidence == certificate.envelope.sender_evidence
         && candidate.start.expected_records == records.len()
         && certificate.envelope.record_count == records.len()
         && certificate.batch_count == candidate.batches.len()
         && certificate.record_count == records.len()
         && certificate.raw_bytes == candidate.usage.raw_bytes
-        && certificate.decoded_bytes == candidate.usage.decoded_bytes
         && certificate.versions == context.versions
         && certificate.envelope.batch_count == certificate.batch_count
         && certificate.envelope.raw_bytes == certificate.raw_bytes
-        && certificate.envelope.decoded_bytes == certificate.decoded_bytes
         && certificate.envelope.ordered_batch_manifest_digest
             == certificate.ordered_batch_manifest_digest
         && certificate.envelope.canonical_content_digest == certificate.canonical_content_digest
@@ -149,6 +147,14 @@ fn completion_is_exact(
         && certificate.envelope.policy_version == certificate.versions.policy
         && certificate.envelope.canonicalization_version == certificate.versions.canonicalization
         && certificate.envelope.digest_version == certificate.versions.digest
+        && certificate.envelope.sender_evidence.schema_version == certificate.versions.schema
+        && certificate.envelope.sender_evidence.policy_version == certificate.versions.policy
+        && certificate
+            .envelope
+            .sender_evidence
+            .canonicalization_version
+            == certificate.versions.canonicalization
+        && certificate.envelope.sender_evidence.digest_version == certificate.versions.digest
         && coverage_is_consistent(context, certificate.envelope.coverage, records.len())
         && certificate.ordered_batch_manifest_digest == candidate_material(candidate).0
         && certificate.canonical_content_digest == content_digest(records)
@@ -162,6 +168,7 @@ fn coverage_is_consistent(
     let expected = match context.state().coverage() {
         SectionCoverage::Complete => CompletionCoverage::Complete,
         SectionCoverage::KnownEmpty => CompletionCoverage::KnownEmpty,
+        SectionCoverage::PointMeasurement => CompletionCoverage::PointMeasurement,
         SectionCoverage::Partial => CompletionCoverage::Partial,
         SectionCoverage::Unknown => CompletionCoverage::Unknown,
         SectionCoverage::Unsupported => CompletionCoverage::Unsupported,

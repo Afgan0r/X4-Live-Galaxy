@@ -4,6 +4,7 @@ mod batch;
 mod batch_budget;
 mod batch_canonical;
 mod candidate_limits;
+mod carrier_control;
 mod completed_scope;
 mod completion;
 mod completion_digest;
@@ -21,16 +22,24 @@ mod runtime_facts;
 mod scheduler;
 mod scheduler_budget;
 mod scheduler_queue;
+mod sender_evidence;
 mod snapshot;
 mod validated_revision;
 mod wire;
 mod wire_decode;
+mod wire_encode;
 pub use batch::{
     MAX_BATCH_BYTES, MAX_BATCH_FRAMES, MAX_BATCH_MARKERS, MAX_BATCH_OBSERVATIONS, MAX_BATCH_SCOPES,
     admit_batch, admit_batch_with_receipt_clock, validate_batch,
 };
 pub use batch_budget::{AggregateUsage, CandidateUsage};
 pub use candidate_limits::{AggregateLimits, CandidateLimits, GenerationLimits};
+pub use carrier_control::{
+    CarrierCodecError, CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody,
+    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody, decode_carrier_control,
+    encode_carrier_control, kind as carrier_control_kind,
+    validate_identity as validate_carrier_identity,
+};
 pub use completed_scope::CompletedScope;
 pub use completion_types::{
     CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome, ContractVersions,
@@ -68,12 +77,14 @@ pub use scheduler_queue::{
     CollectionClass, CollectionIntent, CollectionIntentId, CompletionDisposition,
     SchedulerAdmission, SchedulerSafetyLimits, WorkKind,
 };
+pub use sender_evidence::decode_sender_evidence;
 pub use snapshot::ProjectionSnapshot;
 pub use validated_revision::{
     DurableRevisionError, DurableRevisionParts, HydratedSectionRevision, ValidatedSectionRevision,
 };
 use wire::TracerObservation;
 pub use wire::decode_complete_message;
+pub use wire_encode::encode_complete_message;
 const MAX_TRACER_PAYLOAD_BYTES: usize = 512;
 pub fn inspect_frame(payload: &str) -> Result<FrameHeader, AdmissionError> {
     if payload.len() > 2_048 {

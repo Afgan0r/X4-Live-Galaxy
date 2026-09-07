@@ -101,14 +101,13 @@ impl GenerationStager {
         }
         let delta = CandidateUsage {
             raw_bytes: payload.len(),
-            decoded_bytes: payload.len(),
             records: 0,
             batches: 1,
             work: 1,
         };
         let usage = candidate
             .usage
-            .charged(delta.raw_bytes, delta.decoded_bytes, 0, 1)
+            .charged(delta.raw_bytes, 0, 1)
             .filter(|usage| {
                 usage.raw_bytes <= self.limits.max_staged_bytes
                     && usage.work <= self.limits.max_work_units

@@ -73,10 +73,10 @@ pub const fn current() -> CompletionCurrent {
 
 #[must_use]
 pub fn stager() -> GenerationStager {
-    let candidate = CandidateLimits::new(4_096, 8_192, 16, 16, 32, 100, 10)
-        .expect("candidate limits are non-zero");
-    let aggregate = AggregateLimits::new(4, 16_384, 32_768, 64, 64, 128)
-        .expect("aggregate limits are non-zero");
+    let candidate =
+        CandidateLimits::new(4_096, 16, 16, 32, 100, 10).expect("candidate limits are non-zero");
+    let aggregate =
+        AggregateLimits::new(4, 16_384, 64, 64, 128).expect("aggregate limits are non-zero");
     GenerationStager::new(
         AcceptedProjection::empty(),
         GenerationLimits::bounded(candidate, aggregate),
@@ -95,7 +95,7 @@ pub fn repository(label: &str) -> (TempDatabase, SqliteObservationRepository) {
 #[must_use]
 pub fn start_bytes(section: &str, expected: usize) -> Vec<u8> {
     format!(
-        "{{\"type\":\"section_start\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"expected_records\":{expected}}}"
+        "{{\"type\":\"section_start\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"expected_records\":{expected},\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
     )
     .into_bytes()
 }
@@ -112,7 +112,7 @@ pub fn batch_bytes(section: &str, records: &[(&str, &str)]) -> Vec<u8> {
         .collect::<Vec<_>>()
         .join(",");
     format!(
-        "{{\"type\":\"immutable_batch\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_id\":\"inner:{section}\",\"section_ordinal\":1,\"records\":[{records}],\"optional_detail\":null}}"
+        "{{\"type\":\"immutable_batch\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_id\":\"inner:{section}\",\"section_ordinal\":1,\"records\":[{records}],\"optional_detail\":null}}"
     )
     .into_bytes()
 }
@@ -138,7 +138,6 @@ pub fn completion_bytes(section: &str, records: &[(&str, &str)], coverage: &str)
         batch_count: 0,
         record_count: records.len(),
         raw_bytes: 0,
-        decoded_bytes: 0,
         ordered_batch_manifest_digest: [0; 32],
         canonical_content_digest: [0; 32],
         schema_version: ObservationSchemaVersion::new(1).expect("version is non-zero"),
@@ -150,6 +149,7 @@ pub fn completion_bytes(section: &str, records: &[(&str, &str)], coverage: &str)
             "known_empty" => CompletionCoverage::KnownEmpty,
             _ => unreachable!("fixture coverage is supported"),
         },
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     let envelope = observation_ingest::bind_completion_certificate(
         envelope,
@@ -165,8 +165,8 @@ pub fn completion_bytes(section: &str, records: &[(&str, &str)], coverage: &str)
     let manifest = digest_hex(envelope.ordered_batch_manifest_digest);
     let content = digest_hex(envelope.canonical_content_digest);
     format!(
-        "{{\"type\":\"section_completion\",\"contract_version\":1,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_count\":{},\"record_count\":{},\"raw_bytes\":{},\"decoded_bytes\":{},\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"{coverage}\"}}",
-        envelope.batch_count, envelope.record_count, envelope.raw_bytes, envelope.decoded_bytes
+        "{{\"type\":\"section_completion\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_count\":{},\"record_count\":{},\"raw_bytes\":{},\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"{coverage}\",\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}",
+        envelope.batch_count, envelope.record_count, envelope.raw_bytes
     )
     .into_bytes()
 }

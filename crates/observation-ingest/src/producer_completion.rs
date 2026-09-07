@@ -12,7 +12,6 @@ pub fn bind_completion_certificate(
     envelope.batch_count = material.batch_count;
     envelope.record_count = material.record_count;
     envelope.raw_bytes = material.raw_bytes;
-    envelope.decoded_bytes = material.decoded_bytes;
     envelope.ordered_batch_manifest_digest = material.manifest;
     envelope.canonical_content_digest = material.content;
     envelope.schema_version = versions.schema;

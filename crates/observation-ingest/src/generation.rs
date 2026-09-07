@@ -134,7 +134,6 @@ impl GenerationStager {
         };
         let delta = CandidateUsage {
             raw_bytes: canonical.bytes.len(),
-            decoded_bytes: canonical.decoded_bytes,
             records: batch.records.len(),
             batches: 1,
             work,
@@ -175,12 +174,10 @@ impl GenerationStager {
         candidate: &Candidate,
         delta: CandidateUsage,
     ) -> Option<(CandidateUsage, AggregateUsage)> {
-        let candidate_usage = candidate.usage.charged(
-            delta.raw_bytes,
-            delta.decoded_bytes,
-            delta.records,
-            delta.work,
-        )?;
+        let candidate_usage =
+            candidate
+                .usage
+                .charged(delta.raw_bytes, delta.records, delta.work)?;
         let aggregate = self.aggregate.add(delta)?;
         candidate_usage
             .within(self.limits.candidate)

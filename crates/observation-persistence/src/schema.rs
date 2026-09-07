@@ -109,6 +109,7 @@ pub const fn coverage_name(coverage: CompletionCoverage) -> &'static str {
         CompletionCoverage::Partial => "partial",
         CompletionCoverage::Unknown => "unknown",
         CompletionCoverage::Unsupported => "unsupported",
+        CompletionCoverage::PointMeasurement => "point_measurement",
     }
 }
 
@@ -119,6 +120,7 @@ pub fn parse_coverage(value: &str) -> Result<CompletionCoverage, RepositoryError
         "partial" => Ok(CompletionCoverage::Partial),
         "unknown" => Ok(CompletionCoverage::Unknown),
         "unsupported" => Ok(CompletionCoverage::Unsupported),
+        "point_measurement" => Ok(CompletionCoverage::PointMeasurement),
         _ => Err(RepositoryError::Corrupt(RepositoryDiagnostic {
             code: "coverage-invalid",
         })),

@@ -30,13 +30,14 @@ fn start() -> SectionStartEnvelope {
         section_key: id("ships", SectionKey::new),
         section_revision: revision(),
         expected_records: 0,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     }
 }
 
 fn limits() -> GenerationLimits {
     GenerationLimits::bounded(
-        CandidateLimits::new(64, 64, 1, 1, 1, 100, 10).expect("limits are non-zero"),
-        AggregateLimits::new(1, 64, 64, 1, 1, 1).expect("limits are non-zero"),
+        CandidateLimits::new(64, 1, 1, 1, 100, 10).expect("limits are non-zero"),
+        AggregateLimits::new(1, 64, 1, 1, 1).expect("limits are non-zero"),
     )
 }
 
@@ -129,7 +130,6 @@ fn stale_completion_session_cannot_validate_current_candidate() {
         batch_count: 0,
         record_count: 0,
         raw_bytes: 0,
-        decoded_bytes: 0,
         ordered_batch_manifest_digest: [0; 32],
         canonical_content_digest: [0; 32],
         schema_version: ObservationSchemaVersion::new(1).expect("version is positive"),
@@ -137,6 +137,7 @@ fn stale_completion_session_cannot_validate_current_candidate() {
         canonicalization_version: CanonicalizationVersion::new(1).expect("version is positive"),
         digest_version: DigestAlgorithmVersion::new(1).expect("version is positive"),
         coverage: CompletionCoverage::Complete,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     let envelope =
         observation_ingest::bind_completion_certificate(envelope, &[], context().versions())

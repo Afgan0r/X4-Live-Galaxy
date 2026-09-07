@@ -133,7 +133,6 @@ fn validate_limits(path: &Path) -> Result<(), StartupError> {
 fn default_generation_limits() -> Result<GenerationLimits, StartupError> {
     let candidate = observation_ingest::CandidateLimits::new(
         16 * 1_024 * 1_024,
-        32 * 1_024 * 1_024,
         4_096,
         4_096,
         8_192,
@@ -141,14 +140,8 @@ fn default_generation_limits() -> Result<GenerationLimits, StartupError> {
         64,
     )
     .ok_or(StartupError::InvalidLimits)?;
-    let aggregate = observation_ingest::AggregateLimits::new(
-        128,
-        64 * 1_024 * 1_024,
-        128 * 1_024 * 1_024,
-        16_384,
-        16_384,
-        32_768,
-    )
-    .ok_or(StartupError::InvalidLimits)?;
+    let aggregate =
+        observation_ingest::AggregateLimits::new(128, 64 * 1_024 * 1_024, 16_384, 16_384, 32_768)
+            .ok_or(StartupError::InvalidLimits)?;
     Ok(GenerationLimits::bounded(candidate, aggregate))
 }

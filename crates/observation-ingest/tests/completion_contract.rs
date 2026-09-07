@@ -39,8 +39,8 @@ const fn versions() -> ContractVersions {
 }
 fn limits() -> GenerationLimits {
     GenerationLimits::bounded(
-        CandidateLimits::new(2_048, 4_096, 4, 4, 8, 100, 10).expect("limits are non-zero"),
-        AggregateLimits::new(4, 8_192, 16_384, 16, 16, 32).expect("limits are non-zero"),
+        CandidateLimits::new(2_048, 4, 4, 8, 100, 10).expect("limits are non-zero"),
+        AggregateLimits::new(4, 8_192, 16, 16, 32).expect("limits are non-zero"),
     )
 }
 fn start() -> SectionStartEnvelope {
@@ -51,6 +51,7 @@ fn start() -> SectionStartEnvelope {
         section_key: key("ships"),
         section_revision: revision(7),
         expected_records: 2,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     }
 }
 fn context() -> CandidateContext {
@@ -97,7 +98,6 @@ fn completion() -> SectionCompletionEnvelope {
         batch_count: 0,
         record_count: 2,
         raw_bytes: 0,
-        decoded_bytes: 0,
         ordered_batch_manifest_digest: [0; 32],
         canonical_content_digest: [0; 32],
         schema_version: ObservationSchemaVersion::new(1).expect("version is positive"),
@@ -105,6 +105,7 @@ fn completion() -> SectionCompletionEnvelope {
         canonicalization_version: CanonicalizationVersion::new(3).expect("version is positive"),
         digest_version: DigestAlgorithmVersion::new(1).expect("version is positive"),
         coverage: CompletionCoverage::Complete,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     }
 }
 fn current() -> CompletionCurrent {

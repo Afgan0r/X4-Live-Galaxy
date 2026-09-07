@@ -7,6 +7,7 @@ mod observation;
 mod reconciliation;
 mod section;
 mod section_state;
+mod sender_evidence;
 mod session;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
@@ -15,7 +16,7 @@ pub use identity::{
     DigestAlgorithmVersion, EntityId, EnvelopeDecodeError, EventId, FrameHeader,
     ObservationPolicyVersion, ObservationSchemaVersion, ObservationSource, ObservationTime,
     ObservationVersion, ProducerIncarnationId, RecordId, SectionKey, SectionRevisionId,
-    SourceScopeId, TransportEpoch,
+    SourceEpochId, SourceScopeId, TransportEpoch,
 };
 pub use observation::{
     CompleteMessage, DuplicateDecision, EnvelopeRecord, ImmutableBatchEnvelope, ObservationRecord,
@@ -29,5 +30,8 @@ pub use section::{CompleteMarker, SectionDescriptor, quality_for_empty_section};
 pub use section_state::{
     CaptureWindow, SectionAvailability, SectionCoverage, SectionFreshness, SectionQuality,
     SectionState,
+};
+pub use sender_evidence::{
+    CaptureClock, SenderEvidence, SourceBoundary, SourceConsistency, SourceEpochStatus,
 };
 pub use session::SourceSessionIdentity;

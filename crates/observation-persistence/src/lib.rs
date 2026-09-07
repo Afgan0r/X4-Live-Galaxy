@@ -85,8 +85,8 @@ pub(crate) mod test_support {
             true,
         );
         let limits = GenerationLimits::bounded(
-            CandidateLimits::new(128, 256, 1, 1, 1, 100, 10).expect("limits are non-zero"),
-            AggregateLimits::new(1, 128, 256, 1, 1, 1).expect("limits are non-zero"),
+            CandidateLimits::new(128, 1, 1, 1, 100, 10).expect("limits are non-zero"),
+            AggregateLimits::new(1, 128, 1, 1, 1).expect("limits are non-zero"),
         );
         let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits);
         let start = SectionStartEnvelope {
@@ -97,6 +97,7 @@ pub(crate) mod test_support {
             section_key: section_key.clone(),
             section_revision: revision(value),
             expected_records: 0,
+            sender_evidence: observation_domain::SenderEvidence::legacy_default(),
         };
         assert_eq!(
             stager.start_section_with_context(start, context, 1),
@@ -112,7 +113,6 @@ pub(crate) mod test_support {
             batch_count: 0,
             record_count: 0,
             raw_bytes: 0,
-            decoded_bytes: 0,
             ordered_batch_manifest_digest: [0; 32],
             canonical_content_digest: [0; 32],
             schema_version: ObservationSchemaVersion::new(1).expect("version is non-zero"),
@@ -120,6 +120,7 @@ pub(crate) mod test_support {
             canonicalization_version: CanonicalizationVersion::new(3).expect("version is non-zero"),
             digest_version: DigestAlgorithmVersion::new(1).expect("version is non-zero"),
             coverage: CompletionCoverage::KnownEmpty,
+            sender_evidence: observation_domain::SenderEvidence::legacy_default(),
         };
         let envelope = observation_ingest::bind_completion_certificate(
             envelope,

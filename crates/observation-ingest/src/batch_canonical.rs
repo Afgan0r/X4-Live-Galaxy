@@ -3,7 +3,6 @@ use sha2::{Digest, Sha256};
 
 pub struct CanonicalBatch {
     pub bytes: Vec<u8>,
-    pub decoded_bytes: usize,
     pub digest: [u8; 32],
 }
 
@@ -38,18 +37,8 @@ impl CanonicalBatch {
             }
             None => bytes.push(0),
         }
-        let decoded_bytes = bytes.len().checked_add(
-            batch
-                .records
-                .len()
-                .checked_mul(std::mem::size_of::<observation_domain::EnvelopeRecord>())?,
-        )?;
         let digest = Sha256::digest(&bytes).into();
-        Some(Self {
-            bytes,
-            decoded_bytes,
-            digest,
-        })
+        Some(Self { bytes, digest })
     }
 }
 

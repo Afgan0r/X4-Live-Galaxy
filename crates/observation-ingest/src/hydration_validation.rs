@@ -41,6 +41,7 @@ fn validate_context(parts: &DurableRevisionParts) -> Result<(), DurableRevisionE
     let coverage = match parts.context.state().coverage() {
         SectionCoverage::Complete => CompletionCoverage::Complete,
         SectionCoverage::KnownEmpty => CompletionCoverage::KnownEmpty,
+        SectionCoverage::PointMeasurement => CompletionCoverage::PointMeasurement,
         SectionCoverage::Partial => CompletionCoverage::Partial,
         SectionCoverage::Unknown => CompletionCoverage::Unknown,
         SectionCoverage::Unsupported => CompletionCoverage::Unsupported,

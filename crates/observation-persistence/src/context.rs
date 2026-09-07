@@ -160,6 +160,7 @@ const fn coverage_code(value: SectionCoverage) -> u8 {
         SectionCoverage::Unknown => 3,
         SectionCoverage::Partial => 4,
         SectionCoverage::Unsupported => 5,
+        SectionCoverage::PointMeasurement => 6,
     }
 }
 const fn parse_coverage(value: u64) -> Option<SectionCoverage> {
@@ -169,6 +170,7 @@ const fn parse_coverage(value: u64) -> Option<SectionCoverage> {
         3 => Some(SectionCoverage::Unknown),
         4 => Some(SectionCoverage::Partial),
         5 => Some(SectionCoverage::Unsupported),
+        6 => Some(SectionCoverage::PointMeasurement),
         _ => None,
     }
 }

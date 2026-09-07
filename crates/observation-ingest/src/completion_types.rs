@@ -151,7 +151,6 @@ pub struct CompletionCertificate {
     pub batch_count: usize,
     pub record_count: usize,
     pub raw_bytes: usize,
-    pub decoded_bytes: usize,
     pub ordered_batch_manifest_digest: [u8; 32],
     pub canonical_content_digest: [u8; 32],
     pub versions: ContractVersions,

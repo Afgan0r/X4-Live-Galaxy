@@ -66,8 +66,8 @@ pub fn validated_with(
     let source_scope = SourceScopeId::new(fixture.source_scope).expect("fixture scope is valid");
     let context = fixture_context(fixture, dependencies.clone(), expected);
     let limits = GenerationLimits::bounded(
-        CandidateLimits::new(1_024, 2_048, 1, 1, 1, 100, 10).expect("limits are non-zero"),
-        AggregateLimits::new(1, 1_024, 2_048, 1, 1, 1).expect("limits are non-zero"),
+        CandidateLimits::new(1_024, 1, 1, 1, 100, 10).expect("limits are non-zero"),
+        AggregateLimits::new(1, 1_024, 1, 1, 1).expect("limits are non-zero"),
     );
     let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits);
     let producer =
@@ -80,6 +80,7 @@ pub fn validated_with(
         section_key: section_key.clone(),
         section_revision: revision(value),
         expected_records: 0,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     assert_eq!(
         stager.start_section_with_context(start, context, 1),
@@ -113,7 +114,6 @@ pub fn validated_with(
         batch_count: 0,
         record_count: 0,
         raw_bytes: 0,
-        decoded_bytes: 0,
         ordered_batch_manifest_digest: [0; 32],
         canonical_content_digest: [0; 32],
         schema_version: ObservationSchemaVersion::new(1).expect("version is non-zero"),
@@ -121,6 +121,7 @@ pub fn validated_with(
         canonicalization_version: CanonicalizationVersion::new(3).expect("version is non-zero"),
         digest_version: DigestAlgorithmVersion::new(1).expect("version is non-zero"),
         coverage: terminal_coverage(fixture.coverage),
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     let envelope = observation_ingest::bind_completion_certificate(
         envelope,
@@ -172,6 +173,7 @@ const fn terminal_coverage(value: SectionCoverage) -> CompletionCoverage {
     match value {
         SectionCoverage::Complete => CompletionCoverage::Complete,
         SectionCoverage::KnownEmpty => CompletionCoverage::KnownEmpty,
+        SectionCoverage::PointMeasurement => CompletionCoverage::PointMeasurement,
         SectionCoverage::Partial => CompletionCoverage::Partial,
         SectionCoverage::Unknown => CompletionCoverage::Unknown,
         SectionCoverage::Unsupported => CompletionCoverage::Unsupported,

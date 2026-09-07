@@ -33,7 +33,6 @@ pub struct ProducerMaterial {
     pub batch_count: usize,
     pub record_count: usize,
     pub raw_bytes: usize,
-    pub decoded_bytes: usize,
     pub manifest: [u8; 32],
     pub content: [u8; 32],
 }
@@ -56,13 +55,11 @@ pub fn producer_material(
     let mut manifest = Sha256::new();
     let mut records = Vec::new();
     let mut raw_bytes = 0_usize;
-    let mut decoded_bytes = 0_usize;
     for (batch, value) in canonical {
         framed(&mut manifest, &batch.section_ordinal.to_be_bytes());
         framed(&mut manifest, batch.batch_id.as_str().as_bytes());
         framed(&mut manifest, &value.digest);
         raw_bytes = raw_bytes.checked_add(value.bytes.len())?;
-        decoded_bytes = decoded_bytes.checked_add(value.decoded_bytes)?;
         records.extend(batch.records.clone());
     }
     records.sort_by(|left, right| left.record_id.cmp(&right.record_id));
@@ -70,7 +67,6 @@ pub fn producer_material(
         batch_count: batches.len(),
         record_count: records.len(),
         raw_bytes,
-        decoded_bytes,
         manifest: manifest.finalize().into(),
         content: content_digest(&records),
     })

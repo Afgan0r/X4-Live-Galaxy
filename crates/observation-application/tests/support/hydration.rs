@@ -79,6 +79,7 @@ pub fn validated_empty(
         section_key: key(section),
         section_revision: revision(value),
         expected_records: 0,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     assert_eq!(
         stager.start_section_with_context(start.clone(), context, 1),
@@ -93,7 +94,6 @@ pub fn validated_empty(
         batch_count: 0,
         record_count: 0,
         raw_bytes: 0,
-        decoded_bytes: 0,
         ordered_batch_manifest_digest: [0; 32],
         canonical_content_digest: [0; 32],
         schema_version: base.versions().schema(),
@@ -101,6 +101,7 @@ pub fn validated_empty(
         canonicalization_version: base.versions().canonicalization(),
         digest_version: base.versions().digest(),
         coverage: CompletionCoverage::KnownEmpty,
+        sender_evidence: observation_domain::SenderEvidence::legacy_default(),
     };
     let envelope =
         observation_ingest::bind_completion_certificate(completion, &[], base.versions())

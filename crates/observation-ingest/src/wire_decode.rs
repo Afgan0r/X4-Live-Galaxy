@@ -64,7 +64,6 @@ pub fn decode_completion(raw: RawCompletion) -> Result<CompleteMessage, Envelope
             batch_count: raw.batch_count,
             record_count: raw.record_count,
             raw_bytes: raw.raw_bytes,
-            decoded_bytes: raw.decoded_bytes,
             ordered_batch_manifest_digest: parse_digest(&raw.ordered_batch_manifest_digest)?,
             canonical_content_digest: parse_digest(&raw.canonical_content_digest)?,
             schema_version: ObservationSchemaVersion::new(raw.schema_version)
@@ -77,6 +76,9 @@ pub fn decode_completion(raw: RawCompletion) -> Result<CompleteMessage, Envelope
                 .ok_or(EnvelopeDecodeError::InvalidVersion)?,
             coverage: SectionCompletionEnvelope::coverage_from_wire(&raw.coverage)
                 .ok_or(EnvelopeDecodeError::InvalidShape)?,
+            sender_evidence: crate::sender_evidence::decode_raw_sender_evidence(
+                raw.sender_evidence,
+            )?,
         },
     ))
 }

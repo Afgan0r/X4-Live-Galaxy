@@ -65,8 +65,8 @@ fn stager() -> GenerationStager {
     GenerationStager::new(
         AcceptedProjection::empty(),
         GenerationLimits::bounded(
-            CandidateLimits::new(1, 1, 1, 1, 1, 1, 1).expect("limits are non-zero"),
-            AggregateLimits::new(1, 1, 1, 1, 1, 1).expect("limits are non-zero"),
+            CandidateLimits::new(1, 1, 1, 1, 1, 1).expect("limits are non-zero"),
+            AggregateLimits::new(1, 1, 1, 1, 1).expect("limits are non-zero"),
         ),
     )
 }

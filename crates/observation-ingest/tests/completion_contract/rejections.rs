@@ -6,7 +6,7 @@ fn any_count_length_digest_or_version_mismatch_discards_candidate() {
         |value| value.envelope.batch_count += 1,
         |value| value.envelope.record_count += 1,
         |value| value.envelope.raw_bytes += 1,
-        |value| value.envelope.decoded_bytes += 1,
+        |value| value.envelope.sender_evidence.stable_identity = true,
         |value| value.envelope.ordered_batch_manifest_digest[0] ^= 1,
         |value| value.envelope.canonical_content_digest[0] ^= 1,
         |value| {

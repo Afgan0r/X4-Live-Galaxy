@@ -44,6 +44,7 @@ macro_rules! non_zero_identity {
 }
 
 string_identity!(SourceScopeId);
+string_identity!(SourceEpochId);
 string_identity!(ProducerIncarnationId);
 string_identity!(SectionKey);
 string_identity!(BatchId);
@@ -122,6 +123,7 @@ non_zero_identity!(ObservationVersion);
 pub enum CompletionCoverage {
     Complete,
     KnownEmpty,
+    PointMeasurement,
     Partial,
     Unknown,
     Unsupported,
@@ -150,7 +152,7 @@ pub enum EnvelopeDecodeError {
 
 impl EnvelopeDecodeError {
     pub fn require_contract(version: u64) -> Result<(), Self> {
-        (version == 1).then_some(()).ok_or(Self::UnsupportedVersion)
+        (version == 2).then_some(()).ok_or(Self::UnsupportedVersion)
     }
 }
 

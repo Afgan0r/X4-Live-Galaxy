@@ -124,6 +124,7 @@ const fn coverage_byte(coverage: CompletionCoverage) -> u8 {
         CompletionCoverage::Partial => 3,
         CompletionCoverage::Unknown => 4,
         CompletionCoverage::Unsupported => 5,
+        CompletionCoverage::PointMeasurement => 6,
     }
 }
 

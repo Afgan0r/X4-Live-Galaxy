@@ -19,6 +19,7 @@ pub enum SectionFreshness {
 pub enum SectionCoverage {
     Complete,
     KnownEmpty,
+    PointMeasurement,
     Unknown,
     Partial,
     Unsupported,

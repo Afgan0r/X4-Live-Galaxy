@@ -2,7 +2,10 @@
 
 use std::time::Duration;
 
-use observation_ingest::{ControlEnvelope, TransportEpoch};
+use observation_ingest::{
+    CarrierControl, ControlBody, ControlEnvelope, HandshakeBody, TransportEpoch,
+    decode_carrier_control as decode_typed_control, encode_carrier_control as encode_typed_control,
+};
 use x4_bridge::{
     CarrierBFacade, CarrierCodecError, CarrierIdentity, CompleteMessageSendOutcome,
     ConnectionState, ControlPollOutcome, ObservationCarrierFacade, decode_carrier_control,
@@ -88,7 +91,7 @@ fn codec_rejects_stale_unknown_and_mutation_controls() {
     );
     assert_eq!(
         decode_carrier_control(
-            b"v=1;kind=mutation;session=session-a;incarnation=incarnation-a;epoch=7",
+            br#"{"control_version":2,"kind":"mutation","session":"session-a","incarnation":"incarnation-a","epoch":7,"body":{}}"#,
             &expected,
             512
         ),
@@ -96,7 +99,7 @@ fn codec_rejects_stale_unknown_and_mutation_controls() {
     );
     assert_eq!(
         decode_carrier_control(
-            b"v=1;kind=health;session=session-a;incarnation=incarnation-a;epoch=7;extra=x",
+            br#"{"control_version":2,"kind":"health","session":"session-a","incarnation":"incarnation-a","epoch":7,"body":{"status":"available"},"extra":"x"}"#,
             &expected,
             512
         ),
@@ -117,5 +120,42 @@ fn data_and_control_limits_reject_one_over() {
     assert_eq!(
         decode_carrier_control(&frame, &expected, frame.len() - 1),
         Err(CarrierCodecError::MessageTooLarge)
+    );
+}
+
+#[test]
+fn handshake_binds_the_exact_contract_tuple() {
+    let expected = identity(7);
+    let mut handshake = HandshakeBody {
+        native_abi: 2,
+        envelope_contract: 2,
+        schema_version: 1,
+        policy_version: 2,
+        canonicalization_version: 3,
+        digest_version: 1,
+    };
+    let exact = CarrierControl {
+        identity: expected.clone(),
+        body: ControlBody::Handshake(handshake.clone()),
+    };
+    let encoded = encode_typed_control(&exact, 512).expect("exact handshake encodes");
+    assert_eq!(decode_typed_control(&encoded, &expected, 512), Ok(exact));
+
+    handshake.envelope_contract = 1;
+    let incompatible = CarrierControl {
+        identity: expected.clone(),
+        body: ControlBody::Handshake(handshake),
+    };
+    assert_eq!(
+        encode_typed_control(&incompatible, 512),
+        Err(CarrierCodecError::RestartRequired)
+    );
+    assert_eq!(
+        decode_typed_control(
+            br#"{"control_version":1,"kind":"handshake","session":"session-a","incarnation":"incarnation-a","epoch":7,"body":{"native_abi":2,"envelope_contract":2,"schema_version":1,"policy_version":2,"canonicalization_version":3,"digest_version":1}}"#,
+            &expected,
+            512,
+        ),
+        Err(CarrierCodecError::RestartRequired)
     );
 }

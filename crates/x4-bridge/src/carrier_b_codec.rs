@@ -1,39 +1,53 @@
-use observation_ingest::{ControlEnvelope, TransportEpoch};
+use observation_ingest::{
+    CarrierControl, CollectionIntentBody, ControlBody, DemandBody, DispositionBody, HandshakeBody,
+    HealthBody, ResetBody,
+};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CarrierIdentity {
-    pub session_id: String,
-    pub producer_incarnation: String,
-    pub epoch: TransportEpoch,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CarrierCodecError {
-    MessageTooLarge,
-    InvalidShape,
-    UnknownKind,
-    UnknownField,
-    InvalidIdentity,
-    StaleEpoch,
-    MutationForbidden,
-}
+pub use observation_ingest::{CarrierCodecError, CarrierIdentity};
+use observation_ingest::{ControlEnvelope, decode_carrier_control as decode_typed};
 
 pub fn encode_carrier_control(
     kind: ControlEnvelope,
     identity: &CarrierIdentity,
     limit: usize,
 ) -> Result<Vec<u8>, CarrierCodecError> {
-    validate_identity(identity)?;
-    let text = format!(
-        "v=1;kind={};session={};incarnation={};epoch={}",
-        kind_name(kind),
-        identity.session_id,
-        identity.producer_incarnation,
-        identity.epoch.get()
-    );
-    (text.len() <= limit)
-        .then(|| text.into_bytes())
-        .ok_or(CarrierCodecError::MessageTooLarge)
+    let body = match kind {
+        ControlEnvelope::Handshake => ControlBody::Handshake(HandshakeBody {
+            native_abi: 2,
+            envelope_contract: 2,
+            schema_version: 1,
+            policy_version: 2,
+            canonicalization_version: 3,
+            digest_version: 1,
+        }),
+        ControlEnvelope::Demand => ControlBody::Demand(DemandBody { credit: 1 }),
+        ControlEnvelope::Disposition => ControlBody::Disposition(DispositionBody {
+            message_id: "message:compatibility".to_owned(),
+            section_key: "acceptance".to_owned(),
+            section_revision: 1,
+            message_digest: "0".repeat(64),
+            disposition: "received".to_owned(),
+        }),
+        ControlEnvelope::CollectionIntent => ControlBody::CollectionIntent(CollectionIntentBody {
+            section_key: "acceptance".to_owned(),
+            max_records: 1,
+            max_raw_bytes: 1,
+            max_work: 1,
+        }),
+        ControlEnvelope::Health => ControlBody::Health(HealthBody {
+            status: "available".to_owned(),
+        }),
+        ControlEnvelope::Reset => ControlBody::Reset(ResetBody {
+            reason: "requested".to_owned(),
+        }),
+    };
+    observation_ingest::encode_carrier_control(
+        &CarrierControl {
+            identity: identity.clone(),
+            body,
+        },
+        limit,
+    )
 }
 
 pub fn decode_carrier_control(
@@ -41,70 +55,10 @@ pub fn decode_carrier_control(
     expected: &CarrierIdentity,
     limit: usize,
 ) -> Result<ControlEnvelope, CarrierCodecError> {
-    if bytes.len() > limit {
-        return Err(CarrierCodecError::MessageTooLarge);
-    }
-    validate_identity(expected)?;
-    let text = std::str::from_utf8(bytes).map_err(|_| CarrierCodecError::InvalidShape)?;
-    let fields: Vec<_> = text.split(';').collect();
-    if fields.len() > 5 {
-        return Err(CarrierCodecError::UnknownField);
-    }
-    if fields.len() != 5 {
-        return Err(CarrierCodecError::InvalidShape);
-    }
-    let values = ["v=", "kind=", "session=", "incarnation=", "epoch="]
-        .into_iter()
-        .zip(fields)
-        .map(|(prefix, field)| field.strip_prefix(prefix))
-        .collect::<Option<Vec<_>>>()
-        .ok_or(CarrierCodecError::UnknownField)?;
-    if values[0] != "1" {
-        return Err(CarrierCodecError::InvalidShape);
-    }
-    let kind = parse_kind(values[1])?;
-    if values[2] != expected.session_id || values[3] != expected.producer_incarnation {
-        return Err(CarrierCodecError::InvalidIdentity);
-    }
-    let epoch = values[4]
-        .parse::<u64>()
-        .map_err(|_| CarrierCodecError::InvalidIdentity)?;
-    if epoch != expected.epoch.get() {
-        return Err(CarrierCodecError::StaleEpoch);
-    }
-    Ok(kind)
+    decode_typed(bytes, expected, limit)
+        .map(|control| observation_ingest::carrier_control_kind(&control.body))
 }
 
 pub fn validate_identity(identity: &CarrierIdentity) -> Result<(), CarrierCodecError> {
-    let invalid = identity.session_id.trim().is_empty()
-        || identity.producer_incarnation.trim().is_empty()
-        || identity.session_id.contains([';', '='])
-        || identity.producer_incarnation.contains([';', '=']);
-    (!invalid)
-        .then_some(())
-        .ok_or(CarrierCodecError::InvalidIdentity)
-}
-
-const fn kind_name(kind: ControlEnvelope) -> &'static str {
-    match kind {
-        ControlEnvelope::Handshake => "handshake",
-        ControlEnvelope::Demand => "demand",
-        ControlEnvelope::Disposition => "disposition",
-        ControlEnvelope::CollectionIntent => "collection_intent",
-        ControlEnvelope::Health => "health",
-        ControlEnvelope::Reset => "reset",
-    }
-}
-
-fn parse_kind(value: &str) -> Result<ControlEnvelope, CarrierCodecError> {
-    match value {
-        "handshake" => Ok(ControlEnvelope::Handshake),
-        "demand" => Ok(ControlEnvelope::Demand),
-        "disposition" => Ok(ControlEnvelope::Disposition),
-        "collection_intent" => Ok(ControlEnvelope::CollectionIntent),
-        "health" => Ok(ControlEnvelope::Health),
-        "reset" => Ok(ControlEnvelope::Reset),
-        "mutation" | "command" | "game_action" => Err(CarrierCodecError::MutationForbidden),
-        _ => Err(CarrierCodecError::UnknownKind),
-    }
+    observation_ingest::validate_carrier_identity(identity)
 }

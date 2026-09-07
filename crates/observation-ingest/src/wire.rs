@@ -76,7 +76,8 @@ wire_struct!(RawSectionStart {
     transport_epoch: u64,
     section_key: String,
     section_revision: u64,
-    expected_records: usize
+    expected_records: usize,
+    sender_evidence: RawSenderEvidence
 });
 wire_struct!(RawBatch { contract_version: u64, source_scope: String, producer_incarnation: String, transport_epoch: u64, section_key: String, section_revision: u64, batch_id: String, section_ordinal: usize, records: Vec<RawRecord>, optional_detail: Option<String> });
 wire_struct!(RawCompletion {
@@ -89,14 +90,32 @@ wire_struct!(RawCompletion {
     batch_count: usize,
     record_count: usize,
     raw_bytes: usize,
-    decoded_bytes: usize,
     ordered_batch_manifest_digest: String,
     canonical_content_digest: String,
     schema_version: u64,
     policy_version: u64,
     canonicalization_version: u64,
     digest_version: u64,
-    coverage: String
+    coverage: String,
+    sender_evidence: RawSenderEvidence
+});
+wire_struct!(RawSenderEvidence {
+    capture_clock: String,
+    capture_start_millis: u64,
+    capture_end_millis: u64,
+    freshness: String,
+    quality: String,
+    availability: String,
+    coverage: String,
+    source_epoch: Option<String>,
+    source_epoch_status: String,
+    source_boundary: String,
+    source_consistency: String,
+    stable_identity: bool,
+    schema_version: u64,
+    policy_version: u64,
+    canonicalization_version: u64,
+    digest_version: u64
 });
 wire_struct!(RawControl {
     contract_version: u64
@@ -139,6 +158,9 @@ fn decode_raw(raw: RawEnvelope) -> Result<CompleteMessage, EnvelopeDecodeError> 
                 section_key: identity!(SectionKey, raw.section_key),
                 section_revision: number!(SectionRevisionId, raw.section_revision),
                 expected_records: raw.expected_records,
+                sender_evidence: crate::sender_evidence::decode_raw_sender_evidence(
+                    raw.sender_evidence,
+                )?,
             }))
         }
         RawEnvelope::ImmutableBatch(raw) => {

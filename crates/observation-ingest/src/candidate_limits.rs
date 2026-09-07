@@ -5,7 +5,6 @@ use std::num::{NonZeroU64, NonZeroUsize};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CandidateLimits {
     pub(crate) raw_bytes: NonZeroUsize,
-    pub(crate) decoded_bytes: NonZeroUsize,
     pub(crate) records: NonZeroUsize,
     pub(crate) batches: NonZeroUsize,
     pub(crate) work: NonZeroUsize,
@@ -16,7 +15,6 @@ impl CandidateLimits {
     #[must_use]
     pub fn new(
         raw: usize,
-        decoded: usize,
         records: usize,
         batches: usize,
         work: usize,
@@ -25,7 +23,6 @@ impl CandidateLimits {
     ) -> Option<Self> {
         Some(Self {
             raw_bytes: NonZeroUsize::new(raw)?,
-            decoded_bytes: NonZeroUsize::new(decoded)?,
             records: NonZeroUsize::new(records)?,
             batches: NonZeroUsize::new(batches)?,
             work: NonZeroUsize::new(work)?,
@@ -39,7 +36,6 @@ impl CandidateLimits {
 pub struct AggregateLimits {
     pub(crate) candidates: NonZeroUsize,
     pub(crate) raw_bytes: NonZeroUsize,
-    pub(crate) decoded_bytes: NonZeroUsize,
     pub(crate) records: NonZeroUsize,
     pub(crate) batches: NonZeroUsize,
     pub(crate) work: NonZeroUsize,
@@ -49,7 +45,6 @@ impl AggregateLimits {
     pub fn new(
         candidates: usize,
         raw: usize,
-        decoded: usize,
         records: usize,
         batches: usize,
         work: usize,
@@ -57,7 +52,6 @@ impl AggregateLimits {
         Some(Self {
             candidates: NonZeroUsize::new(candidates)?,
             raw_bytes: NonZeroUsize::new(raw)?,
-            decoded_bytes: NonZeroUsize::new(decoded)?,
             records: NonZeroUsize::new(records)?,
             batches: NonZeroUsize::new(batches)?,
             work: NonZeroUsize::new(work)?,
@@ -78,7 +72,6 @@ impl GenerationLimits {
         let work = nonzero_usize(max_work_units);
         let candidate = CandidateLimits {
             raw_bytes: raw,
-            decoded_bytes: raw,
             records: work,
             batches: work,
             work,
@@ -88,7 +81,6 @@ impl GenerationLimits {
         let aggregate = AggregateLimits {
             candidates: work,
             raw_bytes: raw,
-            decoded_bytes: raw,
             records: work,
             batches: work,
             work,
