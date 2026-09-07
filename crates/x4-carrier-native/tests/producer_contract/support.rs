@@ -9,6 +9,7 @@ use x4_carrier_native::{
 pub fn ready(now: u64) -> (Producer, ProducerSource) {
     let source = source(7);
     let mut producer = Producer::new(ProducerLimits::bring_up(), source.clone(), now).unwrap();
+    producer.mark_local_handoff(now).unwrap();
     for body in [
         handshake(),
         intent(),

@@ -99,7 +99,7 @@ pub unsafe extern "C" fn progress(state: *mut c_void) -> c_int {
         TransportSendOutcome::CapacityUnavailable => 2,
         TransportSendOutcome::Rejected(error) => error_code_for_transport(error),
     };
-    unsafe { push_code(api, state, code) }
+    unsafe { crate::lua_progress::push(api, state, code, producer, transport, now) }
 }
 
 pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {

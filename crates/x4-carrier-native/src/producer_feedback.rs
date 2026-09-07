@@ -20,7 +20,13 @@ impl Producer {
             _ => ProducerError::InvalidInput,
         })?;
         match control.body {
-            ControlBody::Handshake(_) if self.state == ProducerState::AwaitingCompatibility => {
+            ControlBody::Handshake(_)
+                if self.state == ProducerState::AwaitingCompatibility
+                    && self
+                        .pending
+                        .as_ref()
+                        .is_some_and(|pending| pending.id == "bootstrap" && pending.handed_off) =>
+            {
                 self.readiness = Readiness::Handshake;
                 self.pending = None;
                 self.state = ProducerState::Ready;

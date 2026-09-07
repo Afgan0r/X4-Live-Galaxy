@@ -14,6 +14,7 @@ mod lua_input;
 mod lua_open;
 mod lua_operations;
 mod lua_producer_operations;
+mod lua_progress;
 mod lua_table;
 mod lua_transport;
 mod producer;

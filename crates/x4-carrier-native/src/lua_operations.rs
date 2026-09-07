@@ -3,7 +3,9 @@ use std::num::NonZeroUsize;
 
 use crate::abi_windows::LuaFn;
 use crate::lua_producer_operations::{
-    begin_section, fail_section, finish_section, poll_control, progress, push_record,
+    begin_section as begin_section_inner, fail_section as fail_section_inner,
+    finish_section as finish_section_inner, poll_control as poll_control_inner,
+    progress as progress_inner, push_record as push_record_inner,
 };
 use crate::{
     ABI_VERSION, CarrierLimits, NativeTransport, OpenConfig, Producer, ProducerSource,
@@ -24,16 +26,34 @@ pub const REGISTRATIONS: [(&[u8], LuaFn); 10] = [
     (b"close\0", close),
 ];
 
+macro_rules! guarded {
+    ($name:ident, $inner:ident) => {
+        unsafe extern "C" fn $name(state: *mut c_void) -> c_int {
+            guard(state, || unsafe { $inner(state) })
+        }
+    };
+}
+guarded!(begin_section, begin_section_inner);
+guarded!(push_record, push_record_inner);
+guarded!(finish_section, finish_section_inner);
+guarded!(fail_section, fail_section_inner);
+guarded!(progress, progress_inner);
+guarded!(poll_control, poll_control_inner);
+guarded!(abi_version, abi_version_inner);
+guarded!(open, open_inner);
+guarded!(reset, reset_inner);
+guarded!(close, close_inner);
+
 const PIPE_ENDPOINT: &str = r"\\.\pipe\live_galaxy";
 
-unsafe extern "C" fn abi_version(state: *mut c_void) -> c_int {
+unsafe fn abi_version_inner(state: *mut c_void) -> c_int {
     let Some(api) = API.get().copied() else {
         return 0;
     };
     unsafe { push_code(api, state, isize::try_from(ABI_VERSION).unwrap_or_default()) }
 }
 
-unsafe extern "C" fn open(state: *mut c_void) -> c_int {
+unsafe fn open_inner(state: *mut c_void) -> c_int {
     let Some(api) = API.get().copied() else {
         return 0;
     };
@@ -91,16 +111,24 @@ unsafe extern "C" fn open(state: *mut c_void) -> c_int {
     2
 }
 
-unsafe extern "C" fn reset(state: *mut c_void) -> c_int {
+unsafe fn reset_inner(state: *mut c_void) -> c_int {
     let result = crate::lua_transport::close_handle(state, true);
     clear_producer();
     result
 }
 
-unsafe extern "C" fn close(state: *mut c_void) -> c_int {
+unsafe fn close_inner(state: *mut c_void) -> c_int {
     let result = crate::lua_transport::close_handle(state, false);
     clear_producer();
     result
+}
+
+fn guard(state: *mut c_void, operation: impl FnOnce() -> c_int) -> c_int {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(operation)).unwrap_or_else(|_| {
+        API.get()
+            .copied()
+            .map_or(0, |api| unsafe { push_code(api, state, -20) })
+    })
 }
 
 fn clear_producer() {
