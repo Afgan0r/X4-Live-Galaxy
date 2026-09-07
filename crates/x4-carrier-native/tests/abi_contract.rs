@@ -5,23 +5,26 @@ use x4_carrier_native::{
     luaopen_live_galaxy_carrier, module_contract, require_lua_symbols,
 };
 
-const EXPECTED_OPERATIONS: [&str; 7] = [
+const EXPECTED_OPERATIONS: [&str; 10] = [
     "abi_version",
     "open",
-    "connection",
-    "try_send",
-    "poll",
+    "begin_section",
+    "push_record",
+    "finish_section",
+    "fail_section",
+    "progress",
+    "poll_control",
     "reset",
     "close",
 ];
 
 #[test]
-fn initializer_contract_exposes_the_versioned_transport_only_api() {
+fn initializer_contract_exposes_exact_typed_abi_two() {
     let contract = module_contract();
 
     assert_eq!(
-        contract.abi_version, 1,
-        "the ABI version must be frozen at one"
+        contract.abi_version, 2,
+        "the typed producer ABI must be frozen at two"
     );
     assert_eq!(contract.operations, EXPECTED_OPERATIONS);
     assert_eq!(ABI_VERSION, contract.abi_version);

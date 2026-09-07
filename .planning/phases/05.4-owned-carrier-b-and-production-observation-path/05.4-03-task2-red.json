@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-carrier-native --test abi_contract initializer_contract_exposes_exact_typed_abi_two",
+  "exitCode": 1,
+  "targetTest": "initializer_contract_exposes_exact_typed_abi_two",
+  "targetFile": "abi_contract.rs",
+  "expected": "the initializer exposes exactly ten typed ABI-2 operations",
+  "actual": "module contract still reports ABI 1 and the legacy seven operations",
+  "output": "TAP version 13\nnot ok 1 - initializer_contract_exposes_exact_typed_abi_two\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n"
+}
