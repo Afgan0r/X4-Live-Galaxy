@@ -1,50 +1,54 @@
 local scheduler = {}
 
-local MAX_SLICES_PER_TICK = 1
+local terminal = { [6] = true, [7] = true, [8] = true, [9] = true, [10] = true }
 
-function scheduler.save_suppressed(context)
-    return type(context) == "table" and context.save_in_progress == true
+local function call(target, name, ...)
+    if type(target) ~= "table" or type(target[name]) ~= "function" then
+        return nil, "adapter_unavailable"
+    end
+    return target[name](target, ...)
 end
 
-function scheduler.sample_slice(producer, limit)
-    if type(producer) ~= "table" or type(producer.sample) ~= "function" then
-        return { disposition = "producer_unavailable" }
+function scheduler.tick(context, carrier, observation)
+    if type(context) ~= "table" then return { disposition = "clock_unavailable" } end
+    if context.reentry_guard then return { disposition = "reentry_suppressed" } end
+    context.reentry_guard = true
+    local function finish(disposition, code)
+        context.reentry_guard = false
+        return { disposition = disposition, code = code }
     end
 
-    local requested = type(limit) == "number" and math.floor(limit) or 1
-    local bounded = math.max(1, math.min(requested, MAX_SLICES_PER_TICK))
-    local payload, err = producer:sample(bounded)
-    if payload == nil then
-        return { disposition = err or "observation_unavailable" }
-    end
-    return { disposition = "sampled", payload = payload }
-end
+    local progress, progress_error = call(carrier, "progress", 1)
+    if progress == nil then return finish(progress_error, nil) end
+    if terminal[progress] then return finish("producer_terminal", progress) end
+    local control, control_error = call(carrier, "poll_control")
+    if control == nil then return finish(control_error, nil) end
+    if terminal[control] then return finish("producer_terminal", control) end
 
-function scheduler.enqueue_or_backpressure(bridge, payload)
-    if type(bridge) ~= "table" or type(bridge.try_enqueue) ~= "function" then
-        return { disposition = "bridge_unavailable" }
-    end
+    local begin, begin_error = observation.begin_evidence(context)
+    if begin == nil then return finish(begin_error, nil) end
+    local reserved = call(carrier, "begin_section", begin)
+    if reserved == -21 then return finish("producer_busy", reserved) end
+    if reserved ~= 0 then return finish("reservation_failed", reserved) end
 
-    local accepted, reason = bridge:try_enqueue(payload)
-    if accepted then
-        return { disposition = "enqueued" }
+    local fact, source_error = call(observation, "capture")
+    if fact == nil then
+        call(carrier, "fail_section", source_error or "source_failure")
+        return finish(source_error or "source_failure", nil)
     end
-    if reason == "queue_saturated" then
-        return { disposition = "backpressure" }
+    local pushed = call(carrier, "push_record", fact)
+    if pushed ~= 0 then
+        call(carrier, "fail_section", "fact_rejected")
+        return finish("fact_rejected", pushed)
     end
-    return { disposition = "bridge_unavailable" }
-end
-
-function scheduler.tick(context, producer, bridge)
-    if scheduler.save_suppressed(context) then
-        return { disposition = "save_suppressed" }
+    local completion, completion_error = observation.finish_evidence(context)
+    if completion == nil then
+        call(carrier, "fail_section", completion_error or "clock_unavailable")
+        return finish(completion_error or "clock_unavailable", nil)
     end
-
-    local sampled = scheduler.sample_slice(producer, MAX_SLICES_PER_TICK)
-    if sampled.disposition ~= "sampled" then
-        return sampled
-    end
-    return scheduler.enqueue_or_backpressure(bridge, sampled.payload)
+    local closed = call(carrier, "finish_section", completion)
+    if closed ~= 0 then return finish("finish_rejected", closed) end
+    return finish("sampled", 0)
 end
 
 return scheduler
