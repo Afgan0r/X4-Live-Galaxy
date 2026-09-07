@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -Command wrapper around tests/carrier-b-local.ps1 -SelfTest",
+  "exitCode": 1,
+  "targetTest": "actual DLL producer reaches durable SQLite readback",
+  "targetFile": "tests/carrier-b-local.ps1",
+  "expected": "normal product Lua loads the actual owned module and publishes revision 1 through the bridge",
+  "actual": "intentional RED assertion returned ACTUAL_DLL_DURABLE_READBACK_NOT_IMPLEMENTED",
+  "output": "ACTUAL_DLL_DURABLE_READBACK_NOT_IMPLEMENTED\nTAP version 13\nnot ok 1 - actual DLL producer reaches durable SQLite readback\n# tests 1\n# pass 0\n# fail 1\n"
+}

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'syntax', 'xml')]
+    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'syntax', 'xml', 'carrier_b_actual')]
     [string]$Suite = 'all',
     [string]$Filter,
     [string]$ExtensionRoot = (Split-Path -Parent $PSScriptRoot)
@@ -28,6 +28,9 @@ function Invoke-Stage([string]$Name, [string]$Executable, [string[]]$Arguments) 
 
 Push-Location $root
 try {
+    if ($Suite -in @('all', 'carrier_b_actual')) {
+        Invoke-Stage 'Carrier-B-actual' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest')
+    }
     if ($Suite -ne 'xml') {
         $lock = Get-Content -LiteralPath (Join-Path $root 'tools/lua-runner.lock.json') -Raw | ConvertFrom-Json
         $lua = Join-Path $root "$($lock.bustedDevelopment.rootRelativePath)/bin/lua.exe"
