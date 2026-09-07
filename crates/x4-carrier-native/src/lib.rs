@@ -12,6 +12,11 @@ mod abi_windows_sid;
 mod handle;
 mod lua_operations;
 mod lua_transport;
+mod producer;
+mod producer_collection;
+mod producer_feedback;
+mod producer_message;
+mod producer_types;
 mod transport;
 mod transport_peer;
 mod transport_types;
@@ -19,6 +24,11 @@ mod transport_worker;
 mod types;
 
 pub use handle::HandleRegistry;
+pub use producer::Producer;
+pub use producer_types::{
+    ProducerError, ProducerFeedback, ProducerLimits, ProducerOutcome, ProducerSource,
+    ProducerState, SectionEvidence, TypedFact,
+};
 pub use transport::NativeTransport;
 pub use transport_peer::BridgePeer;
 pub use transport_types::{

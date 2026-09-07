@@ -398,6 +398,8 @@ dependencies = [
 name = "x4-carrier-native"
 version = "0.1.0"
 dependencies = [
+ "observation-domain",
+ "observation-ingest",
  "windows-sys",
 ]
 

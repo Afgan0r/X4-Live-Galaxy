@@ -30,6 +30,10 @@ missing_errors_doc = "allow"
 missing_safety_doc = "allow"
 module_name_repetitions = "allow"
 
+[dependencies]
+observation-domain = { path = "../observation-domain" }
+observation-ingest = { path = "../observation-ingest" }
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = [
     "Win32_Foundation",
