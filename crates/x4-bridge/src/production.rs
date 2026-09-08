@@ -151,7 +151,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     }
 
     fn receiver_context(
-        &mut self,
+        &self,
         bytes: &[u8],
     ) -> Result<observation_application::LifecycleContext, ProductionError> {
         let message = observation_ingest::decode_complete_message(

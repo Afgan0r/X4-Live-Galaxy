@@ -3,7 +3,7 @@ use observation_ingest::{
     DecisionRevisionIndex, GenerationStager, ImmutableApplicationBatch, ReceiverDisposition,
     SlotAdmission, StopAndWaitSlot, decode_complete_message,
 };
-use observation_persistence::{CurrentRevision, ObservationRepository, RepositoryError};
+use observation_persistence::ObservationRepository;
 
 use crate::{
     LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
@@ -97,21 +97,6 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             .mark_local_handoff()
             .map_err(|_| LifecycleError::SlotInvariant)?;
         self.dispatch(message, input.context, input.work, input.now)
-    }
-
-    pub const fn complete_message_limit(&self) -> usize {
-        self.limits.complete_message_bytes.get()
-    }
-
-    pub fn current_revision(
-        &self,
-        key: &observation_domain::SectionKey,
-    ) -> Result<Option<CurrentRevision>, RepositoryError> {
-        self.repository.current(key)
-    }
-
-    pub fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
-        self.repository.current_snapshot()
     }
 
     pub fn invalidate_source_scope(&mut self, scope: &observation_domain::SourceScopeId) {
