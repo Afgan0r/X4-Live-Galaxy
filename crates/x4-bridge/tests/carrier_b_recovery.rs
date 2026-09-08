@@ -51,6 +51,33 @@ fn response_loss_reconciles_the_exact_committed_attempt() {
         session.reconcile_ambiguous(3),
         Ok(LifecycleResult::Reconciled(ReconcileResult::Committed))
     );
+    drop(session);
+    assert_exact_recovered_revision(database.path());
+}
+
+fn assert_exact_recovered_revision(path: &std::path::Path) {
+    let repository = SqliteObservationRepository::open(path, publication_limits())
+        .expect("independent recovery readback opens");
+    let snapshot = repository.current_snapshot().expect("snapshot");
+    assert_eq!(snapshot.len(), 1);
+    let current = &snapshot[0];
+    let revision = current.revision();
+    let receipt = current.receipt();
+    assert_eq!(revision.section_key.as_str(), "runtime-clock");
+    assert_eq!(revision.revision.get(), 1);
+    assert_eq!(revision.source_scope.as_str(), "scope:x4");
+    assert_eq!(
+        revision.source_session.producer_incarnation().as_str(),
+        "producer:1"
+    );
+    assert_eq!(revision.source_session.transport_epoch().get(), 1);
+    assert_eq!(revision.accepted_at, 2);
+    assert!(revision.records.is_empty());
+    assert_eq!(receipt.section_key, revision.section_key);
+    assert_eq!(receipt.revision, revision.revision);
+    assert_eq!(receipt.content_digest, revision.content_digest);
+    assert_eq!(receipt.ordinal, 1);
+    assert_eq!(receipt.accepted_at, 2);
 }
 
 #[test]
