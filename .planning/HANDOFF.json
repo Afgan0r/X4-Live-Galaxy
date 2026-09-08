@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-08T02:57:55.714Z",
+  "phase": "05.4",
+  "phase_name": "owned-carrier-b-and-production-observation-path",
+  "phase_dir": ".planning/phases/05.4-owned-carrier-b-and-production-observation-path",
+  "plan": 4,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {
+      "id": 1,
+      "name": "Produce and negatively validate the portable Windows bundle",
+      "status": "done",
+      "commit": "d518d18"
+    },
+    {
+      "id": 2,
+      "name": "Run and measure the actual Lua-to-native-to-durable path",
+      "status": "done",
+      "commit": "c9c7dba"
+    },
+    {
+      "id": 3,
+      "name": "Freeze the measured candidate after safety review and final local regression",
+      "status": "in_progress",
+      "progress": "Implementation, retained package, two review-fix iterations, regression and mutation work are complete; final review still reports one reconnect/transport-epoch root and one associated coverage facet."
+    }
+  ],
+  "remaining_tasks": [
+    {
+      "id": 1,
+      "name": "Fix reconnect transport_epoch rotation and incomplete-candidate discard/reconciliation for pending start, batch and completion",
+      "status": "not_started"
+    },
+    {
+      "id": 2,
+      "name": "Run independent re-review, security audit and goal-backward phase verification",
+      "status": "not_started"
+    },
+    {
+      "id": 3,
+      "name": "Present the exact Plan 05 human procedure and stop before all X4 actions",
+      "status": "not_started"
+    }
+  ],
+  "blockers": [
+    {
+      "description": "The producer rotates only its internal connection_generation during reconnect while wire transport_epoch remains unchanged; old incomplete PendingStart/Batch/Completion work can be restored after handshake.",
+      "type": "technical",
+      "workaround": "None. Implement the ADR-LG-013 protocol fence: rotate wire transport_epoch, discard the incomplete candidate, bootstrap first, then reconcile uncertain durable outcomes before fresh collection."
+    },
+    {
+      "description": "The real replacement-bridge suite does not yet cover pending batch, pending completion and commit-before-disposition loss through the actual Producer path.",
+      "type": "technical",
+      "workaround": "Add bounded real Producer + native transport + replacement bridge cases with exact identity, row-count and no-duplicate assertions."
+    }
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {
+      "action": "Execute Plan 05's disposable X4 ordinary-time, restart/reload and SETA procedure only after all automated gates are clean.",
+      "context": "Runtime acceptance cannot be established by local tests; the current code-review gate is still open, so these actions must not start yet.",
+      "blocking": false
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "The Rust DLL owns complete message production; Lua remains a thin X4 getter/callback adapter.",
+      "rationale": "D-12 keeps testable state, identity, canonicalization, digest, completion and retry behavior in Rust while Lua only bridges game-owned APIs.",
+      "phase": "05.4"
+    },
+    {
+      "decision": "decoded_bytes is not part of the wire or completion contract.",
+      "rationale": "D-13 removes receiver-internal memory estimates from sender authority while retaining enforceable local resource bounds.",
+      "phase": "05.4"
+    },
+    {
+      "decision": "Reconnect is a protocol-generation fence, not only a named-pipe reconnect.",
+      "rationale": "A replacement bridge requires bootstrap-first compatibility and must not inherit an incomplete candidate from the old transport epoch.",
+      "phase": "05.4"
+    }
+  ],
+  "uncommitted_files": [
+    " M .planning/STATE.md",
+    " M .planning/config.json",
+    "?? .planning/state.json"
+  ],
+  "next_action": "Run a third narrow GSD code-review fix iteration for RR-CR-02 and RR-WR-02 from 05.4-REVIEW.md, beginning with RED real replacement-bridge cases for PendingStart, PendingBatch, PendingCompletion and commit-before-disposition loss.",
+  "context_notes": "Plans 05.4-02, 03 and 04 were implemented and pushed. Two review-fix iterations repaired 26 findings, but the final independent review at d1085f2 keeps the checkpoint closed on one deduplicated reconnect root plus its test facet. HEAD and origin are d1085f2190020eea42ee7aeb46363a1f4ddb2bc7. Stable candidate exists at dist/live-galaxy-carrier-b; the last verified manifest SHA-256 is 86c66d3f0f32c7b4a61de955cc3c417c31e20dd24d62b296b477c283ebdab7cf, but it must be rebuilt/refrozen after the final product fix. No X4, installation, game controls, SETA or save access occurred."
+}
