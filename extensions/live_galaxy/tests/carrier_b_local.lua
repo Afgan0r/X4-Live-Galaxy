@@ -8,20 +8,33 @@ local function write(path, text)
     assert(file:close())
 end
 
+local function read(path)
+    local file = assert(io.open(path, "rb"))
+    local text = assert(file:read("*a"))
+    assert(file:close())
+    return text
+end
+
 local function open_carrier()
     local carrier = require("live_galaxy/lua/live_galaxy_carrier")
     return assert(carrier.new())
 end
 
 if mode == "reload" then
+    local prior = read(result_path)
+    local pending_state = assert(prior:match('pending_state="([^"]+)"'))
+    local pending_incarnation = assert(prior:match('pending_incarnation="([^"]+)"'))
+    local pending_owners = assert(prior:match("pending_owners=(%d+)"))
     local initializer = assert(package.loadlib(
         ".\\extensions\\live_galaxy\\ui_c_library_live_galaxy_carrier_64.txt",
         "luaopen_live_galaxy_carrier"))
     local api = assert(initializer())
     local stale = api.close(assert(prior_token))
     local fresh = open_carrier()
-    write(result_path, string.format("return {stale=%d,fresh=%q,token=%q,getter_calls=1}",
-        stale, fresh.token, prior_token))
+    write(result_path, string.format(
+        "return {stale=%d,fresh=%q,token=%q,getter_calls=1,pending_state=%q,pending_incarnation=%q,pending_owners=%s}",
+        stale, fresh.token, prior_token, pending_state,
+        pending_incarnation, pending_owners))
     assert(fresh:close() == 0)
     return
 end
@@ -47,12 +60,21 @@ end
 assert(sampled, "sample watchdog: " .. last)
 
 if mode == "pending-io-unload" then
+    local pending, status = carrier:progress(1)
+    assert(pending == 1, "pending handoff required")
+    assert(type(status) == "table" and status.producer_state == "pending_start")
+    local owners = tonumber(status.capacity:match(":(%d+)$"))
+    assert(owners and owners > 0, "pending OS owner required")
+    local generation = assert(token:match("^(%d+):"), "token generation")
+    assert(status.producer_incarnation == "x4-producer-" .. generation, "pending identity")
     write(marker_path, "kill-bridge")
     host_sleep(500)
-    carrier:progress(1)
+    local retry = carrier:progress(1)
+    assert(retry == 1 or retry == 2, "retained pending bytes required")
     write(result_path, string.format(
-        "return {actual_native=true,token=%q,getter_calls=%d,sampled=true}",
-        token, getter_calls))
+        "return {actual_native=true,token=%q,getter_calls=%d,sampled=true,pending_state=%q,pending_incarnation=%q,pending_owners=%d}",
+        token, getter_calls, status.producer_state,
+        status.producer_incarnation, owners))
     return
 end
 

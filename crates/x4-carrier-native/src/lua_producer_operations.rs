@@ -1,6 +1,7 @@
 use core::ffi::{c_int, c_void};
 
 use crate::abi::{API, PRODUCER, REGISTRY, TRANSPORT, bytes, integer, push_code, token};
+use crate::lua_progress::{error_code, outcome_code};
 use crate::lua_transport::error_code_for_transport;
 use crate::{ProducerError, ProducerOutcome, TransportError, TransportPoll, TransportSendOutcome};
 
@@ -85,8 +86,12 @@ pub unsafe extern "C" fn progress(state: *mut c_void) -> c_int {
     if producer.pending_bytes().is_none() {
         match producer.progress(work, now) {
             Ok(ProducerOutcome::Progress) => {}
-            Ok(outcome) => return unsafe { push_code(api, state, outcome_code(outcome)) },
-            Err(error) => return unsafe { push_code(api, state, error_code(error)) },
+            result => {
+                let code = result.map_or_else(error_code, outcome_code);
+                return unsafe {
+                    crate::lua_progress::push(api, state, code, producer, transport, now)
+                };
+            }
         }
     }
     let Some(message) = producer.pending_bytes() else {
@@ -160,34 +165,6 @@ fn invalid(state: *mut c_void) -> c_int {
     API.get()
         .copied()
         .map_or(0, |api| unsafe { push_code(api, state, -20) })
-}
-
-const fn error_code(error: ProducerError) -> isize {
-    match error {
-        ProducerError::DataLimit => -12,
-        ProducerError::ControlLimit => -13,
-        ProducerError::StaleEpoch => -16,
-        ProducerError::Incompatible => 10,
-        ProducerError::ClockUnavailable => -22,
-        ProducerError::InvalidInput => -20,
-        ProducerError::InvalidTransition => -21,
-    }
-}
-
-const fn outcome_code(outcome: ProducerOutcome) -> isize {
-    match outcome {
-        ProducerOutcome::Accepted => 0,
-        ProducerOutcome::Progress => 1,
-        ProducerOutcome::CapacityUnavailable => 2,
-        ProducerOutcome::NoControl => 3,
-        ProducerOutcome::Received => 4,
-        ProducerOutcome::Committed => 5,
-        ProducerOutcome::PermanentlyRejected => 6,
-        ProducerOutcome::Ambiguous => 7,
-        ProducerOutcome::PausedAfterFailure => 8,
-        ProducerOutcome::Disconnected => 9,
-        ProducerOutcome::RestartRequired => 10,
-    }
 }
 
 const _: Option<TransportError> = None;

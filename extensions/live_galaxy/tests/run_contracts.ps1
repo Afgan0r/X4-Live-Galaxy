@@ -29,9 +29,11 @@ function Invoke-Stage([string]$Name, [string]$Executable, [string[]]$Arguments) 
 Push-Location $root
 try {
     if ($Suite -in @('all', 'carrier_b_actual')) {
-        Invoke-Stage 'Carrier-B-bridge-first' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest')
-        Invoke-Stage 'Carrier-B-native-first' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-StartupOrder', 'native-first')
-        Invoke-Stage 'Carrier-B-unload' 'pwsh' @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-Scenario', 'pending-io-unload')
+        $limits = Join-Path $root 'config/carrier-b-limits.json'
+        $actual = @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-LimitsFile', $limits)
+        Invoke-Stage 'Carrier-B-bridge-first' 'pwsh' $actual
+        Invoke-Stage 'Carrier-B-native-first' 'pwsh' ($actual + @('-StartupOrder', 'native-first'))
+        Invoke-Stage 'Carrier-B-unload' 'pwsh' ($actual + @('-Scenario', 'pending-io-unload'))
     }
     if ($Suite -ne 'xml') {
         $lock = Get-Content -LiteralPath (Join-Path $root 'tools/lua-runner.lock.json') -Raw | ConvertFrom-Json

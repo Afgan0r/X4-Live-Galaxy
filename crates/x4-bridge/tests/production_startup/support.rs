@@ -88,7 +88,17 @@ pub fn fresh_readback(directory: &Path) {
         .output()
         .expect("fresh readback process");
     assert!(output.status.success());
-    assert!(String::from_utf8_lossy(&output.stdout).contains("\"section_revision\":1"));
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).expect("typed JSON");
+    assert_eq!(value["section_key"], "carrier_b_realtime_sample");
+    assert_eq!(value["section_revision"], 1);
+    assert_eq!(value["records"].as_array().map(Vec::len), Some(1));
+    let record = &value["records"][0];
+    assert_eq!(record["record_id"], "record:sample:1");
+    assert_eq!(record["entity_id"], "x4:runtime:realtime_clock");
+    assert_eq!(record["observation_version"], 1);
+    assert_eq!(record["content"], "123.0");
+    assert_eq!(value["receipt"]["ordinal"], 1);
+    assert!(value["receipt"]["accepted_at"].as_u64().is_some());
 }
 
 pub struct TempDirectory(PathBuf);

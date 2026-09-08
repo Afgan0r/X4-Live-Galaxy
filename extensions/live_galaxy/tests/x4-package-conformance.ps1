@@ -42,12 +42,37 @@ function Assert-Rejected([scriptblock]$Check, [string]$Expected) {
     throw "Expected rejection: $Expected"
 }
 
+function Assert-TelemetryOnly([xml[]]$Documents, [string[]]$LuaTexts) {
+    foreach ($document in $Documents) {
+        $actions = @($document.SelectNodes('//actions/*'))
+        foreach ($action in $actions) {
+            if ($action.LocalName -cne 'raise_lua_event') {
+                throw "FORBIDDEN_MUTATION_NODE:$($action.LocalName)"
+            }
+        }
+        foreach ($comment in @($document.SelectNodes('//comment()'))) {
+            [void]$comment.ParentNode.RemoveChild($comment)
+        }
+        if ($document.OuterXml -match '(?i)sn_mod_support_apis|carrier[_-]?a') {
+            throw 'FORBIDDEN_CARRIER_A_REFERENCE'
+        }
+    }
+    if (($LuaTexts -join "`n") -match '(?i)sn_mod_support_apis|carrier[_-]?a') {
+        throw 'FORBIDDEN_CARRIER_A_REFERENCE'
+    }
+}
+
 $content = Read-ProductXml (Get-Content -LiteralPath (Join-Path $ExtensionRoot 'content.xml') -Raw)
 $ui = Read-ProductXml (Get-Content -LiteralPath (Join-Path $ExtensionRoot 'ui.xml') -Raw)
 $xmlFiles = @(Get-ChildItem -LiteralPath $ExtensionRoot -Recurse -File -Filter '*.xml' |
     Where-Object { $_.FullName -notmatch '[\\/]tests[\\/]' })
 foreach ($file in $xmlFiles) { $null = Read-ProductXml (Get-Content -LiteralPath $file.FullName -Raw) }
 Assert-Registration $content $ui $ExtensionRoot
+$mdFiles = @(Get-Item -LiteralPath (Join-Path $ExtensionRoot 'md/live_galaxy_observation.xml'))
+$mdDocuments = @($mdFiles | ForEach-Object { Read-ProductXml (Get-Content -LiteralPath $_.FullName -Raw) })
+$luaTexts = @(Get-ChildItem -LiteralPath (Join-Path $ExtensionRoot 'lua') -File -Filter '*.lua' |
+    ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })
+Assert-TelemetryOnly $mdDocuments $luaTexts
 
 # A few product negatives run in-process; no parser corpus or subprocess per fixture.
 Assert-Rejected { Read-ProductXml '<content>' } 'LoadXml'
@@ -60,4 +85,7 @@ $dependency.SetAttribute('name', 'sn_mod_support_apis')
 [void]$invalid.DocumentElement.SelectSingleNode('./environment').AppendChild($dependency)
 Assert-Rejected { Assert-Registration $content $invalid $ExtensionRoot } '^CARRIER_A_UI_DEPENDENCY_FORBIDDEN$'
 Assert-Rejected { Assert-Registration $content $ui (Join-Path $ExtensionRoot 'missing-entrypoint-fixture') } '^MISSING_ENTRYPOINT$'
-Write-Output "XML package: $($xmlFiles.Count) well-formed files, registration and 4 rejection checks passed."
+$invalidMd = Read-ProductXml '<mdscript><cues><cue><actions><create_ship /></actions></cue></cues></mdscript>'
+Assert-Rejected { Assert-TelemetryOnly @($invalidMd) @() } '^FORBIDDEN_MUTATION_NODE:create_ship$'
+Assert-Rejected { Assert-TelemetryOnly @() @('require("sn_mod_support_apis")') } '^FORBIDDEN_CARRIER_A_REFERENCE$'
+Write-Output "XML package: $($xmlFiles.Count) well-formed files, registration and 6 rejection checks passed."

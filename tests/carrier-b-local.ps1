@@ -7,7 +7,8 @@ param(
     [string]$StartupOrder = 'bridge-first',
     [string]$LuaJitPath,
     [string]$LuaLibraryPath,
-    [string]$LimitsFile
+    [string]$LimitsFile,
+    [switch]$Calibration
 )
 
 Set-StrictMode -Version Latest
@@ -16,7 +17,13 @@ $ErrorActionPreference = 'Stop'
 if (-not $SelfTest) { throw 'SELF_TEST_REQUIRED' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $cache = Join-Path $repo 'tools/.cache/carrier-b-local'
-$luaRoot = Join-Path $repo 'tools/.cache/lua-busted/5.1.5'
+$dependencyRoot = $repo
+if (-not (Test-Path -LiteralPath (Join-Path $dependencyRoot 'tools/.cache/lua-busted/5.1.5'))) {
+    $commonGitDirectory = (& git -C $repo rev-parse --path-format=absolute --git-common-dir).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'GIT_COMMON_DIRECTORY_UNAVAILABLE' }
+    $dependencyRoot = Split-Path -Parent $commonGitDirectory
+}
+$luaRoot = Join-Path $dependencyRoot 'tools/.cache/lua-busted/5.1.5'
 $luaSource = Join-Path $luaRoot 'lua-5.1.5/src'
 $defaultLua = Join-Path $luaRoot 'bin/lua.exe'
 $defaultLibrary = Join-Path $luaRoot 'bin/lua51.dll'
@@ -157,7 +164,16 @@ cargo build --locked --release -p x4-carrier-native -p x4-bridge
 if ($LASTEXITCODE -ne 0) { throw 'RELEASE_BUILD_FAILED' }
 Copy-Item -LiteralPath (Join-Path $repo 'target/release/x4_carrier_native.dll') -Destination (Join-Path $run 'extensions/live_galaxy/ui_c_library_live_galaxy_carrier_64.txt')
 $limits = Join-Path $run 'limits.json'
-if ($LimitsFile) { Copy-Item -LiteralPath (Resolve-Path $LimitsFile) -Destination $limits } else { Write-CalibrationLimits $limits }
+if ($Calibration -and $LimitsFile) { throw 'LIMIT_MODE_CONFLICT' }
+if ($Calibration) {
+    Write-CalibrationLimits $limits
+} else {
+    $sourceLimits = if ($LimitsFile) { $LimitsFile } else { Join-Path $repo 'config/carrier-b-limits.json' }
+    Copy-Item -LiteralPath (Resolve-Path $sourceLimits) -Destination $limits
+    $expectedLimitsHash = '440a55d8a0aed233f29fca14a6e06482c5880a0655f5beb98675f075303f4748'
+    $actualLimitsHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualLimitsHash -cne $expectedLimitsHash) { throw 'FROZEN_LIMITS_DIGEST_MISMATCH' }
+}
 $hostExecutable = Build-Host $run
 $data = Join-Path $run 'data'; [IO.Directory]::CreateDirectory($data) | Out-Null
 $result = Join-Path $run 'result.lua'; $marker = Join-Path $run 'kill.marker'
@@ -175,7 +191,10 @@ try {
     if ($Scenario -eq 'pending-io-unload') {
         $deadline = [DateTime]::UtcNow.AddSeconds(10)
         while (-not (Test-Path -LiteralPath $marker) -and -not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10 }
-        if (-not (Test-Path -LiteralPath $marker)) { throw 'PENDING_OPERATION_MARKER_MISSING' }
+        if (-not (Test-Path -LiteralPath $marker)) {
+            $detail = if ($process.HasExited) { $process.StandardError.ReadToEnd() } else { 'host-running' }
+            throw "PENDING_OPERATION_MARKER_MISSING:$detail"
+        }
         $bridge.Refresh(); $bridgePeak = $bridge.WorkingSet64
         Stop-Owned $bridge
     }
@@ -198,12 +217,31 @@ try {
         stale = if ($resultText -match 'stale=(-?\d+)') { [int]$Matches[1] } else { 0 }
         fresh = if ($resultText -match 'fresh="([^"]+)"') { $Matches[1] } else { '' }
         token = if ($resultText -match 'token="([^"]+)"') { $Matches[1] } else { '' }
+        pending_state = if ($resultText -match 'pending_state="([^"]+)"') { $Matches[1] } else { '' }
+        pending_incarnation = if ($resultText -match 'pending_incarnation="([^"]+)"') { $Matches[1] } else { '' }
+        pending_owners = if ($resultText -match 'pending_owners=(\d+)') { [int]$Matches[1] } else { 0 }
     }
     if ($Scenario -eq 'pending-io-unload') {
+        $pendingGeneration = if ($luaResult.token -match '^(\d+):') { $Matches[1] } else { '' }
+        if ($luaResult.pending_state -cne 'pending_start' -or
+            $luaResult.pending_incarnation -cne "x4-producer-$pendingGeneration" -or
+            $pendingGeneration -eq '' -or $luaResult.pending_owners -le 0) {
+            throw 'PENDING_OPERATION_IDENTITY_FAILED'
+        }
         if ($luaResult.stale -ne -16 -or $luaResult.fresh -eq $luaResult.token) { throw 'STALE_GENERATION_FENCE_FAILED' }
     } else {
         $readback = & (Join-Path $repo 'target/release/x4-bridge.exe') --readback --data-dir $data --section-key carrier_b_realtime_sample --section-revision 1
-        if ($LASTEXITCODE -ne 0 -or ($readback -join '') -notmatch '"section_revision":1') { throw 'DURABLE_READBACK_FAILED' }
+        if ($LASTEXITCODE -ne 0) { throw 'DURABLE_READBACK_FAILED' }
+        $current = ($readback -join '') | ConvertFrom-Json
+        if ($current.section_key -cne 'carrier_b_realtime_sample' -or
+            $current.section_revision -ne 1 -or @($current.records).Count -ne 1 -or
+            $current.records[0].record_id -cne 'carrier-b:1:1' -or
+            $current.records[0].entity_id -cne 'x4:runtime:realtime_clock' -or
+            $current.records[0].observation_version -ne 1 -or
+            $current.records[0].content -cne "getter=GetCurRealTime`nraw_value=123.5`nsemantics=opaque_runtime_number" -or
+            $current.receipt.ordinal -ne 1 -or $current.receipt.accepted_at -le 0) {
+            throw 'DURABLE_TYPED_READBACK_MISMATCH'
+        }
         if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne 1) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
     }
     $timer.Stop()
