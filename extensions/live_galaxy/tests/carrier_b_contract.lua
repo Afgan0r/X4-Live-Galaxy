@@ -132,6 +132,40 @@ describe("owned Carrier B adapter", function()
         assert.equals("game_loaded", env.begin().source_boundary)
     end)
 
+    it("marks exactly the first collection after a Lua module reload", function()
+        local env, init, tick = native(), nil, nil
+        package.loadlib = env.loadlib
+        package.preload.ffi = function()
+            return { C = {
+                GetCurRealTime = function() return 2 end,
+                GetCurrentGameTime = function() return 10 end,
+            } }
+        end
+        _G.Register_OnLoad_Init = function(callback) init = callback end
+        _G.RegisterEvent = function(_, callback) tick = callback end
+
+        fixture.runtime()
+        init()
+        tick("live_galaxy_observation", "telemetry_tick")
+        assert.equals("runtime_start", env.begin().source_boundary)
+
+        fixture.runtime()
+        init()
+        local actual_begin = env.api.begin_section
+        env.api.begin_section = function() return -21 end
+        assert.same({ false, "producer_busy" }, {
+            tick("live_galaxy_observation", "telemetry_tick"),
+        })
+        assert.equals("runtime_start", env.begin().source_boundary)
+        env.api.begin_section = actual_begin
+        tick("live_galaxy_observation", "telemetry_tick")
+        assert.equals("boundary_uncertain", env.begin().source_epoch_status)
+        assert.equals("lua_reload", env.begin().source_boundary)
+        tick("live_galaxy_observation", "telemetry_tick")
+        assert.equals("unknown", env.begin().source_epoch_status)
+        assert.equals("runtime_start", env.begin().source_boundary)
+    end)
+
     it("redacts callback paths and control characters", function()
         local env, init, tick, diagnostic = native({ throw = "progress" }), nil, nil, nil
         package.loadlib = env.loadlib

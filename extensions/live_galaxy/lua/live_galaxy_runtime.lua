@@ -4,6 +4,10 @@ local carrier_module = require(prefix .. "live_galaxy_carrier")
 local observation_module = require(prefix .. "live_galaxy_observation")
 local scheduler = require(prefix .. "live_galaxy_scheduler")
 
+local prior_generation = rawget(_G, "__live_galaxy_runtime_generation")
+local reload_boundary_pending = type(prior_generation) == "number"
+rawset(_G, "__live_galaxy_runtime_generation", (prior_generation or 0) + 1)
+
 local active_carrier, active_observation
 local initialized, callback_active = false, false
 local last_diagnostic
@@ -45,6 +49,9 @@ function runtime.handle_tick(_, event_parameter)
     }
     local boundary = boundaries[event_parameter]
     if boundary == nil then return false, "event_ignored" end
+    if reload_boundary_pending and event_parameter == "telemetry_tick" then
+        boundary = boundaries.telemetry_lua_reload
+    end
     callback_active = true
     local ok, result = pcall(scheduler.tick, boundary, active_carrier, active_observation)
     callback_active = false
@@ -55,6 +62,7 @@ function runtime.handle_tick(_, event_parameter)
     if result.disposition ~= "producer_busy" then
         diagnostic("transition", result.disposition)
     end
+    if result.disposition == "sampled" then reload_boundary_pending = false end
     return result.disposition == "sampled", result.disposition
 end
 
