@@ -7,6 +7,7 @@ mod facade;
 mod ingress;
 mod listener;
 mod operational_history;
+mod operational_status;
 mod production;
 mod production_limits;
 mod production_runtime;

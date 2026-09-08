@@ -25,3 +25,21 @@ fn repeated_events_rotate_with_bounded_gap_status() {
     );
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn post_start_status_sink_failure_is_visible_in_bounded_history() {
+    let path = std::env::temp_dir().join(format!("status-gap-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    let status = path.join("operational-status.json");
+    std::fs::remove_file(&status).expect("replace status file");
+    std::fs::create_dir(&status).expect("block status-file writes");
+
+    assert!(!history.record("collection", "first-status-gap"));
+    assert!(!history.record("collection", "second-status-gap"));
+    let events = std::fs::read_to_string(path.join("operational-history.jsonl"))
+        .expect("history remains readable");
+    assert!(events.contains("\"status_gap_count\":1"));
+    assert!(events.len() <= MAX_HISTORY_BYTES);
+
+    let _ = std::fs::remove_dir_all(path);
+}

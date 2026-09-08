@@ -2,10 +2,9 @@ use std::{
     fs::{File, OpenOptions},
     io::Write as _,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{DiagnosticError, diagnostics::escape};
+use crate::{DiagnosticError, diagnostics::escape, operational_status};
 
 const MAX_HISTORY_BYTES: usize = 64 * 1_024;
 const MAX_IDENTICAL_EVENTS: usize = 16;
@@ -19,6 +18,8 @@ pub struct OperationalHistory {
     suppressed: u64,
     gaps: u64,
     emergency_reported: bool,
+    status_gaps: u64,
+    status_emergency_reported: bool,
     session: String,
     epoch: u64,
     message: String,
@@ -43,6 +44,8 @@ impl OperationalHistory {
             suppressed: 0,
             gaps: 0,
             emergency_reported: false,
+            status_gaps: 0,
+            status_emergency_reported: false,
             session: String::new(),
             epoch: 0,
             message: String::new(),
@@ -59,7 +62,7 @@ impl OperationalHistory {
     pub fn record(&mut self, state: &str, reason: &str) -> bool {
         if self.is_suppressed(state, reason) {
             self.suppressed = self.suppressed.saturating_add(1);
-            return self.write_status(state, reason);
+            return self.record_status(state, reason);
         }
         let line = self.event_line(state, reason);
         self.suppressed = 0;
@@ -74,7 +77,7 @@ impl OperationalHistory {
             return self.note_gap(state, reason);
         }
         self.written = self.written.saturating_add(line.len());
-        self.write_status(state, reason)
+        self.record_status(state, reason)
     }
 
     #[must_use]
@@ -117,8 +120,8 @@ impl OperationalHistory {
 
     fn event_line(&self, state: &str, reason: &str) -> String {
         format!(
-            "{{\"clock\":\"unix-ms\",\"at\":{},\"component\":\"x4-bridge\",\"session\":\"{}\",\"epoch\":{},\"message\":\"{}\",\"section\":\"{}\",\"revision\":{},\"state\":\"{}\",\"reason\":\"{}\",\"suppressed_before\":{}}}\n",
-            now(),
+            "{{\"clock\":\"unix-ms\",\"at\":{},\"component\":\"x4-bridge\",\"session\":\"{}\",\"epoch\":{},\"message\":\"{}\",\"section\":\"{}\",\"revision\":{},\"state\":\"{}\",\"reason\":\"{}\",\"suppressed_before\":{},\"status_gap_count\":{}}}\n",
+            operational_status::now(),
             escape(&self.session),
             self.epoch,
             escape(&self.message),
@@ -126,7 +129,8 @@ impl OperationalHistory {
             self.revision,
             escape(state),
             escape(reason),
-            self.suppressed
+            self.suppressed,
+            self.status_gaps
         )
     }
 
@@ -154,20 +158,27 @@ impl OperationalHistory {
             let _ = std::io::stderr().write_all(b"x4-bridge degraded: operational-history-gap\n");
             self.emergency_reported = true;
         }
-        let _ = self.write_status(state, reason);
+        let _ = self.record_status(state, reason);
         false
     }
 
-    fn write_status(&self, state: &str, reason: &str) -> bool {
-        let path = self.path.with_file_name("operational-status.json");
-        let value = format!(
-            "{{\"component\":\"x4-bridge\",\"state\":\"{}\",\"reason\":\"{}\",\"history_gap_count\":{},\"suppressed_count\":{}}}\n",
-            escape(state),
-            escape(reason),
+    fn record_status(&mut self, state: &str, reason: &str) -> bool {
+        if operational_status::write(
+            &self.path,
+            state,
+            reason,
             self.gaps,
-            self.suppressed
-        );
-        std::fs::write(path, value).is_ok()
+            self.suppressed,
+            self.status_gaps,
+        ) {
+            return true;
+        }
+        self.status_gaps = self.status_gaps.saturating_add(1);
+        if !self.status_emergency_reported {
+            let _ = std::io::stderr().write_all(b"x4-bridge degraded: operational-status-gap\n");
+            self.status_emergency_reported = true;
+        }
+        false
     }
 }
 
@@ -177,14 +188,6 @@ fn open_append(path: &Path) -> Result<File, DiagnosticError> {
         .append(true)
         .open(path)
         .map_err(|_| DiagnosticError::Storage)
-}
-
-fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |value| {
-            u64::try_from(value.as_millis()).unwrap_or(u64::MAX)
-        })
 }
 
 #[cfg(test)]
