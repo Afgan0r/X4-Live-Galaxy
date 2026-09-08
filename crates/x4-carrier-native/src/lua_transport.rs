@@ -2,7 +2,7 @@ use core::ffi::{c_int, c_void};
 
 use crate::{
     CloseOutcome, TransportError,
-    abi::{API, REGISTRY, TRANSPORT, error_code, push_code, token},
+    abi::{API, PRODUCER, REGISTRY, TRANSPORT, error_code, push_code, token},
 };
 
 pub fn error_code_for_transport(error: TransportError) -> isize {
@@ -26,19 +26,67 @@ pub fn close_handle(state: *mut c_void, reset: bool) -> c_int {
     let Some(handle) = (unsafe { token(api, state) }) else {
         return unsafe { push_code(api, state, -20) };
     };
-    if let Ok(transport) = TRANSPORT.lock()
-        && let Some(item) = transport.as_ref()
-    {
-        let _progress = item.request_close(handle);
-    }
-    let code = REGISTRY.lock().map_or(-16, |mut registry| {
+    let Ok(mut registry) = REGISTRY.lock() else {
+        return unsafe { push_code(api, state, -16) };
+    };
+    let (code, owns_active) = {
         if reset {
-            return registry.reset(handle).map_or_else(error_code, |()| 0);
+            let result = registry.reset(handle);
+            let code = result
+                .as_ref()
+                .map_or_else(|error| error_code(*error), |()| 0);
+            (code, TeardownDecision::from_reset(result).allows())
+        } else {
+            let outcome = registry.close(handle);
+            let code = match outcome {
+                CloseOutcome::Closed | CloseOutcome::AlreadyClosed => 0,
+                CloseOutcome::Rejected(error) => error_code(error),
+            };
+            (code, TeardownDecision::from_close(outcome).allows())
         }
-        match registry.close(handle) {
-            CloseOutcome::Closed | CloseOutcome::AlreadyClosed => 0,
-            CloseOutcome::Rejected(error) => error_code(error),
-        }
-    });
+    };
+    if owns_active {
+        teardown_globals(handle);
+    }
     unsafe { push_code(api, state, code) }
+}
+
+#[derive(Clone, Copy)]
+enum TeardownDecision {
+    OwnsActive,
+    PreserveReplacement,
+}
+
+impl TeardownDecision {
+    const fn from_reset(result: Result<(), crate::CarrierError>) -> Self {
+        if result.is_ok() {
+            Self::OwnsActive
+        } else {
+            Self::PreserveReplacement
+        }
+    }
+
+    const fn from_close(outcome: CloseOutcome) -> Self {
+        if matches!(outcome, CloseOutcome::Closed) {
+            Self::OwnsActive
+        } else {
+            Self::PreserveReplacement
+        }
+    }
+
+    const fn allows(self) -> bool {
+        matches!(self, Self::OwnsActive)
+    }
+}
+
+fn teardown_globals(handle: crate::HandleToken) {
+    if let Ok(mut transport) = TRANSPORT.lock() {
+        if let Some(item) = transport.as_ref() {
+            let _progress = item.request_close(handle);
+        }
+        *transport = None;
+    }
+    if let Ok(mut producer) = PRODUCER.lock() {
+        *producer = None;
+    }
 }

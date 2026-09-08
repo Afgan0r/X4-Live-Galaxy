@@ -10,7 +10,7 @@ use crate::lua_producer_operations::{
 use crate::{
     ABI_VERSION, CarrierLimits, NativeTransport, OpenConfig, Producer, ProducerSource,
     TransportConfig,
-    abi::{API, PRODUCER, REGISTRY, TRANSPORT, integer, push_code},
+    abi::{API, PRODUCER, REGISTRY, TRANSPORT, bytes, integer, push_code},
 };
 
 pub const REGISTRATIONS: [(&[u8], LuaFn); 10] = [
@@ -112,15 +112,20 @@ unsafe fn open_inner(state: *mut c_void) -> c_int {
 }
 
 unsafe fn reset_inner(state: *mut c_void) -> c_int {
-    let result = crate::lua_transport::close_handle(state, false);
-    clear_producer();
-    result
+    let Some(api) = API.get().copied() else {
+        return 0;
+    };
+    let Some(reason) = (unsafe { bytes(api, state, 2, 64) }) else {
+        return unsafe { push_code(api, state, -20) };
+    };
+    if reason.is_empty() {
+        return unsafe { push_code(api, state, -20) };
+    }
+    crate::lua_transport::close_handle(state, true)
 }
 
 unsafe fn close_inner(state: *mut c_void) -> c_int {
-    let result = crate::lua_transport::close_handle(state, false);
-    clear_producer();
-    result
+    crate::lua_transport::close_handle(state, false)
 }
 
 fn guard(state: *mut c_void, operation: impl FnOnce() -> c_int) -> c_int {
@@ -129,10 +134,4 @@ fn guard(state: *mut c_void, operation: impl FnOnce() -> c_int) -> c_int {
             .copied()
             .map_or(0, |api| unsafe { push_code(api, state, -20) })
     })
-}
-
-fn clear_producer() {
-    if let Ok(mut producer) = PRODUCER.lock() {
-        *producer = None;
-    }
 }
