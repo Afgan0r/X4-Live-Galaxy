@@ -88,8 +88,8 @@ fn abi_poll_control_retains_control_and_state_while_clock_is_unavailable() {
     )
     .expect("control encodes");
     peer.send_control(&control).expect("control queued");
-    std::thread::sleep(Duration::from_millis(25));
-    transport.set_clock_for_test(None);
+    assert!(transport.wait_for_control_for_test(Duration::from_secs(2)));
+    assert!(transport.set_clock_for_test(None));
     *TRANSPORT.lock().expect("transport lock") = Some(transport);
     *PRODUCER.lock().expect("producer lock") = Some(producer);
     let mut state_value = FakeLuaState {
@@ -112,7 +112,7 @@ fn abi_poll_control_retains_control_and_state_while_clock_is_unavailable() {
         transport.snapshot().connection_generation,
         snapshot.connection_generation
     );
-    transport.set_clock_for_test(Some(101));
+    assert!(transport.set_clock_for_test(Some(101)));
     drop(transport_guard);
 
     assert_eq!(unsafe { poll_control(state_pointer) }, 1);

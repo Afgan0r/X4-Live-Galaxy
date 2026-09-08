@@ -86,6 +86,8 @@ pub(crate) struct Shared {
     pub millis: AtomicU64,
     pub clock_available: AtomicBool,
     pub clock_test_override: AtomicU8,
+    #[cfg(test)]
+    pub clock_test_lock: std::sync::Mutex<()>,
 }
 
 impl Shared {
@@ -102,6 +104,8 @@ impl Shared {
             millis: AtomicU64::new(0),
             clock_available: AtomicBool::new(false),
             clock_test_override: AtomicU8::new(0),
+            #[cfg(test)]
+            clock_test_lock: std::sync::Mutex::new(()),
         }
     }
 }

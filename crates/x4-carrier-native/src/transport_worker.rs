@@ -118,6 +118,10 @@ fn initial_connection(context: &WorkerContext) -> (Option<PendingIo>, Connection
 }
 
 fn refresh_clock(context: &WorkerContext) {
+    #[cfg(test)]
+    let Ok(_test_guard) = context.shared.clock_test_lock.lock() else {
+        return;
+    };
     if context.shared.clock_test_override.load(Ordering::Acquire) != 0 {
         return;
     }
