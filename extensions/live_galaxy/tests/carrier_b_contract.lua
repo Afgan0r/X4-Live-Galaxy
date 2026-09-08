@@ -67,7 +67,7 @@ describe("owned Carrier B adapter", function()
     end
 
     it("loads ABI 2 and samples one reserved realtime fact", function()
-        local env, getter_calls = native(), 0
+        local env, getter_calls, clock_calls = native(), 0, 0
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
         local observation = assert(fixture.load("live_galaxy_observation").new({
             getter = function()
@@ -75,12 +75,16 @@ describe("owned Carrier B adapter", function()
                 getter_calls = getter_calls + 1
                 return 123.5
             end,
+            clock_getter = function()
+                clock_calls = clock_calls + 1
+                return clock_calls == 1 and 10.25 or 10.5
+            end,
         }))
-        local result = fixture.load("live_galaxy_scheduler").tick({
-            capture_start_millis = "10", capture_end_millis = "11",
-        }, carrier, observation)
+        local result = fixture.load("live_galaxy_scheduler").tick(
+            "telemetry_tick", carrier, observation)
         assert.equals("sampled", result.disposition)
         assert.equals(1, getter_calls)
+        assert.equals(2, clock_calls)
         assert.same({ "loadlib", "open", "progress", "poll_control", "begin_section",
             "getter", "push_record", "finish_section" }, env.calls)
         assert.same({
@@ -88,7 +92,8 @@ describe("owned Carrier B adapter", function()
             getter = "GetCurRealTime", raw_value = "123.5", semantics = "opaque_runtime_number",
         }, env.fact())
         assert.equals("game_time_millis", env.begin().capture_clock)
-        assert.equals("11", env.finish().capture_end_millis)
+        assert.equals("10250", env.begin().capture_start_millis)
+        assert.equals("10500", env.finish().capture_end_millis)
     end)
 
     for _, value in ipairs({ false, "0", 1.5 }) do
@@ -108,7 +113,7 @@ describe("owned Carrier B adapter", function()
             return { C = { GetCurRealTime = function()
                 getter_calls = getter_calls + 1
                 return 2
-            end } }
+            end, GetCurrentGameTime = function() return getter_calls == 0 and 10.25 or 10.5 end } }
         end
         _G.Register_OnLoad_Init = function(callback) init = callback end
         _G.RegisterEvent = function(_, callback) tick = callback end
@@ -116,8 +121,8 @@ describe("owned Carrier B adapter", function()
         init()
         assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.equals(1, getter_calls)
-        assert.equals("10001", env.begin().capture_start_millis)
-        assert.equals("10001", env.finish().capture_end_millis)
+        assert.equals("10250", env.begin().capture_start_millis)
+        assert.equals("10500", env.finish().capture_end_millis)
     end)
 
     it("redacts callback paths and control characters", function()
@@ -144,7 +149,9 @@ describe("owned Carrier B adapter", function()
         it("keeps terminal status " .. reason, function()
             local env = native({ progress_code = code })
             local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
-            local observation = assert(fixture.load("live_galaxy_observation").new({ getter = function() return 1 end }))
+            local observation = assert(fixture.load("live_galaxy_observation").new({
+                getter = function() return 1 end, clock_getter = function() return 0 end,
+            }))
             local result = fixture.load("live_galaxy_scheduler").tick("telemetry_tick", carrier, observation)
             assert.equals(reason, result.disposition)
         end)
@@ -155,6 +162,7 @@ describe("owned Carrier B adapter", function()
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
         local observation = assert(fixture.load("live_galaxy_observation").new({
             getter = function() getter_calls = getter_calls + 1; return 1 end,
+            clock_getter = function() return 0 end,
         }))
         local result = fixture.load("live_galaxy_scheduler").tick({
             capture_start_millis = "1", capture_end_millis = "1",
@@ -184,6 +192,7 @@ describe("owned Carrier B adapter", function()
             local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
             local observation = assert(fixture.load("live_galaxy_observation").new({
                 getter = function() return value end,
+                clock_getter = function() return 0 end,
             }))
             local result = fixture.load("live_galaxy_scheduler").tick({
                 capture_start_millis = "1", capture_end_millis = "1",

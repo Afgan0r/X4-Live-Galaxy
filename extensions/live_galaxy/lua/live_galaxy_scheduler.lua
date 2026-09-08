@@ -25,15 +25,11 @@ function scheduler.tick(context, carrier, observation)
     local progress, progress_status = call(carrier, "progress", 1)
     if progress == nil then return finish(progress_status, nil) end
     if terminal[progress] then return finish(terminal[progress], progress) end
-    if context.capture_start_millis == nil and type(progress_status) == "table" then
-        context.capture_start_millis = progress_status.monotonic_millis
-        context.capture_end_millis = progress_status.monotonic_millis
-    end
     local control, control_error = call(carrier, "poll_control")
     if control == nil then return finish(control_error, nil) end
     if terminal[control] then return finish(terminal[control], control) end
 
-    local begin, begin_error = observation.begin_evidence(context)
+    local begin, begin_error = call(observation, "begin_evidence")
     if begin == nil then return finish(begin_error, nil) end
     local reserved = call(carrier, "begin_section", begin)
     if reserved == -21 then return finish("producer_busy", reserved) end
@@ -49,7 +45,7 @@ function scheduler.tick(context, carrier, observation)
         call(carrier, "fail_section", "fact_rejected")
         return finish("fact_rejected", pushed)
     end
-    local completion, completion_error = observation.finish_evidence(context)
+    local completion, completion_error = call(observation, "finish_evidence")
     if completion == nil then
         call(carrier, "fail_section", completion_error or "clock_unavailable")
         return finish(completion_error or "clock_unavailable", nil)
