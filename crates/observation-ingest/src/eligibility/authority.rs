@@ -54,6 +54,22 @@ impl SessionAuthority {
         self.identity = identity;
         self.generation.set(self.generation.get().saturating_add(1));
     }
+
+    fn can_rotate_to(&self, identity: &SourceSessionIdentity) -> bool {
+        self.identity.producer_incarnation() == identity.producer_incarnation()
+            && self.identity.transport_epoch() < identity.transport_epoch()
+    }
+
+    fn admit(&mut self, identity: &SourceSessionIdentity) -> bool {
+        if &self.identity == identity {
+            return true;
+        }
+        if !self.can_rotate_to(identity) {
+            return false;
+        }
+        self.replace(identity.clone());
+        true
+    }
 }
 
 impl DecisionRevisionIndex {
@@ -64,8 +80,8 @@ impl DecisionRevisionIndex {
         let scope = revision.source_scope().clone();
         if self
             .authoritative_sessions
-            .get(&scope)
-            .is_some_and(|current| &current.identity != revision.source_session())
+            .get_mut(&scope)
+            .is_some_and(|current| !current.admit(revision.source_session()))
         {
             return None;
         }

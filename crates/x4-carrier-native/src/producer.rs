@@ -33,8 +33,6 @@ pub struct Producer {
     pub(super) messages: Option<SectionMessages>,
     pub(super) pending: Option<Pending>,
     pub(super) connection_generation: u64,
-    pub(super) recovery_pending: Option<Pending>,
-    pub(super) recovery_state: Option<ProducerState>,
 }
 
 impl Producer {
@@ -59,8 +57,6 @@ impl Producer {
             messages: None,
             pending: Some(Pending::new(bytes, "bootstrap", now_millis)),
             connection_generation: 0,
-            recovery_pending: None,
-            recovery_state: None,
         })
     }
 

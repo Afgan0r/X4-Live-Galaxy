@@ -80,3 +80,71 @@ fn preparation_is_non_mutating_and_finalization_requires_live_authority() {
     );
     assert_eq!(index.current_count(), 0);
 }
+
+#[test]
+fn publication_rotates_only_to_a_higher_epoch_of_the_same_producer() {
+    let mut index = DecisionRevisionIndex::new(4).expect("blocker limit is non-zero");
+    index.record_current_pointer(key("ships"), revision(6));
+    index.record_current_pointer(key("sectors"), revision(4));
+    let first = finish(&mut staged());
+    let accepted = index
+        .prepare_publication(first)
+        .expect("first source session prepares");
+    assert_eq!(
+        index.finalize_committed(&accepted, 4),
+        FinalizationOutcome::Finalized
+    );
+
+    let higher_epoch = finish_with_session("producer:1", 2);
+    assert!(index.prepare_publication(higher_epoch).is_some());
+    assert!(
+        index
+            .prepare_publication(finish_with_session("producer:1", 1))
+            .is_none()
+    );
+    assert!(
+        index
+            .prepare_publication(finish_with_session("producer:2", 3))
+            .is_none()
+    );
+}
+
+fn finish_with_session(producer: &str, epoch: u64) -> observation_ingest::ValidatedSectionRevision {
+    let incarnation = || value(producer, ProducerIncarnationId::new);
+    let transport_epoch = || TransportEpoch::new(epoch).expect("epoch is positive");
+    let mut stager = GenerationStager::new(AcceptedProjection::empty(), limits());
+    let mut start = start();
+    start.producer_incarnation = incarnation();
+    start.transport_epoch = transport_epoch();
+    assert_eq!(
+        stager.start_section_with_context(start, context(), 1),
+        ReceiverDisposition::Received
+    );
+    let mut batches = [
+        batch("batch:1", 1, "ship:2", "record:2"),
+        batch("batch:2", 2, "ship:1", "record:1"),
+    ];
+    for (now, batch) in [2_u64, 3].into_iter().zip(&mut batches) {
+        batch.producer_incarnation = incarnation();
+        batch.transport_epoch = transport_epoch();
+        assert_eq!(
+            stager.stage_section_batch(batch.clone(), 1, now),
+            ReceiverDisposition::Received
+        );
+    }
+    let mut completion = completion();
+    completion.producer_incarnation = incarnation();
+    completion.transport_epoch = transport_epoch();
+    let envelope =
+        observation_ingest::bind_completion_certificate(completion, &batches, versions())
+            .expect("producer certificate binds");
+    let certificate = stager
+        .completion_certificate(envelope)
+        .expect("candidate exists");
+    let revision = match stager.complete_section(&certificate, &current(), 4) {
+        CompletionOutcome::Validated(revision) => Some(revision),
+        CompletionOutcome::Rejected(_) => None,
+    }
+    .expect("exact completion validates");
+    *revision
+}

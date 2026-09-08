@@ -7,48 +7,44 @@ impl Producer {
         generation: u64,
         now_millis: u64,
     ) -> Result<(), ProducerError> {
-        if generation == 0 || generation == self.connection_generation {
+        if generation == 0 || generation <= self.connection_generation {
             return Ok(());
         }
         if self.connection_generation == 0 {
             self.connection_generation = generation;
             return Ok(());
         }
-        self.connection_generation = generation;
-        if self
-            .pending
-            .as_ref()
-            .is_some_and(|pending| pending.id == "bootstrap")
-        {
-            self.pending
-                .as_mut()
+
+        let transport_epoch = self
+            .source
+            .transport_epoch
+            .checked_add(1)
+            .ok_or(ProducerError::StaleEpoch)?;
+        let revision = if self.has_incomplete_attempt() {
+            self.revision
+                .checked_add(1)
                 .ok_or(ProducerError::InvalidTransition)?
-                .handed_off = false;
-            self.readiness = Readiness::Awaiting;
-            self.state = ProducerState::AwaitingCompatibility;
-            return Ok(());
-        }
-        self.recovery_state = Some(self.state);
-        self.recovery_pending = self.pending.take();
-        self.pending = Some(Pending::new(
-            bootstrap_bytes(&self.source, self.limits.control_message_bytes)?,
-            "bootstrap",
-            now_millis,
-        ));
+        } else {
+            self.revision
+        };
+        let mut source = self.source.clone();
+        source.transport_epoch = transport_epoch;
+        let bootstrap = bootstrap_bytes(&source, self.limits.control_message_bytes)?;
+
+        self.discard_incomplete();
+        self.source = source;
+        self.revision = revision;
+        self.connection_generation = generation;
+        self.pending = Some(Pending::new(bootstrap, "bootstrap", now_millis));
         self.readiness = Readiness::Awaiting;
         self.state = ProducerState::AwaitingCompatibility;
         Ok(())
     }
 
-    pub(super) fn restore_recovery(&mut self) {
-        let Some(state) = self.recovery_state.take() else {
-            return;
-        };
-        self.state = state;
-        let Some(mut pending) = self.recovery_pending.take() else {
-            return;
-        };
-        pending.handed_off = false;
-        self.pending = Some(pending);
+    fn has_incomplete_attempt(&self) -> bool {
+        !matches!(
+            self.state,
+            ProducerState::AwaitingCompatibility | ProducerState::Ready
+        )
     }
 }

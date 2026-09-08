@@ -49,7 +49,6 @@ impl Producer {
                 if self.readiness == Readiness::Intent && value.credit == 1 =>
             {
                 self.readiness = Readiness::Ready;
-                self.restore_recovery();
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::Disposition(value) => self.apply_disposition(&value, now_millis),
