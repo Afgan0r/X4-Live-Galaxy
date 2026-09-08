@@ -60,7 +60,6 @@ while host_monotonic_millis() < sample_deadline do
     }, carrier, observation)
     last = result.disposition
     if last == "sampled" then sampled = true; break end
-    write(marker_path, last)
     host_sleep(1)
 end
 local sample_status = carrier.current_status or {}
