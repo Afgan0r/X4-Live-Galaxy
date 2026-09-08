@@ -175,6 +175,7 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
         $startup = @(
             'Live Galaxy Carrier B starts as two independent components.',
             'Start live-galaxy-bridge.exe --data-dir <private-directory> --limits-file carrier-b-limits.json.',
+            'Install extensions/live_galaxy under the X4 game-root extensions directory.',
             'Then enable the unpacked extension with protected UI extensions permitted by X4.',
             'Starting X4 first is also supported; the bridge reconnects within the configured finite budget.',
             'Do not hot-replace the native image. Restart X4 after DLL, Lua, ABI, or contract changes.'

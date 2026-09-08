@@ -1,8 +1,7 @@
 local runtime = {}
-local prefix = "live_galaxy/lua/"
-local carrier_module = require(prefix .. "live_galaxy_carrier")
-local observation_module = require(prefix .. "live_galaxy_observation")
-local scheduler = require(prefix .. "live_galaxy_scheduler")
+local carrier_module = require("extensions.live_galaxy.lua.live_galaxy_carrier")
+local observation_module = require("extensions.live_galaxy.lua.live_galaxy_observation")
+local scheduler = require("extensions.live_galaxy.lua.live_galaxy_scheduler")
 
 local active_carrier, active_observation
 local initialized, callback_active = false, false

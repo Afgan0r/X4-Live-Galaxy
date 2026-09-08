@@ -60,6 +60,9 @@ function Assert-TelemetryOnly([xml[]]$Documents, [string[]]$LuaTexts) {
     if (($LuaTexts -join "`n") -match '(?i)sn_mod_support_apis|carrier[_-]?a') {
         throw 'FORBIDDEN_CARRIER_A_REFERENCE'
     }
+    if (($LuaTexts -join "`n") -match 'require\s*\(\s*["'']live_galaxy/lua/') {
+        throw 'SLASH_QUALIFIED_LOCAL_IMPORT_FORBIDDEN'
+    }
 }
 
 $content = Read-ProductXml (Get-Content -LiteralPath (Join-Path $ExtensionRoot 'content.xml') -Raw)
@@ -88,4 +91,5 @@ Assert-Rejected { Assert-Registration $content $ui (Join-Path $ExtensionRoot 'mi
 $invalidMd = Read-ProductXml '<mdscript><cues><cue><actions><create_ship /></actions></cue></cues></mdscript>'
 Assert-Rejected { Assert-TelemetryOnly @($invalidMd) @() } '^FORBIDDEN_MUTATION_NODE:create_ship$'
 Assert-Rejected { Assert-TelemetryOnly @() @('require("sn_mod_support_apis")') } '^FORBIDDEN_CARRIER_A_REFERENCE$'
-Write-Output "XML package: $($xmlFiles.Count) well-formed files, registration and 6 rejection checks passed."
+Assert-Rejected { Assert-TelemetryOnly @() @('require("live_galaxy/lua/module")') } '^SLASH_QUALIFIED_LOCAL_IMPORT_FORBIDDEN$'
+Write-Output "XML package: $($xmlFiles.Count) well-formed files, registration and 7 rejection checks passed."

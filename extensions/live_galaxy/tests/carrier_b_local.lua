@@ -1,6 +1,6 @@
 local root, mode, result_path, marker_path, prior_token = ...
 assert(type(root) == "string" and type(result_path) == "string")
-package.path = root .. "/extensions/?.lua;" .. package.path
+package.path = root .. "/?.lua;" .. package.path
 
 local function write(path, text)
     local file = assert(io.open(path, "wb"))
@@ -16,7 +16,7 @@ local function read(path)
 end
 
 local function open_carrier()
-    local carrier = require("live_galaxy/lua/live_galaxy_carrier")
+    local carrier = require("extensions.live_galaxy.lua.live_galaxy_carrier")
     return assert(carrier.new())
 end
 
@@ -43,14 +43,14 @@ end
 local carrier = open_carrier()
 local token = carrier.token
 local getter_calls, clock_calls = 0, 0
-local observation = assert(require("live_galaxy/lua/live_galaxy_observation").new({
+local observation = assert(require("extensions.live_galaxy.lua.live_galaxy_observation").new({
     getter = function() getter_calls = getter_calls + 1; return 123.5 end,
     clock_getter = function()
         clock_calls = clock_calls + 1
         return clock_calls == 1 and 10.25 or 10.5
     end,
 }))
-local scheduler = require("live_galaxy/lua/live_galaxy_scheduler")
+local scheduler = require("extensions.live_galaxy.lua.live_galaxy_scheduler")
 local sampled, last = false, "none"
 local sample_deadline = host_monotonic_millis() + 10000
 while host_monotonic_millis() < sample_deadline do

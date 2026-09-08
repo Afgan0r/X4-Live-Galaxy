@@ -1,6 +1,6 @@
 local telemetry = {}
 
-local normalize = require("live_galaxy/lua/live_galaxy_normalize")
+local normalize = require("extensions.live_galaxy.lua.live_galaxy_normalize")
 
 local MAX_SECTIONS_PER_CYCLE = 1
 local MAX_CANONICAL_ENCODED_FRAME_UTF8_BYTES = 1800

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'syntax', 'xml', 'carrier_b_actual')]
+    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'loader', 'syntax', 'xml', 'carrier_b_actual')]
     [string]$Suite = 'all',
     [string]$Filter,
     [string]$ExtensionRoot = (Split-Path -Parent $PSScriptRoot)
@@ -53,9 +53,10 @@ try {
             'x4_discovery' { 'carrier_b_contract.lua' }
             'telemetry' { 'telemetry_spec.lua' }
             'scheduler' { 'carrier_b_contract.lua' }
+            'loader' { 'x4_loader_contract.lua' }
             'syntax' { 'module_loading_spec.lua'; $arguments += '--tags=syntax' }
             'carrier_b_actual' { 'carrier_b_contract.lua' }
-            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua' }
+            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua'; 'x4_loader_contract.lua' }
         }
         $arguments += @($files | ForEach-Object { Join-Path $PSScriptRoot $_ })
         Invoke-Stage 'Busted' $busted $arguments
