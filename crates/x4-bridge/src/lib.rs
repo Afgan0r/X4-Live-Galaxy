@@ -9,6 +9,7 @@ mod listener;
 mod operational_history;
 mod operational_status;
 mod production;
+mod production_admission;
 mod production_limits;
 mod production_runtime;
 mod production_runtime_idle;
