@@ -131,7 +131,9 @@ pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {
         return unsafe { push_code(api, state, -18) };
     };
     let snapshot = transport.snapshot();
-    let now = snapshot.monotonic_millis.unwrap_or(0);
+    let Some(now) = snapshot.monotonic_millis else {
+        return unsafe { push_code(api, state, -22) };
+    };
     if producer
         .observe_connection(snapshot.connection_generation, now)
         .is_err()
