@@ -15,6 +15,7 @@ observation-persistence = { path = "../observation-persistence" }
 x4-carrier-native = { path = "../x4-carrier-native" }
 
 [dev-dependencies]
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 serde_json = "=1.0.151"
 
 [target.'cfg(windows)'.dependencies]

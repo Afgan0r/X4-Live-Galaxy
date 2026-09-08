@@ -3,20 +3,41 @@
     reason = "bounded integration watchdog fails immediately"
 )]
 
-use std::time::Duration;
-
-use x4_carrier_native::{
-    HandleToken, NativeTransport, Producer, ProducerLimits, ProducerOutcome, ProducerSource,
-    ProducerState, SectionEvidence, SectionFinishEvidence, TransportSendOutcome, TypedFact,
-};
+use observation_ingest::{ControlBody, decode_carrier_bootstrap, decode_carrier_control};
+use x4_carrier_native::{Producer, ProducerLimits, ProducerOutcome, ProducerState};
 
 use super::{Harness, TEST_LOCK, startup_support};
 
+#[path = "bootstrap_reconnect/durable.rs"]
+mod durable;
+#[path = "bootstrap_reconnect/support.rs"]
+mod support;
+
+#[derive(Clone, Copy, Debug)]
+enum DisconnectCut {
+    PendingStart,
+    PendingBatch,
+    PendingCompletion,
+    CommitBeforeDisposition,
+}
+
 #[test]
-fn replacement_bridge_requires_bootstrap_before_exact_pending_replay() {
+fn replacement_bridge_fences_every_pending_stage_and_uncertain_commit() {
     let _guard = TEST_LOCK.lock().expect("test lock");
-    let mut harness = Harness::start("producer-reconnect", startup_support::valid_limits());
-    let source = producer_source("producer-reconnect");
+    for cut in [
+        DisconnectCut::PendingStart,
+        DisconnectCut::PendingBatch,
+        DisconnectCut::PendingCompletion,
+        DisconnectCut::CommitBeforeDisposition,
+    ] {
+        run_replacement(cut);
+    }
+}
+
+fn run_replacement(cut: DisconnectCut) {
+    let label = format!("producer-reconnect-{cut:?}");
+    let mut harness = Harness::start(&label, startup_support::valid_limits());
+    let source = support::producer_source(&label);
     let now = harness
         .transport
         .snapshot()
@@ -24,10 +45,9 @@ fn replacement_bridge_requires_bootstrap_before_exact_pending_replay() {
         .expect("clock");
     let mut producer =
         Producer::new(ProducerLimits::bring_up(), source.clone(), now).expect("producer");
-    negotiate(&mut producer, &harness.transport, harness.token);
-    collect(&mut producer, &source, now);
-    let immutable = producer.pending_bytes().expect("pending start").to_vec();
-    send_pending(&mut producer, &harness.transport, harness.token);
+    support::negotiate(&mut producer, &harness.transport, harness.token, 1);
+    support::collect(&mut producer, &source, now, "123.0");
+    advance_to_cut(&mut producer, &harness, &source, cut);
 
     let old_generation = harness.transport.snapshot().connection_generation;
     harness.child.kill().expect("old bridge killed");
@@ -36,152 +56,67 @@ fn replacement_bridge_requires_bootstrap_before_exact_pending_replay() {
         harness.directory.path(),
         &harness.directory.path().join("limits.json"),
     );
-    wait_for_generation(&harness.transport, old_generation);
-    negotiate(&mut producer, &harness.transport, harness.token);
-    assert_eq!(producer.state(), ProducerState::PendingStart);
-    assert_eq!(producer.pending_bytes(), Some(immutable.as_slice()));
+    support::wait_for_generation(&harness.transport, old_generation);
 
-    for expected in [
-        ProducerOutcome::Received,
-        ProducerOutcome::Received,
-        ProducerOutcome::Committed,
-    ] {
-        send_pending(&mut producer, &harness.transport, harness.token);
-        let bytes = startup_support::await_control(&harness.transport, harness.token);
-        let current = harness
-            .transport
-            .snapshot()
-            .monotonic_millis
-            .expect("clock");
-        assert_eq!(producer.apply_control(&bytes, current), Ok(expected));
-    }
-    assert_eq!(producer.state(), ProducerState::Ready);
-    assert!(producer.pending_bytes().is_none());
-    assert_actual_readback(harness.directory.path());
-    let history =
-        std::fs::read_to_string(harness.directory.path().join("operational-history.jsonl"))
-            .expect("history");
-    assert!(history.contains("\"session\":\"session-producer-reconnect\""));
-    assert!(history.contains("\"epoch\":1"));
-    harness.stop();
-}
-
-fn collect(producer: &mut Producer, source: &ProducerSource, now: u64) {
-    producer
-        .begin_section(SectionEvidence::point_measurement(
-            source.source_scope.clone(),
-        ))
-        .expect("reserve");
-    producer
-        .push_record(&TypedFact {
-            entity_id: "x4:runtime:realtime_clock".to_owned(),
-            observation_version: 1,
-            getter: "GetCurRealTime".to_owned(),
-            semantics: "opaque_runtime_number".to_owned(),
-            raw_value: "123.0".to_owned(),
-        })
-        .expect("fact");
-    producer
-        .finish_section(SectionFinishEvidence {
-            capture_end_millis: 0,
-            succeeded: true,
-            quality: observation_domain::SectionQuality::Unknown,
-            availability: observation_domain::SectionAvailability::Available,
-            coverage: observation_domain::SectionCoverage::PointMeasurement,
-            consistency: observation_domain::SourceConsistency::Unknown,
-            stable_identity: false,
-        })
-        .expect("finish");
-    producer.progress(1, now).expect("assemble");
-}
-
-fn producer_source(label: &str) -> ProducerSource {
-    ProducerSource {
-        session_id: format!("session-{label}"),
-        producer_incarnation: "producer:1".to_owned(),
-        transport_epoch: 1,
-        source_scope: "x4:carrier_b_acceptance".to_owned(),
-        source_epoch_status: observation_domain::SourceEpochStatus::Unknown,
-        source_boundary: observation_domain::SourceBoundary::RuntimeStart,
-    }
-}
-
-fn negotiate(producer: &mut Producer, transport: &NativeTransport, token: HandleToken) {
-    let snapshot = transport.snapshot();
+    let snapshot = harness.transport.snapshot();
     producer
         .observe_connection(
             snapshot.connection_generation,
             snapshot.monotonic_millis.expect("clock"),
         )
-        .expect("observe connection");
-    send_pending(producer, transport, token);
-    for _ in 0..3 {
-        let bytes = startup_support::await_control(transport, token);
-        let now = transport.snapshot().monotonic_millis.expect("clock");
-        assert_eq!(
-            producer.apply_control(&bytes, now),
-            Ok(ProducerOutcome::Accepted)
-        );
-    }
-}
-
-fn send_pending(producer: &mut Producer, transport: &NativeTransport, token: HandleToken) {
-    let bytes = producer.pending_bytes().expect("sendable pending");
-    let deadline = std::time::Instant::now() + Duration::from_secs(3);
-    loop {
-        match transport.try_send(token, bytes) {
-            TransportSendOutcome::LocalHandoff => break,
-            TransportSendOutcome::CapacityUnavailable if std::time::Instant::now() < deadline => {
-                std::thread::yield_now();
-            }
-            TransportSendOutcome::CapacityUnavailable => panic!("send watchdog expired"),
-            outcome @ TransportSendOutcome::Rejected(_) => panic!("send failed: {outcome:?}"),
-        }
-    }
-    let now = transport.snapshot().monotonic_millis.expect("clock");
-    producer.mark_local_handoff(now).expect("handoff");
-}
-
-fn wait_for_generation(transport: &NativeTransport, previous: u64) {
-    let deadline = std::time::Instant::now() + Duration::from_secs(3);
-    while transport.snapshot().connection_generation <= previous
-        && std::time::Instant::now() < deadline
-    {
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    assert!(transport.snapshot().connection_generation > previous);
-}
-
-fn assert_actual_readback(directory: &std::path::Path) {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_x4-bridge"))
-        .args([
-            "--readback",
-            "--data-dir",
-            directory.to_str().expect("path"),
-        ])
-        .args([
-            "--section-key",
-            "carrier_b_realtime_sample",
-            "--section-revision",
-            "1",
-        ])
-        .output()
-        .expect("readback");
-    assert!(output.status.success());
-    let value: serde_json::Value = serde_json::from_slice(&output.stdout).expect("typed JSON");
-    assert_eq!(value["section_key"], "carrier_b_realtime_sample");
-    assert_eq!(value["section_revision"], 1);
-    assert_eq!(value["records"].as_array().map(Vec::len), Some(1));
-    assert_eq!(value["records"][0]["record_id"], "carrier-b:1:1");
+        .expect("replacement observed");
+    assert_eq!(producer.state(), ProducerState::AwaitingCompatibility);
+    let bootstrap = producer.pending_bytes().expect("replacement bootstrap");
     assert_eq!(
-        value["records"][0]["entity_id"],
-        "x4:runtime:realtime_clock"
+        decode_carrier_bootstrap(bootstrap, 2_048).expect("bootstrap"),
+        support::identity(&source, 2)
     );
-    assert_eq!(value["records"][0]["observation_version"], 1);
-    assert_eq!(
-        value["records"][0]["content"],
-        "getter=GetCurRealTime\nraw_value=123.0\nsemantics=opaque_runtime_number"
+    support::negotiate_observed(&mut producer, &harness.transport, harness.token, 2);
+    assert_eq!(producer.state(), ProducerState::Ready);
+    assert!(producer.pending_bytes().is_none());
+
+    support::collect(&mut producer, &source, now, "123.0");
+    support::publish_pending(&mut producer, &harness.transport, harness.token);
+    assert_eq!(producer.state(), ProducerState::Ready);
+    durable::assert_state(harness.directory.path(), cut);
+    harness.stop();
+}
+
+fn advance_to_cut(
+    producer: &mut Producer,
+    harness: &Harness,
+    source: &x4_carrier_native::ProducerSource,
+    cut: DisconnectCut,
+) {
+    if matches!(cut, DisconnectCut::PendingStart) {
+        support::send_and_drop_disposition(producer, &harness.transport, harness.token);
+        return;
+    }
+    support::send_and_apply(
+        producer,
+        &harness.transport,
+        harness.token,
+        ProducerOutcome::Received,
     );
-    assert_eq!(value["receipt"]["ordinal"], 1);
-    assert!(value["receipt"]["accepted_at"].as_u64().is_some());
+    if matches!(cut, DisconnectCut::PendingBatch) {
+        support::send_and_drop_disposition(producer, &harness.transport, harness.token);
+        return;
+    }
+    support::send_and_apply(
+        producer,
+        &harness.transport,
+        harness.token,
+        ProducerOutcome::Received,
+    );
+    if matches!(cut, DisconnectCut::PendingCompletion) {
+        return;
+    }
+    support::send_pending(producer, &harness.transport, harness.token);
+    let bytes = startup_support::await_control(&harness.transport, harness.token);
+    let identity = support::identity(source, 1);
+    let control = decode_carrier_control(&bytes, &identity, 2_048).expect("committed disposition");
+    assert!(matches!(
+        control.body,
+        ControlBody::Disposition(value) if value.disposition == "committed"
+    ));
 }

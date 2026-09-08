@@ -391,6 +391,7 @@ dependencies = [
  "observation-ingest",
  "observation-persistence",
  "recvmsg",
+ "rusqlite",
  "serde_json",
  "x4-carrier-native",
 ]
