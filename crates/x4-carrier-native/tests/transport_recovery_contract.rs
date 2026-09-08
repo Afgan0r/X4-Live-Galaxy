@@ -85,6 +85,33 @@ fn generation_reports_uncertain_write_for_exact_caller_reconciliation() {
 }
 
 #[test]
+fn explicit_reconnect_advances_generation_without_peer_failure() {
+    let config = config();
+    let transport = NativeTransport::start(config.clone(), token()).expect("transport");
+    let _peer = BridgePeer::connect(&config, Duration::from_secs(2)).expect("first peer");
+    let old_generation = transport.snapshot().connection_generation;
+    transport
+        .request_reconnect(token())
+        .expect("reconnect request");
+    let mut replacement = connect_until(&config, &transport);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while transport.snapshot().connection_generation <= old_generation {
+        assert!(Instant::now() < deadline, "generation did not advance");
+        std::thread::yield_now();
+    }
+    assert_eq!(
+        transport.try_send(token(), b"fresh-application"),
+        TransportSendOutcome::LocalHandoff
+    );
+    assert_eq!(
+        replacement.receive(2_048),
+        Ok(b"fresh-application".to_vec())
+    );
+    let _ = transport.request_close(token());
+    assert!(transport.wait_closed_for_test(Duration::from_secs(2)));
+}
+
+#[test]
 fn stale_control_is_fenced_from_replacement_connection() {
     let config = config();
     let transport = NativeTransport::start(config.clone(), token()).expect("transport");

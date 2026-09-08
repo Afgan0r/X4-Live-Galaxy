@@ -67,6 +67,17 @@ fn peer_reset_waits_for_reconnect_and_preserves_session_identity() {
 }
 
 #[test]
+fn observing_the_same_connection_generation_is_idempotent() {
+    let (mut producer, _) = support::ready(22_000);
+    producer.observe_connection(1, 22_000).unwrap();
+    let state = producer.state();
+    let pending = producer.pending_bytes().map(<[u8]>::to_vec);
+    producer.observe_connection(1, 22_001).unwrap();
+    assert_eq!(producer.state(), state);
+    assert_eq!(producer.pending_bytes(), pending.as_deref());
+}
+
+#[test]
 fn reconnect_bootstrap_fences_and_restores_exact_pending_bytes() {
     let now = 25_000;
     let (mut producer, source) = pending_section(now);
