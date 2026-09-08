@@ -96,6 +96,10 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         self.slot = StopAndWaitSlot::empty();
     }
 
+    pub fn expire_candidates(&mut self, now: u64) -> usize {
+        self.stager.expire_candidates(now)
+    }
+
     fn dispatch(
         &mut self,
         message: CompleteMessage,

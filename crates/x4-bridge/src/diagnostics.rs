@@ -1,6 +1,4 @@
 use std::fmt::Write as _;
-use std::fs::{File, OpenOptions};
-use std::io::Write as _;
 use std::path::Path;
 
 use observation_domain::{SectionKey, SectionRevisionId};
@@ -32,55 +30,6 @@ impl DiagnosticError {
             Self::RevisionMismatch => "revision-mismatch",
             Self::Storage => "diagnostic-storage",
         }
-    }
-}
-
-pub struct OperationalHistory {
-    sink: Option<File>,
-    gap_reported: bool,
-}
-
-impl OperationalHistory {
-    pub fn open(data_dir: &Path) -> Result<Self, DiagnosticError> {
-        std::fs::create_dir_all(data_dir).map_err(|_| DiagnosticError::Storage)?;
-        let path = data_dir.join("operational-history.jsonl");
-        let sink = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .map_err(|_| DiagnosticError::Storage)?;
-        let mut history = Self {
-            sink: Some(sink),
-            gap_reported: false,
-        };
-        if history.record("startup", "journal-accepted") {
-            Ok(history)
-        } else {
-            Err(DiagnosticError::Storage)
-        }
-    }
-
-    #[must_use]
-    pub fn record(&mut self, state: &str, reason: &str) -> bool {
-        let line = format!(
-            "{{\"state\":\"{}\",\"reason\":\"{}\"}}\n",
-            escape(state),
-            escape(reason)
-        );
-        let accepted = self
-            .sink
-            .as_mut()
-            .is_some_and(|sink| sink.write_all(line.as_bytes()).is_ok() && sink.flush().is_ok());
-        if !accepted {
-            self.sink = None;
-            self.gap_reported = true;
-        }
-        accepted
-    }
-
-    #[must_use]
-    pub const fn has_history_gap(&self) -> bool {
-        self.gap_reported
     }
 }
 
@@ -140,7 +89,7 @@ fn render_current(current: &observation_persistence::CurrentRevision) -> String 
     output
 }
 
-fn escape(value: &str) -> String {
+pub fn escape(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
     for character in value.chars() {
         match character {

@@ -114,6 +114,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         self.last_received = None;
     }
 
+    pub fn expire_candidates(&mut self, now: u64) -> usize {
+        let expired = self.lifecycle.expire_candidates(now);
+        if expired > 0 {
+            self.last_received = None;
+        }
+        expired
+    }
+
     fn receiver_context(
         &mut self,
         bytes: &[u8],

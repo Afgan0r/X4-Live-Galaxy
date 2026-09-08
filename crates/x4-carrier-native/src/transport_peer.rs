@@ -39,6 +39,22 @@ impl BridgePeer {
         Err(TransportError::Unavailable)
     }
 
+    pub fn receive_timeout(
+        &mut self,
+        capacity: usize,
+        timeout: Duration,
+    ) -> Result<Option<Vec<u8>>, TransportError> {
+        if capacity == 0 || capacity > self.max_data_message_bytes {
+            return Err(TransportError::InvalidConfig);
+        }
+        #[cfg(windows)]
+        {
+            crate::abi_windows_peer::peer_read_timeout(self.handle, capacity, timeout)
+        }
+        #[cfg(not(windows))]
+        Err(TransportError::Unavailable)
+    }
+
     pub fn send_control(&mut self, bytes: &[u8]) -> Result<(), TransportError> {
         if bytes.len() > self.max_control_message_bytes {
             return Err(TransportError::MessageTooLarge);

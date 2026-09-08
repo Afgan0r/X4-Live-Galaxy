@@ -11,7 +11,9 @@ use windows_sys::Win32::{
     Storage::FileSystem::{
         CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, ReadFile, WriteFile,
     },
-    System::Pipes::{PIPE_READMODE_MESSAGE, SetNamedPipeHandleState, WaitNamedPipeW},
+    System::Pipes::{
+        PIPE_READMODE_MESSAGE, PeekNamedPipe, SetNamedPipeHandleState, WaitNamedPipeW,
+    },
 };
 
 use crate::{TransportError, abi_windows_io::RawHandle};
@@ -73,6 +75,38 @@ pub fn peer_read(handle: RawHandle, capacity: usize) -> Result<Vec<u8>, Transpor
     }
     bytes.truncate(received as usize);
     Ok(bytes)
+}
+
+pub fn peer_read_timeout(
+    handle: RawHandle,
+    capacity: usize,
+    timeout: Duration,
+) -> Result<Option<Vec<u8>>, TransportError> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let mut available = 0_u32;
+        // SAFETY: handle is live and only the available byte count is requested.
+        let ok = unsafe {
+            PeekNamedPipe(
+                handle,
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+                &raw mut available,
+                ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            return Err(TransportError::Unavailable);
+        }
+        if available > 0 {
+            return peer_read(handle, capacity).map(Some);
+        }
+        if Instant::now() >= deadline {
+            return Ok(None);
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
 }
 
 pub fn peer_write(handle: RawHandle, bytes: &[u8]) -> Result<(), TransportError> {

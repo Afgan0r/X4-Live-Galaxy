@@ -8,10 +8,32 @@ use observation_ingest::{
 };
 use x4_carrier_native::{BridgePeer, TransportConfig};
 
+use crate::production_runtime_idle::await_progress;
 use crate::production_runtime_message::{
     digest_hex, disposition_name, identity as message_identity,
 };
 use crate::{OperationalHistory, PIPE_ENDPOINT, ProductionLimits, ProductionObservationSession};
+
+#[derive(Clone, Copy)]
+enum AdmitError {
+    Decode,
+    Identity,
+    Lifecycle,
+    UnexpectedResult,
+    ResponseLoss,
+}
+
+impl AdmitError {
+    const fn reason(self) -> &'static str {
+        match self {
+            Self::Decode => "message-decode",
+            Self::Identity => "message-identity",
+            Self::Lifecycle => "message-lifecycle",
+            Self::UnexpectedResult => "message-result",
+            Self::ResponseLoss => "disposition-response-loss",
+        }
+    }
+}
 
 pub fn run(
     limits: &ProductionLimits,
@@ -24,6 +46,7 @@ pub fn run(
         max_control_message_bytes: limits.control_message_bytes,
     };
     loop {
+        history.bind_session("", 0);
         let _ = history.record("waiting", "peer-absent");
         let scope = connect(&config, limits)
             .and_then(|mut peer| serve(&mut peer, limits, history, session));
@@ -55,6 +78,7 @@ fn serve(
         let _ = history.record("rejected", "bootstrap-incompatible");
         return None;
     };
+    history.bind_session(&identity.session_id, identity.epoch.get());
     for body in [
         ControlBody::Handshake(observation_ingest::HandshakeBody {
             native_abi: 2,
@@ -78,16 +102,16 @@ fn serve(
         }
     }
     let _ = history.record("collection", "compatible-session");
-    let connected_at = Instant::now();
+    let mut last_progress = Instant::now();
     let mut active_scope = None;
-    while let Ok(bytes) = peer.receive(limits.complete_message_bytes) {
-        if connected_at.elapsed() > Duration::from_millis(limits.max_message_age_millis as u64) {
-            let _ = history.record("rejected", "message-expired");
-            return active_scope;
-        }
-        let Ok((scope, disposition)) = admit(peer, &identity, &bytes, limits, session) else {
-            let _ = history.record("rejected", "whole-message");
-            return active_scope;
+    while let Ok(bytes) = await_progress(peer, limits, history, session, last_progress) {
+        last_progress = Instant::now();
+        let (scope, disposition) = match admit(peer, &identity, &bytes, limits, history, session) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = history.record("rejected", error.reason());
+                return active_scope;
+            }
         };
         active_scope = Some(scope);
         let state = if disposition == ReceiverDisposition::Committed {
@@ -106,10 +130,14 @@ fn admit(
     identity: &observation_ingest::CarrierIdentity,
     bytes: &[u8],
     limits: &ProductionLimits,
+    history: &mut OperationalHistory,
     session: &mut ProductionObservationSession,
-) -> Result<(observation_domain::SourceScopeId, ReceiverDisposition), ()> {
-    let decoded = decode_complete_message(bytes, limits.complete_message_bytes).map_err(|_| ())?;
-    let (message_id, section_key, section_revision, scope) = message_identity(&decoded, identity)?;
+) -> Result<(observation_domain::SourceScopeId, ReceiverDisposition), AdmitError> {
+    let decoded = decode_complete_message(bytes, limits.complete_message_bytes)
+        .map_err(|_| AdmitError::Decode)?;
+    let (message_id, section_key, section_revision, scope) =
+        message_identity(&decoded, identity).map_err(|()| AdmitError::Identity)?;
+    history.bind_message(message_id.as_str(), &section_key, section_revision);
     let result = session
         .submit_received(
             identity.epoch,
@@ -118,9 +146,9 @@ fn admit(
             bytes.len(),
             now(),
         )
-        .map_err(|_| ())?;
+        .map_err(|_| AdmitError::Lifecycle)?;
     let LifecycleResult::Disposition(disposition) = result else {
-        return Err(());
+        return Err(AdmitError::UnexpectedResult);
     };
     let body = ControlBody::Disposition(DispositionBody {
         message_id: message_id.as_str().to_owned(),
@@ -129,7 +157,7 @@ fn admit(
         message_digest: digest_hex(complete_message_digest(bytes)),
         disposition: disposition_name(disposition).to_owned(),
     });
-    send(peer, identity, body, limits)?;
+    send(peer, identity, body, limits).map_err(|()| AdmitError::ResponseLoss)?;
     Ok((scope, disposition))
 }
 
@@ -150,7 +178,7 @@ fn send(
     peer.send_control(&bytes).map_err(|_| ())
 }
 
-fn now() -> u64 {
+pub fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |v| u64::try_from(v.as_millis()).unwrap_or(u64::MAX))
