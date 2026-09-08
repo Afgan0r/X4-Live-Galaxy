@@ -79,12 +79,19 @@ static int host_sleep(lua_State *state) {
     return 0;
 }
 
+static int host_monotonic_millis(lua_State *state) {
+    lua_pushnumber(state, (lua_Number)GetTickCount64());
+    return 1;
+}
+
 static int run_state(int argc, char **argv, const char *mode, const char *prior) {
     lua_State *state = luaL_newstate();
     if (!state) return 10;
     luaL_openlibs(state);
     lua_pushcfunction(state, host_sleep);
     lua_setglobal(state, "host_sleep");
+    lua_pushcfunction(state, host_monotonic_millis);
+    lua_setglobal(state, "host_monotonic_millis");
     if (luaL_loadfile(state, argv[2]) != 0) {
         fprintf(stderr, "load:%s\n", lua_tostring(state, -1)); lua_close(state); return 11;
     }

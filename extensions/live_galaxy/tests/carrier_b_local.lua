@@ -52,17 +52,22 @@ local observation = assert(require("live_galaxy/lua/live_galaxy_observation").ne
 }))
 local scheduler = require("live_galaxy/lua/live_galaxy_scheduler")
 local sampled, last = false, "none"
-for index = 1, 200000 do
+local sample_deadline = host_monotonic_millis() + 10000
+while host_monotonic_millis() < sample_deadline do
     local result = scheduler.tick({
-        capture_start_millis = tostring(index),
-        capture_end_millis = tostring(index + 1),
+        capture_start_millis = "1",
+        capture_end_millis = "2",
     }, carrier, observation)
     last = result.disposition
     if last == "sampled" then sampled = true; break end
-    if index % 10000 == 0 then write(marker_path, last) end
-    host_sleep(0)
+    write(marker_path, last)
+    host_sleep(1)
 end
-assert(sampled, "sample watchdog: " .. last)
+local sample_status = carrier.current_status or {}
+assert(sampled, string.format(
+    "sample watchdog: last=%s producer=%s transport=%s monotonic=%s",
+    last, tostring(sample_status.producer_state),
+    tostring(sample_status.transport_state), tostring(sample_status.monotonic_millis)))
 
 if mode == "pending-io-unload" then
     local pending, status = carrier:progress(1)
@@ -84,7 +89,8 @@ if mode == "pending-io-unload" then
 end
 
 local committed = false
-for _ = 1, 200000 do
+local commit_deadline = host_monotonic_millis() + 10000
+while host_monotonic_millis() < commit_deadline do
     local progress, state = carrier:progress(1)
     local control = carrier:poll_control()
     if control ~= 3 then
@@ -94,9 +100,13 @@ for _ = 1, 200000 do
         trace:close()
     end
     if control == 5 then committed = true; break end
-    host_sleep(0)
+    host_sleep(1)
 end
-assert(committed, "commit watchdog")
+local commit_status = carrier.current_status or {}
+assert(committed, string.format(
+    "commit watchdog: producer=%s transport=%s monotonic=%s",
+    tostring(commit_status.producer_state), tostring(commit_status.transport_state),
+    tostring(commit_status.monotonic_millis)))
 write(result_path, string.format(
     "return {actual_native=true,token=%q,getter_calls=%d,clock_calls=%d,sampled=true}",
     token, getter_calls, clock_calls))
