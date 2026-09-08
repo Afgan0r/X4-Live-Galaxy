@@ -121,10 +121,8 @@ impl OperationalHistory {
     }
 
     fn reset_duplicate_window(&mut self) {
-        self.last = None;
-        self.repeated = 0;
+        (self.last, self.repeated) = (None, 0);
     }
-
     fn event_line(&self, state: &str, reason: &str) -> String {
         format!(
             "{{\"clock\":\"unix-ms\",\"at\":{},\"component\":\"x4-bridge\",\"session\":\"{}\",\"epoch\":{},\"message\":\"{}\",\"section\":\"{}\",\"revision\":{},\"state\":\"{}\",\"reason\":\"{}\",\"suppressed_before\":{},\"status_gap_count\":{}}}\n",
