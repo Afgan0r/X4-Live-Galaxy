@@ -91,6 +91,22 @@ fn retry_budget_allows_exactly_one_retry() {
     assert_eq!(producer.state(), ProducerState::PausedAfterFailure);
 }
 
+#[test]
+fn first_handoff_uses_actual_high_epoch_time() {
+    let (mut producer, source) = pending_section(0);
+    let bytes = producer.pending_bytes().unwrap().to_vec();
+    let handoff = 9_000_000_000;
+    producer.mark_local_handoff(handoff).unwrap();
+    assert_eq!(
+        producer.apply_control(
+            &support::disposition(&source, &bytes, "capacity_unavailable", 1),
+            handoff + 1,
+        ),
+        Ok(ProducerOutcome::CapacityUnavailable)
+    );
+    assert_eq!(producer.pending_bytes(), Some(bytes.as_slice()));
+}
+
 fn assert_wrong_stage_rejected(state: ProducerState, disposition: &str) {
     let now = 40_000;
     let (mut producer, source) = pending_section(now);

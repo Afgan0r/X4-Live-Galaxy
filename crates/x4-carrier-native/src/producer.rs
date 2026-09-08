@@ -98,8 +98,10 @@ impl Producer {
         if pending.handed_off {
             return Err(ProducerError::InvalidTransition);
         }
+        if pending.attempts == 1 {
+            pending.first_attempt_at = now_millis;
+        }
         pending.handed_off = true;
-        pending.first_attempt_at = pending.first_attempt_at.min(now_millis);
         Ok(())
     }
 
