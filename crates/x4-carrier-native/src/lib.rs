@@ -27,6 +27,8 @@ mod transport;
 mod transport_peer;
 mod transport_types;
 mod transport_worker;
+mod transport_worker_io;
+mod transport_worker_state;
 mod types;
 
 pub use handle::HandleRegistry;

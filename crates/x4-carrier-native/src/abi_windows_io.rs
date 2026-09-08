@@ -149,6 +149,10 @@ pub fn close_pipe(handle: RawHandle) {
     }
 }
 
+pub fn disconnect_pipe(handle: RawHandle) {
+    // SAFETY: the worker owns a live server pipe handle.
+    unsafe { DisconnectNamedPipe(handle) };
+}
 pub fn close_handle(handle: RawHandle) {
     // SAFETY: caller transfers one owned handle.
     unsafe { CloseHandle(handle) };
@@ -188,7 +192,6 @@ impl PendingIo {
         }
     }
 }
-
 impl Drop for PendingIo {
     fn drop(&mut self) {
         // SAFETY: worker drops an operation only after terminal completion.
