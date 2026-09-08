@@ -5,6 +5,8 @@
 
 #[path = "carrier_b_support/mod.rs"]
 mod carrier_b_support;
+#[path = "actual_rejection_matrix/producer_matrix.rs"]
+mod producer_matrix;
 #[path = "production_startup/support.rs"]
 #[expect(dead_code, reason = "shared integration support has extra helpers")]
 mod startup_support;
@@ -18,7 +20,9 @@ use startup_support::{
     wait_for_history,
 };
 use x4_bridge::PIPE_ENDPOINT;
-use x4_carrier_native::{HandleToken, NativeTransport, TransportConfig};
+use x4_carrier_native::{
+    HandleToken, NativeTransport, TransportConfig, TransportError, TransportSendOutcome,
+};
 
 #[test]
 fn actual_pipe_rejects_decoder_matrix_and_recovers_bridge() {
@@ -29,6 +33,7 @@ fn actual_pipe_rejects_decoder_matrix_and_recovers_bridge() {
             "version-one",
             start.replacen("\"contract_version\":2", "\"contract_version\":1", 1),
         ),
+        ("malformed", "{".to_owned()),
         (
             "version-unknown",
             start.replacen("\"contract_version\":2", "\"contract_version\":99", 1),
@@ -44,6 +49,8 @@ fn actual_pipe_rejects_decoder_matrix_and_recovers_bridge() {
     ] {
         reject_actual(label, bytes.as_bytes());
     }
+    reject_actual_oversize();
+    producer_matrix::run();
     bridge_restart_accepts_a_fresh_bootstrap();
 }
 
@@ -52,7 +59,40 @@ fn reject_actual(label: &str, bytes: &[u8]) {
     harness.bootstrap(label);
     send_data(&harness.transport, harness.token, bytes);
     wait_for_history(harness.directory.path(), "message-decode");
+    assert_no_durable_revision(harness.directory.path());
     harness.stop();
+}
+
+fn reject_actual_oversize() {
+    let mut harness = Harness::start("oversize");
+    harness.bootstrap("oversize");
+    assert_eq!(
+        harness
+            .transport
+            .try_send(harness.token, &vec![b'x'; 8_193]),
+        TransportSendOutcome::Rejected(TransportError::MessageTooLarge)
+    );
+    assert_no_durable_revision(harness.directory.path());
+    harness.stop();
+}
+
+fn assert_no_durable_revision(directory: &std::path::Path) {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_x4-bridge"))
+        .args([
+            "--readback",
+            "--data-dir",
+            directory.to_str().expect("path"),
+        ])
+        .args([
+            "--section-key",
+            "carrier_b_realtime_sample",
+            "--section-revision",
+            "1",
+        ])
+        .output()
+        .expect("readback");
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
 }
 
 fn bridge_restart_accepts_a_fresh_bootstrap() {
