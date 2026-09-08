@@ -29,16 +29,39 @@ fn peer_reset_waits_for_reconnect_and_rotates_transport_epoch() {
 
 #[test]
 fn observing_the_same_connection_generation_is_idempotent() {
-    let (mut producer, _) = support::ready(22_000);
-    producer.observe_connection(1, 22_000).unwrap();
+    let (mut producer, source) = support::ready(22_000);
+    producer.observe_connection(1, 21_999).unwrap();
+    producer.observe_connection(2, 22_000).unwrap();
     let state = producer.state();
     let pending = producer.pending_bytes().map(<[u8]>::to_vec);
-    producer.observe_connection(1, 22_001).unwrap();
+    let epoch = observation_ingest::decode_carrier_bootstrap(
+        pending.as_deref().expect("replacement bootstrap"),
+        512,
+    )
+    .expect("bootstrap decodes")
+    .epoch;
+    producer.observe_connection(2, 22_001).unwrap();
     assert_eq!(producer.state(), state);
     assert_eq!(producer.pending_bytes(), pending.as_deref());
-    producer.observe_connection(0, 22_002).unwrap();
+    producer.observe_connection(1, 22_002).unwrap();
     assert_eq!(producer.state(), state);
     assert_eq!(producer.pending_bytes(), pending.as_deref());
+    assert_eq!(
+        observation_ingest::decode_carrier_bootstrap(
+            producer.pending_bytes().expect("bootstrap retained"),
+            512,
+        )
+        .expect("bootstrap decodes")
+        .epoch,
+        epoch
+    );
+    let reconnect_source = x4_carrier_native::ProducerSource {
+        transport_epoch: source.transport_epoch + 1,
+        ..source
+    };
+    finish_bootstrap(&mut producer, &reconnect_source, 22_002);
+    collect(&mut producer, 22_002);
+    assert_start(&producer, 1, reconnect_source.transport_epoch);
 }
 
 #[test]

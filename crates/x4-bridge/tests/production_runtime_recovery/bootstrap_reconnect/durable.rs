@@ -60,6 +60,11 @@ struct DurableRow {
 }
 
 fn assert_commit_loss(connection: &Connection) {
+    const EXPECTED_CONTENT_DIGEST: [u8; 32] = [
+        0x06, 0x10, 0xc0, 0x84, 0x82, 0xeb, 0xf2, 0x09, 0x2b, 0xcf, 0xad, 0x7a, 0xca, 0x04,
+        0x79, 0x49, 0xc7, 0xc2, 0x9f, 0xc8, 0xf4, 0xf0, 0x05, 0x2d, 0x51, 0x09, 0x20, 0x07,
+        0xf4, 0x3c, 0x24, 0xe6,
+    ];
     let mut statement = connection
         .prepare(
             "SELECT r.revision, r.producer_incarnation, r.transport_epoch, rr.content, r.content_digest, p.content_digest, p.previous_revision, p.ordinal FROM revisions r JOIN revision_records rr USING(section_key, revision) JOIN publication_receipts p USING(section_key, revision) ORDER BY r.revision",
@@ -94,7 +99,7 @@ fn assert_commit_loss(connection: &Connection) {
     assert_eq!((rows[1].previous, rows[1].ordinal), (Some(1), 2));
     assert_eq!(rows[0].content, rows[1].content);
     for row in rows {
-        assert_eq!(row.revision_digest, row.receipt_digest);
-        assert_eq!(row.revision_digest.len(), 32);
+        assert_eq!(row.revision_digest, EXPECTED_CONTENT_DIGEST);
+        assert_eq!(row.receipt_digest, EXPECTED_CONTENT_DIGEST);
     }
 }
