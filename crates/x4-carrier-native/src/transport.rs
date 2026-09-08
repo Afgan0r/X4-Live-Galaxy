@@ -142,6 +142,20 @@ impl NativeTransport {
         }
         self.shared.closed.load(Ordering::Acquire)
     }
+
+    #[doc(hidden)]
+    pub fn set_clock_for_test(&self, monotonic_millis: Option<u64>) {
+        self.shared.clock_test_override.store(
+            if monotonic_millis.is_some() { 2 } else { 1 },
+            Ordering::Release,
+        );
+        if let Some(value) = monotonic_millis {
+            self.shared.millis.store(value, Ordering::Release);
+        }
+        self.shared
+            .clock_available
+            .store(monotonic_millis.is_some(), Ordering::Release);
+    }
 }
 
 impl Drop for NativeTransport {

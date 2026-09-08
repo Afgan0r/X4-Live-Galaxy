@@ -143,22 +143,3 @@ fn generation_exhaustion_rejects_instead_of_wrapping() {
         Err(CarrierError::GenerationExhausted)
     );
 }
-
-#[test]
-fn poll_control_requires_a_monotonic_clock_before_observation_or_consumption() {
-    let source = std::fs::read_to_string("src/lua_producer_operations.rs")
-        .expect("poll-control implementation must remain readable");
-    let clock_gate = source
-        .find("let Some(now) = snapshot.monotonic_millis")
-        .expect("poll-control must fail closed when monotonic time is unavailable");
-    let observation = source
-        .find(".observe_connection(snapshot.connection_generation, now)")
-        .expect("connection observation must remain explicit");
-    let consumption = source
-        .find("transport.poll_control(handle, 512)")
-        .expect("control consumption must remain explicit");
-
-    assert!(clock_gate < observation);
-    assert!(clock_gate < consumption);
-    assert!(source[clock_gate..observation].contains("push_code(api, state, -22)"));
-}

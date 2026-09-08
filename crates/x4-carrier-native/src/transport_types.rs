@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize};
 
 use crate::HandleToken;
 
@@ -85,6 +85,7 @@ pub(crate) struct Shared {
     pub owners: AtomicUsize,
     pub millis: AtomicU64,
     pub clock_available: AtomicBool,
+    pub clock_test_override: AtomicU8,
 }
 
 impl Shared {
@@ -100,6 +101,7 @@ impl Shared {
             owners: AtomicUsize::new(0),
             millis: AtomicU64::new(0),
             clock_available: AtomicBool::new(false),
+            clock_test_override: AtomicU8::new(0),
         }
     }
 }

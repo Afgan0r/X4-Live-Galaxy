@@ -118,6 +118,9 @@ fn initial_connection(context: &WorkerContext) -> (Option<PendingIo>, Connection
 }
 
 fn refresh_clock(context: &WorkerContext) {
+    if context.shared.clock_test_override.load(Ordering::Acquire) != 0 {
+        return;
+    }
     let Ok(now) = monotonic_millis() else {
         return;
     };

@@ -191,3 +191,7 @@ fn invalid(state: *mut c_void) -> c_int {
 }
 
 const _: Option<TransportError> = None;
+
+#[cfg(all(test, windows))]
+#[path = "lua_producer_operations_tests.rs"]
+mod tests;
