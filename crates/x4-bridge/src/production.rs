@@ -84,6 +84,11 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         work: usize,
         now: u64,
     ) -> Result<LifecycleResult, ProductionError> {
+        let message = observation_ingest::decode_complete_message(
+            &bytes,
+            self.lifecycle.complete_message_limit(),
+        )
+        .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
         let context = if let Some((prior_identity, prior_bytes, prior_context)) =
             &self.last_received
             && prior_identity == &identity
@@ -101,10 +106,15 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             now,
             context.clone(),
         );
-        let result = self
-            .lifecycle
-            .submit(input)
-            .map_err(ProductionError::Lifecycle)?;
+        let result = if let Some((scope, source_session)) =
+            crate::receiver_context::source_boundary(&message)
+        {
+            self.lifecycle
+                .submit_source_boundary(input, scope, source_session)
+        } else {
+            self.lifecycle.submit(input)
+        }
+        .map_err(ProductionError::Lifecycle)?;
         self.last_received = Some((identity, bytes, context));
         Ok(result)
     }
@@ -149,7 +159,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             self.lifecycle.complete_message_limit(),
         )
         .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
-        crate::receiver_context::assemble(&mut self.lifecycle, &message)
+        crate::receiver_context::assemble(&self.lifecycle, &message)
     }
 
     #[must_use]

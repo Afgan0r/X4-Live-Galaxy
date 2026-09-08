@@ -37,6 +37,26 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
     }
 
     pub fn submit(&mut self, input: LifecycleInput) -> Result<LifecycleResult, LifecycleError> {
+        self.submit_admitted(input, None)
+    }
+
+    pub fn submit_source_boundary(
+        &mut self,
+        input: LifecycleInput,
+        scope: observation_domain::SourceScopeId,
+        session: observation_domain::SourceSessionIdentity,
+    ) -> Result<LifecycleResult, LifecycleError> {
+        self.submit_admitted(input, Some((scope, session)))
+    }
+
+    fn submit_admitted(
+        &mut self,
+        input: LifecycleInput,
+        source_boundary: Option<(
+            observation_domain::SourceScopeId,
+            observation_domain::SourceSessionIdentity,
+        )>,
+    ) -> Result<LifecycleResult, LifecycleError> {
         if self.retained.is_some() {
             return Err(LifecycleError::BlockedAmbiguous);
         }
@@ -44,6 +64,9 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             decode_complete_message(&input.bytes, self.limits.complete_message_bytes.get())
                 .map_err(|_| LifecycleError::DecodeRejected)?;
         validate_context(&message, &input.context, input.epoch)?;
+        if let Some((scope, session)) = source_boundary {
+            self.mark_source_scope_uncertain(&scope, session);
+        }
         let replay_identity = input.context.replay_identity(input.work);
         let batch = ImmutableApplicationBatch::new(
             input.epoch,

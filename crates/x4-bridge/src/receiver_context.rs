@@ -10,26 +10,11 @@ use observation_persistence::ObservationRepository;
 use crate::ProductionError;
 
 pub fn assemble<R: ObservationRepository>(
-    lifecycle: &mut ObservationLifecycle<R>,
+    lifecycle: &ObservationLifecycle<R>,
     message: &CompleteMessage,
 ) -> Result<LifecycleContext, ProductionError> {
     match message {
         CompleteMessage::SectionStart(start) => {
-            if matches!(
-                start.sender_evidence.source_epoch_status,
-                SourceEpochStatus::BoundaryUncertain
-            ) || matches!(
-                start.sender_evidence.source_boundary,
-                SourceBoundary::GameLoaded | SourceBoundary::LuaReload
-            ) {
-                lifecycle.mark_source_scope_uncertain(
-                    &start.source_scope,
-                    SourceSessionIdentity::new(
-                        start.producer_incarnation.clone(),
-                        start.transport_epoch,
-                    ),
-                );
-            }
             let current = lifecycle
                 .current_revision(&start.section_key)
                 .map_err(|_| ProductionError::Storage)?
@@ -64,4 +49,25 @@ pub fn assemble<R: ObservationRepository>(
             observation_application::LifecycleError::ContextMismatch,
         )),
     }
+}
+
+pub fn source_boundary(
+    message: &CompleteMessage,
+) -> Option<(observation_domain::SourceScopeId, SourceSessionIdentity)> {
+    let CompleteMessage::SectionStart(start) = message else {
+        return None;
+    };
+    (matches!(
+        start.sender_evidence.source_epoch_status,
+        SourceEpochStatus::BoundaryUncertain
+    ) || matches!(
+        start.sender_evidence.source_boundary,
+        SourceBoundary::GameLoaded | SourceBoundary::LuaReload
+    ))
+    .then(|| {
+        (
+            start.source_scope.clone(),
+            SourceSessionIdentity::new(start.producer_incarnation.clone(), start.transport_epoch),
+        )
+    })
 }
