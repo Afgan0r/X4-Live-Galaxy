@@ -1,8 +1,8 @@
 ---
-status: fixing
+status: resolved
 trigger: "Protected UI was already disabled; find why Carrier B remains peer-absent in the first real X4 run."
 created: 2026-09-08
-updated: 2026-09-08T21:30:00+07:00
+updated: 2026-09-08T21:55:00+07:00
 ---
 
 # Debug Session: Carrier B Peer Absent
@@ -32,9 +32,9 @@ updated: 2026-09-08T21:30:00+07:00
       - "config: extension installation root was tested and eliminated."
     and_gate: "yes — the defect escaped and manifested through the combination of wrong production import syntax and a permissive test-only loader surface; the product failure itself is caused by the import mismatch."
 - hypothesis: confirmed — production uses slash-qualified local Lua imports that the real X4 9.00 UI loader does not resolve; the standalone test runner injected an `extensions/?.lua` path that masked this mismatch.
-- test: target test, package conformance, and revert-and-reconfirm pass; run the existing package self-test and actual local DLL/bridge/SQLite integrations against the frozen limits.
-- expecting: package hashes/layout remain coherent and both startup orders plus pending-I/O unload pass through the dotted actual-loader path.
-- next_action: run package self-test and `tests/carrier-b-local.ps1` bridge-first/native-first/pending-I/O scenarios.
+- test: complete — target loader, package conformance, aggregate contracts, package self-test, actual local DLL/bridge/SQLite scenarios, full Rust workspace, Clippy, format, and source-size all pass.
+- expecting: human-operated X4 retry loads the rebuilt candidate, initializes native Carrier B, and connects to the bridge before B1 collection.
+- next_action: install manifest `357b5b38c279efc10764ab1a772434928c748e8876a9a2ee76787ea7ba537c87` and repeat B1; this remains human evidence.
 
 ## Evidence
 
@@ -96,7 +96,7 @@ updated: 2026-09-08T21:30:00+07:00
     target_test: { result: pass }
     mutation_check: { result: skipped, reason_if_skipped: "No configured Lua mutation runner for import-string replacement; the unchanged driving loader contract plus revert-and-reconfirm directly exercises the fix site.", mutant_killed: null }
     no_op_deletion: { result: pass, deletion_justified_by_rca: false }
-    adjacent_tests: { result: pending, suites_run: ["loader", "package-conformance"] }
+    adjacent_tests: { result: pass, suites_run: ["aggregate 50 Lua / 9 syntax", "XML/package", "persistence", "three actual local scenarios", "full Rust workspace", "Clippy", "format", "source-size"] }
     revert_and_reconfirm: { result: pass, bug_returned_on_revert: true, fixed_on_reapply: true }
-    guardrail_verdict: pending
-- files_changed: `.planning/debug/carrier-b-peer-absent.md`, `extensions/live_galaxy/tests/x4_loader_contract.lua`, and `extensions/live_galaxy/tests/run_contracts.ps1`; production unchanged at RED.
+    guardrail_verdict: passed; independent re-review CLEAN and focused security audit SECURED 5/5
+- files_changed: five production import call sites across `live_galaxy_runtime.lua`, `live_galaxy_telemetry.lua`, and `live_galaxy_x4_discovery.lua`; loader/local/package tests; packaging startup guidance; Phase 05.4 procedure, evidence, review, security, verification, summary, and this debug record.
