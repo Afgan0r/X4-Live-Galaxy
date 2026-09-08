@@ -36,6 +36,9 @@ fn observing_the_same_connection_generation_is_idempotent() {
     producer.observe_connection(1, 22_001).unwrap();
     assert_eq!(producer.state(), state);
     assert_eq!(producer.pending_bytes(), pending.as_deref());
+    producer.observe_connection(0, 22_002).unwrap();
+    assert_eq!(producer.state(), state);
+    assert_eq!(producer.pending_bytes(), pending.as_deref());
 }
 
 #[test]

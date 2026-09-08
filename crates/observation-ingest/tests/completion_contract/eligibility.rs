@@ -90,13 +90,18 @@ fn publication_rotates_only_to_a_higher_epoch_of_the_same_producer() {
     let accepted = index
         .prepare_publication(first)
         .expect("first source session prepares");
+    let higher_epoch = finish_with_session("producer:1", 2);
+    let replacement = index
+        .prepare_publication(higher_epoch)
+        .expect("higher epoch rotates authority before finalization");
     assert_eq!(
         index.finalize_committed(&accepted, 4),
+        FinalizationOutcome::AuthorityChanged
+    );
+    assert_eq!(
+        index.finalize_committed(&replacement, 5),
         FinalizationOutcome::Finalized
     );
-
-    let higher_epoch = finish_with_session("producer:1", 2);
-    assert!(index.prepare_publication(higher_epoch).is_some());
     assert!(
         index
             .prepare_publication(finish_with_session("producer:1", 1))
@@ -107,6 +112,22 @@ fn publication_rotates_only_to_a_higher_epoch_of_the_same_producer() {
             .prepare_publication(finish_with_session("producer:2", 3))
             .is_none()
     );
+}
+
+#[test]
+fn finalization_checks_pointer_and_dependencies_independently() {
+    for (ships, sectors) in [(revision(99), revision(4)), (revision(6), revision(99))] {
+        let mut index = DecisionRevisionIndex::new(4).expect("blocker limit");
+        index.record_current_pointer(key("ships"), ships);
+        index.record_current_pointer(key("sectors"), sectors);
+        let accepted = index
+            .prepare_publication(finish(&mut staged()))
+            .expect("publication prepares before concurrent pointer change");
+        assert_eq!(
+            index.finalize_committed(&accepted, 4),
+            FinalizationOutcome::StateMismatch
+        );
+    }
 }
 
 fn finish_with_session(producer: &str, epoch: u64) -> observation_ingest::ValidatedSectionRevision {
