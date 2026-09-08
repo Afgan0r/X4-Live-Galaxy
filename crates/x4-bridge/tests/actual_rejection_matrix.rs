@@ -1,3 +1,8 @@
+#![expect(
+    clippy::expect_used,
+    reason = "invalid integration fixtures fail immediately"
+)]
+
 #[path = "carrier_b_support/mod.rs"]
 mod carrier_b_support;
 #[path = "production_startup/support.rs"]
