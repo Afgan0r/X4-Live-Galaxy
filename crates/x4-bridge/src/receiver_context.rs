@@ -51,20 +51,24 @@ pub fn assemble<R: ObservationRepository>(
     }
 }
 
-pub fn source_boundary(
+pub fn source_boundary<R: ObservationRepository>(
+    lifecycle: &ObservationLifecycle<R>,
     message: &CompleteMessage,
 ) -> Option<(observation_domain::SourceScopeId, SourceSessionIdentity)> {
     let CompleteMessage::SectionStart(start) = message else {
         return None;
     };
-    (matches!(
+    let explicit_boundary = matches!(
         start.sender_evidence.source_epoch_status,
         SourceEpochStatus::BoundaryUncertain
     ) || matches!(
         start.sender_evidence.source_boundary,
         SourceBoundary::GameLoaded | SourceBoundary::LuaReload
-    ))
-    .then(|| {
+    );
+    let producer_reincarnated = lifecycle
+        .authoritative_source_session(&start.source_scope)
+        .is_some_and(|current| current.producer_incarnation() != &start.producer_incarnation);
+    (explicit_boundary || producer_reincarnated).then(|| {
         (
             start.source_scope.clone(),
             SourceSessionIdentity::new(start.producer_incarnation.clone(), start.transport_epoch),

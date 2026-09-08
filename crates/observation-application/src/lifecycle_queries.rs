@@ -17,4 +17,12 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
     pub fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
         self.repository.current_snapshot()
     }
+
+    #[must_use]
+    pub fn authoritative_source_session(
+        &self,
+        scope: &observation_domain::SourceScopeId,
+    ) -> Option<&observation_domain::SourceSessionIdentity> {
+        self.index.authoritative_source_session(scope)
+    }
 }

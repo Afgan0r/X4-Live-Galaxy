@@ -4,7 +4,6 @@ local pipe_module = "extensions.sn_mod_support_apis.ui.named_pipes.Interface"
 local globals = {
     "DebugError", "Register_OnLoad_Init", "RegisterEvent",
     "ConvertStringToLuaID", "ConvertIDTo64Bit", "GetComponentData",
-    "__live_galaxy_runtime_generation",
 }
 
 local function relevant(name)

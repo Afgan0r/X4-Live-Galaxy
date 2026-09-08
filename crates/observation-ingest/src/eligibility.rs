@@ -102,6 +102,16 @@ impl DecisionRevisionIndex {
         }
     }
 
+    #[must_use]
+    pub fn authoritative_source_session(
+        &self,
+        scope: &SourceScopeId,
+    ) -> Option<&SourceSessionIdentity> {
+        self.authoritative_sessions
+            .get(scope)
+            .map(|authority| &authority.identity)
+    }
+
     fn evaluate_required<'a>(
         &'a self,
         key: SectionKey,

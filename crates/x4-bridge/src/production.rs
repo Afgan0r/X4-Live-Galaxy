@@ -107,7 +107,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             context.clone(),
         );
         let result = if let Some((scope, source_session)) =
-            crate::receiver_context::source_boundary(&message)
+            crate::receiver_context::source_boundary(&self.lifecycle, &message)
         {
             self.lifecycle
                 .submit_source_boundary(input, scope, source_session)
