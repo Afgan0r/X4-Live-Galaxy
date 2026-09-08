@@ -125,6 +125,22 @@ impl Producer {
         self.messages = None;
         self.pending = None;
     }
+
+    pub(super) fn fresh_source(&self) -> Result<ProducerSource, ProducerError> {
+        let epoch = self
+            .source
+            .transport_epoch
+            .checked_add(1)
+            .ok_or(ProducerError::StaleEpoch)?;
+        Ok(ProducerSource {
+            session_id: format!("x4-session-{epoch}"),
+            producer_incarnation: format!("x4-producer-{epoch}"),
+            transport_epoch: epoch,
+            source_scope: self.source.source_scope.clone(),
+            source_epoch_status: self.source.source_epoch_status,
+            source_boundary: self.source.source_boundary,
+        })
+    }
 }
 
 impl Pending {

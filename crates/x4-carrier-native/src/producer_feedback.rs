@@ -53,9 +53,8 @@ impl Producer {
             }
             ControlBody::Disposition(value) => self.apply_disposition(&value, now_millis),
             ControlBody::Reset(_) => {
-                self.discard_incomplete();
-                self.readiness = Readiness::Awaiting;
-                self.state = ProducerState::AwaitingCompatibility;
+                let source = self.fresh_source()?;
+                self.reset(source, now_millis)?;
                 Ok(ProducerOutcome::Disconnected)
             }
             _ => Err(ProducerError::InvalidTransition),
@@ -97,12 +96,13 @@ impl Producer {
             self.state = ProducerState::PausedAfterFailure;
             return Ok(ProducerOutcome::PermanentlyRejected);
         }
-        self.advance_message(feedback)
+        self.advance_message(feedback, now)
     }
 
     fn advance_message(
         &mut self,
         feedback: ProducerFeedback,
+        now: u64,
     ) -> Result<ProducerOutcome, ProducerError> {
         let messages = self
             .messages
@@ -126,7 +126,7 @@ impl Producer {
             _ => return Err(ProducerError::InvalidTransition),
         };
         if let Some((bytes, id, state)) = next {
-            self.pending = Some(Pending::new(bytes, id, 0));
+            self.pending = Some(Pending::new(bytes, id, now));
             self.state = state;
             return Ok(ProducerOutcome::Received);
         }

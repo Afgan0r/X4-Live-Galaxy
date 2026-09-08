@@ -112,7 +112,7 @@ unsafe fn open_inner(state: *mut c_void) -> c_int {
 }
 
 unsafe fn reset_inner(state: *mut c_void) -> c_int {
-    let result = crate::lua_transport::close_handle(state, true);
+    let result = crate::lua_transport::close_handle(state, false);
     clear_producer();
     result
 }
