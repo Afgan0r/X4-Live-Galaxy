@@ -214,6 +214,7 @@ try {
     $luaResult = [pscustomobject]@{
         actual_native = $resultText -match 'actual_native=true'
         getter_calls = if ($resultText -match 'getter_calls=(\d+)') { [int]$Matches[1] } else { -1 }
+        clock_calls = if ($resultText -match 'clock_calls=(\d+)') { [int]$Matches[1] } else { -1 }
         stale = if ($resultText -match 'stale=(-?\d+)') { [int]$Matches[1] } else { 0 }
         fresh = if ($resultText -match 'fresh="([^"]+)"') { $Matches[1] } else { '' }
         token = if ($resultText -match 'token="([^"]+)"') { $Matches[1] } else { '' }
@@ -221,6 +222,8 @@ try {
         pending_incarnation = if ($resultText -match 'pending_incarnation="([^"]+)"') { $Matches[1] } else { '' }
         pending_owners = if ($resultText -match 'pending_owners=(\d+)') { [int]$Matches[1] } else { 0 }
     }
+    if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne 1 -or
+        $luaResult.clock_calls -lt 2) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
     if ($Scenario -eq 'pending-io-unload') {
         $pendingGeneration = if ($luaResult.token -match '^(\d+):') { $Matches[1] } else { '' }
         if ($luaResult.pending_state -cne 'pending_start' -or
@@ -242,7 +245,6 @@ try {
             $current.receipt.ordinal -ne 1 -or $current.receipt.accepted_at -le 0) {
             throw 'DURABLE_TYPED_READBACK_MISMATCH'
         }
-        if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne 1) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
     }
     $timer.Stop()
     $effective = Get-Content -LiteralPath $limits -Raw | ConvertFrom-Json
@@ -252,7 +254,7 @@ try {
     $historyBytes = if (Test-Path -LiteralPath $history) { (Get-Item -LiteralPath $history).Length } else { 0 }
     $nativeHash = (Get-FileHash (Join-Path $run 'extensions/live_galaxy/ui_c_library_live_galaxy_carrier_64.txt') -Algorithm SHA256).Hash.ToLowerInvariant()
     $configHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
-    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) host_peak_bytes=$hostPeak bridge_peak_bytes=$bridgePeak store_bytes=$storeBytes history_bytes=$historyBytes data_limit=$($effective.complete_message_bytes) control_limit=$($effective.control_message_bytes) pending_limit=$($effective.max_pending_bytes) lifecycle_work=$($effective.max_lifecycle_work) delivery_attempts=$($effective.max_delivery_attempts) reconnect_attempts=$($effective.reconnect_attempts) availability_millis=$($effective.availability_interval_millis) native_sha256=$nativeHash config_sha256=$configHash"
+    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) clock_calls=$($luaResult.clock_calls) host_peak_bytes=$hostPeak bridge_peak_bytes=$bridgePeak store_bytes=$storeBytes history_bytes=$historyBytes data_limit=$($effective.complete_message_bytes) control_limit=$($effective.control_message_bytes) pending_limit=$($effective.max_pending_bytes) lifecycle_work=$($effective.max_lifecycle_work) delivery_attempts=$($effective.max_delivery_attempts) reconnect_attempts=$($effective.reconnect_attempts) availability_millis=$($effective.availability_interval_millis) native_sha256=$nativeHash config_sha256=$configHash"
     Write-Output "PASS scenario=$Scenario startup_order=$StartupOrder actual_native=true durable=$($Scenario -ne 'pending-io-unload')"
 } finally {
     Stop-Owned $bridge

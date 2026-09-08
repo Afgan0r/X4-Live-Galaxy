@@ -25,6 +25,7 @@ if mode == "reload" then
     local pending_state = assert(prior:match('pending_state="([^"]+)"'))
     local pending_incarnation = assert(prior:match('pending_incarnation="([^"]+)"'))
     local pending_owners = assert(prior:match("pending_owners=(%d+)"))
+    local clock_calls = assert(prior:match("clock_calls=(%d+)"))
     local initializer = assert(package.loadlib(
         ".\\extensions\\live_galaxy\\ui_c_library_live_galaxy_carrier_64.txt",
         "luaopen_live_galaxy_carrier"))
@@ -32,8 +33,8 @@ if mode == "reload" then
     local stale = api.close(assert(prior_token))
     local fresh = open_carrier()
     write(result_path, string.format(
-        "return {stale=%d,fresh=%q,token=%q,getter_calls=1,pending_state=%q,pending_incarnation=%q,pending_owners=%s}",
-        stale, fresh.token, prior_token, pending_state,
+        "return {actual_native=true,stale=%d,fresh=%q,token=%q,getter_calls=1,clock_calls=%s,pending_state=%q,pending_incarnation=%q,pending_owners=%s}",
+        stale, fresh.token, prior_token, clock_calls, pending_state,
         pending_incarnation, pending_owners))
     assert(fresh:close() == 0)
     return
@@ -41,9 +42,13 @@ end
 
 local carrier = open_carrier()
 local token = carrier.token
-local getter_calls = 0
+local getter_calls, clock_calls = 0, 0
 local observation = assert(require("live_galaxy/lua/live_galaxy_observation").new({
     getter = function() getter_calls = getter_calls + 1; return 123.5 end,
+    clock_getter = function()
+        clock_calls = clock_calls + 1
+        return clock_calls == 1 and 10.25 or 10.5
+    end,
 }))
 local scheduler = require("live_galaxy/lua/live_galaxy_scheduler")
 local sampled, last = false, "none"
@@ -72,8 +77,8 @@ if mode == "pending-io-unload" then
     local retry = carrier:progress(1)
     assert(retry == 1 or retry == 2, "retained pending bytes required")
     write(result_path, string.format(
-        "return {actual_native=true,token=%q,getter_calls=%d,sampled=true,pending_state=%q,pending_incarnation=%q,pending_owners=%d}",
-        token, getter_calls, status.producer_state,
+        "return {actual_native=true,token=%q,getter_calls=%d,clock_calls=%d,sampled=true,pending_state=%q,pending_incarnation=%q,pending_owners=%d}",
+        token, getter_calls, clock_calls, status.producer_state,
         status.producer_incarnation, owners))
     return
 end
@@ -93,6 +98,6 @@ for _ = 1, 200000 do
 end
 assert(committed, "commit watchdog")
 write(result_path, string.format(
-    "return {actual_native=true,token=%q,getter_calls=%d,sampled=true}",
-    token, getter_calls))
+    "return {actual_native=true,token=%q,getter_calls=%d,clock_calls=%d,sampled=true}",
+    token, getter_calls, clock_calls))
 assert(carrier:close() == 0)
