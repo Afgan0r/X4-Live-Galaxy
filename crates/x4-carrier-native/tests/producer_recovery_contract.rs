@@ -8,7 +8,7 @@
 )]
 
 use observation_ingest::{ControlBody, ResetBody};
-use x4_carrier_native::{ProducerOutcome, ProducerState, SectionEvidence};
+use x4_carrier_native::{ProducerError, ProducerOutcome, ProducerState, SectionEvidence};
 
 #[path = "producer_contract/support.rs"]
 mod support;
@@ -58,6 +58,87 @@ fn peer_reset_creates_a_fresh_bootstrap_identity() {
             .unwrap();
     assert_ne!(identity.epoch.get(), source.transport_epoch);
     assert_ne!(identity.producer_incarnation, source.producer_incarnation);
+}
+
+#[test]
+fn each_message_stage_rejects_a_later_stage_disposition() {
+    assert_wrong_stage_rejected(ProducerState::PendingStart, "committed");
+    assert_wrong_stage_rejected(ProducerState::PendingBatch, "committed");
+    assert_wrong_stage_rejected(ProducerState::PendingCompletion, "received");
+}
+
+#[test]
+fn retry_budget_allows_exactly_one_retry() {
+    let now = 30_000;
+    let (mut producer, source) = pending_section(now);
+    let bytes = producer.pending_bytes().unwrap().to_vec();
+    producer.mark_local_handoff(now).unwrap();
+    assert_eq!(
+        producer.apply_control(
+            &support::disposition(&source, &bytes, "capacity_unavailable", 1),
+            now + 1,
+        ),
+        Ok(ProducerOutcome::CapacityUnavailable)
+    );
+    producer.mark_local_handoff(now + 1).unwrap();
+    assert_eq!(
+        producer.apply_control(
+            &support::disposition(&source, &bytes, "capacity_unavailable", 1),
+            now + 2,
+        ),
+        Ok(ProducerOutcome::PausedAfterFailure)
+    );
+    assert_eq!(producer.state(), ProducerState::PausedAfterFailure);
+}
+
+fn assert_wrong_stage_rejected(state: ProducerState, disposition: &str) {
+    let now = 40_000;
+    let (mut producer, source) = pending_section(now);
+    let stages = match state {
+        ProducerState::PendingStart => 0,
+        ProducerState::PendingBatch => 1,
+        ProducerState::PendingCompletion => 2,
+        _ => unreachable!("test selects pending states only"),
+    };
+    for ordinal in 1..=stages {
+        let bytes = producer.pending_bytes().unwrap().to_vec();
+        producer.mark_local_handoff(now).unwrap();
+        producer
+            .apply_control(
+                &support::disposition(&source, &bytes, "received", ordinal),
+                now,
+            )
+            .unwrap();
+    }
+    let ordinal = stages + 1;
+    let bytes = producer.pending_bytes().unwrap().to_vec();
+    producer.mark_local_handoff(now).unwrap();
+    assert_eq!(
+        producer.apply_control(
+            &support::disposition(&source, &bytes, disposition, ordinal),
+            now,
+        ),
+        Err(ProducerError::InvalidTransition)
+    );
+    assert_eq!(producer.state(), state);
+}
+
+fn pending_section(
+    now: u64,
+) -> (
+    x4_carrier_native::Producer,
+    x4_carrier_native::ProducerSource,
+) {
+    let (mut producer, source) = support::ready(now);
+    producer
+        .begin_section(SectionEvidence::point_measurement(
+            "x4:carrier_b_acceptance",
+        ))
+        .unwrap();
+    producer.push_record(&support::sample("3")).unwrap();
+    producer.finish_section(support::finish(now)).unwrap();
+    producer.progress(1, now).unwrap();
+    (producer, source)
 }
 
 fn retry_then_receive(
