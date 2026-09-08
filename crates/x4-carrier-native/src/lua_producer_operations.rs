@@ -80,9 +80,16 @@ pub unsafe extern "C" fn progress(state: *mut c_void) -> c_int {
     let Some(transport) = transport_guard.as_ref() else {
         return unsafe { push_code(api, state, -18) };
     };
-    let Some(now) = transport.snapshot().monotonic_millis else {
+    let snapshot = transport.snapshot();
+    let Some(now) = snapshot.monotonic_millis else {
         return unsafe { push_code(api, state, -22) };
     };
+    if producer
+        .observe_connection(snapshot.connection_generation, now)
+        .is_err()
+    {
+        return unsafe { push_code(api, state, -18) };
+    }
     if producer.pending_bytes().is_none() {
         match producer.progress(work, now) {
             Ok(ProducerOutcome::Progress) => {}
@@ -123,12 +130,26 @@ pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {
     let Some(transport) = transport_guard.as_ref() else {
         return unsafe { push_code(api, state, -18) };
     };
+    let snapshot = transport.snapshot();
+    let now = snapshot.monotonic_millis.unwrap_or(0);
+    if producer
+        .observe_connection(snapshot.connection_generation, now)
+        .is_err()
+    {
+        return unsafe { push_code(api, state, -18) };
+    }
     let code = match transport.poll_control(handle, 512) {
         TransportPoll::Message(bytes) => {
-            let now = transport.snapshot().monotonic_millis.unwrap_or(0);
-            producer
+            if transport.snapshot().connection_generation != snapshot.connection_generation {
+                return unsafe { push_code(api, state, 3) };
+            }
+            let outcome = producer
                 .apply_control(&bytes, now)
-                .map_or_else(error_code, outcome_code)
+                .map_or_else(error_code, outcome_code);
+            if outcome == outcome_code(ProducerOutcome::Disconnected) {
+                let _ = transport.request_reconnect(handle);
+            }
+            outcome
         }
         TransportPoll::NoMessage => 3,
         TransportPoll::Closed => 9,

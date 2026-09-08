@@ -1,26 +1,29 @@
 use std::{
     fmt,
     sync::{
-        Arc, Mutex, TryLockError,
+        Arc, Mutex,
         atomic::Ordering,
-        mpsc::{SyncSender, TryRecvError, TrySendError, sync_channel},
+        mpsc::{SyncSender, TrySendError, sync_channel},
     },
     time::{Duration, Instant},
 };
 
 use crate::{
-    CloseProgress, HandleToken, SecurityEvidence, TransportConfig, TransportError, TransportPoll,
+    CloseProgress, HandleToken, SecurityEvidence, TransportConfig, TransportError,
     TransportSendOutcome, WorkerSnapshot,
     transport_types::{Shared, validate},
 };
+
+#[path = "transport_control.rs"]
+mod control;
 
 pub struct NativeTransport {
     config: TransportConfig,
     evidence: SecurityEvidence,
     shared: Arc<Shared>,
     data_tx: SyncSender<Vec<u8>>,
-    control_rx: Mutex<std::sync::mpsc::Receiver<Vec<u8>>>,
-    control_pending: Mutex<Option<Vec<u8>>>,
+    control_rx: Mutex<std::sync::mpsc::Receiver<(u64, Vec<u8>)>>,
+    control_pending: Mutex<Option<(u64, Vec<u8>)>>,
 }
 
 impl fmt::Debug for NativeTransport {
@@ -106,43 +109,6 @@ impl NativeTransport {
         }
     }
 
-    pub fn poll_control(&self, token: HandleToken, capacity: usize) -> TransportPoll {
-        if token != self.shared.token {
-            return TransportPoll::Rejected(TransportError::StaleGeneration);
-        }
-        if self.shared.closed.load(Ordering::Acquire) {
-            return TransportPoll::Closed;
-        }
-        let mut pending = match self.control_pending.try_lock() {
-            Ok(value) => value,
-            Err(TryLockError::WouldBlock | TryLockError::Poisoned(_)) => {
-                return TransportPoll::NoMessage;
-            }
-        };
-        if pending.is_none() {
-            match self.try_receive_control() {
-                TransportPoll::Message(bytes) => *pending = Some(bytes),
-                outcome => return outcome,
-            }
-        }
-        if pending.as_ref().is_some_and(|bytes| bytes.len() > capacity) {
-            TransportPoll::Rejected(TransportError::InvalidOutputCapacity)
-        } else {
-            TransportPoll::Message(pending.take().unwrap_or_default())
-        }
-    }
-
-    fn try_receive_control(&self) -> TransportPoll {
-        let Ok(receiver) = self.control_rx.try_lock() else {
-            return TransportPoll::NoMessage;
-        };
-        match receiver.try_recv() {
-            Ok(bytes) => TransportPoll::Message(bytes),
-            Err(TryRecvError::Empty) => TransportPoll::NoMessage,
-            Err(TryRecvError::Disconnected) => TransportPoll::Closed,
-        }
-    }
-
     pub fn request_close(&self, token: HandleToken) -> CloseProgress {
         if token != self.shared.token {
             return CloseProgress::StaleGeneration;
@@ -158,6 +124,7 @@ impl NativeTransport {
     pub fn snapshot(&self) -> WorkerSnapshot {
         WorkerSnapshot {
             connected: self.shared.connected.load(Ordering::Acquire),
+            connection_generation: self.shared.connection_generation.load(Ordering::Acquire),
             pending_operation_owners: self.shared.owners.load(Ordering::Acquire),
             monotonic_millis: self
                 .shared

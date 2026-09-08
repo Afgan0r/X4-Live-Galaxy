@@ -89,9 +89,10 @@ pub(super) fn flush_control(context: &WorkerContext, retained: &mut Option<Vec<u
     let Some(bytes) = retained.take() else {
         return;
     };
-    match context.control_tx.try_send(bytes) {
+    let generation = context.shared.connection_generation.load(Ordering::Acquire);
+    match context.control_tx.try_send((generation, bytes)) {
         Ok(()) => {}
-        Err(TrySendError::Full(bytes) | TrySendError::Disconnected(bytes)) => {
+        Err(TrySendError::Full((_, bytes)) | TrySendError::Disconnected((_, bytes))) => {
             *retained = Some(bytes);
         }
     }
@@ -101,7 +102,6 @@ pub(super) fn drain_for_reconnect(
     context: &WorkerContext,
     read: &mut Option<PendingIo>,
     write: &mut Option<PendingIo>,
-    retained_write: &mut Option<Vec<u8>>,
 ) {
     if read
         .as_ref()
@@ -113,6 +113,6 @@ pub(super) fn drain_for_reconnect(
         .as_ref()
         .is_some_and(|pending| !matches!(poll(context.pipe, pending), Completion::Pending))
     {
-        *retained_write = write.take().map(|value| value.buffer.clone());
+        *write = None;
     }
 }

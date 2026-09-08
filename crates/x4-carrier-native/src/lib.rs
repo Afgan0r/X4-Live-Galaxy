@@ -22,6 +22,7 @@ mod producer;
 mod producer_collection;
 mod producer_feedback;
 mod producer_message;
+mod producer_recovery;
 mod producer_types;
 mod transport;
 mod transport_peer;

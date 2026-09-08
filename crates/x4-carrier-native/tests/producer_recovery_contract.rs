@@ -10,6 +10,8 @@
 use observation_ingest::{ControlBody, ResetBody};
 use x4_carrier_native::{ProducerError, ProducerOutcome, ProducerState, SectionEvidence};
 
+#[path = "producer_recovery_contract/helpers.rs"]
+mod recovery_helpers;
 #[path = "producer_contract/support.rs"]
 mod support;
 
@@ -34,14 +36,15 @@ fn high_epoch_retry_budget_covers_batch_and_completion_handoffs() {
             now + 1,
         )
         .unwrap();
-    retry_then_receive(&mut producer, &source, 2, now + 2);
-    retry_then_receive(&mut producer, &source, 3, now + 4);
+    recovery_helpers::retry_then_receive(&mut producer, &source, 2, now + 2);
+    recovery_helpers::retry_then_receive(&mut producer, &source, 3, now + 4);
     assert_eq!(producer.state(), ProducerState::Ready);
 }
 
 #[test]
-fn peer_reset_creates_a_fresh_bootstrap_identity() {
+fn peer_reset_waits_for_reconnect_and_preserves_session_identity() {
     let (mut producer, source) = support::ready(20_000);
+    producer.observe_connection(1, 20_000).unwrap();
     let reset = support::control(
         &source,
         ControlBody::Reset(ResetBody {
@@ -52,12 +55,40 @@ fn peer_reset_creates_a_fresh_bootstrap_identity() {
         producer.apply_control(&reset, 20_001),
         Ok(ProducerOutcome::Disconnected)
     );
+    assert_eq!(producer.state(), ProducerState::Ready);
+    producer.observe_connection(2, 20_002).unwrap();
     assert_eq!(producer.state(), ProducerState::AwaitingCompatibility);
     let identity =
         observation_ingest::decode_carrier_bootstrap(producer.pending_bytes().unwrap(), 512)
             .unwrap();
-    assert_ne!(identity.epoch.get(), source.transport_epoch);
-    assert_ne!(identity.producer_incarnation, source.producer_incarnation);
+    assert_eq!(identity.epoch.get(), source.transport_epoch);
+    assert_eq!(identity.producer_incarnation, source.producer_incarnation);
+    assert_eq!(identity.session_id, source.session_id);
+}
+
+#[test]
+fn reconnect_bootstrap_fences_and_restores_exact_pending_bytes() {
+    let now = 25_000;
+    let (mut producer, source) = pending_section(now);
+    producer.observe_connection(1, now).unwrap();
+    let pending = producer.pending_bytes().unwrap().to_vec();
+    producer.mark_local_handoff(now).unwrap();
+
+    producer.observe_connection(2, now + 1).unwrap();
+    let bootstrap = producer.pending_bytes().unwrap().to_vec();
+    assert_ne!(bootstrap, pending);
+    producer.mark_local_handoff(now + 1).unwrap();
+    for body in [
+        support::handshake(),
+        support::intent(),
+        ControlBody::Demand(observation_ingest::DemandBody { credit: 1 }),
+    ] {
+        producer
+            .apply_control(&support::control(&source, body), now + 2)
+            .unwrap();
+    }
+    assert_eq!(producer.state(), ProducerState::PendingStart);
+    assert_eq!(producer.pending_bytes(), Some(pending.as_slice()));
 }
 
 #[test]
@@ -155,38 +186,4 @@ fn pending_section(
     producer.finish_section(support::finish(now)).unwrap();
     producer.progress(1, now).unwrap();
     (producer, source)
-}
-
-fn retry_then_receive(
-    producer: &mut x4_carrier_native::Producer,
-    source: &x4_carrier_native::ProducerSource,
-    ordinal: usize,
-    now: u64,
-) {
-    let bytes = producer.pending_bytes().unwrap().to_vec();
-    producer.mark_local_handoff(now).unwrap();
-    assert_eq!(
-        producer.apply_control(
-            &support::disposition(source, &bytes, "capacity_unavailable", ordinal),
-            now + 1,
-        ),
-        Ok(ProducerOutcome::CapacityUnavailable)
-    );
-    assert_eq!(producer.pending_bytes(), Some(bytes.as_slice()));
-    producer.mark_local_handoff(now + 1).unwrap();
-    producer
-        .apply_control(
-            &support::disposition(
-                source,
-                &bytes,
-                if ordinal == 3 {
-                    "committed"
-                } else {
-                    "received"
-                },
-                ordinal,
-            ),
-            now + 2,
-        )
-        .unwrap();
 }

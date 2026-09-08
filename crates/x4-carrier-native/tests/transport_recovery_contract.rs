@@ -45,19 +45,64 @@ fn control_burst_is_retained_until_lua_drains_each_message() {
 }
 
 #[test]
-fn disconnected_peer_reconnects_and_receives_retained_write() {
+fn generation_reports_uncertain_write_for_exact_caller_reconciliation() {
     let config = config();
     let transport = NativeTransport::start(config.clone(), token()).expect("transport");
     let peer = BridgePeer::connect(&config, Duration::from_secs(2)).expect("first peer");
+    let old_generation = transport.snapshot().connection_generation;
     drop(peer);
     assert_eq!(
         transport.try_send(token(), b"retained-across-reconnect"),
         TransportSendOutcome::LocalHandoff
     );
+    transport
+        .request_reconnect(token())
+        .expect("reconnect request");
     let mut replacement = connect_until(&config, &transport);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while transport.snapshot().connection_generation <= old_generation {
+        assert!(Instant::now() < deadline, "generation did not advance");
+        std::thread::yield_now();
+    }
+    let uncertain = replacement
+        .receive_timeout(2_048, Duration::from_millis(50))
+        .expect("bounded read");
+    if let Some(bytes) = uncertain {
+        assert_eq!(bytes, b"retained-across-reconnect");
+        drop(replacement);
+        replacement = connect_until(&config, &transport);
+    }
+    assert_eq!(
+        transport.try_send(token(), b"retained-across-reconnect"),
+        TransportSendOutcome::LocalHandoff
+    );
     assert_eq!(
         replacement.receive(2_048),
         Ok(b"retained-across-reconnect".to_vec())
+    );
+    let _ = transport.request_close(token());
+    assert!(transport.wait_closed_for_test(Duration::from_secs(2)));
+}
+
+#[test]
+fn stale_control_is_fenced_from_replacement_connection() {
+    let config = config();
+    let transport = NativeTransport::start(config.clone(), token()).expect("transport");
+    let mut peer = BridgePeer::connect(&config, Duration::from_secs(2)).expect("first peer");
+    peer.send_control(b"stale-control").expect("old control");
+    std::thread::sleep(Duration::from_millis(20));
+    let old_generation = transport.snapshot().connection_generation;
+    drop(peer);
+    let mut replacement = connect_until(&config, &transport);
+    while transport.snapshot().connection_generation <= old_generation {
+        std::thread::yield_now();
+    }
+    replacement
+        .send_control(b"current-control")
+        .expect("new control");
+    assert_eq!(
+        poll(&transport),
+        TransportPoll::Message(b"current-control".to_vec())
     );
     let _ = transport.request_close(token());
     assert!(transport.wait_closed_for_test(Duration::from_secs(2)));

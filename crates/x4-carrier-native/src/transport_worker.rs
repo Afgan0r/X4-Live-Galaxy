@@ -17,7 +17,8 @@ use crate::{
     transport_types::Shared,
     transport_worker_io::{flush_control, progress_read, progress_write},
     transport_worker_state::{
-        advance_connect, advance_reconnect, enter_reconnect, start_pending_io,
+        advance_connect, advance_reconnect, begin_new_generation, closing, mark_connected,
+        start_pending_io,
     },
 };
 
@@ -26,7 +27,7 @@ pub struct WorkerContext {
     pub pipe: RawHandle,
     pub shared: Arc<Shared>,
     pub data_rx: Receiver<Vec<u8>>,
-    pub control_tx: SyncSender<Vec<u8>>,
+    pub control_tx: SyncSender<(u64, Vec<u8>)>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -53,24 +54,28 @@ fn run(context: &WorkerContext) {
     let mut retained_write = None;
     let mut cancellation_requested = false;
     loop {
-        let closing = context.shared.close_requested.load(Ordering::Acquire);
+        let closing = closing(
+            context,
+            [connect.as_ref(), read.as_ref(), write.as_ref()],
+            &mut cancellation_requested,
+        );
         refresh_clock(context);
-        if closing && !cancellation_requested {
-            cancel_all(
-                context.pipe,
-                [connect.as_ref(), read.as_ref(), write.as_ref()],
-            );
-            cancellation_requested = true;
-        }
         advance_connect(context, &mut state, &mut connect, closing);
-        let io_failed = state == ConnectionState::Connected
+        let forced_reconnect = context
+            .shared
+            .reconnect_requested
+            .swap(false, Ordering::AcqRel);
+        let io_failed = !forced_reconnect
+            && state == ConnectionState::Connected
             && (progress_write(context, &mut write, &mut retained_write)
                 || progress_read(context, &mut read, &mut retained_control));
-        if io_failed && !closing {
-            enter_reconnect(
+        if (forced_reconnect || io_failed) && state == ConnectionState::Connected && !closing {
+            begin_new_generation(
                 context,
                 &mut state,
                 [connect.as_ref(), read.as_ref(), write.as_ref()],
+                &mut retained_control,
+                &mut retained_write,
             );
         }
         flush_control(context, &mut retained_control);
@@ -80,7 +85,6 @@ fn run(context: &WorkerContext) {
             &mut connect,
             &mut read,
             &mut write,
-            &mut retained_write,
             closing,
         );
         if ready_to_terminate(context, [&connect, &read, &write]) {
@@ -105,7 +109,7 @@ fn run(context: &WorkerContext) {
 fn initial_connection(context: &WorkerContext) -> (Option<PendingIo>, ConnectionState) {
     match begin_connect(context.pipe) {
         Ok(None) => {
-            context.shared.connected.store(true, Ordering::Release);
+            mark_connected(context);
             (None, ConnectionState::Connected)
         }
         Ok(Some(operation)) => (Some(operation), ConnectionState::Connecting),
@@ -140,7 +144,7 @@ pub(super) fn progress_connect(
         Completion::Pending => Ok(false),
         Completion::Complete(_) => {
             *operation = None;
-            context.shared.connected.store(true, Ordering::Release);
+            mark_connected(context);
             Ok(true)
         }
         Completion::Cancelled | Completion::Failed => {

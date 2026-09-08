@@ -68,6 +68,7 @@ pub struct SecurityEvidence {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct WorkerSnapshot {
     pub connected: bool,
+    pub connection_generation: u64,
     pub pending_operation_owners: usize,
     pub monotonic_millis: Option<u64>,
     pub closed: bool,
@@ -77,7 +78,9 @@ pub(crate) struct Shared {
     pub token: HandleToken,
     pub data_busy: AtomicBool,
     pub close_requested: AtomicBool,
+    pub reconnect_requested: AtomicBool,
     pub connected: AtomicBool,
+    pub connection_generation: AtomicU64,
     pub closed: AtomicBool,
     pub owners: AtomicUsize,
     pub millis: AtomicU64,
@@ -90,7 +93,9 @@ impl Shared {
             token,
             data_busy: AtomicBool::new(false),
             close_requested: AtomicBool::new(false),
+            reconnect_requested: AtomicBool::new(false),
             connected: AtomicBool::new(false),
+            connection_generation: AtomicU64::new(0),
             closed: AtomicBool::new(false),
             owners: AtomicUsize::new(0),
             millis: AtomicU64::new(0),

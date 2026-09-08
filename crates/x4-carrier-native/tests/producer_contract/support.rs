@@ -106,7 +106,7 @@ pub const fn finish(end: u64) -> SectionFinishEvidence {
     }
 }
 
-fn handshake() -> ControlBody {
+pub fn handshake() -> ControlBody {
     ControlBody::Handshake(observation_ingest::HandshakeBody {
         native_abi: 2,
         envelope_contract: 2,
@@ -117,7 +117,7 @@ fn handshake() -> ControlBody {
     })
 }
 
-fn intent() -> ControlBody {
+pub fn intent() -> ControlBody {
     ControlBody::CollectionIntent(CollectionIntentBody {
         section_key: "carrier_b_realtime_sample".to_owned(),
         max_records: 1,

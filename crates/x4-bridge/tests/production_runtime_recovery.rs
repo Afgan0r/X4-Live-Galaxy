@@ -3,10 +3,15 @@
     reason = "invalid integration fixtures fail immediately"
 )]
 
+#[path = "production_runtime_recovery/bootstrap_reconnect.rs"]
+mod bootstrap_reconnect;
 #[path = "carrier_b_support/mod.rs"]
 mod carrier_b_support;
 #[path = "production_startup/support.rs"]
-#[expect(dead_code, reason = "shared integration support includes readback")]
+#[expect(
+    dead_code,
+    reason = "shared integration support includes fixture readback"
+)]
 mod startup_support;
 
 use std::time::Duration;
@@ -23,8 +28,11 @@ use startup_support::{
 use x4_bridge::PIPE_ENDPOINT;
 use x4_carrier_native::{HandleToken, NativeTransport, TransportConfig};
 
+static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn long_lived_and_stalled_sessions_keep_distinct_deadlines() {
+    let _guard = TEST_LOCK.lock().expect("test lock");
     long_lived_session_accepts_late_transport_progress();
     stalled_candidate_expires_before_peer_disconnect();
 }

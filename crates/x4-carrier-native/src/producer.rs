@@ -32,6 +32,9 @@ pub struct Producer {
     pub(super) finished: bool,
     pub(super) messages: Option<SectionMessages>,
     pub(super) pending: Option<Pending>,
+    pub(super) connection_generation: u64,
+    pub(super) recovery_pending: Option<Pending>,
+    pub(super) recovery_state: Option<ProducerState>,
 }
 
 impl Producer {
@@ -43,22 +46,7 @@ impl Producer {
         if !limits.valid() {
             return Err(ProducerError::InvalidInput);
         }
-        let identity = identity(&source)?;
-        let bytes = encode_carrier_control(
-            &CarrierControl {
-                identity,
-                body: ControlBody::Handshake(observation_ingest::HandshakeBody {
-                    native_abi: 2,
-                    envelope_contract: 2,
-                    schema_version: 1,
-                    policy_version: 2,
-                    canonicalization_version: 3,
-                    digest_version: 1,
-                }),
-            },
-            limits.control_message_bytes,
-        )
-        .map_err(|_| ProducerError::ControlLimit)?;
+        let bytes = bootstrap_bytes(&source, limits.control_message_bytes)?;
         Ok(Self {
             limits,
             source,
@@ -70,6 +58,9 @@ impl Producer {
             finished: false,
             messages: None,
             pending: Some(Pending::new(bytes, "bootstrap", now_millis)),
+            connection_generation: 0,
+            recovery_pending: None,
+            recovery_state: None,
         })
     }
 
@@ -127,22 +118,6 @@ impl Producer {
         self.messages = None;
         self.pending = None;
     }
-
-    pub(super) fn fresh_source(&self) -> Result<ProducerSource, ProducerError> {
-        let epoch = self
-            .source
-            .transport_epoch
-            .checked_add(1)
-            .ok_or(ProducerError::StaleEpoch)?;
-        Ok(ProducerSource {
-            session_id: format!("x4-session-{epoch}"),
-            producer_incarnation: format!("x4-producer-{epoch}"),
-            transport_epoch: epoch,
-            source_scope: self.source.source_scope.clone(),
-            source_epoch_status: self.source.source_epoch_status,
-            source_boundary: self.source.source_boundary,
-        })
-    }
 }
 
 impl Pending {
@@ -167,4 +142,25 @@ pub(super) fn identity(source: &ProducerSource) -> Result<CarrierIdentity, Produ
     observation_ingest::validate_carrier_identity(&identity)
         .map_err(|_| ProducerError::InvalidInput)?;
     Ok(identity)
+}
+
+pub(super) fn bootstrap_bytes(
+    source: &ProducerSource,
+    limit: usize,
+) -> Result<Vec<u8>, ProducerError> {
+    encode_carrier_control(
+        &CarrierControl {
+            identity: identity(source)?,
+            body: ControlBody::Handshake(observation_ingest::HandshakeBody {
+                native_abi: 2,
+                envelope_contract: 2,
+                schema_version: 1,
+                policy_version: 2,
+                canonicalization_version: 3,
+                digest_version: 1,
+            }),
+        },
+        limit,
+    )
+    .map_err(|_| ProducerError::ControlLimit)
 }

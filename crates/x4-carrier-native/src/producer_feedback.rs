@@ -49,14 +49,11 @@ impl Producer {
                 if self.readiness == Readiness::Intent && value.credit == 1 =>
             {
                 self.readiness = Readiness::Ready;
+                self.restore_recovery();
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::Disposition(value) => self.apply_disposition(&value, now_millis),
-            ControlBody::Reset(_) => {
-                let source = self.fresh_source()?;
-                self.reset(source, now_millis)?;
-                Ok(ProducerOutcome::Disconnected)
-            }
+            ControlBody::Reset(_) => Ok(ProducerOutcome::Disconnected),
             _ => Err(ProducerError::InvalidTransition),
         }
     }
