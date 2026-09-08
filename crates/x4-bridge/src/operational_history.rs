@@ -91,6 +91,7 @@ impl OperationalHistory {
     }
 
     pub fn bind_session(&mut self, session: &str, epoch: u64) {
+        self.reset_duplicate_window();
         session.clone_into(&mut self.session);
         self.epoch = epoch;
         self.message.clear();
@@ -99,6 +100,7 @@ impl OperationalHistory {
     }
 
     pub fn bind_message(&mut self, message: &str, section: &str, revision: u64) {
+        self.reset_duplicate_window();
         message.clone_into(&mut self.message);
         section.clone_into(&mut self.section);
         self.revision = revision;
@@ -116,6 +118,11 @@ impl OperationalHistory {
             self.repeated = 1;
         }
         self.repeated > MAX_IDENTICAL_EVENTS
+    }
+
+    fn reset_duplicate_window(&mut self) {
+        self.last = None;
+        self.repeated = 0;
     }
 
     fn event_line(&self, state: &str, reason: &str) -> String {

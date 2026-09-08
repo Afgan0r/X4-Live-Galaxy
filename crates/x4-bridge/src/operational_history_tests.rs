@@ -43,3 +43,28 @@ fn post_start_status_sink_failure_is_visible_in_bounded_history() {
 
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn duplicate_suppression_never_crosses_session_or_message_identity() {
+    let path = std::env::temp_dir().join(format!("history-identity-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    history.bind_session("session-a", 1);
+    history.bind_message("message-a", "section", 1);
+    for _ in 0..32 {
+        let _ = history.record("collection", "received");
+    }
+    let suppressed = history.suppressed;
+    assert!(suppressed > 0);
+
+    history.bind_session("session-b", 2);
+    history.bind_message("message-b", "section", 2);
+    assert!(history.record("collection", "received"));
+
+    let events = std::fs::read_to_string(path.join("operational-history.jsonl"))
+        .expect("history remains readable");
+    assert!(events.contains("\"session\":\"session-b\",\"epoch\":2"));
+    assert!(events.contains("\"message\":\"message-b\",\"section\":\"section\",\"revision\":2"));
+    assert!(events.contains(&format!("\"suppressed_before\":{suppressed}")));
+
+    let _ = std::fs::remove_dir_all(path);
+}
