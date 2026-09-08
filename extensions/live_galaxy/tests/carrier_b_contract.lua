@@ -93,6 +93,8 @@ describe("owned Carrier B adapter", function()
         }, env.fact())
         assert.equals("game_time_millis", env.begin().capture_clock)
         assert.equals("10250", env.begin().capture_start_millis)
+        assert.equals("unknown", env.begin().source_epoch_status)
+        assert.equals("runtime_start", env.begin().source_boundary)
         assert.equals("10500", env.finish().capture_end_millis)
     end)
 
@@ -123,6 +125,11 @@ describe("owned Carrier B adapter", function()
         assert.equals(1, getter_calls)
         assert.equals("10250", env.begin().capture_start_millis)
         assert.equals("10500", env.finish().capture_end_millis)
+        assert.same({ true, "sampled" }, {
+            tick("live_galaxy_observation", "telemetry_game_loaded"),
+        })
+        assert.equals("boundary_uncertain", env.begin().source_epoch_status)
+        assert.equals("game_loaded", env.begin().source_boundary)
     end)
 
     it("redacts callback paths and control characters", function()

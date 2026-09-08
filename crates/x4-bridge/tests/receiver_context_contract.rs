@@ -2,6 +2,7 @@ mod carrier_b_support;
 
 use observation_application::{LifecycleContext, LifecycleError, LifecycleResult};
 use observation_ingest::ReceiverDisposition;
+use observation_ingest::{DecisionEligibility, EligibilityBlocker};
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 use x4_bridge::{ProductionError, ProductionObservationSession};
 
@@ -41,6 +42,10 @@ fn sender_evidence_cannot_be_replaced_by_forged_receiver_context() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "boundary test keeps the ordered durable setup and replacement assertions together"
+)]
 fn production_bytes_derive_context_and_publish_point_measurement() {
     let database = database("receiver-context-publication");
     let mut session = ProductionObservationSession::open(
@@ -104,4 +109,50 @@ fn production_bytes_derive_context_and_publish_point_measurement() {
         observation_domain::CompletionCoverage::PointMeasurement
     );
     assert_eq!(current.receipt().revision.get(), 1);
+    drop(repository);
+
+    let mut replacement = ProductionObservationSession::open(
+        database.path(),
+        generation_limits(),
+        publication_limits(),
+        lifecycle_limits(),
+        4,
+    )
+    .expect("replacement session opens");
+    let boundary_start = String::from_utf8(start_bytes("runtime-clock"))
+        .expect("fixture is UTF-8")
+        .replacen(
+            "\"producer_incarnation\":\"producer:1\"",
+            "\"producer_incarnation\":\"producer:2\"",
+            1,
+        )
+        .replacen("\"transport_epoch\":1", "\"transport_epoch\":2", 1)
+        .replacen("\"section_revision\":1", "\"section_revision\":2", 1)
+        .replacen(
+            "\"source_epoch_status\":\"unknown\"",
+            "\"source_epoch_status\":\"boundary_uncertain\"",
+            1,
+        )
+        .replacen(
+            "\"source_boundary\":\"unknown\"",
+            "\"source_boundary\":\"game_loaded\"",
+            1,
+        )
+        .into_bytes();
+    assert_eq!(
+        replacement.submit_received(
+            observation_domain::TransportEpoch::new(2).expect("epoch"),
+            observation_domain::BatchId::new("outer:boundary-start").expect("identity"),
+            boundary_start,
+            0,
+            3,
+        ),
+        Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
+    );
+    assert_eq!(
+        replacement.decision_eligibility(std::slice::from_ref(&key), 3, 10),
+        DecisionEligibility::Blocked(vec![EligibilityBlocker::Uncertain(
+            observation_domain::SourceScopeId::new("scope:x4").expect("scope")
+        )])
+    );
 }

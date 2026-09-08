@@ -2,14 +2,14 @@ use core::ffi::c_void;
 
 use observation_domain::{
     CaptureWindow, SectionAvailability, SectionCoverage, SectionFreshness, SectionQuality,
-    SectionState, SenderEvidence, SourceConsistency,
+    SectionState, SenderEvidence, SourceBoundary, SourceConsistency, SourceEpochStatus,
 };
 
 use crate::abi_windows::LuaApi;
 use crate::lua_table::{exact_keys, field_bool, field_integer, field_string};
 use crate::{ProducerSource, SectionEvidence, SectionFinishEvidence, TypedFact};
 
-const BEGIN_KEYS: [&str; 9] = [
+const BEGIN_KEYS: [&str; 11] = [
     "section_key",
     "expected_records",
     "capture_start_millis",
@@ -19,6 +19,8 @@ const BEGIN_KEYS: [&str; 9] = [
     "coverage",
     "consistency",
     "stable_identity",
+    "source_epoch_status",
+    "source_boundary",
 ];
 const FACT_KEYS: [&str; 5] = [
     "entity_id",
@@ -63,8 +65,19 @@ pub unsafe fn begin(
         SectionAvailability::Available,
         SectionCoverage::PointMeasurement,
     );
-    sender.source_epoch_status = source.source_epoch_status;
-    sender.source_boundary = source.source_boundary;
+    sender.source_epoch_status =
+        match unsafe { field_string(api, state, 2, "source_epoch_status", 32) }?.as_str() {
+            "unknown" => SourceEpochStatus::Unknown,
+            "boundary_uncertain" => SourceEpochStatus::BoundaryUncertain,
+            _ => return None,
+        };
+    sender.source_boundary =
+        match unsafe { field_string(api, state, 2, "source_boundary", 32) }?.as_str() {
+            "runtime_start" => SourceBoundary::RuntimeStart,
+            "game_loaded" => SourceBoundary::GameLoaded,
+            "lua_reload" => SourceBoundary::LuaReload,
+            _ => return None,
+        };
     sender.source_consistency = SourceConsistency::Unknown;
     sender.stable_identity = false;
     Some(SectionEvidence {

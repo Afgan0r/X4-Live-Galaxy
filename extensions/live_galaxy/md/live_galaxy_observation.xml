@@ -5,17 +5,26 @@
     progress; this cue declares no mutation or support-API dependency.
   -->
   <cues>
-    <cue name="live_galaxy_root">
+    <cue name="live_galaxy_game_start">
       <conditions>
-        <check_any>
-          <event_cue_signalled cue="md.Setup.GameStart" />
-          <event_game_loaded />
-        </check_any>
+        <event_cue_signalled cue="md.Setup.GameStart" />
       </conditions>
       <cues>
         <cue name="live_galaxy_observation" instantiate="true" checkinterval="30s">
           <actions>
             <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_tick'" />
+          </actions>
+        </cue>
+      </cues>
+    </cue>
+    <cue name="live_galaxy_game_loaded">
+      <conditions>
+        <event_game_loaded />
+      </conditions>
+      <cues>
+        <cue name="live_galaxy_loaded_observation" instantiate="true" checkinterval="30s">
+          <actions>
+            <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_game_loaded'" />
           </actions>
         </cue>
       </cues>

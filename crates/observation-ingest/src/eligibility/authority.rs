@@ -171,7 +171,6 @@ impl DecisionRevisionIndex {
                 .remove(&key)
                 .into_iter()
                 .for_each(|revision| self.history.push(revision));
-            self.pointers.remove(&key);
         }
     }
 

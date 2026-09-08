@@ -34,9 +34,19 @@ end
 function runtime.handle_tick(_, event_parameter)
     if callback_active then return false, "reentry_suppressed" end
     if active_carrier == nil or active_observation == nil then return false, "adapter_unavailable" end
-    if event_parameter ~= "telemetry_tick" then return false, "event_ignored" end
+    local boundaries = {
+        telemetry_tick = { source_epoch_status = "unknown", source_boundary = "runtime_start" },
+        telemetry_game_loaded = {
+            source_epoch_status = "boundary_uncertain", source_boundary = "game_loaded",
+        },
+        telemetry_lua_reload = {
+            source_epoch_status = "boundary_uncertain", source_boundary = "lua_reload",
+        },
+    }
+    local boundary = boundaries[event_parameter]
+    if boundary == nil then return false, "event_ignored" end
     callback_active = true
-    local ok, result = pcall(scheduler.tick, event_parameter, active_carrier, active_observation)
+    local ok, result = pcall(scheduler.tick, boundary, active_carrier, active_observation)
     callback_active = false
     if not ok or type(result) ~= "table" then
         diagnostic("callback_failure", ok and "invalid_result" or "exception")

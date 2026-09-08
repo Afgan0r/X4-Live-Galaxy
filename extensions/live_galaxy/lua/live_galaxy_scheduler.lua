@@ -13,7 +13,9 @@ local function call(target, name, ...)
 end
 
 function scheduler.tick(context, carrier, observation)
-    if context == "telemetry_tick" then context = {} end
+    if context == "telemetry_tick" then
+        context = { source_epoch_status = "unknown", source_boundary = "runtime_start" }
+    end
     if type(context) ~= "table" then return { disposition = "clock_unavailable" } end
     if context.reentry_guard then return { disposition = "reentry_suppressed" } end
     context.reentry_guard = true
@@ -31,6 +33,8 @@ function scheduler.tick(context, carrier, observation)
 
     local begin, begin_error = call(observation, "begin_evidence")
     if begin == nil then return finish(begin_error, nil) end
+    begin.source_epoch_status = context.source_epoch_status or "unknown"
+    begin.source_boundary = context.source_boundary or "runtime_start"
     local reserved = call(carrier, "begin_section", begin)
     if reserved == -21 then return finish("producer_busy", reserved) end
     if reserved ~= 0 then return finish("reservation_failed", reserved) end

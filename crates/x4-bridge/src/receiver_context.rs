@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use observation_application::{LifecycleContext, ObservationLifecycle};
-use observation_domain::CompleteMessage;
+use observation_domain::{
+    CompleteMessage, SourceBoundary, SourceEpochStatus, SourceSessionIdentity,
+};
 use observation_ingest::{CandidateContext, CompletionCurrent, ContractVersions};
 use observation_persistence::ObservationRepository;
 
@@ -15,14 +17,18 @@ pub fn assemble<R: ObservationRepository>(
         CompleteMessage::SectionStart(start) => {
             if matches!(
                 start.sender_evidence.source_epoch_status,
-                observation_domain::SourceEpochStatus::BoundaryUncertain
+                SourceEpochStatus::BoundaryUncertain
             ) || matches!(
                 start.sender_evidence.source_boundary,
-                observation_domain::SourceBoundary::GameLoaded
-                    | observation_domain::SourceBoundary::LuaReload
-                    | observation_domain::SourceBoundary::TransportReconnect
+                SourceBoundary::GameLoaded | SourceBoundary::LuaReload
             ) {
-                lifecycle.invalidate_source_scope(&start.source_scope);
+                lifecycle.mark_source_scope_uncertain(
+                    &start.source_scope,
+                    SourceSessionIdentity::new(
+                        start.producer_incarnation.clone(),
+                        start.transport_epoch,
+                    ),
+                );
             }
             let current = lifecycle
                 .current_revision(&start.section_key)

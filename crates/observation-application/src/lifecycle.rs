@@ -96,6 +96,15 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         self.slot = StopAndWaitSlot::empty();
     }
 
+    pub fn mark_source_scope_uncertain(
+        &mut self,
+        scope: &observation_domain::SourceScopeId,
+        session: observation_domain::SourceSessionIdentity,
+    ) {
+        self.invalidate_source_scope(scope);
+        self.index.mark_scope_uncertain(scope, session);
+    }
+
     pub fn expire_candidates(&mut self, now: u64) -> usize {
         self.stager.expire_candidates(now)
     }

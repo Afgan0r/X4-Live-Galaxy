@@ -114,12 +114,30 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         self.last_received = None;
     }
 
+    pub fn mark_source_scope_uncertain(
+        &mut self,
+        scope: &observation_domain::SourceScopeId,
+        session: observation_domain::SourceSessionIdentity,
+    ) {
+        self.lifecycle.mark_source_scope_uncertain(scope, session);
+        self.last_received = None;
+    }
+
     pub fn expire_candidates(&mut self, now: u64) -> usize {
         let expired = self.lifecycle.expire_candidates(now);
         if expired > 0 {
             self.last_received = None;
         }
         expired
+    }
+
+    pub fn decision_eligibility(
+        &self,
+        required: &[observation_domain::SectionKey],
+        now: u64,
+        max_age: u64,
+    ) -> observation_ingest::DecisionEligibility {
+        self.lifecycle.decision_eligibility(required, now, max_age)
     }
 
     fn receiver_context(
