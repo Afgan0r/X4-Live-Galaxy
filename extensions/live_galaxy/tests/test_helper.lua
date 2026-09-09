@@ -1,5 +1,6 @@
 local helper = {}
 local prefix = "live_galaxy/lua/"
+local dotted_prefix = "live_galaxy.lua."
 local pipe_module = "extensions.sn_mod_support_apis.ui.named_pipes.Interface"
 local globals = {
     "DebugError", "Register_OnLoad_Init", "RegisterEvent",
@@ -8,6 +9,7 @@ local globals = {
 
 local function relevant(name)
     return name:sub(1, #prefix) == prefix
+        or name:sub(1, #dotted_prefix) == dotted_prefix
         or name == "extensions.live_galaxy.lua.live_galaxy_runtime"
         or name == "ffi" or name == pipe_module
 end
@@ -39,6 +41,7 @@ function helper.new()
     function fixture.load(name) return require(prefix .. name) end
     function fixture.runtime()
         package.loaded[prefix .. "live_galaxy_runtime"] = nil
+        package.loaded[dotted_prefix .. "live_galaxy_runtime"] = nil
         package.loaded["extensions.live_galaxy.lua.live_galaxy_runtime"] = nil
         return fixture.load("live_galaxy_runtime")
     end

@@ -1,5 +1,5 @@
 local discovery = {}
-local component_discovery = require("extensions.live_galaxy.lua.live_galaxy_component_discovery")
+local component_discovery = require("live_galaxy.lua.live_galaxy_component_discovery")
 
 function discovery.new(api)
     return component_discovery.new(api)

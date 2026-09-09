@@ -1,7 +1,12 @@
+local extension_path = "extensions/?.lua"
+if not package.path:find(extension_path, 1, true) then
+    package.path = package.path .. ";" .. extension_path
+end
+
 local runtime = {}
-local carrier_module = require("extensions.live_galaxy.lua.live_galaxy_carrier")
-local observation_module = require("extensions.live_galaxy.lua.live_galaxy_observation")
-local scheduler = require("extensions.live_galaxy.lua.live_galaxy_scheduler")
+local carrier_module = require("live_galaxy.lua.live_galaxy_carrier")
+local observation_module = require("live_galaxy.lua.live_galaxy_observation")
+local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
 
 local active_carrier, active_observation
 local initialized, callback_active = false, false
