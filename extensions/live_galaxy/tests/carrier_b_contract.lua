@@ -22,7 +22,8 @@ describe("owned Carrier B adapter", function()
                 if options.throw == name then error("injected " .. name) end
                 if result == nil then result = 0 end
                 if name == "progress" then
-                    return result, "ready", "connected", "10001", "available", "producer:1"
+                    return result, "ready", "connected", "10001",
+                        options.capacity or "available:0", "producer:1"
                 end
                 return result
             end
@@ -165,7 +166,7 @@ describe("owned Carrier B adapter", function()
     end
 
     it("does not call the getter while immutable retry is pending", function()
-        local env, getter_calls = native({ progress_code = 2, begin_code = -21 }), 0
+        local env, getter_calls = native({ progress_code = 2, capacity = "occupied:1" }), 0
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
         local observation = assert(fixture.load("live_galaxy_observation").new({
             getter = function() getter_calls = getter_calls + 1; return 1 end,
@@ -176,7 +177,25 @@ describe("owned Carrier B adapter", function()
         }, carrier, observation)
         assert.equals("producer_busy", result.disposition)
         assert.equals(0, getter_calls)
-        assert.same({ "loadlib", "open", "progress", "poll_control", "begin_section" }, env.calls)
+        assert.same({ "loadlib", "open", "progress", "poll_control" }, env.calls)
+    end)
+
+    it("pumps frequently without touching observation sources before admission", function()
+        local env = native({ capacity = "occupied:0" })
+        local begin_calls, getter_calls, finish_calls = 0, 0, 0
+        local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+        local observation = {
+            begin_evidence = function() begin_calls = begin_calls + 1 end,
+            capture = function() getter_calls = getter_calls + 1 end,
+            finish_evidence = function() finish_calls = finish_calls + 1 end,
+        }
+        local scheduler = fixture.load("live_galaxy_scheduler")
+        for _ = 1, 100 do
+            local result = scheduler.tick("telemetry_tick", carrier, observation)
+            assert.equals("producer_busy", result.disposition)
+        end
+        assert.same({ 0, 0, 0 }, { begin_calls, getter_calls, finish_calls })
+        assert.equals(200, #env.calls - 2)
     end)
 
     for _, case in ipairs({

@@ -230,7 +230,7 @@ try {
         pending_owners = if ($resultText -match 'pending_owners=(\d+)') { [int]$Matches[1] } else { 0 }
     }
     if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne 1 -or
-        $luaResult.clock_calls -lt 2) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
+        $luaResult.clock_calls -ne 2) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
     if ($Scenario -eq 'pending-io-unload') {
         $pendingGeneration = if ($luaResult.token -match '^(\d+):') { $Matches[1] } else { '' }
         if ($luaResult.pending_state -cne 'pending_start' -or

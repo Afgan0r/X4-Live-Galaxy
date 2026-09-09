@@ -15,10 +15,10 @@ pub unsafe fn push(
     let monotonic = monotonic_millis.to_string();
     let capacity = format!(
         "{}:{}",
-        if pending(producer.state()) {
-            "occupied"
-        } else {
+        if producer.collection_admitted() {
             "available"
+        } else {
+            "occupied"
         },
         snapshot.pending_operation_owners
     );
@@ -40,16 +40,6 @@ pub unsafe fn push(
         unsafe { (api.push_string)(state, field.as_ptr().cast(), field.len()) };
     }
     6
-}
-
-const fn pending(state: ProducerState) -> bool {
-    matches!(
-        state,
-        ProducerState::PendingStart
-            | ProducerState::PendingBatch
-            | ProducerState::PendingCompletion
-            | ProducerState::PausedAfterFailure
-    )
 }
 
 const fn state_name(state: ProducerState) -> &'static str {

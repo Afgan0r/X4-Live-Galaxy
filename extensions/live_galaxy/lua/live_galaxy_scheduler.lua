@@ -30,6 +30,11 @@ function scheduler.tick(context, carrier, observation)
     local control, control_error = call(carrier, "poll_control")
     if control == nil then return finish(control_error, nil) end
     if terminal[control] then return finish(terminal[control], control) end
+    if type(progress_status) ~= "table"
+        or type(progress_status.capacity) ~= "string"
+        or not progress_status.capacity:match("^available:%d+$") then
+        return finish("producer_busy", progress)
+    end
 
     local begin, begin_error = call(observation, "begin_evidence")
     if begin == nil then return finish(begin_error, nil) end

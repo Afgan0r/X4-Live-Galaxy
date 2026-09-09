@@ -77,6 +77,11 @@ impl Producer {
             .map(|value| value.bytes.as_slice())
     }
 
+    #[must_use]
+    pub(crate) fn collection_admitted(&self) -> bool {
+        self.state == ProducerState::Ready && matches!(self.readiness, Readiness::Ready)
+    }
+
     pub fn mark_local_handoff(&mut self, now_millis: u64) -> Result<(), ProducerError> {
         let pending = self
             .pending
