@@ -111,11 +111,14 @@ describe("owned Carrier B adapter", function()
     it("drives the registered callback with the actual event arguments", function()
         local env, tick, getter_calls = native(), nil, 0
         package.loadlib = env.loadlib
+        _G.GetCurRealTime = function()
+            getter_calls = getter_calls + 1
+            return 2
+        end
         package.preload.ffi = function()
-            return { C = { GetCurRealTime = function()
-                getter_calls = getter_calls + 1
-                return 2
-            end, GetCurrentGameTime = function() return getter_calls == 0 and 10.25 or 10.5 end } }
+            return { C = {
+                GetCurrentGameTime = function() return getter_calls == 0 and 10.25 or 10.5 end,
+            } }
         end
         _G.RegisterEvent = function(_, callback) tick = callback end
         fixture.runtime()
@@ -133,8 +136,9 @@ describe("owned Carrier B adapter", function()
     it("redacts callback paths and control characters", function()
         local env, tick, diagnostic = native({ throw = "progress" }), nil, nil
         package.loadlib = env.loadlib
+        _G.GetCurRealTime = function() return 2 end
         package.preload.ffi = function()
-            return { C = { GetCurRealTime = function() return 2 end } }
+            return { C = { GetCurrentGameTime = function() return 0 end } }
         end
         _G.DebugError = function(value) diagnostic = value end
         _G.RegisterEvent = function(_, callback) tick = callback end
@@ -238,8 +242,9 @@ describe("owned Carrier B adapter", function()
     it("initializes once through normal require and registers one callback", function()
         local env, tick = native(), nil
         package.loadlib = env.loadlib
+        _G.GetCurRealTime = function() return 2 end
         package.preload.ffi = function()
-            return { C = { GetCurRealTime = function() return 2 end } }
+            return { C = { GetCurrentGameTime = function() return 0 end } }
         end
         _G.RegisterEvent = function(name, callback)
             assert.equals("live_galaxy_observation", name)

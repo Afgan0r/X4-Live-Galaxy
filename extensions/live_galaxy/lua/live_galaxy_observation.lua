@@ -15,15 +15,13 @@ end
 function observation.new(options)
     options = options or {}
     local getter, clock_getter = options.getter, options.clock_getter
-    if getter == nil or clock_getter == nil then
+    if getter == nil then getter = rawget(_G, "GetCurRealTime") end
+    if clock_getter == nil then
         local ok, ffi = pcall(require, "ffi")
         if not ok or type(ffi) ~= "table" or type(ffi.C) ~= "userdata" and type(ffi.C) ~= "table" then
             return nil, "getter_loader_failure"
         end
-        if getter == nil then getter = function() return ffi.C.GetCurRealTime() end end
-        if clock_getter == nil then
-            clock_getter = function() return ffi.C.GetCurrentGameTime() end
-        end
+        clock_getter = function() return ffi.C.GetCurrentGameTime() end
     end
     if type(getter) ~= "function" then return nil, "getter_unavailable" end
     if type(clock_getter) ~= "function" then return nil, "clock_unavailable" end

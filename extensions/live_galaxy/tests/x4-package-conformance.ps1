@@ -73,6 +73,11 @@ foreach ($file in $xmlFiles) { $null = Read-ProductXml (Get-Content -LiteralPath
 Assert-Registration $content $ui $ExtensionRoot
 $mdFiles = @(Get-Item -LiteralPath (Join-Path $ExtensionRoot 'md/live_galaxy_observation.xml'))
 $mdDocuments = @($mdFiles | ForEach-Object { Read-ProductXml (Get-Content -LiteralPath $_.FullName -Raw) })
+$observationIntervals = @($mdDocuments[0].SelectNodes('//cue[@checkinterval]') |
+    ForEach-Object { $_.GetAttribute('checkinterval') })
+if ($observationIntervals.Count -ne 2 -or @($observationIntervals | Where-Object { $_ -cne '1s' }).Count -ne 0) {
+    throw 'CARRIER_PROGRESS_INTERVAL_MISMATCH'
+}
 $luaTexts = @(Get-ChildItem -LiteralPath (Join-Path $ExtensionRoot 'lua') -File -Filter '*.lua' |
     ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })
 Assert-TelemetryOnly $mdDocuments $luaTexts

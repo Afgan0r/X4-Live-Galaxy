@@ -75,7 +75,7 @@ function runtime.initialize(options)
     end
     active_carrier, active_observation = carrier, observation
     initialized = true
-    diagnostic("initialized", "abi=2")
+    diagnostic("initialized", "initialized")
     return true, "initialized"
 end
 

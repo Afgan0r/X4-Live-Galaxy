@@ -3,7 +3,7 @@ local prefix = "live_galaxy/lua/"
 local dotted_prefix = "live_galaxy.lua."
 local pipe_module = "extensions.sn_mod_support_apis.ui.named_pipes.Interface"
 local globals = {
-    "DebugError", "Register_OnLoad_Init", "RegisterEvent",
+    "DebugError", "Register_OnLoad_Init", "RegisterEvent", "GetCurRealTime",
     "ConvertStringToLuaID", "ConvertIDTo64Bit", "GetComponentData",
 }
 
