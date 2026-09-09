@@ -109,7 +109,7 @@ describe("owned Carrier B adapter", function()
     end
 
     it("drives the registered callback with the actual event arguments", function()
-        local env, init, tick, getter_calls = native(), nil, nil, 0
+        local env, tick, getter_calls = native(), nil, 0
         package.loadlib = env.loadlib
         package.preload.ffi = function()
             return { C = { GetCurRealTime = function()
@@ -117,10 +117,8 @@ describe("owned Carrier B adapter", function()
                 return 2
             end, GetCurrentGameTime = function() return getter_calls == 0 and 10.25 or 10.5 end } }
         end
-        _G.Register_OnLoad_Init = function(callback) init = callback end
         _G.RegisterEvent = function(_, callback) tick = callback end
         fixture.runtime()
-        init()
         assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.equals(1, getter_calls)
         assert.equals("10250", env.begin().capture_start_millis)
@@ -133,16 +131,14 @@ describe("owned Carrier B adapter", function()
     end)
 
     it("redacts callback paths and control characters", function()
-        local env, init, tick, diagnostic = native({ throw = "progress" }), nil, nil, nil
+        local env, tick, diagnostic = native({ throw = "progress" }), nil, nil
         package.loadlib = env.loadlib
         package.preload.ffi = function()
             return { C = { GetCurRealTime = function() return 2 end } }
         end
         _G.DebugError = function(value) diagnostic = value end
-        _G.Register_OnLoad_Init = function(callback) init = callback end
         _G.RegisterEvent = function(_, callback) tick = callback end
         fixture.runtime()
-        init()
         tick("live_galaxy_observation", "telemetry_tick")
         assert.equals("Live Galaxy Carrier B: event=transition detail=operation_failure", diagnostic)
         assert.is_nil(diagnostic:match("[A-Z]:\\"))
@@ -240,23 +236,18 @@ describe("owned Carrier B adapter", function()
     end)
 
     it("initializes once through normal require and registers one callback", function()
-        local env, init, tick = native(), nil, nil
+        local env, tick = native(), nil
         package.loadlib = env.loadlib
         package.preload.ffi = function()
             return { C = { GetCurRealTime = function() return 2 end } }
-        end
-        _G.Register_OnLoad_Init = function(callback, alias)
-            assert.equals("extensions.live_galaxy.lua.live_galaxy_runtime", alias)
-            init = callback
         end
         _G.RegisterEvent = function(name, callback)
             assert.equals("live_galaxy_observation", name)
             tick = callback
         end
         local runtime = fixture.runtime()
-        assert.is_function(init)
-        init()
         assert.is_function(tick)
+        assert.same({ true, "initialized" }, { runtime.initialize() })
         assert.same({ "loadlib", "open" }, env.calls)
         assert.same({ true, "already_initialized" }, { runtime.initialize() })
     end)

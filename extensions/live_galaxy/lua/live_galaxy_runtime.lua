@@ -75,19 +75,21 @@ function runtime.initialize(options)
     end
     active_carrier, active_observation = carrier, observation
     initialized = true
-    if type(RegisterEvent) == "function" then
-        RegisterEvent("live_galaxy_observation", runtime.handle_tick)
-    end
     diagnostic("initialized", "abi=2")
     return true, "initialized"
 end
 
-local function init()
-    runtime.initialize()
+local function dispatch(event_name, event_parameter)
+    if not initialized then
+        local ok, reason = runtime.initialize()
+        if not ok then return false, reason end
+    end
+    return runtime.handle_tick(event_name, event_parameter)
 end
 
-if type(Register_OnLoad_Init) == "function" then
-    Register_OnLoad_Init(init, "extensions.live_galaxy.lua.live_galaxy_runtime")
+if type(RegisterEvent) ~= "function" then
+    error("Live Galaxy Carrier B: RegisterEvent unavailable")
 end
+RegisterEvent("live_galaxy_observation", dispatch)
 
 return runtime

@@ -233,11 +233,12 @@ describe("real product modules #loading", function()
         assert.equals("pipe_unavailable", status)
     end)
 
-    it("loads without the optional X4 initialization registration callback", function()
+    it("fails loudly without the required X4 event registration callback", function()
         local env = environment()
-        _G.Register_OnLoad_Init = nil
-        assert.is_table(fixture.runtime())
-        assert.spy(env.calls.onload).was_not.called()
+        _G.RegisterEvent = nil
+        local ok, load_error = pcall(fixture.runtime)
+        assert.is_false(ok)
+        assert.matches("RegisterEvent", load_error, 1, true)
         assert.spy(env.calls.register).was_not.called()
         assert.spy(env.calls.write).was_not.called()
     end)
