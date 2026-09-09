@@ -47,8 +47,15 @@ pub struct LuaApi {
 pub unsafe fn resolve() -> Result<LuaApi, InitializerError> {
     use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
 
-    // SAFETY: null selects the current executable module without changing it.
-    let host = unsafe { GetModuleHandleA(core::ptr::null()) };
+    // SAFETY: the static name selects X4's already-loaded Lua runtime without
+    // changing its lifetime. The executable fallback is only for the owned
+    // local host, which exports the same validated Lua 5.1 symbols.
+    let lua_runtime = unsafe { GetModuleHandleA(c"lua51_64.dll".as_ptr().cast()) };
+    let host = if lua_runtime.is_null() {
+        unsafe { GetModuleHandleA(core::ptr::null()) }
+    } else {
+        lua_runtime
+    };
     if host.is_null() {
         return Err(InitializerError::MissingHostModule);
     }
