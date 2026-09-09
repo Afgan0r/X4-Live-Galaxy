@@ -259,7 +259,11 @@ renumbering the ledger.
   lifecycle boundaries to corrupt one another.
 - **Consequences:** retries retain immutable bytes. Reconnect changes the
   transport epoch and discards incomplete candidates. Ambiguous outcomes are
-  not automatically retryable.
+  not automatically retryable. Control contract 3 makes the bridge's durable
+  `current + 1` section revision an explicit collection-intent floor; the DLL
+  uses the greater of that floor and its next local revision. This prevents a
+  restarted X4/DLL producer from reusing durable section and observation
+  versions without giving the bridge authority over record content or IDs.
 - **Supersedes:** using one global session sequence as both transport order and
   section-local completeness.
 

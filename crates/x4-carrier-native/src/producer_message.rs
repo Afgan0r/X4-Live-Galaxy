@@ -54,7 +54,7 @@ pub fn assemble(
             record_id: RecordId::new(format!("carrier-b:{}:1", revision.get()))
                 .ok_or(ProducerError::InvalidInput)?,
             entity_id: EntityId::new(fact.entity_id.clone()).ok_or(ProducerError::InvalidInput)?,
-            observation_version: ObservationVersion::new(fact.observation_version)
+            observation_version: ObservationVersion::new(revision.get())
                 .ok_or(ProducerError::InvalidInput)?,
             content,
         }],

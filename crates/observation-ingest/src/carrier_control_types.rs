@@ -2,6 +2,9 @@ use observation_domain::{ControlEnvelope, TransportEpoch};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub const CONTROL_CONTRACT_VERSION: u16 = 3;
+pub const MAX_DURABLE_SECTION_REVISION: u64 = i64::MAX as u64;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CarrierIdentity {
     pub session_id: String,
@@ -68,6 +71,7 @@ pub struct DispositionBody {
 #[serde(deny_unknown_fields)]
 pub struct CollectionIntentBody {
     pub section_key: String,
+    pub next_revision: u64,
     pub max_records: usize,
     pub max_raw_bytes: usize,
     pub max_work: usize,
@@ -110,7 +114,9 @@ pub fn decode_carrier_bootstrap(
             CarrierCodecError::InvalidShape
         }
     })?;
-    if raw.control_version != 2 || raw.body != crate::carrier_control::exact_handshake() {
+    if raw.control_version != CONTROL_CONTRACT_VERSION
+        || raw.body != crate::carrier_control::exact_handshake()
+    {
         return Err(CarrierCodecError::RestartRequired);
     }
     if raw.kind != "handshake" {

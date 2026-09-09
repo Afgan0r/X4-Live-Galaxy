@@ -29,6 +29,24 @@ fn pending(now: u64) -> (Producer, ProducerSource) {
     (producer, source)
 }
 
+fn take_revision(
+    producer: &mut Producer,
+    source: &ProducerSource,
+    result: &str,
+    revision: u64,
+    ordinal: usize,
+) -> Vec<u8> {
+    let bytes = producer.pending_bytes().unwrap().to_vec();
+    producer.mark_local_handoff(0).unwrap();
+    producer
+        .apply_control(
+            &support::disposition_revision(source, &bytes, result, revision, ordinal),
+            0,
+        )
+        .unwrap();
+    bytes
+}
+
 #[test]
 fn typed_fact_produces_v2_start_batch_and_completion() {
     let (mut producer, source) = ready(0);
@@ -85,6 +103,74 @@ fn typed_fact_produces_v2_start_batch_and_completion() {
     tampered[offset] = b'z';
     assert!(decode_complete_message(&tampered, 2_048).is_err());
     assert_eq!(producer.state(), ProducerState::Ready);
+}
+
+#[test]
+fn fresh_demand_advances_the_entity_version_with_the_section_revision() {
+    let (mut producer, source) = ready(0);
+    for revision in 1..=2 {
+        producer
+            .begin_section(SectionEvidence::point_measurement(
+                "x4:carrier_b_acceptance",
+            ))
+            .unwrap();
+        producer
+            .push_record(&sample(if revision == 1 { "1" } else { "2" }))
+            .unwrap();
+        producer.finish_section(support::finish(revision)).unwrap();
+        producer.progress(1, revision).unwrap();
+        let _start = take_revision(&mut producer, &source, "received", revision, 1);
+        let batch = take_revision(&mut producer, &source, "received", revision, 2);
+        let _completion = take_revision(&mut producer, &source, "committed", revision, 3);
+        let CompleteMessage::ImmutableBatch(batch) =
+            decode_complete_message(&batch, 2_048).unwrap()
+        else {
+            panic!("batch expected")
+        };
+        assert_eq!(batch.records[0].observation_version.get(), revision);
+        if revision == 1 {
+            producer
+                .apply_control(
+                    &control(&source, ControlBody::Demand(DemandBody { credit: 1 })),
+                    revision,
+                )
+                .unwrap();
+        }
+    }
+}
+
+#[test]
+fn durable_revision_floor_resumes_a_fresh_producer_without_reuse() {
+    let source = source(7);
+    let mut producer = Producer::new(ProducerLimits::bring_up(), source.clone(), 0).unwrap();
+    producer.mark_local_handoff(0).unwrap();
+    for body in [
+        support::handshake(),
+        support::intent_at(3),
+        ControlBody::Demand(DemandBody { credit: 1 }),
+    ] {
+        producer.apply_control(&control(&source, body), 0).unwrap();
+    }
+    producer
+        .begin_section(SectionEvidence::point_measurement(
+            "x4:carrier_b_acceptance",
+        ))
+        .unwrap();
+    producer.push_record(&sample("3")).unwrap();
+    producer.finish_section(support::finish(3)).unwrap();
+    producer.progress(1, 3).unwrap();
+    let start = take_revision(&mut producer, &source, "received", 3, 1);
+    let batch = take_revision(&mut producer, &source, "received", 3, 2);
+    let CompleteMessage::SectionStart(start) = decode_complete_message(&start, 2_048).unwrap()
+    else {
+        panic!("start expected")
+    };
+    let CompleteMessage::ImmutableBatch(batch) = decode_complete_message(&batch, 2_048).unwrap()
+    else {
+        panic!("batch expected")
+    };
+    assert_eq!(start.section_revision.get(), 3);
+    assert_eq!(batch.records[0].observation_version.get(), 3);
 }
 
 #[test]

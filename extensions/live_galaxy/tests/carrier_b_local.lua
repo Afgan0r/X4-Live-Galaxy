@@ -106,6 +106,30 @@ assert(committed, string.format(
     "commit watchdog: producer=%s transport=%s monotonic=%s",
     tostring(commit_status.producer_state), tostring(commit_status.transport_state),
     tostring(commit_status.monotonic_millis)))
+if mode == "multi-collection" then
+    local second_deadline = host_monotonic_millis() + 15000
+    local second_sampled = false
+    while host_monotonic_millis() < second_deadline do
+        local result = scheduler.tick({
+            capture_start_millis = "3",
+            capture_end_millis = "4",
+        }, carrier, observation)
+        if result.disposition == "sampled" then second_sampled = true; break end
+        host_sleep(1)
+    end
+    assert(second_sampled, "second bridge demand must produce a sample")
+    assert(getter_calls == 2, "second bridge demand must collect exactly once")
+    assert(clock_calls == 4, "pre-admission pumps must not call the clock")
+
+    local second_committed = false
+    local second_commit_deadline = host_monotonic_millis() + 10000
+    while host_monotonic_millis() < second_commit_deadline do
+        carrier:progress(1)
+        if carrier:poll_control() == 5 then second_committed = true; break end
+        host_sleep(1)
+    end
+    assert(second_committed, "second sample must be durably committed")
+end
 write(result_path, string.format(
     "return {actual_native=true,token=%q,getter_calls=%d,clock_calls=%d,sampled=true}",
     token, getter_calls, clock_calls))

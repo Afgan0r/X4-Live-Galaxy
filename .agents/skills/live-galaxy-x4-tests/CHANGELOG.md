@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-09
+
+- Required a distinct producer process against the same durable database for
+  restart-sensitive revision tests after the Carrier B fixed-version defect
+  survived a single-collection local oracle.
+
 ## 2026-09-05
 
 - Linked shared test sufficiency to `live-galaxy-tests` and retained X4-specific

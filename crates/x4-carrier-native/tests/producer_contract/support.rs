@@ -37,17 +37,27 @@ pub fn take(
 }
 
 pub fn disposition(source: &ProducerSource, bytes: &[u8], result: &str, ordinal: usize) -> Vec<u8> {
+    disposition_revision(source, bytes, result, 1, ordinal)
+}
+
+pub fn disposition_revision(
+    source: &ProducerSource,
+    bytes: &[u8],
+    result: &str,
+    revision: u64,
+    ordinal: usize,
+) -> Vec<u8> {
     let id = match ordinal {
-        1 => "message:start:carrier_b_realtime_sample:1".to_owned(),
-        2 => format!("carrier-b:1:{}:1", source.transport_epoch),
-        _ => "message:complete:carrier_b_realtime_sample:1".to_owned(),
+        1 => format!("message:start:carrier_b_realtime_sample:{revision}"),
+        2 => format!("carrier-b:{revision}:{}:1", source.transport_epoch),
+        _ => format!("message:complete:carrier_b_realtime_sample:{revision}"),
     };
     control(
         source,
         ControlBody::Disposition(DispositionBody {
             message_id: id,
             section_key: "carrier_b_realtime_sample".to_owned(),
-            section_revision: 1,
+            section_revision: revision,
             message_digest: hex(complete_message_digest(bytes)),
             disposition: result.to_owned(),
         }),
@@ -118,8 +128,13 @@ pub fn handshake() -> ControlBody {
 }
 
 pub fn intent() -> ControlBody {
+    intent_at(1)
+}
+
+pub fn intent_at(next_revision: u64) -> ControlBody {
     ControlBody::CollectionIntent(CollectionIntentBody {
         section_key: "carrier_b_realtime_sample".to_owned(),
+        next_revision,
         max_records: 1,
         max_raw_bytes: 96,
         max_work: 2_048,

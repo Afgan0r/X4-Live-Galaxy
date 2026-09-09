@@ -53,28 +53,11 @@ fn serve(
         let _ = history.record("rejected", "bootstrap-incompatible");
         return None;
     };
+    let next_revision = revision_floor(session, history)?;
     history.bind_session(&identity.session_id, identity.epoch.get());
-    for body in [
-        ControlBody::Handshake(observation_ingest::HandshakeBody {
-            native_abi: 2,
-            envelope_contract: 2,
-            schema_version: 1,
-            policy_version: 2,
-            canonicalization_version: 3,
-            digest_version: 1,
-        }),
-        ControlBody::CollectionIntent(CollectionIntentBody {
-            section_key: "carrier_b_realtime_sample".to_owned(),
-            max_records: limits.max_candidate_records,
-            max_raw_bytes: limits.max_candidate_raw_bytes,
-            max_work: limits.max_candidate_work,
-        }),
-        ControlBody::Demand(DemandBody { credit: 1 }),
-    ] {
-        if send(peer, &identity, body, limits).is_err() {
-            let _ = history.record("rejected", "control-response-loss");
-            return None;
-        }
+    if send_initial_controls(peer, &identity, next_revision, limits).is_err() {
+        let _ = history.record("rejected", "control-response-loss");
+        return None;
     }
     let _ = history.record("collection", "compatible-session");
     let mut last_progress = Instant::now();
@@ -105,6 +88,49 @@ fn serve(
     }
     let _ = history.record("waiting", "peer-disconnected");
     active_scope
+}
+
+fn send_initial_controls(
+    peer: &mut BridgePeer,
+    identity: &observation_ingest::CarrierIdentity,
+    next_revision: u64,
+    limits: &ProductionLimits,
+) -> Result<(), ()> {
+    for body in [
+        ControlBody::Handshake(observation_ingest::HandshakeBody {
+            native_abi: 2,
+            envelope_contract: 2,
+            schema_version: 1,
+            policy_version: 2,
+            canonicalization_version: 3,
+            digest_version: 1,
+        }),
+        ControlBody::CollectionIntent(CollectionIntentBody {
+            section_key: "carrier_b_realtime_sample".to_owned(),
+            next_revision,
+            max_records: limits.max_candidate_records,
+            max_raw_bytes: limits.max_candidate_raw_bytes,
+            max_work: limits.max_candidate_work,
+        }),
+        ControlBody::Demand(DemandBody { credit: 1 }),
+    ] {
+        send(peer, identity, body, limits)?;
+    }
+    Ok(())
+}
+
+fn revision_floor(
+    session: &ProductionObservationSession,
+    history: &mut OperationalHistory,
+) -> Option<u64> {
+    let key = observation_domain::SectionKey::new("carrier_b_realtime_sample")?;
+    session.next_revision(&key).map_or_else(
+        |_| {
+            let _ = history.record("rejected", "revision-floor-unavailable");
+            None
+        },
+        Some,
+    )
 }
 
 fn send(

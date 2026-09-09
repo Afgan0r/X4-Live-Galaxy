@@ -37,9 +37,10 @@ pub use batch_budget::{AggregateUsage, CandidateUsage};
 pub use candidate_limits::{AggregateLimits, CandidateLimits, GenerationLimits};
 pub use carrier_control::{decode_carrier_control, encode_carrier_control};
 pub use carrier_control_types::{
-    CarrierCodecError, CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody,
-    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody, carrier_control_kind,
-    complete_message_digest, decode_carrier_bootstrap, validate_carrier_identity,
+    CONTROL_CONTRACT_VERSION, CarrierCodecError, CarrierControl, CarrierIdentity,
+    CollectionIntentBody, ControlBody, DemandBody, DispositionBody, HandshakeBody, HealthBody,
+    MAX_DURABLE_SECTION_REVISION, ResetBody, carrier_control_kind, complete_message_digest,
+    decode_carrier_bootstrap, validate_carrier_identity,
 };
 pub use completed_scope::CompletedScope;
 pub use completion_types::{

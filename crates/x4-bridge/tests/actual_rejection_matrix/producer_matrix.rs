@@ -127,6 +127,7 @@ fn negotiate(
         }),
         ControlBody::CollectionIntent(CollectionIntentBody {
             section_key: "carrier_b_realtime_sample".to_owned(),
+            next_revision: 1,
             max_records: 1,
             max_raw_bytes: 96,
             max_work: 1,

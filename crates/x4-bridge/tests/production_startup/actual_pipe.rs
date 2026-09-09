@@ -27,9 +27,21 @@ fn bootstrap_is_handshake_only_and_message_digest_is_byte_exact() {
     let expected = identity("bootstrap");
     let bootstrap = control(&expected, ControlBody::Handshake(exact_handshake()));
     assert_eq!(decode_carrier_bootstrap(&bootstrap, 2_048), Ok(expected));
+    for stale in [1, 2] {
+        let text = String::from_utf8(bootstrap.clone()).expect("bootstrap is UTF-8");
+        let stale_text = text.replacen(
+            "\"control_version\":3",
+            &format!("\"control_version\":{stale}"),
+            1,
+        );
+        assert_eq!(
+            decode_carrier_bootstrap(stale_text.as_bytes(), 2_048),
+            Err(CarrierCodecError::RestartRequired)
+        );
+    }
     assert_eq!(
         decode_carrier_bootstrap(
-            br#"{"control_version":2,"kind":"health","session":"s","incarnation":"i","epoch":1,"body":{"native_abi":2,"envelope_contract":2,"schema_version":1,"policy_version":2,"canonicalization_version":3,"digest_version":1}}"#,
+            br#"{"control_version":3,"kind":"health","session":"s","incarnation":"i","epoch":1,"body":{"native_abi":2,"envelope_contract":2,"schema_version":1,"policy_version":2,"canonicalization_version":3,"digest_version":1}}"#,
             2_048,
         ),
         Err(CarrierCodecError::UnknownKind)
@@ -88,6 +100,9 @@ fn run_actual_sample(label: &str, native_first: bool) {
     for expected in ["handshake", "collection_intent", "demand"] {
         let value = decode_carrier_control(&await_control(&transport, token), &identity, 2_048)
             .expect("bound control");
+        if let ControlBody::CollectionIntent(intent) = &value.body {
+            assert_eq!(intent.next_revision, 1);
+        }
         assert!(matches!(
             (expected, value.body),
             ("handshake", ControlBody::Handshake(_))

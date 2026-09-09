@@ -38,10 +38,12 @@ impl Producer {
             ControlBody::CollectionIntent(value)
                 if self.readiness == Readiness::Handshake
                     && value.section_key == "carrier_b_realtime_sample"
+                    && value.next_revision > 0
                     && value.max_records >= 1
                     && value.max_raw_bytes >= self.limits.max_raw_bytes
                     && value.max_work >= 1 =>
             {
+                self.revision = self.revision.max(value.next_revision);
                 self.readiness = Readiness::Intent;
                 Ok(ProducerOutcome::Accepted)
             }

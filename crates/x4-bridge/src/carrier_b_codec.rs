@@ -30,6 +30,7 @@ pub fn encode_carrier_control(
         }),
         ControlEnvelope::CollectionIntent => ControlBody::CollectionIntent(CollectionIntentBody {
             section_key: "acceptance".to_owned(),
+            next_revision: 1,
             max_records: 1,
             max_raw_bytes: 1,
             max_work: 1,

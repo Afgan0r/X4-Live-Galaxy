@@ -80,19 +80,27 @@ pub fn input(
 }
 
 pub fn start_bytes(section: &str) -> Vec<u8> {
+    start_bytes_at(section, 1)
+}
+
+pub fn start_bytes_at(section: &str, revision: u64) -> Vec<u8> {
     format!(
-        "{{\"type\":\"section_start\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"expected_records\":0,\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
+        "{{\"type\":\"section_start\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":{revision},\"expected_records\":0,\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
     )
     .into_bytes()
 }
 
 pub fn completion_bytes(section: &str) -> Vec<u8> {
+    completion_bytes_at(section, 1)
+}
+
+pub fn completion_bytes_at(section: &str, revision: u64) -> Vec<u8> {
     let envelope = SectionCompletionEnvelope {
         source_scope: SourceScopeId::new("scope:x4").expect("scope"),
         producer_incarnation: ProducerIncarnationId::new("producer:1").expect("producer"),
         transport_epoch: TransportEpoch::new(1).expect("epoch"),
         section_key: SectionKey::new(section).expect("section"),
-        section_revision: SectionRevisionId::new(1).expect("revision"),
+        section_revision: SectionRevisionId::new(revision).expect("revision"),
         batch_count: 0,
         record_count: 0,
         raw_bytes: 0,
@@ -110,7 +118,7 @@ pub fn completion_bytes(section: &str) -> Vec<u8> {
     let manifest = digest_hex(bound.ordered_batch_manifest_digest);
     let content = digest_hex(bound.canonical_content_digest);
     format!(
-        "{{\"type\":\"section_completion\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":1,\"batch_count\":0,\"record_count\":0,\"raw_bytes\":0,\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"known_empty\",\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
+        "{{\"type\":\"section_completion\",\"contract_version\":2,\"source_scope\":\"scope:x4\",\"producer_incarnation\":\"producer:1\",\"transport_epoch\":1,\"section_key\":\"{section}\",\"section_revision\":{revision},\"batch_count\":0,\"record_count\":0,\"raw_bytes\":0,\"ordered_batch_manifest_digest\":\"{manifest}\",\"canonical_content_digest\":\"{content}\",\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1,\"coverage\":\"known_empty\",\"sender_evidence\":{{\"capture_clock\":\"game_time_millis\",\"capture_start_millis\":0,\"capture_end_millis\":0,\"freshness\":\"fresh\",\"quality\":\"unknown\",\"availability\":\"available\",\"coverage\":\"complete\",\"source_epoch\":null,\"source_epoch_status\":\"unknown\",\"source_boundary\":\"unknown\",\"source_consistency\":\"unknown\",\"stable_identity\":false,\"schema_version\":1,\"policy_version\":2,\"canonicalization_version\":3,\"digest_version\":1}}}}"
     )
     .into_bytes()
 }

@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::carrier_control_types::{
-    CarrierCodecError, CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody,
-    DemandBody, DispositionBody, HandshakeBody, HealthBody, ResetBody, validate_carrier_identity,
+    CONTROL_CONTRACT_VERSION, CarrierCodecError, CarrierControl, CarrierIdentity,
+    CollectionIntentBody, ControlBody, DemandBody, DispositionBody, HandshakeBody, HealthBody,
+    MAX_DURABLE_SECTION_REVISION, ResetBody, validate_carrier_identity,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -24,7 +25,7 @@ pub fn encode_carrier_control(
     validate_body(&control.body)?;
     let (kind, body) = encode_body(&control.body)?;
     let raw = RawControl {
-        control_version: 2,
+        control_version: CONTROL_CONTRACT_VERSION,
         kind: kind.to_owned(),
         session: control.identity.session_id.clone(),
         incarnation: control.identity.producer_incarnation.clone(),
@@ -47,7 +48,7 @@ pub fn decode_carrier_control(
     }
     validate_carrier_identity(expected)?;
     let raw: RawControl = serde_json::from_slice(bytes).map_err(|error| classify_shape(&error))?;
-    if raw.control_version != 2 {
+    if raw.control_version != CONTROL_CONTRACT_VERSION {
         return Err(CarrierCodecError::RestartRequired);
     }
     if raw.session != expected.session_id || raw.incarnation != expected.producer_incarnation {
@@ -90,6 +91,8 @@ fn validate_body(body: &ControlBody) -> Result<(), CarrierCodecError> {
         }
         ControlBody::CollectionIntent(value)
             if value.section_key.is_empty()
+                || value.next_revision == 0
+                || value.next_revision > MAX_DURABLE_SECTION_REVISION
                 || value.max_records == 0
                 || value.max_raw_bytes == 0
                 || value.max_work == 0 =>

@@ -14,6 +14,7 @@ use observation_persistence::{
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProductionError {
     InvalidLimits,
+    RevisionExhausted,
     Storage,
     Lifecycle(LifecycleError),
 }
@@ -148,6 +149,27 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         max_age: u64,
     ) -> observation_ingest::DecisionEligibility {
         self.lifecycle.decision_eligibility(required, now, max_age)
+    }
+
+    pub fn next_revision(
+        &self,
+        key: &observation_domain::SectionKey,
+    ) -> Result<u64, ProductionError> {
+        let current = self
+            .lifecycle
+            .current_revision(key)
+            .map_err(|_| ProductionError::Storage)?;
+        current.map_or(Ok(1), |value| {
+            let next = value
+                .revision()
+                .revision
+                .get()
+                .checked_add(1)
+                .ok_or(ProductionError::RevisionExhausted)?;
+            (next <= observation_ingest::MAX_DURABLE_SECTION_REVISION)
+                .then_some(next)
+                .ok_or(ProductionError::RevisionExhausted)
+        })
     }
 
     fn receiver_context(

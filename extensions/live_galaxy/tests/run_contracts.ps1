@@ -33,6 +33,8 @@ try {
         $actual = @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-LimitsFile', $limits)
         Invoke-Stage 'Carrier-B-bridge-first' 'pwsh' $actual
         Invoke-Stage 'Carrier-B-native-first' 'pwsh' ($actual + @('-StartupOrder', 'native-first'))
+        Invoke-Stage 'Carrier-B-multi-collection' 'pwsh' ($actual + @('-Scenario', 'multi-collection'))
+        Invoke-Stage 'Carrier-B-process-restart' 'pwsh' ($actual + @('-Scenario', 'process-restart'))
         Invoke-Stage 'Carrier-B-unload' 'pwsh' ($actual + @('-Scenario', 'pending-io-unload'))
     }
     if ($Suite -ne 'xml') {

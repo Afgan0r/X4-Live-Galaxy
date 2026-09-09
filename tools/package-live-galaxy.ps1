@@ -127,7 +127,7 @@ function Assert-SourceRegistration([string]$ExtensionRoot) {
 function Assert-Manifest($Manifest) {
     if ($Manifest.product -cne 'live_galaxy' -or $Manifest.product_version -cne '0.1.0' -or
         $Manifest.architecture -cne 'amd64-pe32+' -or $Manifest.initializer -cne $requiredExport -or
-        $Manifest.native_abi_version -ne 2 -or $Manifest.control_contract_version -ne 2 -or
+        $Manifest.native_abi_version -ne 2 -or $Manifest.control_contract_version -ne 3 -or
         $Manifest.envelope_contract_version -ne 2 -or $Manifest.semantic_versions.schema -ne 1 -or
         $Manifest.semantic_versions.policy -ne 2 -or $Manifest.semantic_versions.canonicalization -ne 3 -or
         $Manifest.semantic_versions.digest -ne 1) { throw 'MANIFEST_VERSION_OR_IDENTITY_INVALID' }
@@ -193,7 +193,7 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
             product = 'live_galaxy'; product_version = '0.1.0'; source_revision = (git -C $repo rev-parse HEAD)
             candidate = $(if ($Calibration) { 'local-calibration-only' } else { 'ready-for-user-x4-checkpoint' })
             architecture = 'amd64-pe32+'; initializer = $requiredExport
-            native_abi_version = 2; control_contract_version = 2; envelope_contract_version = 2
+            native_abi_version = 2; control_contract_version = 3; envelope_contract_version = 2
             semantic_versions = [ordered]@{ schema = 1; policy = 2; canonicalization = 3; digest = 1 }
             files = $hashes
         }
@@ -230,9 +230,14 @@ function Invoke-SelfTest {
         $selectedLimits = if ($LimitsFile) { Assert-Contained (Join-Path $repo $LimitsFile) $repo } else { $fixture }
         $bundle = Write-Bundle (Join-Path $scratch 'bundle') $selectedLimits (-not [bool]$LimitsFile)
         $manifest = Get-Content -LiteralPath (Join-Path $bundle 'manifest.json') -Raw | ConvertFrom-Json
-        foreach ($field in @('native_abi_version', 'control_contract_version', 'envelope_contract_version')) {
+        $wrongVersions = @{
+            native_abi_version = @(1, 3)
+            control_contract_version = @(1, 2, 4)
+            envelope_contract_version = @(1, 3)
+        }
+        foreach ($field in $wrongVersions.Keys) {
             $saved = $manifest.$field
-            foreach ($wrong in @(1, 3)) {
+            foreach ($wrong in $wrongVersions[$field]) {
                 $manifest.$field = $wrong
                 try { Assert-Manifest $manifest; throw 'NEGATIVE_VERSION_ACCEPTED' }
                 catch { if ($_.Exception.Message -eq 'NEGATIVE_VERSION_ACCEPTED') { throw } }

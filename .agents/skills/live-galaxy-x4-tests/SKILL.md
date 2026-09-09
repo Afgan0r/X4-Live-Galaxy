@@ -29,7 +29,12 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   partial mutation, and independent readback semantics.
 - **XT-04 — Cross-language path:** When Lua/MD changes affect Rust boundaries,
   run the actual owned producer/consumer path. A fake adapter proves the local
-  seam; it cannot establish a real X4 API or game behavior.
+  seam; it cannot establish a real X4 API or game behavior. When durable
+  revision identity must survive process restart, require multiple accepted
+  collections before restart and a distinct producer process against the same
+  durable database afterward. Assert the exact ordered revision history and
+  absence of permanent rejection; a single first-revision sample cannot detect
+  process-local version reuse.
 - **XT-05 — In-game evidence:** Use a disposable Creative Custom campaign or
   approved test copy under a written plan. The user performs all X4 actions.
   Report a scenario as `observed in X4` only after expected behavior and its

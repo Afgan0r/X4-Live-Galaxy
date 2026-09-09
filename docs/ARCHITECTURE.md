@@ -814,7 +814,10 @@ through a source-resolved `package.loadlib` call and the
 (`sn_mod_support_apis`) remains research/comparison evidence only: it is not a
 production dependency or automatic fallback. Carrier B negotiates the exact
 native ABI, complete-message envelope, and control-contract versions before
-the bridge admits observation data.
+the bridge admits observation data. Control contract 3 adds a mandatory
+bridge-derived `next_revision` floor to collection intent. The DLL assigns the
+actual section and observation version as the greater of its next local value
+and that durable floor.
 
 - No external language independently invokes the inspected X4 getter surface.
 - Bridge-to-Lua messages express bounded demand, disposition, collection intent,
@@ -834,7 +837,8 @@ Inbound messages carry bounded control, not collected game state:
 - Handshake, capability, and transport-epoch data;
 - Demand or implicit credit;
 - `received`, `committed`, rejection, abort, and retry-after dispositions;
-- Section collection intent, logical scope, policy identity, and urgency;
+- Section collection intent, durable next-revision floor, logical scope,
+  policy identity, and urgency;
 - Bounded health and session-reset signals;
 
 Phase 05.4 permits observations and bounded collection/control traffic only.

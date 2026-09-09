@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SelfTest,
-    [ValidateSet('actual-chain', 'pending-io-unload')]
+    [ValidateSet('actual-chain', 'multi-collection', 'process-restart', 'pending-io-unload')]
     [string]$Scenario = 'actual-chain',
     [ValidateSet('bridge-first', 'native-first')]
     [string]$StartupOrder = 'bridge-first',
@@ -187,11 +187,12 @@ $result = Join-Path $run 'result.lua'; $marker = Join-Path $run 'kill.marker'
 $bridge = $null; $bridgePeak = 0L; $hostPeak = 0L
 $timer = [Diagnostics.Stopwatch]::StartNew()
 try {
+    $hostScenario = if ($Scenario -eq 'process-restart') { 'multi-collection' } else { $Scenario }
     if ($StartupOrder -eq 'bridge-first') {
         $bridge = Start-Owned (Join-Path $repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $limits) $run
-        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $Scenario) $run $true
+        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $hostScenario) $run $true
     } else {
-        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $Scenario) $run $true
+        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, $hostScenario) $run $true
         Start-Sleep -Milliseconds 25
         $bridge = Start-Owned (Join-Path $repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $limits) $run
     }
@@ -229,8 +230,33 @@ try {
         pending_incarnation = if ($resultText -match 'pending_incarnation="([^"]+)"') { $Matches[1] } else { '' }
         pending_owners = if ($resultText -match 'pending_owners=(\d+)') { [int]$Matches[1] } else { 0 }
     }
-    if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne 1 -or
-        $luaResult.clock_calls -ne 2) { throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED' }
+    $expectedSamples = if ($Scenario -in @('multi-collection', 'process-restart')) { 2 } else { 1 }
+    if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne $expectedSamples -or
+        $luaResult.clock_calls -ne (2 * $expectedSamples)) {
+        throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED'
+    }
+    $totalGetterCalls = $luaResult.getter_calls
+    $totalClockCalls = $luaResult.clock_calls
+    if ($Scenario -eq 'process-restart') {
+        $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, 'actual-chain') $run $true
+        $deadline = [DateTime]::UtcNow.AddSeconds(30)
+        while (-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+            $process.Refresh()
+            $hostPeak = [Math]::Max($hostPeak, $process.WorkingSet64)
+            Start-Sleep -Milliseconds 5
+        }
+        if (-not $process.HasExited) { Stop-Owned $process; throw 'RESTARTED_LUA_HOST_WATCHDOG' }
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) { throw "RESTARTED_LUA_HOST_FAILED:$($process.ExitCode):$($process.StandardError.ReadToEnd())" }
+        $restartText = Get-Content -LiteralPath $result -Raw
+        $restartGetterCalls = if ($restartText -match 'getter_calls=(\d+)') { [int]$Matches[1] } else { -1 }
+        $restartClockCalls = if ($restartText -match 'clock_calls=(\d+)') { [int]$Matches[1] } else { -1 }
+        if ($restartText -notmatch 'actual_native=true' -or $restartGetterCalls -ne 1 -or $restartClockCalls -ne 2) {
+            throw 'RESTARTED_LUA_NATIVE_IDENTITY_FAILED'
+        }
+        $totalGetterCalls += $restartGetterCalls
+        $totalClockCalls += $restartClockCalls
+    }
     if ($Scenario -eq 'pending-io-unload') {
         $pendingGeneration = if ($luaResult.token -match '^(\d+):') { $Matches[1] } else { '' }
         if ($luaResult.pending_state -cne 'pending_start' -or
@@ -240,16 +266,17 @@ try {
         }
         if ($luaResult.stale -ne -16 -or $luaResult.fresh -eq $luaResult.token) { throw 'STALE_GENERATION_FENCE_FAILED' }
     } else {
-        $readback = & (Join-Path $repo 'target/release/x4-bridge.exe') --readback --data-dir $data --section-key carrier_b_realtime_sample --section-revision 1
+        $readbackRevision = if ($Scenario -eq 'process-restart') { 3 } else { $expectedSamples }
+        $readback = & (Join-Path $repo 'target/release/x4-bridge.exe') --readback --data-dir $data --section-key carrier_b_realtime_sample --section-revision $readbackRevision
         if ($LASTEXITCODE -ne 0) { throw 'DURABLE_READBACK_FAILED' }
         $current = ($readback -join '') | ConvertFrom-Json
         if ($current.section_key -cne 'carrier_b_realtime_sample' -or
-            $current.section_revision -ne 1 -or @($current.records).Count -ne 1 -or
-            $current.records[0].record_id -cne 'carrier-b:1:1' -or
+            $current.section_revision -ne $readbackRevision -or @($current.records).Count -ne 1 -or
+            $current.records[0].record_id -cne "carrier-b:$readbackRevision`:1" -or
             $current.records[0].entity_id -cne 'x4:runtime:realtime_clock' -or
-            $current.records[0].observation_version -ne 1 -or
+            $current.records[0].observation_version -ne $readbackRevision -or
             $current.records[0].content -cne "getter=GetCurRealTime`nraw_value=123.5`nsemantics=opaque_runtime_number" -or
-            $current.receipt.ordinal -ne 1 -or $current.receipt.accepted_at -le 0) {
+            $current.receipt.ordinal -ne $readbackRevision -or $current.receipt.accepted_at -le 0) {
             throw 'DURABLE_TYPED_READBACK_MISMATCH'
         }
     }
@@ -257,11 +284,21 @@ try {
     $effective = Get-Content -LiteralPath $limits -Raw | ConvertFrom-Json
     $store = Join-Path $data 'observations.sqlite3'
     $history = Join-Path $data 'operational-history.jsonl'
+    if ($Scenario -eq 'process-restart') {
+        $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
+        $committedRevisions = @($events | Where-Object { $_.state -ceq 'committed' } | ForEach-Object { $_.revision })
+        $producerSessions = @($events | Where-Object { $_.session } | ForEach-Object { $_.session } | Sort-Object -Unique)
+        $permanentRejections = @($events | Where-Object { $_.reason -ceq 'permanently_rejected' })
+        if (($committedRevisions -join ',') -cne '1,2,3' -or $producerSessions.Count -ne 2 -or
+            $permanentRejections.Count -ne 0) {
+            throw 'PROCESS_RESTART_HISTORY_MISMATCH'
+        }
+    }
     $storeBytes = if (Test-Path -LiteralPath $store) { (Get-Item -LiteralPath $store).Length } else { 0 }
     $historyBytes = if (Test-Path -LiteralPath $history) { (Get-Item -LiteralPath $history).Length } else { 0 }
     $nativeHash = (Get-FileHash (Join-Path $run 'extensions/live_galaxy/ui_c_library_live_galaxy_carrier_64.txt') -Algorithm SHA256).Hash.ToLowerInvariant()
     $configHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
-    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$($luaResult.getter_calls) clock_calls=$($luaResult.clock_calls) host_peak_bytes=$hostPeak bridge_peak_bytes=$bridgePeak store_bytes=$storeBytes history_bytes=$historyBytes data_limit=$($effective.complete_message_bytes) control_limit=$($effective.control_message_bytes) pending_limit=$($effective.max_pending_bytes) lifecycle_work=$($effective.max_lifecycle_work) delivery_attempts=$($effective.max_delivery_attempts) reconnect_attempts=$($effective.reconnect_attempts) availability_millis=$($effective.availability_interval_millis) native_sha256=$nativeHash config_sha256=$configHash"
+    Write-Output "MEASUREMENT scenario=$Scenario startup_order=$StartupOrder elapsed_millis=$($timer.ElapsedMilliseconds) getter_calls=$totalGetterCalls clock_calls=$totalClockCalls host_peak_bytes=$hostPeak bridge_peak_bytes=$bridgePeak store_bytes=$storeBytes history_bytes=$historyBytes data_limit=$($effective.complete_message_bytes) control_limit=$($effective.control_message_bytes) pending_limit=$($effective.max_pending_bytes) lifecycle_work=$($effective.max_lifecycle_work) delivery_attempts=$($effective.max_delivery_attempts) reconnect_attempts=$($effective.reconnect_attempts) availability_millis=$($effective.availability_interval_millis) native_sha256=$nativeHash config_sha256=$configHash"
     Write-Output "PASS scenario=$Scenario startup_order=$StartupOrder actual_native=true durable=$($Scenario -ne 'pending-io-unload')"
 } finally {
     Stop-Owned $bridge
