@@ -7,6 +7,7 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $packageRelative = 'dist/live-galaxy-carrier-b'
 $package = Join-Path $root $packageRelative
 $extension = Join-Path $package 'extensions/live_galaxy'
+. (Join-Path $root 'tools/carrier-b-package-contract.ps1')
 
 if (Get-Process -Name 'X4' -ErrorAction SilentlyContinue) {
     throw 'refusing verification or installation while X4 is running'
@@ -17,10 +18,11 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw 'ready package manifest is missing'
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+Assert-CarrierBManifest $manifest 'ready-for-user-x4-checkpoint'
 $packageInputs = @(
     'Cargo.toml', 'Cargo.lock', 'config/carrier-b-limits.json',
     'crates/x4-carrier-native', 'crates/x4-bridge', 'extensions/live_galaxy',
-    'tools/package-live-galaxy.ps1'
+    'tools/package-live-galaxy.ps1', 'tools/carrier-b-package-contract.ps1'
 )
 git -C $root merge-base --is-ancestor $manifest.source_revision HEAD
 if ($LASTEXITCODE -ne 0) { throw 'package source revision is not an ancestor of HEAD' }
@@ -38,14 +40,7 @@ $manifestFiles = @($manifest.files.PSObject.Properties.Name)
 if (@($requiredFiles | Where-Object { $_ -cnotin $manifestFiles }).Count -ne 0) {
     throw 'package manifest omits a required Carrier B file'
 }
-foreach ($property in $manifest.files.PSObject.Properties) {
-    $path = Join-Path $package $property.Name
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "packaged file is missing: $($property.Name)"
-    }
-    $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actual -cne $property.Value) { throw "packaged file hash mismatch: $($property.Name)" }
-}
+Assert-CarrierBBundleFiles $package $manifest
 
 $content = [xml](Get-Content -LiteralPath (Join-Path $extension 'content.xml') -Raw)
 $ui = [xml](Get-Content -LiteralPath (Join-Path $extension 'ui.xml') -Raw)

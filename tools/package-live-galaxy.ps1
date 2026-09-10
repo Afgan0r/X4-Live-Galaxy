@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $ownedNative = 'ui_c_library_live_galaxy_carrier_64.txt'
 $requiredExport = 'luaopen_live_galaxy_carrier'
+. (Join-Path $PSScriptRoot 'carrier-b-package-contract.ps1')
 $limitFields = @(
     'complete_message_bytes', 'control_message_bytes', 'max_candidate_raw_bytes',
     'max_candidate_records', 'max_candidate_batches', 'max_candidate_work',
@@ -124,29 +125,15 @@ function Assert-SourceRegistration([string]$ExtensionRoot) {
     if ($nativeNames.Count -ne 1 -or $nativeNames[0] -cne $ownedNative) { throw 'NATIVE_PATH_OR_CASE_INVALID' }
 }
 
-function Assert-Manifest($Manifest) {
-    if ($Manifest.product -cne 'live_galaxy' -or $Manifest.product_version -cne '0.1.0' -or
-        $Manifest.architecture -cne 'amd64-pe32+' -or $Manifest.initializer -cne $requiredExport -or
-        $Manifest.native_abi_version -ne 2 -or $Manifest.control_contract_version -ne 3 -or
-        $Manifest.envelope_contract_version -ne 2 -or $Manifest.semantic_versions.schema -ne 1 -or
-        $Manifest.semantic_versions.policy -ne 2 -or $Manifest.semantic_versions.canonicalization -ne 3 -or
-        $Manifest.semantic_versions.digest -ne 1) { throw 'MANIFEST_VERSION_OR_IDENTITY_INVALID' }
-}
-
-function Assert-Bundle([string]$Root) {
+function Assert-Bundle([string]$Root, [string]$ExpectedCandidate) {
     Assert-SourceRegistration (Join-Path $Root 'extensions/live_galaxy')
     Assert-OwnedPe (Join-Path $Root "extensions/live_galaxy/$ownedNative")
     if (-not (Test-Path -LiteralPath (Join-Path $Root 'live-galaxy-bridge.exe') -PathType Leaf)) {
         throw 'BRIDGE_MISSING'
     }
     $manifest = Get-Content -LiteralPath (Join-Path $Root 'manifest.json') -Raw | ConvertFrom-Json
-    Assert-Manifest $manifest
-    foreach ($property in $manifest.files.PSObject.Properties) {
-        $path = Join-Path $Root $property.Name
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "MANIFEST_FILE_MISSING:$($property.Name)" }
-        $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($actual -cne $property.Value) { throw "MANIFEST_HASH_MISMATCH:$($property.Name)" }
-    }
+    Assert-CarrierBManifest $manifest $ExpectedCandidate
+    Assert-CarrierBBundleFiles $Root $manifest
 }
 
 function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibration) {
@@ -198,7 +185,8 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
             files = $hashes
         }
         $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'manifest.json') -Encoding utf8NoBOM
-        Assert-Bundle $stage
+        $candidate = if ($Calibration) { 'local-calibration-only' } else { 'ready-for-user-x4-checkpoint' }
+        Assert-Bundle $stage $candidate
         if (Test-Path -LiteralPath $destination) {
             $old = "$destination.old"
             if (Test-Path -LiteralPath $old) { Remove-Item -LiteralPath $old -Recurse -Force }
@@ -230,6 +218,7 @@ function Invoke-SelfTest {
         $selectedLimits = if ($LimitsFile) { Assert-Contained (Join-Path $repo $LimitsFile) $repo } else { $fixture }
         $bundle = Write-Bundle (Join-Path $scratch 'bundle') $selectedLimits (-not [bool]$LimitsFile)
         $manifest = Get-Content -LiteralPath (Join-Path $bundle 'manifest.json') -Raw | ConvertFrom-Json
+        $expectedCandidate = if ($LimitsFile) { 'ready-for-user-x4-checkpoint' } else { 'local-calibration-only' }
         $wrongVersions = @{
             native_abi_version = @(1, 3)
             control_contract_version = @(1, 2, 4)
@@ -239,12 +228,31 @@ function Invoke-SelfTest {
             $saved = $manifest.$field
             foreach ($wrong in $wrongVersions[$field]) {
                 $manifest.$field = $wrong
-                try { Assert-Manifest $manifest; throw 'NEGATIVE_VERSION_ACCEPTED' }
+                try { Assert-CarrierBManifest $manifest $expectedCandidate; throw 'NEGATIVE_VERSION_ACCEPTED' }
                 catch { if ($_.Exception.Message -eq 'NEGATIVE_VERSION_ACCEPTED') { throw } }
             }
             $manifest.$field = $saved
         }
-        Assert-Bundle $bundle
+        $savedCandidate = $manifest.candidate
+        $manifest.candidate = 'unverified'
+        try { Assert-CarrierBManifest $manifest $expectedCandidate; throw 'NEGATIVE_IDENTITY_ACCEPTED' }
+        catch { if ($_.Exception.Message -eq 'NEGATIVE_IDENTITY_ACCEPTED') { throw } }
+        $manifest.candidate = $savedCandidate
+        Assert-Bundle $bundle $expectedCandidate
+        $extra = Join-Path $bundle 'extensions/live_galaxy/md/unmanifested.xml'
+        [IO.File]::WriteAllText($extra, '<mdscript />', [Text.UTF8Encoding]::new($false))
+        try { Assert-Bundle $bundle $expectedCandidate; throw 'NEGATIVE_EXTRA_FILE_ACCEPTED' }
+        catch { if ($_.Exception.Message -eq 'NEGATIVE_EXTRA_FILE_ACCEPTED') { throw } }
+        Remove-Item -LiteralPath $extra
+        $manifestPath = Join-Path $bundle 'manifest.json'
+        $manifestRaw = Get-Content -LiteralPath $manifestPath -Raw
+        $manifest.files | Add-Member -NotePropertyName '../outside' -NotePropertyValue ('0' * 64)
+        try { Resolve-CarrierBManifestPath $bundle '../outside'; throw 'NEGATIVE_TRAVERSAL_ACCEPTED' }
+        catch { if ($_.Exception.Message -eq 'NEGATIVE_TRAVERSAL_ACCEPTED') { throw } }
+        $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
+        try { Assert-Bundle $bundle $expectedCandidate; throw 'NEGATIVE_TRAVERSAL_ACCEPTED' }
+        catch { if ($_.Exception.Message -eq 'NEGATIVE_TRAVERSAL_ACCEPTED') { throw } }
+        [IO.File]::WriteAllText($manifestPath, $manifestRaw, [Text.UTF8Encoding]::new($false))
         $wrongPe = Join-Path $scratch 'wrong.txt'; [IO.File]::WriteAllText($wrongPe, 'not-pe')
         try { Assert-OwnedPe $wrongPe; throw 'NEGATIVE_PE_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_PE_ACCEPTED') { throw } }
         $wrongExport = Join-Path $scratch 'wrong-export.txt'
@@ -261,10 +269,10 @@ function Invoke-SelfTest {
         try { Assert-OwnedPe $wrongExport; throw 'NEGATIVE_EXPORT_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_EXPORT_ACCEPTED') { throw } }
         $nativePath = Join-Path $bundle "extensions/live_galaxy/$ownedNative"
         $nativeBackup = "$nativePath.backup"; Move-Item -LiteralPath $nativePath -Destination $nativeBackup
-        try { Assert-Bundle $bundle; throw 'NEGATIVE_PATH_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_PATH_ACCEPTED') { throw } }
+        try { Assert-Bundle $bundle $expectedCandidate; throw 'NEGATIVE_PATH_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_PATH_ACCEPTED') { throw } }
         Move-Item -LiteralPath $nativeBackup -Destination $nativePath
         [IO.File]::AppendAllText((Join-Path $bundle 'STARTUP.txt'), 'tamper')
-        try { Assert-Bundle $bundle; throw 'NEGATIVE_HASH_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_HASH_ACCEPTED') { throw } }
+        try { Assert-Bundle $bundle $expectedCandidate; throw 'NEGATIVE_HASH_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_HASH_ACCEPTED') { throw } }
         $missing = Join-Path $scratch 'missing-output'
         [IO.Directory]::CreateDirectory($missing) | Out-Null
         [IO.File]::WriteAllText((Join-Path $missing 'sentinel'), 'preserve')
