@@ -1,14 +1,14 @@
 use std::path::Path;
 
-use observation_domain::{DecisionSnapshotId, SectionKey};
+use observation_domain::{DecisionSnapshotId, SectionKey, SectionRevisionId};
 use observation_ingest::DecisionRevisionSet;
 use rusqlite::Connection;
 
 use crate::{
     CurrentRevision, DecisionPinReceipt, DecisionRevisionPin, ObservationRepository,
-    PublicationLimits, PublishOutcome, PublishRequest, RepositoryDiagnostic, RepositoryError,
-    UnpinOutcome, retention, schema, sqlite_ambiguity, sqlite_current, sqlite_pins, sqlite_publish,
-    sqlite_read, sqlite_receipt, sqlite_reconcile,
+    PublicationLimits, PublicationReceipt, PublishOutcome, PublishRequest, RepositoryDiagnostic,
+    RepositoryError, RevisionRecord, UnpinOutcome, retention, schema, sqlite_ambiguity,
+    sqlite_current, sqlite_pins, sqlite_publish, sqlite_read, sqlite_receipt, sqlite_reconcile,
 };
 use crate::{PublicationFailpoint, ReconciliationOutcome, RetentionPolicy, RetentionReport};
 
@@ -50,6 +50,14 @@ impl SqliteObservationRepository {
             .pragma_query_value(None, "foreign_keys", |row| row.get::<_, i64>(0))
             .map(|value| value == 1)
             .map_err(|_| storage("foreign-keys-query"))
+    }
+
+    pub fn stored_revision(
+        &self,
+        key: &SectionKey,
+        revision: SectionRevisionId,
+    ) -> Result<Option<(RevisionRecord, PublicationReceipt)>, RepositoryError> {
+        sqlite_read::stored_revision(&self.connection, key, revision)
     }
 
     pub fn publish_with_failpoint(

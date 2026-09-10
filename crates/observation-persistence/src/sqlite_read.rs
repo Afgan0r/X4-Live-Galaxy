@@ -7,8 +7,8 @@ use observation_domain::{
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{
-    CurrentRevision, RepositoryDiagnostic, RepositoryError, RevisionRecord, record, schema,
-    sqlite_receipt,
+    CurrentRevision, PublicationReceipt, RepositoryDiagnostic, RepositoryError, RevisionRecord,
+    record, schema, sqlite_receipt,
 };
 
 pub fn current(
@@ -18,12 +18,21 @@ pub fn current(
     let Some(revision) = current_pointer(connection, key)? else {
         return Ok(None);
     };
-    let record = load_revision(connection, key, revision)?.ok_or(corrupt("dangling-current"))?;
+    let (revision, receipt) =
+        stored_revision(connection, key, revision)?.ok_or(corrupt("dangling-current"))?;
+    Ok(Some(CurrentRevision { revision, receipt }))
+}
+
+pub fn stored_revision(
+    connection: &Connection,
+    key: &SectionKey,
+    revision: SectionRevisionId,
+) -> Result<Option<(RevisionRecord, PublicationReceipt)>, RepositoryError> {
+    let Some(record) = load_revision(connection, key, revision)? else {
+        return Ok(None);
+    };
     let receipt = sqlite_receipt::load_validated(connection, &record)?;
-    Ok(Some(CurrentRevision {
-        revision: record,
-        receipt,
-    }))
+    Ok(Some((record, receipt)))
 }
 
 pub fn current_pointer(

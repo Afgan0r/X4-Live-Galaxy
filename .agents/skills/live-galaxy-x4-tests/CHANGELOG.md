@@ -2,6 +2,8 @@
 
 ## 2026-09-10
 
+- Required offline readback of both earlier and current revisions after the
+  Phase 05.4 X4 checkpoint exposed a current-pointer-only diagnostic path.
 - Added a sustained same-process collection oracle that crosses recurring
   demand intervals and forbids reconnect-driven progress after the Phase 05.4
   demand/inactivity deadline race reproduced locally.

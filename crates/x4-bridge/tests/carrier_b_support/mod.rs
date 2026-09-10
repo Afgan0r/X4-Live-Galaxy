@@ -46,7 +46,11 @@ pub fn lifecycle_limits() -> LifecycleLimits {
     LifecycleLimits::new(4_096, 16_384, 1_000, 4).expect("lifecycle limits")
 }
 
-pub const fn context(coverage: SectionCoverage) -> CandidateContext {
+pub fn context(coverage: SectionCoverage) -> CandidateContext {
+    context_at(coverage, None)
+}
+
+pub fn context_at(coverage: SectionCoverage, expected: Option<u64>) -> CandidateContext {
     CandidateContext::new(
         versions(),
         CaptureWindow::new(10, 20).expect("capture window"),
@@ -58,7 +62,7 @@ pub const fn context(coverage: SectionCoverage) -> CandidateContext {
             coverage,
         ),
         BTreeMap::new(),
-        None,
+        expected.and_then(SectionRevisionId::new),
         true,
     )
 }
@@ -135,6 +139,10 @@ fn digest_hex(digest: [u8; 32]) -> String {
 
 pub const fn current() -> CompletionCurrent {
     CompletionCurrent::new(BTreeMap::new(), None)
+}
+
+pub const fn current_at(expected: u64) -> CompletionCurrent {
+    CompletionCurrent::new(BTreeMap::new(), SectionRevisionId::new(expected))
 }
 
 pub fn session_with<R: observation_persistence::ObservationRepository>(

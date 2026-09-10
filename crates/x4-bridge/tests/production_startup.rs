@@ -46,11 +46,52 @@ fn offline_readback_returns_exact_durable_revision_and_receipt() {
         result,
         LifecycleResult::Disposition(ReceiverDisposition::Committed)
     );
+    submit_second_readback_revision(&mut session);
     assert_eq!(
         readback_revision(database.path(), "economy.stations", 1),
         Ok(String::from(
             "{\"section_key\":\"economy.stations\",\"section_revision\":1,\"records\":[],\"receipt\":{\"ordinal\":1,\"accepted_at\":101}}"
         ))
+    );
+    assert_eq!(
+        readback_revision(database.path(), "economy.stations", 2),
+        Ok(String::from(
+            "{\"section_key\":\"economy.stations\",\"section_revision\":2,\"records\":[],\"receipt\":{\"ordinal\":2,\"accepted_at\":103}}"
+        ))
+    );
+    assert_eq!(
+        readback_revision(database.path(), "economy.stations", 3),
+        Err(DiagnosticError::MissingRevision)
+    );
+}
+
+fn submit_second_readback_revision(
+    session: &mut x4_bridge::ProductionObservationSession<
+        observation_persistence::SqliteObservationRepository,
+    >,
+) {
+    let _ = session
+        .submit(carrier_b_support::input(
+            "batch:start:readback-2",
+            carrier_b_support::start_bytes_at("economy.stations", 2),
+            LifecycleContext::Start(carrier_b_support::context_at(
+                observation_domain::SectionCoverage::KnownEmpty,
+                Some(1),
+            )),
+            102,
+        ))
+        .expect("second start accepted");
+    let result = session
+        .submit(carrier_b_support::input(
+            "batch:complete:readback-2",
+            carrier_b_support::completion_bytes_at("economy.stations", 2),
+            LifecycleContext::Completion(carrier_b_support::current_at(1)),
+            103,
+        ))
+        .expect("second completion accepted");
+    assert_eq!(
+        result,
+        LifecycleResult::Disposition(ReceiverDisposition::Committed)
     );
 }
 

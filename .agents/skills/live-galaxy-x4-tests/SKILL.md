@@ -37,7 +37,9 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   process-local version reuse. For recurring bridge-controlled collection,
   also sustain enough same-process cycles to cross the demand interval and
   assert that commits continue on one connection without peer-inactivity
-  reconnects.
+  reconnects. After multiple commits, exercise offline readback for both an
+  earlier retained revision and the current revision; checking only current
+  cannot prove independently readable history.
 - **XT-05 — In-game evidence:** Use a disposable Creative Custom campaign or
   approved test copy under a written plan. The user performs all X4 actions.
   Report a scenario as `observed in X4` only after expected behavior and its

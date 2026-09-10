@@ -2,15 +2,12 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use observation_domain::{SectionKey, SectionRevisionId};
-use observation_persistence::{
-    ObservationRepository, PublicationLimits, SqliteObservationRepository,
-};
+use observation_persistence::{PublicationLimits, SqliteObservationRepository};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DiagnosticError {
     InvalidIdentity,
     MissingRevision,
-    RevisionMismatch,
     Storage,
 }
 
@@ -27,7 +24,6 @@ impl DiagnosticError {
         match self {
             Self::InvalidIdentity => "invalid-identity",
             Self::MissingRevision => "missing-revision",
-            Self::RevisionMismatch => "revision-mismatch",
             Self::Storage => "diagnostic-storage",
         }
     }
@@ -50,19 +46,17 @@ pub fn readback_revision(
         PublicationLimits::new(4_096, 16 * 1_024 * 1_024).ok_or(DiagnosticError::Storage)?;
     let repository = SqliteObservationRepository::open(&database, limits)
         .map_err(|_| DiagnosticError::Storage)?;
-    let current = repository
-        .current(&key)
+    let (revision, receipt) = repository
+        .stored_revision(&key, expected)
         .map_err(|_| DiagnosticError::Storage)?
         .ok_or(DiagnosticError::MissingRevision)?;
-    if current.revision().revision != expected {
-        return Err(DiagnosticError::RevisionMismatch);
-    }
-    Ok(render_current(&current))
+    Ok(render_revision(&revision, &receipt))
 }
 
-fn render_current(current: &observation_persistence::CurrentRevision) -> String {
-    let revision = current.revision();
-    let receipt = current.receipt();
+fn render_revision(
+    revision: &observation_persistence::RevisionRecord,
+    receipt: &observation_persistence::PublicationReceipt,
+) -> String {
     let mut output = format!(
         "{{\"section_key\":\"{}\",\"section_revision\":{},\"records\":[",
         escape(revision.section_key.as_str()),
