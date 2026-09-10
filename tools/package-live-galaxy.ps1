@@ -10,6 +10,7 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $ownedNative = 'ui_c_library_live_galaxy_carrier_64.txt'
 $requiredExport = 'luaopen_live_galaxy_carrier'
+$limitsValidator = Join-Path $repo 'target/release/validate_limits.exe'
 . (Join-Path $PSScriptRoot 'carrier-b-package-contract.ps1')
 $limitFields = @(
     'complete_message_bytes', 'control_message_bytes', 'max_candidate_raw_bytes',
@@ -101,6 +102,11 @@ function Read-Limits([string]$Path) {
         if ($value.$field -isnot [long] -and $value.$field -isnot [int]) { throw "LIMIT_NOT_INTEGER:$field" }
         if ($value.$field -le 0) { throw "LIMIT_NOT_POSITIVE:$field" }
     }
+    if (-not (Test-Path -LiteralPath $limitsValidator -PathType Leaf)) {
+        throw 'LIMITS_VALIDATOR_MISSING'
+    }
+    $null = & $limitsValidator --limits-file $Path 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'LIMITS_PRODUCTION_REJECTED' }
     $raw
 }
 
@@ -253,6 +259,28 @@ function Invoke-SelfTest {
         try { Assert-Bundle $bundle $expectedCandidate; throw 'NEGATIVE_TRAVERSAL_ACCEPTED' }
         catch { if ($_.Exception.Message -eq 'NEGATIVE_TRAVERSAL_ACCEPTED') { throw } }
         [IO.File]::WriteAllText($manifestPath, $manifestRaw, [Text.UTF8Encoding]::new($false))
+        $invalidRelationships = @(
+            @{ field = 'max_pending_bytes'; value = 1024 },
+            @{ field = 'max_total_bytes'; value = 2048 },
+            @{ field = 'max_aggregate_bytes'; value = 95 },
+            @{ field = 'max_publication_records'; value = 2 },
+            @{ field = 'max_publication_content_bytes'; value = 8193 },
+            @{ field = 'max_candidate_work'; value = 2 }
+        )
+        foreach ($invalid in $invalidRelationships) {
+            $saved = $values[$invalid.field]
+            $values[$invalid.field] = $invalid.value
+            $values | ConvertTo-Json -Compress | Set-Content -LiteralPath $fixture -Encoding utf8NoBOM
+            try { Read-Limits $fixture; throw "NEGATIVE_RELATIONSHIP_ACCEPTED:$($invalid.field)" }
+            catch { if ($_.Exception.Message -eq "NEGATIVE_RELATIONSHIP_ACCEPTED:$($invalid.field)") { throw } }
+            $values[$invalid.field] = $saved
+        }
+        $validRaw = $values | ConvertTo-Json -Compress
+        $duplicate = $validRaw.TrimEnd('}') + ',"complete_message_bytes":2048}'
+        [IO.File]::WriteAllText($fixture, $duplicate, [Text.UTF8Encoding]::new($false))
+        try { Read-Limits $fixture; throw 'NEGATIVE_DUPLICATE_LIMIT_ACCEPTED' }
+        catch { if ($_.Exception.Message -eq 'NEGATIVE_DUPLICATE_LIMIT_ACCEPTED') { throw } }
+        [IO.File]::WriteAllText($fixture, $validRaw, [Text.UTF8Encoding]::new($false))
         $wrongPe = Join-Path $scratch 'wrong.txt'; [IO.File]::WriteAllText($wrongPe, 'not-pe')
         try { Assert-OwnedPe $wrongPe; throw 'NEGATIVE_PE_ACCEPTED' } catch { if ($_.Exception.Message -eq 'NEGATIVE_PE_ACCEPTED') { throw } }
         $wrongExport = Join-Path $scratch 'wrong-export.txt'
