@@ -320,7 +320,7 @@ try {
         $peerInactive = @($events | Where-Object { $_.reason -ceq 'peer-inactive' })
         $expectedRevisions = if ($Scenario -eq 'process-restart') { '1,2,3' } elseif ($Scenario -eq 'bridge-restart') { '1,2' } else { '1,2,3,4,5' }
         $expectedSessions = if ($Scenario -eq 'process-restart') { 2 } else { 1 }
-        $expectedEpochs = if ($Scenario -eq 'bridge-restart') { 2 } else { 1 }
+        $expectedEpochs = if ($Scenario -in @('process-restart', 'bridge-restart')) { 2 } else { 1 }
         if (($committedRevisions -join ',') -cne $expectedRevisions -or
             $producerSessions.Count -ne $expectedSessions -or $transportEpochs.Count -ne $expectedEpochs -or
             $permanentRejections.Count -ne 0 -or
