@@ -53,9 +53,9 @@ Do not retain save files, secrets, raw private payloads, or unbounded game logs.
 
 | ID | Contract under proof | Current evidence class | Admission state | Owning decision |
 | --- | --- | --- | --- | --- |
-| VER-LG-001 | Scheduler callback delivery and lifecycle | observed nearby precedent; Live Galaxy proof incomplete | open | [ADR-LG-004](architecture-decisions.md#adr-lg-004-initial-scheduler-callback-seam) |
-| VER-LG-002 | Real-time scheduler budget and SETA degradation | design only | open | [ADR-LG-003](architecture-decisions.md#adr-lg-003-continuous-cooperative-scheduling) |
-| VER-LG-003 | Native enumeration cost, identity, and source coverage | partial source and prototype evidence | open | [ADR-LG-006](architecture-decisions.md#adr-lg-006-independent-aggregate-safety-bounds), [ADR-LG-019](architecture-decisions.md#adr-lg-019-coverage-absence-and-future-deltas) |
+| VER-LG-001 | Scheduler callback delivery and lifecycle | observed for the Phase 05.4 one-getter Carrier B slice; broader scheduler proof incomplete | open | [ADR-LG-004](architecture-decisions.md#adr-lg-004-initial-scheduler-callback-seam) |
+| VER-LG-002 | Real-time scheduler budget and SETA degradation | observed for the Phase 05.4 one-getter Carrier B cadence; shared scheduler policy incomplete | open | [ADR-LG-003](architecture-decisions.md#adr-lg-003-continuous-cooperative-scheduling) |
+| VER-LG-003 | Native enumeration cost, identity, and source coverage | one opaque `GetCurRealTime` value observed; enumeration and coverage unproven | open | [ADR-LG-006](architecture-decisions.md#adr-lg-006-independent-aggregate-safety-bounds), [ADR-LG-019](architecture-decisions.md#adr-lg-019-coverage-absence-and-future-deltas) |
 | VER-LG-004 | Carrier A bounded duplex behavior | installed-source evidence; pressure/lifecycle proof incomplete | open | [ADR-LG-008](architecture-decisions.md#adr-lg-008-carrier-neutral-application-protocol) |
 | VER-LG-005 | Whole-message boundary and oversize classification | library and prototype evidence; production path incomplete | open | [ADR-LG-007](architecture-decisions.md#adr-lg-007-semantic-records-and-bounded-messages) |
 | VER-LG-006 | Stop-and-wait disposition semantics | architecture contract only | open | [ADR-LG-011](architecture-decisions.md#adr-lg-011-stop-and-wait-receiver-feedback) |
@@ -63,8 +63,8 @@ Do not retain save files, secrets, raw private payloads, or unbounded game logs.
 | VER-LG-008 | Content-bound completion and per-section atomicity | prototype generation tests; end-to-end path incomplete | open | [ADR-LG-017](architecture-decisions.md#adr-lg-017-content-bound-completion) |
 | VER-LG-009 | Durable publication and restart recovery | persistence tests exist; observation transaction incomplete | open | [ADR-LG-018](architecture-decisions.md#adr-lg-018-atomic-durable-publication) |
 | VER-LG-010 | Keyed candidate fairness and dependency supersession | architecture contract only | open | [ADR-LG-015](architecture-decisions.md#adr-lg-015-bounded-keyed-rust-candidates), [ADR-LG-016](architecture-decisions.md#adr-lg-016-dependency-handling) |
-| VER-LG-011 | Aggregate bounds and sustained stream stability | numerical policy intentionally unset | open | [ADR-LG-006](architecture-decisions.md#adr-lg-006-independent-aggregate-safety-bounds) |
-| VER-LG-012 | Heavy faction ship conformance proof | deferred to dedicated phase | deferred | [ADR-LG-021](architecture-decisions.md#adr-lg-021-heavy-detail-grouping), [ADR-LG-022](architecture-decisions.md#adr-lg-022-heavy-ship-proof-scope) |
+| VER-LG-011 | Aggregate bounds and sustained stream stability | measured finite Phase 05.4 one-record stream; aggregate production policy incomplete | open | [ADR-LG-006](architecture-decisions.md#adr-lg-006-independent-aggregate-safety-bounds) |
+| VER-LG-012 | Heavy faction ship conformance proof | Carrier B transport and lifecycle ready; heavy ship proof deferred | deferred | [ADR-LG-021](architecture-decisions.md#adr-lg-021-heavy-detail-grouping), [ADR-LG-022](architecture-decisions.md#adr-lg-022-heavy-ship-proof-scope) |
 | VER-LG-013 | Station-specific complete-set and deletion semantics | Phase 05.1 evidence incomplete | deferred | [ADR-LG-019](architecture-decisions.md#adr-lg-019-coverage-absence-and-future-deltas), [ADR-LG-023](architecture-decisions.md#adr-lg-023-successor-phase-boundaries) |
 | VER-LG-014 | Authoritative X4 source epoch | no authoritative value found | deferred | [ADR-LG-014](architecture-decisions.md#adr-lg-014-unknown-source-epoch-baseline) |
 | VER-LG-015 | Event/delta completeness | no qualifying X4 stream proven | deferred | [ADR-LG-019](architecture-decisions.md#adr-lg-019-coverage-absence-and-future-deltas) |
@@ -72,6 +72,17 @@ Do not retain save files, secrets, raw private payloads, or unbounded game logs.
 <!-- markdownlint-enable MD013 -->
 
 ## VER-LG-001: Scheduler callback delivery and lifecycle
+
+### VER-LG-001 Phase 05.4 earned scope
+
+The exact Phase 05.4 attempt-12 package passed both startup orders, a game load,
+one UI reload, two repeated UI reloads, bridge absence and restart, a
+10-real-minute ordinary window, and a 20-real-minute sustained SETA window.
+The game remained responsive at every recorded sample, stale incarnations were
+fenced, and accepted revisions remained durable. This is observed evidence for
+the one-getter Carrier B seam only. Pause, menus, minimization, general callback
+reentrancy, catch-up behavior, and larger shared-scheduler workloads remain
+unproven.
 
 ### VER-LG-001 question
 
@@ -108,6 +119,17 @@ for missed delivery by increasing work per callback.
 
 ## VER-LG-002: Real-time scheduler budget and SETA degradation
 
+### VER-LG-002 Phase 05.4 earned scope
+
+The game-facing seam used a bounded 50 ms pump while the bridge admitted useful
+work on its conditional five-second cadence. The ordinary window produced 112
+unique commits over 600.589 real seconds. The sustained SETA window ran for
+1,201.581 real seconds without a duplicate, history gap, status gap, or observed
+Live Galaxy-attributable stall. The largest last-commit age was 17.499 seconds
+during the required bridge restart, below the 35-second test bound. This does
+not establish the later shared scheduler's token, debt, fairness, urgency, or
+heavy-work policy.
+
 ### VER-LG-002 question
 
 Does the shared scheduler bound admitted work in real time while using game-time
@@ -131,6 +153,14 @@ unsatisfied core freshness blocks dependent decisions rather than hiding
 starvation.
 
 ## VER-LG-003: Native enumeration, identity, and coverage
+
+### VER-LG-003 Phase 05.4 earned scope
+
+The accepted runtime path invoked `GetCurRealTime` exactly once per measured
+revision and durably preserved the returned value as opaque typed content with
+its exact receipt. This proves the carrier can transport one real X4 getter
+result. It does not establish absolute epoch or precision, collection
+completeness, stable object identity, enumeration semantics, or deletion.
 
 ### VER-LG-003 question
 
@@ -328,6 +358,16 @@ starvation is visible as stale data and blocked decisions.
 
 ## VER-LG-011: Aggregate bounds and stream stability
 
+### VER-LG-011 Phase 05.4 earned scope
+
+The retained one-record stream stayed within the frozen Carrier B limits during
+both measured windows. Bridge working set remained approximately 5.3 to 6.2
+MiB, retained storage grew finitely from 412,461 to 576,060 bytes during the
+SETA window, history rotated within its configured bounds, and no persistent
+backlog or unexpected rejection appeared. These measurements admit the small
+Phase 05.4 path only; they do not select aggregate production limits for
+representative faction, ship, station, or supported-mod populations.
+
 ### VER-LG-011 measurements required before choosing numbers
 
 1. complete-record UTF-8 size distributions, including Unicode and optional
@@ -391,6 +431,13 @@ The selected value is the minimum independently safe boundary, not the largest
 buffer one layer can allocate.
 
 ## VER-LG-012: Heavy faction ship conformance proof
+
+### VER-LG-012 Phase 05.4 readiness boundary
+
+Phase 05.4 supplies observed transport, publication, restart, load, reload, and
+small-stream scheduling evidence needed to begin the dedicated heavy proof. It
+does not exercise a `mind_candidate` faction, enumerate ships, establish source
+coverage, or satisfy either ordered heavy-conformance gate.
 
 ### VER-LG-012 ordered gates
 
