@@ -85,9 +85,37 @@ fn serve(
             "collection"
         };
         let _ = history.record(state, disposition_name(disposition));
+        if disposition != ReceiverDisposition::Committed {
+            continue;
+        }
+        if let Err(reason) = send_next_demand(peer, &identity, limits) {
+            let _ = history.record("rejected", reason);
+            return active_scope;
+        }
+        last_progress = Instant::now();
     }
     let _ = history.record("waiting", "peer-disconnected");
     active_scope
+}
+
+fn send_next_demand(
+    peer: &mut BridgePeer,
+    identity: &observation_ingest::CarrierIdentity,
+    limits: &ProductionLimits,
+) -> Result<(), &'static str> {
+    let interval = Duration::from_millis(limits.availability_interval_millis as u64);
+    match peer.receive_timeout(limits.complete_message_bytes, interval) {
+        Ok(None) => {}
+        Ok(Some(_)) => return Err("message-before-demand"),
+        Err(_) => return Err("peer-disconnected"),
+    }
+    send(
+        peer,
+        identity,
+        ControlBody::Demand(DemandBody { credit: 1 }),
+        limits,
+    )
+    .map_err(|()| "control-response-loss")
 }
 
 fn send_initial_controls(

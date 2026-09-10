@@ -11,6 +11,13 @@ local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
 local active_carrier, active_observation
 local initialized, callback_active = false, false
 local last_diagnostic
+local pending_boundary
+local boundaries = {
+    telemetry_tick = { source_epoch_status = "unknown", source_boundary = "runtime_start" },
+    telemetry_game_loaded = {
+        source_epoch_status = "boundary_uncertain", source_boundary = "game_loaded",
+    },
+}
 local safe_details = {
     already_initialized = true, initialized = true, sampled = true,
     producer_busy = true, reentry_suppressed = true, adapter_unavailable = true,
@@ -36,22 +43,21 @@ local function diagnostic(event, detail)
 end
 
 function runtime.handle_tick(_, event_parameter)
+    local event_boundary = boundaries[event_parameter]
+    if event_boundary == nil then return false, "event_ignored" end
+    if event_parameter == "telemetry_game_loaded" then pending_boundary = event_boundary end
     if callback_active then return false, "reentry_suppressed" end
     if active_carrier == nil or active_observation == nil then return false, "adapter_unavailable" end
-    local boundaries = {
-        telemetry_tick = { source_epoch_status = "unknown", source_boundary = "runtime_start" },
-        telemetry_game_loaded = {
-            source_epoch_status = "boundary_uncertain", source_boundary = "game_loaded",
-        },
-    }
-    local boundary = boundaries[event_parameter]
-    if boundary == nil then return false, "event_ignored" end
+    local boundary = pending_boundary or event_boundary
     callback_active = true
     local ok, result = pcall(scheduler.tick, boundary, active_carrier, active_observation)
     callback_active = false
     if not ok or type(result) ~= "table" then
         diagnostic("callback_failure", ok and "invalid_result" or "exception")
         return false, "callback_failure"
+    end
+    if result.disposition == "sampled" and boundary == pending_boundary then
+        pending_boundary = nil
     end
     if result.disposition ~= "producer_busy" then
         diagnostic("transition", result.disposition)

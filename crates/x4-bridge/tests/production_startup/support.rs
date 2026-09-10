@@ -34,7 +34,8 @@ pub fn wait_for_history(directory: &Path, expected: &str) {
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
-    panic!("watchdog expired waiting for {expected}");
+    let observed = std::fs::read_to_string(&path).unwrap_or_else(|error| error.to_string());
+    panic!("watchdog expired waiting for {expected}; history={observed}");
 }
 
 pub const fn valid_limits() -> &'static str {

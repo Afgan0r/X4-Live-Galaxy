@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-10
+
+- Added a sustained same-process collection oracle that crosses recurring
+  demand intervals and forbids reconnect-driven progress after the Phase 05.4
+  demand/inactivity deadline race reproduced locally.
+
 ## 2026-09-09
 
 - Required a distinct producer process against the same durable database for

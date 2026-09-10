@@ -20,12 +20,18 @@ describe("owned Carrier B adapter", function()
                 if name == "begin_section" then begin = value end
                 if name == "finish_section" then finish = value end
                 if options.throw == name then error("injected " .. name) end
-                if result == nil then result = 0 end
-                if name == "progress" then
-                    return result, "ready", "connected", "10001",
-                        options.capacity or "available:0", "producer:1"
+                local current = result
+                if name == "progress" and type(options.progress_code) == "function" then
+                    current = options.progress_code()
                 end
-                return result
+                if current == nil then current = 0 end
+                if name == "progress" then
+                    local capacity = options.capacity or "available:0"
+                    if type(capacity) == "function" then capacity = capacity() end
+                    return current, "ready", "connected", "10001",
+                        capacity, "producer:1"
+                end
+                return current
             end
         end
         local api = {
@@ -132,6 +138,35 @@ describe("owned Carrier B adapter", function()
         })
         assert.equals("boundary_uncertain", env.begin().source_epoch_status)
         assert.equals("game_loaded", env.begin().source_boundary)
+    end)
+
+    it("retains one game-loaded boundary until a sample is admitted", function()
+        local progress = 0
+        local env, tick = native({
+            capacity = function()
+                progress = progress + 1
+                return progress == 1 and "occupied:1" or "available:0"
+            end,
+        }), nil
+        package.loadlib = env.loadlib
+        _G.GetCurRealTime = function() return 2 end
+        package.preload.ffi = function()
+            return { C = { GetCurrentGameTime = function() return 10 end } }
+        end
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        fixture.runtime()
+
+        assert.same({ false, "producer_busy" }, {
+            tick("live_galaxy_observation", "telemetry_game_loaded"),
+        })
+        assert.same({ true, "sampled" }, {
+            tick("live_galaxy_observation", "telemetry_tick"),
+        })
+        assert.equals("game_loaded", env.begin().source_boundary)
+        assert.same({ true, "sampled" }, {
+            tick("live_galaxy_observation", "telemetry_tick"),
+        })
+        assert.equals("runtime_start", env.begin().source_boundary)
     end)
 
     it("redacts callback paths and control characters", function()

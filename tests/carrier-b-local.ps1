@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SelfTest,
-    [ValidateSet('actual-chain', 'multi-collection', 'process-restart', 'pending-io-unload')]
+    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'pending-io-unload')]
     [string]$Scenario = 'actual-chain',
     [ValidateSet('bridge-first', 'native-first')]
     [string]$StartupOrder = 'bridge-first',
@@ -230,7 +230,7 @@ try {
         pending_incarnation = if ($resultText -match 'pending_incarnation="([^"]+)"') { $Matches[1] } else { '' }
         pending_owners = if ($resultText -match 'pending_owners=(\d+)') { [int]$Matches[1] } else { 0 }
     }
-    $expectedSamples = if ($Scenario -in @('multi-collection', 'process-restart')) { 2 } else { 1 }
+    $expectedSamples = if ($Scenario -eq 'sustained-collection') { 5 } elseif ($Scenario -in @('multi-collection', 'process-restart')) { 2 } else { 1 }
     if (-not $luaResult.actual_native -or $luaResult.getter_calls -ne $expectedSamples -or
         $luaResult.clock_calls -ne (2 * $expectedSamples)) {
         throw 'ACTUAL_LUA_NATIVE_IDENTITY_FAILED'
@@ -238,7 +238,10 @@ try {
     $totalGetterCalls = $luaResult.getter_calls
     $totalClockCalls = $luaResult.clock_calls
     if ($Scenario -eq 'process-restart') {
+        Stop-Owned $bridge
         $process = Start-Owned $hostExecutable @($run, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_local.lua'), $result, $marker, 'actual-chain') $run $true
+        Start-Sleep -Milliseconds 25
+        $bridge = Start-Owned (Join-Path $repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $limits) $run
         $deadline = [DateTime]::UtcNow.AddSeconds(30)
         while (-not $process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
             $process.Refresh()
@@ -284,14 +287,18 @@ try {
     $effective = Get-Content -LiteralPath $limits -Raw | ConvertFrom-Json
     $store = Join-Path $data 'observations.sqlite3'
     $history = Join-Path $data 'operational-history.jsonl'
-    if ($Scenario -eq 'process-restart') {
+    if ($Scenario -in @('process-restart', 'sustained-collection')) {
         $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
         $committedRevisions = @($events | Where-Object { $_.state -ceq 'committed' } | ForEach-Object { $_.revision })
         $producerSessions = @($events | Where-Object { $_.session } | ForEach-Object { $_.session } | Sort-Object -Unique)
         $permanentRejections = @($events | Where-Object { $_.reason -ceq 'permanently_rejected' })
-        if (($committedRevisions -join ',') -cne '1,2,3' -or $producerSessions.Count -ne 2 -or
-            $permanentRejections.Count -ne 0) {
-            throw 'PROCESS_RESTART_HISTORY_MISMATCH'
+        $peerInactive = @($events | Where-Object { $_.reason -ceq 'peer-inactive' })
+        $expectedRevisions = if ($Scenario -eq 'process-restart') { '1,2,3' } else { '1,2,3,4,5' }
+        $expectedSessions = if ($Scenario -eq 'process-restart') { 2 } else { 1 }
+        if (($committedRevisions -join ',') -cne $expectedRevisions -or
+            $producerSessions.Count -ne $expectedSessions -or $permanentRejections.Count -ne 0 -or
+            ($Scenario -eq 'sustained-collection' -and $peerInactive.Count -ne 0)) {
+            throw 'COLLECTION_HISTORY_MISMATCH'
         }
     }
     $storeBytes = if (Test-Path -LiteralPath $store) { (Get-Item -LiteralPath $store).Length } else { 0 }

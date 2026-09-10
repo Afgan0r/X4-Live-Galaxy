@@ -34,7 +34,10 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   collections before restart and a distinct producer process against the same
   durable database afterward. Assert the exact ordered revision history and
   absence of permanent rejection; a single first-revision sample cannot detect
-  process-local version reuse.
+  process-local version reuse. For recurring bridge-controlled collection,
+  also sustain enough same-process cycles to cross the demand interval and
+  assert that commits continue on one connection without peer-inactivity
+  reconnects.
 - **XT-05 — In-game evidence:** Use a disposable Creative Custom campaign or
   approved test copy under a written plan. The user performs all X4 actions.
   Report a scenario as `observed in X4` only after expected behavior and its

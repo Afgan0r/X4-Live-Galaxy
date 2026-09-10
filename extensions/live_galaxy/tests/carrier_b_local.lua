@@ -52,12 +52,10 @@ local observation = assert(require("extensions.live_galaxy.lua.live_galaxy_obser
 }))
 local scheduler = require("extensions.live_galaxy.lua.live_galaxy_scheduler")
 local sampled, last = false, "none"
+local sample_context = { source_epoch_status = "unknown", source_boundary = "runtime_start" }
 local sample_deadline = host_monotonic_millis() + 10000
 while host_monotonic_millis() < sample_deadline do
-    local result = scheduler.tick({
-        capture_start_millis = "1",
-        capture_end_millis = "2",
-    }, carrier, observation)
+    local result = scheduler.tick(sample_context, carrier, observation)
     last = result.disposition
     if last == "sampled" then sampled = true; break end
     host_sleep(1)
@@ -106,29 +104,29 @@ assert(committed, string.format(
     "commit watchdog: producer=%s transport=%s monotonic=%s",
     tostring(commit_status.producer_state), tostring(commit_status.transport_state),
     tostring(commit_status.monotonic_millis)))
-if mode == "multi-collection" then
-    local second_deadline = host_monotonic_millis() + 15000
-    local second_sampled = false
-    while host_monotonic_millis() < second_deadline do
-        local result = scheduler.tick({
-            capture_start_millis = "3",
-            capture_end_millis = "4",
-        }, carrier, observation)
-        if result.disposition == "sampled" then second_sampled = true; break end
-        host_sleep(1)
-    end
-    assert(second_sampled, "second bridge demand must produce a sample")
-    assert(getter_calls == 2, "second bridge demand must collect exactly once")
-    assert(clock_calls == 4, "pre-admission pumps must not call the clock")
+if mode == "multi-collection" or mode == "sustained-collection" then
+    local expected_samples = mode == "sustained-collection" and 5 or 2
+    for sample = 2, expected_samples do
+        local sample_deadline = host_monotonic_millis() + 15000
+        local next_sampled = false
+        while host_monotonic_millis() < sample_deadline do
+            local result = scheduler.tick(sample_context, carrier, observation)
+            if result.disposition == "sampled" then next_sampled = true; break end
+            host_sleep(1)
+        end
+        assert(next_sampled, "bridge demand must produce each fresh sample")
+        assert(getter_calls == sample, "bridge demand must collect exactly once")
+        assert(clock_calls == 2 * sample, "pre-admission pumps must not call the clock")
 
-    local second_committed = false
-    local second_commit_deadline = host_monotonic_millis() + 10000
-    while host_monotonic_millis() < second_commit_deadline do
-        carrier:progress(1)
-        if carrier:poll_control() == 5 then second_committed = true; break end
-        host_sleep(1)
+        local next_committed = false
+        local commit_deadline = host_monotonic_millis() + 10000
+        while host_monotonic_millis() < commit_deadline do
+            carrier:progress(1)
+            if carrier:poll_control() == 5 then next_committed = true; break end
+            host_sleep(1)
+        end
+        assert(next_committed, "each fresh sample must be durably committed")
     end
-    assert(second_committed, "second sample must be durably committed")
 end
 write(result_path, string.format(
     "return {actual_native=true,token=%q,getter_calls=%d,clock_calls=%d,sampled=true}",

@@ -51,6 +51,10 @@ Game-facing callbacks admit bounded work and respect native resource lifetime.
 Do not assume batching after an indivisible native call made that call safe.
 Preserve architecture-owned scheduler/pump separation and generation fences;
 do not invent loader hooks or lifecycle guarantees without source evidence.
+Keep lifecycle boundary events one-shot. If admission can be temporarily busy,
+latch the boundary until one sample accepts it; do not turn the boundary cue
+into a second periodic pump. A bridge-controlled collection interval must issue
+new demand without depending on an inactivity reconnect at the same deadline.
 
 ## Source notes
 

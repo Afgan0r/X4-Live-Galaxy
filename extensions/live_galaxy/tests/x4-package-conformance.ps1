@@ -75,8 +75,13 @@ $mdFiles = @(Get-Item -LiteralPath (Join-Path $ExtensionRoot 'md/live_galaxy_obs
 $mdDocuments = @($mdFiles | ForEach-Object { Read-ProductXml (Get-Content -LiteralPath $_.FullName -Raw) })
 $observationIntervals = @($mdDocuments[0].SelectNodes('//cue[@checkinterval]') |
     ForEach-Object { $_.GetAttribute('checkinterval') })
-if ($observationIntervals.Count -ne 2 -or @($observationIntervals | Where-Object { $_ -cne '50ms' }).Count -ne 0) {
+if ($observationIntervals.Count -ne 1 -or $observationIntervals[0] -cne '50ms') {
     throw 'CARRIER_PROGRESS_INTERVAL_MISMATCH'
+}
+$loadedCue = $mdDocuments[0].SelectSingleNode('//cue[@name="live_galaxy_game_loaded"]')
+$loadedRaises = @($loadedCue.SelectNodes('./actions/raise_lua_event[@param="''telemetry_game_loaded''"]'))
+if ($loadedRaises.Count -ne 1 -or $loadedCue.SelectNodes('./cues/cue').Count -ne 0) {
+    throw 'GAME_LOADED_BOUNDARY_MUST_BE_ONE_SHOT'
 }
 $luaTexts = @(Get-ChildItem -LiteralPath (Join-Path $ExtensionRoot 'lua') -File -Filter '*.lua' |
     ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-10
+
+- Required one-shot lifecycle boundaries with bounded Lua latching and recurring
+  bridge demand independent of inactivity reconnect. Phase 05.4 showed that a
+  repeating game-loaded cue reapplied a one-time boundary while equal demand
+  and inactivity deadlines forced reconnect-driven collection.
+
 ## 2026-09-05
 
 - Added the owner-approved Lua/MD coding reference and common code/logging

@@ -1,4 +1,4 @@
-use observation_application::LifecycleResult;
+use observation_application::{LifecycleError, LifecycleResult};
 use observation_domain::SourceScopeId;
 use observation_ingest::{
     CarrierIdentity, ControlBody, DispositionBody, ReceiverDisposition, complete_message_digest,
@@ -12,7 +12,7 @@ use crate::{OperationalHistory, ProductionObservationSession};
 pub enum AdmitError {
     Decode,
     Identity,
-    Lifecycle,
+    Production(crate::ProductionError),
     UnexpectedResult,
     ResponseLoss(SourceScopeId, ReceiverDisposition),
 }
@@ -22,7 +22,7 @@ impl AdmitError {
         match self {
             Self::Decode => "message-decode",
             Self::Identity => "message-identity",
-            Self::Lifecycle => "message-lifecycle",
+            Self::Production(error) => production_reason(*error),
             Self::UnexpectedResult => "message-result",
             Self::ResponseLoss(_, _) => "disposition-response-loss",
         }
@@ -70,7 +70,7 @@ pub fn admit(
             bytes.len(),
             crate::production_runtime::now(),
         )
-        .map_err(|_| AdmitError::Lifecycle)?;
+        .map_err(AdmitError::Production)?;
     let LifecycleResult::Disposition(disposition) = result else {
         return Err(AdmitError::UnexpectedResult);
     };
@@ -85,11 +85,80 @@ pub fn admit(
     Ok((scope, disposition))
 }
 
+const fn lifecycle_reason(error: LifecycleError) -> &'static str {
+    match error {
+        LifecycleError::DecodeRejected => "lifecycle-decode-rejected",
+        LifecycleError::ContextMismatch => "lifecycle-context-mismatch",
+        LifecycleError::SlotInvariant => "lifecycle-slot-invariant",
+        LifecycleError::BlockedAmbiguous => "lifecycle-blocked-ambiguous",
+        LifecycleError::RetainedLimit => "lifecycle-retained-limit",
+        LifecycleError::CompletionRejected => "lifecycle-completion-rejected",
+        LifecycleError::AuthorityRejected => "lifecycle-authority-rejected",
+        LifecycleError::FinalizationBlocked => "lifecycle-finalization-blocked",
+        LifecycleError::RetryNotEligible => "lifecycle-retry-not-eligible",
+    }
+}
+
+const fn production_reason(error: crate::ProductionError) -> &'static str {
+    match error {
+        crate::ProductionError::InvalidLimits => "production-invalid-limits",
+        crate::ProductionError::RevisionExhausted => "production-revision-exhausted",
+        crate::ProductionError::Storage => "production-storage",
+        crate::ProductionError::Lifecycle(error) => lifecycle_reason(error),
+    }
+}
+
 pub const fn response_loss_state(disposition: ReceiverDisposition) -> &'static str {
     if matches!(disposition, ReceiverDisposition::Committed) {
         "ambiguous"
     } else {
         "rejected"
+    }
+}
+
+#[cfg(test)]
+mod reason_tests {
+    use observation_application::LifecycleError;
+
+    use super::AdmitError;
+
+    #[test]
+    fn lifecycle_failures_keep_actionable_static_reasons() {
+        let cases = [
+            (LifecycleError::DecodeRejected, "lifecycle-decode-rejected"),
+            (
+                LifecycleError::ContextMismatch,
+                "lifecycle-context-mismatch",
+            ),
+            (LifecycleError::SlotInvariant, "lifecycle-slot-invariant"),
+            (
+                LifecycleError::BlockedAmbiguous,
+                "lifecycle-blocked-ambiguous",
+            ),
+            (LifecycleError::RetainedLimit, "lifecycle-retained-limit"),
+            (
+                LifecycleError::CompletionRejected,
+                "lifecycle-completion-rejected",
+            ),
+            (
+                LifecycleError::AuthorityRejected,
+                "lifecycle-authority-rejected",
+            ),
+            (
+                LifecycleError::FinalizationBlocked,
+                "lifecycle-finalization-blocked",
+            ),
+            (
+                LifecycleError::RetryNotEligible,
+                "lifecycle-retry-not-eligible",
+            ),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(
+                AdmitError::Production(crate::ProductionError::Lifecycle(error)).reason(),
+                expected
+            );
+        }
     }
 }
 

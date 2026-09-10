@@ -21,13 +21,9 @@
       <conditions>
         <event_game_loaded />
       </conditions>
-      <cues>
-        <cue name="live_galaxy_loaded_observation" instantiate="true" checkinterval="50ms">
-          <actions>
-            <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_game_loaded'" />
-          </actions>
-        </cue>
-      </cues>
+      <actions>
+        <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_game_loaded'" />
+      </actions>
     </cue>
   </cues>
 </mdscript>
