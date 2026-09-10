@@ -60,8 +60,8 @@ if ($ui.addon.environment.type -ne 'menus' -or
     throw 'menus UI Lua registration is invalid'
 }
 $cues = @($md.SelectNodes('//cue[@checkinterval]'))
-if ($cues.Count -ne 2 -or @($cues | Where-Object { $_.checkinterval -ne '50ms' }).Count -ne 0) {
-    throw '50 ms Carrier B pump cadence is missing'
+if ($cues.Count -ne 1 -or $cues[0].Name -ne 'live_galaxy_observation' -or $cues[0].checkinterval -ne '50ms') {
+    throw 'single 50 ms Carrier B telemetry pump cadence is missing'
 }
 if ($runtime -notmatch 'RegisterEvent\("live_galaxy_observation", dispatch\)' -or
     $runtime -match '(?i)sn_mod_support_apis') {
