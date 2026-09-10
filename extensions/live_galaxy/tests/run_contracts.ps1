@@ -36,6 +36,7 @@ try {
         Invoke-Stage 'Carrier-B-multi-collection' 'pwsh' ($actual + @('-Scenario', 'multi-collection'))
         Invoke-Stage 'Carrier-B-sustained' 'pwsh' ($actual + @('-Scenario', 'sustained-collection', '-StartupOrder', 'native-first'))
         Invoke-Stage 'Carrier-B-process-restart' 'pwsh' ($actual + @('-Scenario', 'process-restart', '-StartupOrder', 'native-first'))
+        Invoke-Stage 'Carrier-B-bridge-restart' 'pwsh' ($actual + @('-Scenario', 'bridge-restart', '-StartupOrder', 'native-first'))
         Invoke-Stage 'Carrier-B-unload' 'pwsh' ($actual + @('-Scenario', 'pending-io-unload'))
     }
     if ($Suite -ne 'xml') {

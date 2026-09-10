@@ -104,7 +104,16 @@ assert(committed, string.format(
     "commit watchdog: producer=%s transport=%s monotonic=%s",
     tostring(commit_status.producer_state), tostring(commit_status.transport_state),
     tostring(commit_status.monotonic_millis)))
-if mode == "multi-collection" or mode == "sustained-collection" then
+if mode == "bridge-restart" then
+    write(marker_path, "first-commit")
+    local restart_deadline = host_monotonic_millis() + 10000
+    while host_monotonic_millis() < restart_deadline do
+        if read(marker_path) == "bridge-restarted" then break end
+        host_sleep(1)
+    end
+    assert(read(marker_path) == "bridge-restarted", "bridge restart signal required")
+end
+if mode == "multi-collection" or mode == "sustained-collection" or mode == "bridge-restart" then
     local expected_samples = mode == "sustained-collection" and 5 or 2
     for sample = 2, expected_samples do
         local sample_deadline = host_monotonic_millis() + 15000
