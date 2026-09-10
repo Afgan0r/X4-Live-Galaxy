@@ -93,15 +93,6 @@ function Read-Limits([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw 'LIMITS_FILE_MISSING' }
     $raw = Get-Content -LiteralPath $Path -Raw
     if ([Text.Encoding]::UTF8.GetByteCount($raw) -gt 4096) { throw 'LIMITS_FILE_TOO_LARGE' }
-    $value = $raw | ConvertFrom-Json
-    $names = @($value.PSObject.Properties.Name)
-    if ($names.Count -ne $limitFields.Count -or @($names | Where-Object { $_ -cnotin $limitFields }).Count) {
-        throw 'LIMITS_SHAPE_INVALID'
-    }
-    foreach ($field in $limitFields) {
-        if ($value.$field -isnot [long] -and $value.$field -isnot [int]) { throw "LIMIT_NOT_INTEGER:$field" }
-        if ($value.$field -le 0) { throw "LIMIT_NOT_POSITIVE:$field" }
-    }
     if (-not (Test-Path -LiteralPath $limitsValidator -PathType Leaf)) {
         throw 'LIMITS_VALIDATOR_MISSING'
     }
@@ -276,6 +267,13 @@ function Invoke-SelfTest {
             $values[$invalid.field] = $saved
         }
         $validRaw = $values | ConvertTo-Json -Compress
+        $bigIntegerRaw = $validRaw.Replace(
+            '"max_blockers":1',
+            '"max_blockers":9223372036854775808'
+        )
+        if ($bigIntegerRaw -ceq $validRaw) { throw 'BIG_INTEGER_FIXTURE_INVALID' }
+        [IO.File]::WriteAllText($fixture, $bigIntegerRaw, [Text.UTF8Encoding]::new($false))
+        if ((Read-Limits $fixture) -cne $bigIntegerRaw) { throw 'VALID_BIG_INTEGER_REJECTED' }
         $duplicate = $validRaw.TrimEnd('}') + ',"complete_message_bytes":2048}'
         [IO.File]::WriteAllText($fixture, $duplicate, [Text.UTF8Encoding]::new($false))
         try { Read-Limits $fixture; throw 'NEGATIVE_DUPLICATE_LIMIT_ACCEPTED' }
