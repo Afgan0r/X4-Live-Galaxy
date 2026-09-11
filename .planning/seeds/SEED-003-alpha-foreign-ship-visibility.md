@@ -4,7 +4,7 @@ status: dormant
 planted: 2026-09-11
 planted_during: Milestone 0.1 / Phase 05.5 discussion
 trigger_when: before foreign ship observations feed public-alpha faction decisions
-scope: owner discussion and source-backed research; effort unestimated
+scope: accepted passive-observation direction; source-backed design pending
 ---
 
 # SEED-003: Alpha Foreign Ship Visibility Before Full Reconnaissance
@@ -19,23 +19,28 @@ of their fleet positions, cargo, crew or equipment to every faction.
 
 The accepted information boundary permits authoritative own-state and static
 resource-map facts, but foreign operational facts require an attributable
-observation. The concrete alpha contact source and disclosure policy remain
-unresolved. The current strategic filter admits threat-family facts without
+observation. The owner accepted passive observation for alpha: existing faction
+objects provide contacts; detection does not automatically disclose cargo,
+crew or full equipment; contact loss retains only the last observation and its
+age, without refreshing hidden positions. Active scout deployment and building
+an intelligence network remain later work. The concrete contact source,
+per-field disclosure and aging thresholds still require design and research.
+The current strategic filter admits threat-family facts without
 itself verifying a game contact; that is not evidence of real sensor coverage.
 
 ## When to Surface
 
 **Trigger:** before foreign ship observations feed public-alpha faction decisions.
 
-Resolve the minimum alpha policy before admitting production foreign-ship
+Implement the accepted direction through a checked alpha policy before admitting production foreign-ship
 reasoning. Phase 05.5 remains an observation conformance proof; this seed does
 not authorize implementing reconnaissance or broadening that phase.
 
 ## Scope Estimate
 
-Owner discussion and source-backed research; effort is unestimated. Decide
-contact acquisition, per-field disclosure, contact loss and stale observations,
-then verify the exact X4 source capabilities and required runtime evidence.
+Source-backed design and any remaining owner decisions; effort is unestimated.
+Resolve the contact source, per-field disclosure and observation aging within
+the accepted direction, then verify exact X4 capabilities and runtime behavior.
 
 ## Breadcrumbs
 
@@ -51,7 +56,8 @@ then verify the exact X4 source capabilities and required runtime evidence.
 
 ## Notes
 
-User-raised on 2026-09-11. A passive-contact alpha approach is a discussion
-candidate, not an accepted implementation. Physical scouts and satellites are
-the recorded broader direction; no X4 API, sensor range, contact timeout or
-omniscient fallback is selected here.
+User-raised and passive-observation direction approved on 2026-09-11. This is
+product-direction approval, not permission to implement it in Phase 05.5.
+Physical scouts and satellites remain the recorded broader direction. No X4
+API, sensor range or contact timeout is selected; no omniscient fallback is
+permitted. The seed remains dormant until its delivery scope is admitted.
