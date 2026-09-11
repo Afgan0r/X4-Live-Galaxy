@@ -30,7 +30,7 @@ observed KHK activity, and remain bounded and recoverable during unattended X4
 - [ ] **Phase 05.1: Bounded Real Component Discovery** - Historical partial implementation; do not execute the superseded remainder.
 - [x] **Phase 05.2: Layered Lua and X4 Verification Foundation** - Historical completed phase; obsolete research tooling was retired by quick 260903-06l and 260903-32k.
 - [x] **Phase 05.3: Generic Observation Contracts and Durable Publication** - Build source-agnostic bounded observation assembly, feedback contracts and atomic publication without selecting a production X4 carrier. (completed 2026-09-05)
-- [ ] **Phase 05.4: Owned Carrier B and Production Observation Path** - Connect X4 to the shared contracts through a minimal Live Galaxy-owned carrier with explicit bounded outcomes and runtime proof.
+- [x] **Phase 05.4: Owned Carrier B and Production Observation Path** - Connect X4 to the shared contracts through a minimal Live Galaxy-owned carrier with explicit bounded outcomes and runtime proof. (completed 2026-09-11)
 - [ ] **Phase 05.5: Heavy Faction Ship Conformance** - Prove the shared flow with heavy ship observations across X4 and Rust.
 - [ ] **Phase 05.6: Station-Specific Observation Remainder** - Close only station-specific gaps remaining after 05.5; conditional scope.
 - [ ] **Phase 6: Correlated Reports and Diagnostics** - Emit safe concise X4 reports while retaining complete external decision evidence.
@@ -317,8 +317,14 @@ Plans:
 3. Native allocation, copy, callback-time, message-size and queued-work limits are measured and enforced. Start, reconnect, load and UI-reload boundaries fail closed; automatic save resume remains unsupported unless later evidence establishes a safe boundary.
 4. Layered static, pure-Lua, fake-adapter and disposable X4 evidence covers ordinary time, sustained SETA, reconnect, malformed or oversized traffic and packaging without promoting local fakes into runtime proof.
 
-**Research:** Required after a dedicated owner discussion. Start from the 2026-09-04 Docs MCP evidence that triggered Carrier B; re-open product or architecture choices that were not part of the approved phase split.
-**Plans:** 0; separate future phase, not pre-approved for execution.
+**Research:** Complete. The dedicated research retained the 2026-09-04 Docs MCP evidence that triggered Carrier B and resolved only the product and architecture choices admitted by the approved phase split.
+**Plans:** 5/5 plans complete
+
+- [x] 05.4-01-PLAN.md
+- [x] 05.4-02-PLAN.md
+- [x] 05.4-03-PLAN.md
+- [x] 05.4-04-PLAN.md
+- [x] 05.4-05-PLAN.md
 
 ### Phase 05.5: Heavy Faction Ship Conformance
 
@@ -430,7 +436,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 05.1. Bounded Real Component Discovery | 6 summarized | Remainder superseded/reassigned | - |
 | 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
 | 05.3. Generic Observation Contracts and Durable Publication | 5/5 | Complete    | 2026-09-05 |
-| 05.4. Owned Carrier B and Production Observation Path | 0/TBD | Awaiting dedicated owner discussion after 05.3 | - |
+| 05.4. Owned Carrier B and Production Observation Path | 5/5 | Complete | 2026-09-11 |
 | 05.5. Heavy Faction Ship Conformance | 0/TBD | Awaiting 05.4 and owner discussion | - |
 | 05.6. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.5 | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
