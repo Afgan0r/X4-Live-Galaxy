@@ -414,38 +414,48 @@ renumbering the ledger.
 
 ## ADR-LG-022: Heavy ship proof scope
 
-- **Status:** accepted
+- **Status:** accepted; scope amended by the owner on 2026-09-11
 - **Context:** the architecture needs a deliberately heavy cross-layer proof,
   but the proof must not become the definition of the generic system or silently
   admit every special faction.
 - **Accepted rule:** first exercise one heavy ordinary eligible faction, then all
-  dynamically discovered `mind_candidate` factions. Core ships are required;
-  cargo, crew, and loadout use a source-backed capability matrix. KHK, the player
-  faction, and XEN are excluded for distinct owner-approved reasons.
-- **Rationale:** this validates the architecture under realistic scale for
-  future faction minds while isolating special product and source semantics.
-- **Consequences:** each discovered faction is classified as `mind_candidate`,
-  `excluded`, or `unknown`; unknown blocks proof closure. The proof spans X4,
-  Lua, transport, Rust staging, publication, and decision snapshots under normal
+  dynamically discovered independent vanilla/DLC factions, including small and
+  pirate factions, plus XEN and KHK. Territory, shipyard ownership and fleet size
+  are not eligibility prerequisites. Core ships and all agreed applicable cargo,
+  crew and loadout fields are required. Proven non-applicability is acceptable;
+  applicable but unobtainable fields remain blockers, even when a selected
+  source has a confirmed limitation. Source coverage is never fabricated.
+- **Rationale:** observation subjects and Faction Mind participants serve
+  different purposes. Hostile ship observations matter without hostile minds.
+- **Consequences:** record observation eligibility separately from mind
+  participation. Every discovered faction has an included, excluded or unknown
+  proof disposition; unknown blocks closure. Exact representation belongs to
+  checked planning. Player and mod-added factions remain outside mandatory
+  coverage; service/temporary records need evidenced exclusions. The proof spans
+  X4, Lua, transport, Rust staging, publication, and decision snapshots under normal
   time and approximately `6.2x` SETA, but does not by itself make ship reading a
-  production Faction Mind feature.
+  production Faction Mind feature. Phase 05.5 uses vanilla, DLC and Live Galaxy;
+  supported-mod coexistence remains a later gate. Its approved context defines
+  the exact required data profile. No hostile mind or reconnaissance system is
+  admitted by extending collection coverage.
 - **Supersedes:** a station-only architectural proof and an implicit vanilla
-  faction allowlist.
+  faction allowlist, and the earlier XEN/KHK ship-proof exclusions.
 
 ## ADR-LG-023: Successor phase boundaries
 
-- **Status:** accepted
+- **Status:** accepted; numbering reconciled with the approved Carrier B split
 - **Context:** Phase 05.1 and Phase 05.2 accumulated useful foundations but also
   mixed generic architecture, station-specific gaps, and verification work.
 - **Accepted rule:** Phase 05.3 owns the generic observation data-flow
-  foundation and feedback baseline. Phase 05.4 owns the real heavy faction ship
-  proof across X4 and Rust. Phase 05.5 owns only station-specific source or
+  foundation and feedback baseline. Phase 05.4 owns Carrier B and the production
+  observation path. Phase 05.5 owns the real heavy faction ship proof across X4
+  and Rust. Phase 05.6 owns only station-specific source or
   completeness gaps that remain afterward.
 - **Rationale:** generic architecture must exist before another source-specific
   closure attempt; the heavy proof then identifies which station gaps are truly
   unique.
 - **Consequences:** `.planning/**` must persist final scope and may shrink or
-  remove Phase 05.5 when Phase 05.4 closes the shared seam. This ADR does not
+  remove Phase 05.6 when Phase 05.5 closes the shared seam. This ADR does not
   retroactively expand Phase 05.1.
 - **Supersedes:** closing the generic architecture opportunistically inside the
   remaining station work.

@@ -441,30 +441,41 @@ coverage, or satisfy either ordered heavy-conformance gate.
 
 ### VER-LG-012 ordered gates
 
-1. One deliberately heavy ordinary `mind_candidate` faction exercises the full
+1. One deliberately heavy ordinary eligible faction exercises the full
    pipeline for diagnosis.
-2. Every dynamically discovered `mind_candidate` faction exercises the same
-   architecture under aggregate normal-time and sustained approximately `6.2x`
-   SETA evidence.
+2. Every dynamically discovered independent vanilla/DLC faction, including
+   small and pirate factions, plus XEN and KHK exercises the same architecture
+   under aggregate normal-time and sustained approximately `6.2x` SETA evidence.
+
+The Phase 05.5 acceptance stand is vanilla X4 plus DLC and Live Galaxy.
+KUDA AI Tweaks and Add More Sectors compatibility remains a later obligation.
 
 ### VER-LG-012 required coverage
 
 - complete core ship index to the strength proven by its source adapter;
 - deterministic bounded cargo, crew, and loadout groups when applicable;
 - explicit `not_applicable`, `unsupported`, and `unknown` dispositions;
+- source-proven non-applicability is acceptable; every agreed applicable field
+  must be obtained. Unavailable applicable data blocks closure, even when a
+  selected source has a confirmed limitation; `unsupported` is not a waiver;
 - eventual group coverage without a false simultaneous faction snapshot;
 - scheduler fairness, bounded memory, transport feedback, retry, reconnect,
   candidate completion, durable publication, and dependency-aware decision
   snapshots;
-- faction eligibility manifest with exactly one of `mind_candidate`,
-  `excluded`, or `unknown` for every discovered faction;
-- KHK, player, and XEN excluded under their distinct recorded product reasons.
+- observation eligibility for every discovered faction, distinct from Faction
+  Mind participation; unresolved eligibility blocks closure;
+- no territory, shipyard or fleet-size prerequisite; player and mod-added
+  factions remain outside mandatory coverage, while service/temporary records
+  require evidenced exclusions;
+- XEN and KHK ship observations, with source-backed field applicability, under
+  the owner-approved 2026-09-11 amendment to ADR-LG-022.
 
 ### VER-LG-012 non-claims
 
 Passing the proof does not make ship reading a production Faction Mind feature,
-does not validate a global X4 snapshot, and does not establish special XEN
-semantics.
+does not validate a global X4 snapshot, admit XEN/KHK minds or establish their
+special strategic semantics. Collected foreign facts are not automatically
+available to every faction; alpha recipient visibility remains separate work.
 
 ## VER-LG-013: Station-specific completeness and deletion
 

@@ -453,6 +453,13 @@ all-or-nothing structure.
 
 For the faction ship proof:
 
+Observation eligibility is distinct from Faction Mind participation
+([ADR-LG-022](architecture-decisions.md#adr-lg-022-heavy-ship-proof-scope)).
+The proof includes ordinary independent vanilla/DLC factions plus XEN and KHK;
+this does not grant hostile minds or automatic recipient access to foreign
+observations. Phase scope defines required fields and acceptance; independent
+detail availability preserves core entities but cannot waive those requirements.
+
 ```text
 ship core index
   identity

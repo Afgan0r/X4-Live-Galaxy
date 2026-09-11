@@ -2,12 +2,12 @@
 gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
-status: Ready for discussion
-stopped_at: Phase 05.4 complete, ready to discuss Phase 05.5
-last_updated: "2026-09-11T05:18:19.122Z"
+status: planning
+stopped_at: Phase 05.5 context approved; research and checked planning are next
+last_updated: "2026-09-11T11:42:26.541Z"
 last_activity: 2026-09-11
-last_activity_desc: Phase 05.4 complete; Phase 05.5 discussion is next
-state_head: d2e67c35d161fb2af411b902e9205cc76acdcfa3
+last_activity_desc: Phase 05.5 discussion approved; research and checked planning are next
+state_head: ff8a354c89342fb401e26bc6b4d580b66b9e8292
 progress:
   total_phases: 14
   completed_phases: 7
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 — Heavy Faction Ship Conformance
 Plan: Not started
-Status: Ready for discussion
-Last activity: 2026-09-11 — Phase 05.4 complete; Phase 05.5 discussion is next
+Status: Ready for research and planning
+Last activity: 2026-09-11 — Phase 05.5 discussion approved; research and checked planning are next
 
-Progress: [█████░░░░░] 50% (7 of 14 phases complete; Phase 05.5 discussion is next)
+Progress: [█████░░░░░] 50% (7 of 14 phases complete; Phase 05.5 ready for research and planning)
 
 ## Performance Metrics
 
@@ -236,6 +236,7 @@ None yet.
 - Phase 05.2 inserted after Phase 5 and reordered before further Phase 05.1 X4 execution: it must build the admission gate and read-only candidate harness first; Phase 05.1 then owns one prepared X4 run over the remaining candidate matrix. (URGENT)
 - Phase 05.3 inserted after Phase 5: Owner-approved ADR-LG-023 reconciliation originally grouped generic flow and production transport before heavy ship and station proof. Historical 01/05.1 gaps remain open under successor owners.
 - Phase 05.4 inserted after Phase 05.3: Docs MCP evidence triggered an owned Carrier B. The owner split it from 05.3 on 2026-09-04; heavy ship proof moved to 05.5 and conditional station remainder to 05.6.
+- Phase 05.5 edited: Owner approved observation profile, XEN/KHK inclusion, strict applicable-field acceptance and vanilla/DLC stand; alpha passive observation deferred to SEED-003.
 
 ## Deferred Items
 
@@ -247,6 +248,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-06T06:11:55.453Z
-Stopped at: Phase 05.4 complete, ready to discuss Phase 05.5
-Resume file: .planning/phases/05.4-owned-carrier-b-and-production-observation-path/05.4-CONTEXT.md
+Last session: 2026-09-11T11:41:43.011Z
+Stopped at: Phase 05.5 context approved; research and checked planning are next
+Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-CONTEXT.md

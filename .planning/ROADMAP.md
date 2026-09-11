@@ -334,13 +334,14 @@ Plans:
 **Layers:** `rust-domain`, `x4-runtime`.
 **Success Criteria:**
 
-1. One heavy ordinary eligible faction passes before the proof expands to all dynamically discovered `mind_candidate` factions; every faction is classified and unknown eligibility blocks closure.
-2. Core ship observations and applicable cargo/crew/loadout groups preserve exact core dependencies, explicit availability and eventual group coverage without claiming simultaneous global capture.
-3. Normal-time and sustained SETA observations demonstrate independently bounded collection, feedback, candidate assembly, durable publication, recovery and freshness under the measured workload.
-4. Source coverage remains as weak as the available proof requires. KHK, the player faction and XEN remain excluded under ADR-LG-022; source gaps become explicit blockers, not fabricated complete sets.
+1. One heavy ordinary eligible faction passes before the proof expands to all dynamically discovered independent vanilla/DLC factions, including small and pirate factions, plus XEN and KHK. Every discovered faction has an observation eligibility disposition independent of Faction Mind participation; unknown eligibility blocks closure. Territory, shipyard ownership and fleet size are not prerequisites; player and mod-added factions remain outside mandatory coverage, and service/temporary records require evidenced exclusions.
+2. Core identity/owner/type/location and the agreed cargo, aggregate crew and installed-equipment/ammunition/drone fields preserve exact core dependencies, explicit availability and eventual bounded-group coverage without claiming simultaneous global capture. The approved context defines the exact field profile.
+3. Normal-time and sustained SETA observations on vanilla X4 plus DLC and Live Galaxy demonstrate independently bounded collection, feedback, candidate assembly, durable publication, recovery and freshness under measured workload. Supported-mod compatibility remains a later gate.
+4. Source coverage remains as weak as the available proof requires. Proven non-applicability is acceptable; every agreed applicable field must be obtained. Unavailable applicable data and source gaps remain blockers, including confirmed limitations of a selected API; `unsupported` does not waive closure.
 
-**Research:** Required, after owner discussion. Exact ship APIs and source completeness are not audited by the 05.3 readiness check.
-**Plans:** 0; future phase, not pre-approved for execution.
+**Research:** Required; owner discussion approved on 2026-09-11. Exact ship APIs, faction classification, completeness, applicability and workload limits require source-backed research and checked plans, followed by owner approval before execution.
+**Canonical refs:** `.planning/phases/05.5-heavy-faction-ship-conformance/05.5-CONTEXT.md`; `docs/architecture-decisions.md` ADR-LG-022; `docs/architecture-verification.md` VER-LG-003/011/012.
+**Plans:** 0; ready for research and planning, not approved for execution.
 
 ### Phase 05.6: Station-Specific Observation Remainder
 
@@ -437,7 +438,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
 | 05.3. Generic Observation Contracts and Durable Publication | 5/5 | Complete    | 2026-09-05 |
 | 05.4. Owned Carrier B and Production Observation Path | 5/5 | Complete | 2026-09-11 |
-| 05.5. Heavy Faction Ship Conformance | 0/TBD | Awaiting 05.4 and owner discussion | - |
+| 05.5. Heavy Faction Ship Conformance | 0/TBD | Discussion approved; research and planning next | - |
 | 05.6. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.5 | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |

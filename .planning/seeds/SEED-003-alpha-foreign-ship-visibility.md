@@ -47,8 +47,8 @@ the accepted direction, then verify exact X4 capabilities and runtime behavior.
 - `.planning/phases/03-faction-scoped-strategic-state/03-CONTEXT.md` — D-01/D-03.
 - `.planning/REQUIREMENTS.md` — MIND-02 and INST-02.
 - `crates/strategic-state/src/derive.rs` — current `visible` filter.
-- `.planning/phases/05.5-heavy-faction-ship-conformance/05.5-DISCUSS-CHECKPOINT.json`
-  — originating discussion while in progress; final context replaces it.
+- `.planning/phases/05.5-heavy-faction-ship-conformance/05.5-CONTEXT.md`
+  — originating owner-approved discussion and phase boundary.
 - Historical personal memory
   `wing_x4_live_galaxy/decisions`, drawer
   `drawer_wing_x4_live_galaxy_decisions_067f488f83547d02a201fcbd` — accepted
