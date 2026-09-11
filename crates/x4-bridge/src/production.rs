@@ -1,11 +1,15 @@
 use std::path::Path;
 
 use observation_application::{
-    LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult, ObservationLifecycle,
-    PublicationReconciler,
+    LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
+    ObservationLifecycle, PublicationReconciler,
+};
+use observation_domain::{
+    BatchId, SectionKey, SourceScopeId, SourceSessionIdentity, TransportEpoch,
 };
 use observation_ingest::{
-    AcceptedProjection, DecisionRevisionIndex, GenerationLimits, GenerationStager,
+    AcceptedProjection, DecisionEligibility, DecisionRevisionIndex, GenerationLimits,
+    GenerationStager,
 };
 use observation_persistence::{
     ObservationRepository, PublicationLimits, SqliteObservationRepository,
@@ -21,11 +25,7 @@ pub enum ProductionError {
 
 pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     lifecycle: ObservationLifecycle<R>,
-    last_received: Option<(
-        observation_domain::BatchId,
-        Vec<u8>,
-        observation_application::LifecycleContext,
-    )>,
+    last_received: Option<(BatchId, Vec<u8>, LifecycleContext)>,
 }
 
 impl ProductionObservationSession {
@@ -79,8 +79,8 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
 
     pub fn submit_received(
         &mut self,
-        epoch: observation_domain::TransportEpoch,
-        identity: observation_domain::BatchId,
+        epoch: TransportEpoch,
+        identity: BatchId,
         bytes: Vec<u8>,
         work: usize,
         now: u64,
@@ -120,15 +120,15 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         Ok(result)
     }
 
-    pub fn invalidate_source_scope(&mut self, scope: &observation_domain::SourceScopeId) {
+    pub fn invalidate_source_scope(&mut self, scope: &SourceScopeId) {
         self.lifecycle.invalidate_source_scope(scope);
         self.last_received = None;
     }
 
     pub fn mark_source_scope_uncertain(
         &mut self,
-        scope: &observation_domain::SourceScopeId,
-        session: observation_domain::SourceSessionIdentity,
+        scope: &SourceScopeId,
+        session: SourceSessionIdentity,
     ) {
         self.lifecycle.mark_source_scope_uncertain(scope, session);
         self.last_received = None;
@@ -144,17 +144,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
 
     pub fn decision_eligibility(
         &self,
-        required: &[observation_domain::SectionKey],
+        required: &[SectionKey],
         now: u64,
         max_age: u64,
-    ) -> observation_ingest::DecisionEligibility {
+    ) -> DecisionEligibility {
         self.lifecycle.decision_eligibility(required, now, max_age)
     }
 
-    pub fn next_revision(
-        &self,
-        key: &observation_domain::SectionKey,
-    ) -> Result<u64, ProductionError> {
+    pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
         let current = self
             .lifecycle
             .current_revision(key)
@@ -172,10 +169,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         })
     }
 
-    fn receiver_context(
-        &self,
-        bytes: &[u8],
-    ) -> Result<observation_application::LifecycleContext, ProductionError> {
+    fn receiver_context(&self, bytes: &[u8]) -> Result<LifecycleContext, ProductionError> {
         let message = observation_ingest::decode_complete_message(
             bytes,
             self.lifecycle.complete_message_limit(),

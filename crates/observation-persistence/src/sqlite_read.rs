@@ -11,10 +11,9 @@ use crate::{
     record, schema, sqlite_receipt,
 };
 
-pub fn current(
-    connection: &Connection,
-    key: &SectionKey,
-) -> Result<Option<CurrentRevision>, RepositoryError> {
+type ReadResult<T> = Result<T, RepositoryError>;
+
+pub fn current(connection: &Connection, key: &SectionKey) -> ReadResult<Option<CurrentRevision>> {
     let Some(revision) = current_pointer(connection, key)? else {
         return Ok(None);
     };
@@ -27,7 +26,7 @@ pub fn stored_revision(
     connection: &Connection,
     key: &SectionKey,
     revision: SectionRevisionId,
-) -> Result<Option<(RevisionRecord, PublicationReceipt)>, RepositoryError> {
+) -> ReadResult<Option<(RevisionRecord, PublicationReceipt)>> {
     let Some(record) = load_revision(connection, key, revision)? else {
         return Ok(None);
     };
@@ -38,7 +37,7 @@ pub fn stored_revision(
 pub fn current_pointer(
     connection: &Connection,
     key: &SectionKey,
-) -> Result<Option<SectionRevisionId>, RepositoryError> {
+) -> ReadResult<Option<SectionRevisionId>> {
     let value: Option<i64> = connection
         .query_row(
             "SELECT revision FROM current_revisions WHERE section_key=?1",
@@ -54,7 +53,7 @@ pub fn load_revision(
     connection: &Connection,
     key: &SectionKey,
     revision_id: SectionRevisionId,
-) -> Result<Option<RevisionRecord>, RepositoryError> {
+) -> ReadResult<Option<RevisionRecord>> {
     type Header = (
         String,
         String,
@@ -121,7 +120,7 @@ fn load_records(
     connection: &Connection,
     key: &SectionKey,
     revision_id: SectionRevisionId,
-) -> Result<Vec<EnvelopeRecord>, RepositoryError> {
+) -> ReadResult<Vec<EnvelopeRecord>> {
     let mut statement = connection.prepare(
         "SELECT position, record_id, entity_id, observation_version, content FROM revision_records WHERE section_key=?1 AND revision=?2 ORDER BY position"
     ).map_err(|_| storage("records-read"))?;
@@ -158,7 +157,7 @@ fn load_dependencies(
     connection: &Connection,
     key: &SectionKey,
     revision_id: SectionRevisionId,
-) -> Result<BTreeMap<SectionKey, SectionRevisionId>, RepositoryError> {
+) -> ReadResult<BTreeMap<SectionKey, SectionRevisionId>> {
     let mut statement = connection.prepare(
         "SELECT dependency_key, dependency_revision FROM revision_dependencies WHERE section_key=?1 AND revision=?2 ORDER BY dependency_key"
     ).map_err(|_| storage("dependencies-read"))?;
@@ -178,19 +177,19 @@ fn load_dependencies(
     Ok(dependencies)
 }
 
-pub fn sql_u64(value: u64) -> Result<i64, RepositoryError> {
+pub fn sql_u64(value: u64) -> ReadResult<i64> {
     i64::try_from(value).map_err(|_| corrupt("integer-range"))
 }
-fn sql_usize(value: usize) -> Result<i64, RepositoryError> {
+fn sql_usize(value: usize) -> ReadResult<i64> {
     i64::try_from(value).map_err(|_| corrupt("integer-range"))
 }
-fn rust_u64(value: i64) -> Result<u64, RepositoryError> {
+fn rust_u64(value: i64) -> ReadResult<u64> {
     u64::try_from(value).map_err(|_| corrupt("integer-range"))
 }
-fn revision(value: i64) -> Result<SectionRevisionId, RepositoryError> {
+fn revision(value: i64) -> ReadResult<SectionRevisionId> {
     SectionRevisionId::new(rust_u64(value)?).ok_or(corrupt("revision-invalid"))
 }
-fn digest(value: &[u8]) -> Result<[u8; 32], RepositoryError> {
+fn digest(value: &[u8]) -> ReadResult<[u8; 32]> {
     value.try_into().map_err(|_| corrupt("digest-length"))
 }
 const fn corrupt(code: &'static str) -> RepositoryError {
