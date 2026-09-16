@@ -6,7 +6,7 @@
 )]
 
 use observation_domain::{CompleteMessage, SourceBoundary, SourceEpochStatus};
-use observation_ingest::{ControlBody, decode_carrier_bootstrap};
+use observation_ingest::decode_carrier_bootstrap;
 #[path = "ship_abi_host.rs"]
 mod host;
 #[path = "ship_abi_wire.rs"]
@@ -58,6 +58,45 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
             SourceEpochStatus::BoundaryUncertain
         );
         assert_eq!(done.record_count, 1);
+        send(
+            &mut peer,
+            &identity,
+            observation_ingest::ControlBody::Demand(observation_ingest::DemandBody { credit: 1 }),
+        );
+        host.wait_replacement();
+        drop(peer);
+        host.release_peer();
+        let mut replacement = connect();
+        let fresh_identity = qualify(&mut replacement);
+        assert_ne!(fresh_identity, identity);
+        let CompleteMessage::SectionStart(fresh_start) =
+            receive(&mut replacement, &fresh_identity, "received")
+        else {
+            panic!("fresh start");
+        };
+        assert_eq!(fresh_start.source_scope, start.source_scope);
+        assert_eq!(fresh_start.sender_evidence.source_boundary, boundary);
+        let CompleteMessage::ImmutableBatch(fresh_batch) =
+            receive(&mut replacement, &fresh_identity, "received")
+        else {
+            panic!("fresh batch");
+        };
+        assert!(
+            fresh_batch.records[0]
+                .content
+                .contains("identity=9007199254740995")
+        );
+        assert!(fresh_batch.records[0].content.contains("location=sector:2"));
+        let CompleteMessage::SectionCompletion(fresh_done) =
+            receive(&mut replacement, &fresh_identity, "committed")
+        else {
+            panic!("fresh completion");
+        };
+        assert_eq!(fresh_done.record_count, 1);
+        assert_eq!(
+            fresh_done.sender_evidence.source_epoch_status,
+            SourceEpochStatus::BoundaryUncertain
+        );
         host.finish();
     }
 }

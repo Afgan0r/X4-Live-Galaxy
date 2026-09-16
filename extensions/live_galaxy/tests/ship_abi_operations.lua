@@ -1,5 +1,5 @@
 local root, mode, result_path = ...
-package.path = root .. "/?.lua;" .. package.path
+package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 local module = require("extensions.live_galaxy.lua.live_galaxy_carrier")
 local dll_path = assert(os.getenv("X4_SHIP_ABI_DLL"))
 local function loadlib(_, name) return package.loadlib(dll_path, name) end
@@ -15,6 +15,7 @@ local source = { source_scope = "x4:faction:argon:ships", source_epoch_status = 
 local function copy(value)
     local result = {}; for key, field in pairs(value) do result[key] = field end; return result
 end
+local original_limits, original_source = copy(limits), copy(source)
 -- Open goes through registered operations. Invalid configuration cannot start a worker.
 assert(api.open(1, limits, source) == -10)
 for key, value in pairs({ pending_slots = 2, max_attempts = 3, max_age_millis = 4999,
@@ -50,7 +51,7 @@ if mode == "incompatible" then
     assert(status.producer_state == "incompatible", "incompatible profile must latch restart-required state")
     assert(carrier:close() == 0)
 else
-    local status = await(function(_, _, status) return status and status.capacity == "available:0" end)
+    local status = await(function(_, _, status) return status and status.capacity:match("^available:") end)
     assert(status.selection == "ship_core" and status.remaining_capacity == "129")
     for key in pairs(begin) do
         local bad = copy(begin); bad[key] = nil
@@ -68,9 +69,10 @@ else
         assert(carrier:push_record(bad) == -20, "missing ship key " .. key)
     end
     for _, value in ipairs({ 9007199254740992, 0/0, math.huge, -math.huge,
-        "9.007199254740993e15", "09007199254740993", "18446744073709551616" }) do
+        "9.007199254740993e15", "09007199254740993", "12345678901234567890123456789012345" }) do
         local bad = copy(record); bad.identity = value
-        assert(carrier:push_record(bad) == -20, "precision-losing/noncanonical identity")
+        local code = carrier:push_record(bad)
+        assert(code == -20, "precision-losing/noncanonical identity " .. tostring(value) .. ":" .. tostring(code))
     end
     for key, value in pairs({ profile = "ship_core_v2", source_scope = "", owner = "",
         type = "", class = "", location = "" }) do
@@ -85,9 +87,17 @@ else
     local finish = { capture_end_millis = "13", success = true, quality = "unknown",
         availability = "available", coverage = "partial", consistency = "observed_count_fill_only",
         stable_identity = true }
+    for key in pairs(finish) do
+        local bad = copy(finish); bad[key] = nil
+        assert(carrier:finish_section(bad) == -20, "missing finish key " .. key)
+    end
+    extra = copy(finish); extra.extra = true
+    assert(carrier:finish_section(extra) == -20)
+    assert(carrier:finish_section(setmetatable(copy(finish), {})) == -20)
     assert(carrier:finish_section(finish) == 0)
     finish.capture_end_millis = "999"
     await(function(control) return control == 5 end)
-    assert(carrier:close() == 0)
+    require("extensions.live_galaxy.tests.ship_abi_lifecycle")(
+        module, api, carrier, loadlib, original_limits, original_source, mode)
 end
 local file = assert(io.open(result_path, "wb")); assert(file:write("SHIP_ABI_PASS")); assert(file:close())

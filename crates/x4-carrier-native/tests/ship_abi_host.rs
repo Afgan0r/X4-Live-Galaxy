@@ -64,6 +64,7 @@ impl Host {
         )
         .unwrap();
         let child = Command::new(prepared_host(repo))
+            .env("X4_SHIP_ABI_MARKER", run.join("marker.txt"))
             .env(
                 "X4_SHIP_ABI_DLL",
                 run.join("extensions/live_galaxy/ui_c_library_live_galaxy_carrier_64.txt"),
@@ -79,6 +80,19 @@ impl Host {
             .spawn()
             .unwrap();
         Self { child, run }
+    }
+    pub(super) fn wait_replacement(&mut self) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !self.run.join("marker.txt").is_file() {
+            if self.child.try_wait().unwrap().is_some() {
+                self.finish();
+            }
+            assert!(Instant::now() < deadline, "replacement open watchdog");
+            std::thread::yield_now();
+        }
+    }
+    pub(super) fn release_peer(&self) {
+        std::fs::write(self.run.join("marker.txt.released"), "released").unwrap();
     }
     pub(super) fn finish(&mut self) {
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -114,6 +128,14 @@ impl Drop for Host {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if std::thread::panicking() {
+            use std::io::Read as _;
+            let mut output = String::new();
+            if let Some(stderr) = self.child.stderr.as_mut() {
+                let _ = stderr.read_to_string(&mut output);
+            }
+            eprintln!("Lua host diagnostic: {output}");
+        }
         // Only this owned ignored fixture directory is removed; never any repository source.
         let _ = std::fs::remove_dir_all(&self.run);
     }
