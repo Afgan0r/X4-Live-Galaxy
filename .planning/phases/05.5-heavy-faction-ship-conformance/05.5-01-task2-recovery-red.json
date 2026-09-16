@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-carrier-native --test producer_contract discarded_completion_reconciles -- --nocapture",
+  "exitCode": 1,
+  "output": "not ok 1 - discarded_completion_reconciles_without_replaying_capture_or_skipping_handshake\nassertion failed: discarded handoff must retain exact outcome identity only\nleft: Err(InvalidInput)\nright: Ok(Committed)\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
+  "targetTest": "discarded_completion_reconciles_without_replaying_capture_or_skipping_handshake",
+  "targetFile": "crates/x4-carrier-native/tests/producer_contract/ship_requalification.rs",
+  "expected": "exact committed outcome reconciles after discard/reset without replay or bypassing handshake",
+  "actual": "reconcile_committed returns InvalidInput after reset lost the completion identity"
+}
