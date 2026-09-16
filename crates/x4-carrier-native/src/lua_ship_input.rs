@@ -3,7 +3,7 @@ use core::ffi::c_void;
 use observation_domain::{
     CaptureWindow, SectionAvailability, SectionCoverage, SectionFreshness, SectionQuality,
     SectionState, SenderEvidence, ShipClass, ShipCoreRecord, ShipIdentity, ShipLocation, ShipOwner,
-    ShipType, SourceConsistency, SourceScopeId,
+    ShipType, SourceBoundary, SourceConsistency, SourceEpochStatus, SourceScopeId,
 };
 
 use crate::abi_windows::LuaApi;
@@ -49,6 +49,20 @@ pub unsafe fn begin(
     );
     sender.source_consistency = SourceConsistency::ObservedCountFillOnly;
     sender.stable_identity = true;
+    sender.source_epoch_status =
+        match unsafe { field_string(api, state, 2, "source_epoch_status", 32) }?.as_str() {
+            "unknown" => SourceEpochStatus::Unknown,
+            "boundary_uncertain" => SourceEpochStatus::BoundaryUncertain,
+            _ => return None,
+        };
+    sender.source_boundary =
+        match unsafe { field_string(api, state, 2, "source_boundary", 32) }?.as_str() {
+            "runtime_start" => SourceBoundary::RuntimeStart,
+            "game_loaded" => SourceBoundary::GameLoaded,
+            "lua_reload" => SourceBoundary::LuaReload,
+            "transport_reconnect" => SourceBoundary::TransportReconnect,
+            _ => return None,
+        };
     Some(BeginInput::ShipCore {
         evidence: SectionEvidence {
             source_scope: source.source_scope.clone(),

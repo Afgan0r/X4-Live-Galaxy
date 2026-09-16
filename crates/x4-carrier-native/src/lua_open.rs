@@ -48,13 +48,13 @@ pub unsafe fn decode(api: LuaApi, state: *mut c_void) -> Option<OpenArgs> {
     let attempts = unsafe { field_integer(api, state, 2, "max_attempts") }?;
     let retry = unsafe { field_integer(api, state, 2, "max_retry_age_millis") }?;
     let availability = unsafe { field_integer(api, state, 2, "availability_interval_millis") }?;
-    if data != 2_048
-        || control != 512
-        || records != 1
-        || content != 96
-        || canonical != 2_048
-        || batches != 1
-        || work != 1
+    if data == 0
+        || control == 0
+        || records == 0
+        || content == 0
+        || canonical != data
+        || batches < records
+        || work == 0
         || age != 5_000
         || slots != 1
         || attempts != 2
@@ -76,9 +76,7 @@ pub unsafe fn decode(api: LuaApi, state: *mut c_void) -> Option<OpenArgs> {
         return None;
     }
     let (source_scope, epoch_status, boundary) = unsafe { decode_source(api, state) }?;
-    if source_scope != "x4:carrier_b_acceptance" {
-        return None;
-    }
+    let _validated_scope = observation_domain::SourceScopeId::new(source_scope.clone())?;
     Some(OpenArgs {
         limits,
         source_scope,
