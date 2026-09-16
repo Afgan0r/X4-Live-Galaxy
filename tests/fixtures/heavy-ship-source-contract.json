@@ -1,0 +1,900 @@
+{
+  "schema_version": 1,
+  "status": "pending",
+  "run": null,
+  "envelope": {
+    "status": "blocked",
+    "native_calls": 0,
+    "attempts": 0,
+    "allocation_bytes": 0,
+    "wall_time_ms": 0,
+    "reason": "No finite nonzero safe native envelope justified; owner decision required"
+  },
+  "source_snapshot": {
+    "id": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+    "root": "blake3:5cc981dc8a15914c993062aaefc37ebfc45401339d93526dd3df295ba51d996d",
+    "kind": "game"
+  },
+  "runtime_snapshot": {
+    "id": "x4-probe-faction-ship-runtime-686318dd-v1",
+    "root": "blake3:01ea3b0d39afee3541a1c7e87ce2c1c8fc011ce688584966952c0d20e7a90c82",
+    "kind": "documentation"
+  },
+  "snapshots": {
+    "game": {
+      "id": "x4-9.00-steam-23660954",
+      "root": "blake3:8d30413b740369e8572d6a7647366be338421698596eee84d62fec0415685c79",
+      "kind": "game"
+    },
+    "declaration": {
+      "id": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "root": "blake3:5cc981dc8a15914c993062aaefc37ebfc45401339d93526dd3df295ba51d996d",
+      "kind": "game"
+    },
+    "runtime": {
+      "id": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "root": "blake3:01ea3b0d39afee3541a1c7e87ce2c1c8fc011ce688584966952c0d20e7a90c82",
+      "kind": "documentation"
+    },
+    "detail": {
+      "id": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "root": "blake3:4f04a991bd595ff9493dc025a2f636fa64a6c59ed213c0dc1b19d3598b97b518",
+      "kind": "game"
+    }
+  },
+  "rows": [
+    {
+      "id": "faction_census",
+      "query": "GetNumAllFactions / GetAllFactions",
+      "source_snapshot": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "GetNumAllFactions / GetAllFactions",
+      "input_shape": "false; const char*[count], capacity, false",
+      "output_shape": "uint32 count/fill; immediately copied faction strings",
+      "units": "IDs",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "05.5-01-SUMMARY#source-declaration-closure"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "ship_membership",
+      "query": "GetNumAllFactionShips / GetAllFactionShips",
+      "source_snapshot": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "GetNumAllFactionShips / GetAllFactionShips",
+      "input_shape": "faction string; UniverseID[count], capacity, faction string",
+      "output_shape": "uint32 count/fill; uint64 IDs as decimal strings",
+      "units": "IDs",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "05.5-01-SUMMARY#source-declaration-closure"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "core_identity",
+      "query": "UniverseID / ConvertStringToLuaID",
+      "source_snapshot": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "UniverseID / ConvertStringToLuaID",
+      "input_shape": "canonical decimal string; no Lua-number round trip",
+      "output_shape": "uint64 decimal [1,18446744073709551615]",
+      "units": "identity",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "claim:368cbfd2d9408f28453220bb81cf7282b76ae04a9fc40002f99d0830087e6f1c"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "core_owner",
+      "query": "GetComponentData",
+      "source_snapshot": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "GetComponentData",
+      "input_shape": "converted component, owner",
+      "output_shape": "faction ID string",
+      "units": "ID",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "claim:2b07318717e618adea2ed116fa7731f1b2438396c3c8b36c4da2cf1a30bd61fd"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "core_type_class",
+      "query": "GetComponentData",
+      "source_snapshot": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "GetComponentData",
+      "input_shape": "converted component, macro / classid",
+      "output_shape": "macro / class ID strings",
+      "units": "IDs",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "claim:3048a47ae08684f744a8c1630d18e617e674c02cfb614c8737a8581b99eb90d1"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "core_location",
+      "query": "GetComponentData",
+      "source_snapshot": "x4-9.00-steam-23660954-faction-ship-observation-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "GetComponentData",
+      "input_shape": "converted component, sectorid",
+      "output_shape": "sector identity; absence unresolved",
+      "units": "ID",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "claim:39e96605c24c4b222c2d52eaa576f61edf3d650fb37a1a96a8532bbe5869d4cb"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "cargo_wares_quantities",
+      "query": "GetComponentData",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetComponentData",
+      "input_shape": "GetComponentData(component,cargo)",
+      "output_shape": "documented: StorageInfo: const char* name/transport; uint32_t spaceused/capacity; ABI size requires ffi.sizeof. | observed: GetComponentData(component,cargo): keyed ware->item amount; occupied volume=sum(amount*GetWareData(ware,transport,volume)); GetStorageData capacity/stored; GetWareCapacity is per-ware items; reservations separate. | observed: GetNumCargoTransportTypes(component,true); GetCargoTransportTypes(buf,n,component,true,false); 0..returned_count-1; capacity/spaceused volume; transport tags split by vanilla helper. | documented: ReadText(1001,110): m³ storage display; ware volume m³/item by observed formula.",
+      "units": "items",
+      "numeric_representation": "Lua quantity range/precision unknown; ware volume m³/item",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "claim:8a1b894f465e44eea8058c97e3d616b45044a423824d67e8336bc941937e021d",
+        "claim:detail-source-v1:34ed77bab2b38e505c240c7b4fcaf930041daf74d1709fab15bad839ccc5ec88",
+        "claim:detail-source-v1:920ecf3e47f9dcd94897863ada6f0ffe18f710de5c941b0fef7a0cc8eab1a25d",
+        "claim:detail-source-v1:9f03360aa878de626b5c0cf36a3415b42afcf05ef26a1385913af5fa573085bb",
+        "claim:detail-source-v1:f7cf65a47261fae150b071da2e708d6161f556f3e95d4e5d481e706bd32129a0"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "cargo_capacity",
+      "query": "GetNumCargoTransportTypes / GetCargoTransportTypes; GetStorageData alternative",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetNumCargoTransportTypes / GetCargoTransportTypes; GetStorageData alternative",
+      "input_shape": "count(component,true); fill(StorageInfo[n],n,component,true,false)",
+      "output_shape": "documented: StorageInfo: const char* name/transport; uint32_t spaceused/capacity; ABI size requires ffi.sizeof. | observed: GetComponentData(component,cargo): keyed ware->item amount; occupied volume=sum(amount*GetWareData(ware,transport,volume)); GetStorageData capacity/stored; GetWareCapacity is per-ware items; reservations separate. | observed: GetNumCargoTransportTypes(component,true); GetCargoTransportTypes(buf,n,component,true,false); 0..returned_count-1; capacity/spaceused volume; transport tags split by vanilla helper. | documented: ReadText(1001,110): m³ storage display; ware volume m³/item by observed formula.",
+      "units": "m³",
+      "numeric_representation": "StorageInfo uint32 capacity/spaceused; alternative Lua numeric range unknown",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#residual-semantic-limits",
+        "claim:detail-source-v1:34ed77bab2b38e505c240c7b4fcaf930041daf74d1709fab15bad839ccc5ec88",
+        "claim:detail-source-v1:920ecf3e47f9dcd94897863ada6f0ffe18f710de5c941b0fef7a0cc8eab1a25d",
+        "claim:detail-source-v1:9f03360aa878de626b5c0cf36a3415b42afcf05ef26a1385913af5fa573085bb",
+        "claim:detail-source-v1:f7cf65a47261fae150b071da2e708d6161f556f3e95d4e5d481e706bd32129a0"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "cargo_occupied_volume",
+      "query": "GetCargoTransportTypes / GetStorageData / cargo amount * ware volume",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetCargoTransportTypes / GetStorageData / cargo amount * ware volume",
+      "input_shape": "StorageInfo count/fill as cargo_capacity; GetWareData(ware,transport,volume)",
+      "output_shape": "documented: StorageInfo: const char* name/transport; uint32_t spaceused/capacity; ABI size requires ffi.sizeof. | observed: GetComponentData(component,cargo): keyed ware->item amount; occupied volume=sum(amount*GetWareData(ware,transport,volume)); GetStorageData capacity/stored; GetWareCapacity is per-ware items; reservations separate. | observed: GetNumCargoTransportTypes(component,true); GetCargoTransportTypes(buf,n,component,true,false); 0..returned_count-1; capacity/spaceused volume; transport tags split by vanilla helper. | documented: ReadText(1001,110): m³ storage display; ware volume m³/item by observed formula.",
+      "units": "m³",
+      "numeric_representation": "StorageInfo uint32 spaceused; Lua sum/product precision and range unknown",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#residual-semantic-limits",
+        "claim:detail-source-v1:34ed77bab2b38e505c240c7b4fcaf930041daf74d1709fab15bad839ccc5ec88",
+        "claim:detail-source-v1:920ecf3e47f9dcd94897863ada6f0ffe18f710de5c941b0fef7a0cc8eab1a25d",
+        "claim:detail-source-v1:9f03360aa878de626b5c0cf36a3415b42afcf05ef26a1385913af5fa573085bb",
+        "claim:detail-source-v1:f7cf65a47261fae150b071da2e708d6161f556f3e95d4e5d481e706bd32129a0"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "crew_role_counts",
+      "query": "GetPeople2",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetPeople2",
+      "input_shape": "GetNumAllRoles(); GetPeople2(PeopleInfo[n],n,object,true); observed arriving selector; policy pending",
+      "output_shape": "documented: Static roles service(engineering75/morale25), marine(boarding90/morale10), thresholds0/25/80; passenger/prisoner/trainee_group/worker independent, unassigned; not live presence. | documented: RoleTierData: const char* name; int32_t skilllevel; uint32_t amount; ABI dependent, copy strings. | observed: Combined role raw skill normalization100, display_thirds=floor(raw*15/100), stars=thirds/3; individual skills value/3 uses separate0..15 display scale; runtime bounds unknown; highest matching raw lower threshold. | documented: PeopleInfo: const char* id/name/desc; uint32_t amount/numtiers; bool canhire; ABI dependent, no packed layout, copy strings. | observed: GetRoleTiers(buf,numtiers,object,role_id), 0..returned_count-1; amount people, skilllevel raw lower threshold; hidden zero fallback is not all-person zero skill; NPCSeed=uint64, no individual expansion required. | observed: GetNumAllRoles(); GetPeople2(buf,n,object,true); preserve each role id/amount/numtiers/canhire; sum canhire only is UI hireable total, not all-person total; includes arriving.",
+      "units": "people",
+      "numeric_representation": "uint32 amount/numtiers; ABI dependent ffi.sizeof, copied strings",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "claim:cd9b2054cc136ba9b95f571ad3df17fd84fdcbd53aca0dec4d30e41dc8ee2e22",
+        "claim:detail-source-v1:29063bf0d5e462491e45b102657a5786e208cdb7414a5a671f6f48fb33c9ed3f",
+        "claim:detail-source-v1:34a6219f765ba6c2549444d66383511e3137b0dd8437fdb1e7c8b732f0a75095",
+        "claim:detail-source-v1:6c3be027aeda9410a207b82392dfa9e83717906de54dd50b0881a446c34e0ed5",
+        "claim:detail-source-v1:792329a80316b62e154370593b9c29b15563508c34ab48845bf2c8a207640e3e",
+        "claim:detail-source-v1:c2de7f1e55941337727a599a52824362bfaf2dcb0c3ed4f090afe81ae2b73ac2",
+        "claim:detail-source-v1:e54c2d6a543e14324b9947999440b48848981ce95d5be4da99871df7f2c8f379"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "crew_capacity",
+      "query": "GetPeopleCapacity",
+      "source_snapshot": "x4-9.00-steam-23660954",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "documented_route_pending_normalization",
+      "getter": "GetPeopleCapacity",
+      "input_shape": "UniverseID, const char* macro name, bool includepilot; observed empty macro name; pilot selection pending",
+      "output_shape": "uint32_t capacity; applicability pending",
+      "units": "people; pilot policy pending",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "route only; no atomicity or complete-set guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "source or envelope unresolved",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "crew_qualification",
+      "query": "GetPeople2 numtiers / GetRoleTiers",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetRoleTiers",
+      "input_shape": "RoleTierData[numtiers],numtiers,object,role_id",
+      "output_shape": "documented: Static roles service(engineering75/morale25), marine(boarding90/morale10), thresholds0/25/80; passenger/prisoner/trainee_group/worker independent, unassigned; not live presence. | documented: RoleTierData: const char* name; int32_t skilllevel; uint32_t amount; ABI dependent, copy strings. | observed: Combined role raw skill normalization100, display_thirds=floor(raw*15/100), stars=thirds/3; individual skills value/3 uses separate0..15 display scale; runtime bounds unknown; highest matching raw lower threshold. | documented: PeopleInfo: const char* id/name/desc; uint32_t amount/numtiers; bool canhire; ABI dependent, no packed layout, copy strings. | observed: GetRoleTiers(buf,numtiers,object,role_id), 0..returned_count-1; amount people, skilllevel raw lower threshold; hidden zero fallback is not all-person zero skill; NPCSeed=uint64, no individual expansion required. | observed: GetNumAllRoles(); GetPeople2(buf,n,object,true); preserve each role id/amount/numtiers/canhire; sum canhire only is UI hireable total, not all-person total; includes arriving.",
+      "units": "raw combined skill normalization100; display thirds/stars distinct",
+      "numeric_representation": "int32 threshold, uint32 amount; raw runtime bounds unknown",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "claim:cd9b2054cc136ba9b95f571ad3df17fd84fdcbd53aca0dec4d30e41dc8ee2e22",
+        "claim:detail-source-v1:29063bf0d5e462491e45b102657a5786e208cdb7414a5a671f6f48fb33c9ed3f",
+        "claim:detail-source-v1:34a6219f765ba6c2549444d66383511e3137b0dd8437fdb1e7c8b732f0a75095",
+        "claim:detail-source-v1:6c3be027aeda9410a207b82392dfa9e83717906de54dd50b0881a446c34e0ed5",
+        "claim:detail-source-v1:792329a80316b62e154370593b9c29b15563508c34ab48845bf2c8a207640e3e",
+        "claim:detail-source-v1:c2de7f1e55941337727a599a52824362bfaf2dcb0c3ed4f090afe81ae2b73ac2",
+        "claim:detail-source-v1:e54c2d6a543e14324b9947999440b48848981ce95d5be4da99871df7f2c8f379"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "installed_engines",
+      "query": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "input_shape": "GetNumUpgradeSlots(object,empty_macro,type); component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); slots1..N; per-type applicability pending",
+      "output_shape": "documented: GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32. | inferred: thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained. | observed: Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded. | documented: SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+      "units": "component/macro IDs; applicability pending",
+      "numeric_representation": "UniverseID uint64 decimal, no Lua-number roundtrip; size_t count/index target ABI dependent",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics",
+        "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+        "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+        "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+        "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "installed_shields",
+      "query": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "input_shape": "GetNumUpgradeSlots(object,empty_macro,type); component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); slots1..N; per-type applicability pending",
+      "output_shape": "documented: GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32. | inferred: thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained. | observed: Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded. | documented: SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+      "units": "component/macro IDs; applicability pending",
+      "numeric_representation": "UniverseID uint64 decimal, no Lua-number roundtrip; size_t count/index target ABI dependent",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics",
+        "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+        "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+        "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+        "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "installed_weapons",
+      "query": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "input_shape": "GetNumUpgradeSlots(object,empty_macro,type); component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); slots1..N; per-type applicability pending",
+      "output_shape": "documented: GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32. | inferred: thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained. | observed: Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded. | documented: SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+      "units": "component/macro IDs; applicability pending",
+      "numeric_representation": "UniverseID uint64 decimal, no Lua-number roundtrip; size_t count/index target ABI dependent",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics",
+        "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+        "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+        "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+        "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "installed_turrets",
+      "query": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "input_shape": "GetNumUpgradeSlots(object,empty_macro,type); component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); slots1..N; per-type applicability pending",
+      "output_shape": "documented: GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32. | inferred: thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained. | observed: Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded. | documented: SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+      "units": "component/macro IDs; applicability pending",
+      "numeric_representation": "UniverseID uint64 decimal, no Lua-number roundtrip; size_t count/index target ABI dependent",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics",
+        "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+        "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+        "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+        "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "installed_software",
+      "query": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetNumSoftwareSlots / GetSoftwareSlots",
+      "input_shape": "count(object,empty_macro); fill(SoftwareSlot[n],n,object,empty_macro)",
+      "output_shape": "documented: GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32. | inferred: thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained. | observed: Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded. | documented: SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+      "units": "component/macro IDs; applicability pending",
+      "numeric_representation": "uint32 count/fill; copied string pointers",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics",
+        "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+        "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+        "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+        "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "installed_virtual_thruster",
+      "query": "GetUpgradeSlotCurrentComponent / current upgrade slots",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetNumVirtualUpgradeSlots / GetVirtualUpgradeSlotCurrentMacro",
+      "input_shape": "count(object,empty_macro,type); macro(object,type,j), slots1..N; thruster inference retained",
+      "output_shape": "documented: GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32. | inferred: thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained. | observed: Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded. | documented: SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+      "units": "component/macro IDs; applicability pending",
+      "numeric_representation": "size_t count/index; target ABI preflight pending",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#established-x4-semantics",
+        "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+        "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+        "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+        "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "missiles",
+      "query": "GetNumMissileCargo / GetMissileCargo",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetNumMissileCargo / GetMissileCargo",
+      "input_shape": "count(object); fill(UIWareInfo[n],n,object)",
+      "output_shape": "documented: AmmoData: const char* macro/ware; uint32_t amount/capacity; ABI dependent. | documented: GetMissileCargo(UIWareInfo*,uint32_t,UniverseID) and GetUnitCargo(UIWareInfo*,uint32_t,UniverseID,bool) return uint32_t; signed amount preserved; semantics/completeness not proven. | documented: UIWareInfo: const char* ware/macro; int amount; ABI dependent, copy strings. | inferred: Cargo getter quantities in items inferred from related resource/AmmoData paths; direct getter call sites, signed range/negative values and installed-inventory completeness remain unknown. | observed: Installed AmmoData amount items; missile storage usage amount*ware volume; other ammo classes default volume1 in this UI; capacities not universally item counts.",
+      "units": "items inferred from related paths; direct getter semantics unknown",
+      "numeric_representation": "signed int amount; ABI width/range, negatives and completeness unknown",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "claim:7a38cb13b338e456e10ec22ce22983ba47fa92e83e6114c2be5593652f2ade46",
+        "claim:detail-source-v1:0dccf968211434a3e1b834d5a0344a0b141c9c938bccb991a45e486d228246bd",
+        "claim:detail-source-v1:4767e30fbe0fe8e096a1347947052b4a6a852f92a609f3d7215322f6d78a26c9",
+        "claim:detail-source-v1:571c37bacffb68e851c8847d0b82dd070784766abf595ed0c2598d027e18cc78",
+        "claim:detail-source-v1:c2c9b17e563462e0f4033a31f664900b450b279d715502be75d599cd8dd11c29",
+        "claim:detail-source-v1:eac69e66d41197836b5e917a8cd3be168cfe93bdff77e133725eb2cec777e856"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "all_drone_unit_classes",
+      "query": "GetNumAllUnits / GetAllUnits",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetNumAllUnits / GetAllUnits",
+      "input_shape": "count(object,false); fill(UnitData[n],n,object,false)",
+      "output_shape": "documented: UnitData: const char* macro/category; uint32_t amount; ABI dependent, copy strings. | observed: GetAllUnits(buf,n,object,false); indices0..returned_count-1; macro/category, amount items; preserve raw unfiltered categories separately from downstream drone UI exclusions.",
+      "units": "items",
+      "numeric_representation": "uint32 amount; preserve all macro/category strings, target ffi.sizeof required",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "claim:6c731522eab2da57652fe268e087efd805fc2a100c0d8981848e9d10a6b8b345",
+        "claim:detail-source-v1:581e078b5f3537191ced85d782313d3b62f07ea1d919bc05e180a0d12aab9732",
+        "claim:detail-source-v1:a186964a528b601a4c43b6f259939fed361139a291c81bedd14f509370e9ec47"
+      ],
+      "evidence_ids": [],
+      "value": null
+    },
+    {
+      "id": "faction_origin",
+      "query": "GetFactionData / reviewed vanilla-DLC definitions",
+      "source_snapshot": "x4-9.00-steam-23660954-ship-detail-source-v1",
+      "runtime_snapshot": "x4-probe-faction-ship-runtime-686318dd-v1",
+      "claim_kind": "mixed_source_claims_runtime_pending",
+      "getter": "GetFactionData / reviewed vanilla-DLC definitions",
+      "input_shape": "discovered faction ID; no authoritative disposition getter established",
+      "output_shape": "inferred: Service/mission classifications from specific first-party usage, not universal boolean fields: civilian/criminal/smuggler mission substitutions, outlaw patrol exclusion, ownerless fallback, holyorderfanatic missioncue-owned fleets not faction expiry; visitor tag declared, lifetime unknown. No-economic/fixed-relations/no-diplomat cannot exclude XEN/KHK. | documented: Base plus all seven installed Egosoft DLC layers; preserve patch/context duplicates. DLC additions boron,loanshark,scavenger,court,fallensplit,freesplit,split,pioneers,terran,yaki,kaori; DLC modification to vanilla id does not change origin. No campaign independence/lifecycle or mod-added coverage; no universal origin/service/temporary selector. | observed: Selected metadata name/policefaction/isrelationlocked does not establish origin/service/mission; universal temporary lifetime and campaign-specific scenario/story availability unknown.",
+      "units": "taxonomy",
+      "numeric_representation": "unknown unless explicitly stated in output_shape; no rounding",
+      "applicability_evidence": "pending",
+      "observation_outcome": "pending",
+      "capture_interval": {
+        "core": null,
+        "detail": null
+      },
+      "source_strength": "Per-claim schema/source/inference distinctions in source_enrichment; partial coverage; no new runtime or atomicity guarantee",
+      "faction_origin_evidence": "Declared source inventory; service/mission inferred; visitor lifetime and campaign availability unknown; per discovered ID disposition pending",
+      "stop_reason": "bounded capture readiness, ABI preflight, applicability and owner limits pending",
+      "provenance_ids": [
+        "05.5-RESEARCH#residual-semantic-limits",
+        "claim:detail-source-v1:332c3d984531f2fb25206ec8c6d2e9edc1776c0b30284cbae030ec51fc1cf0c5",
+        "claim:detail-source-v1:6a150b768b1e34bedc48fbc40abd60c791fb360e5e62965691bfe185aa4dbed9",
+        "claim:detail-source-v1:ffa07a7af100b02336483495c665f01823fca92bd3455ea7ca8c77c8142443ae"
+      ],
+      "evidence_ids": [],
+      "value": null
+    }
+  ],
+  "source_enrichment": [
+    {
+      "claims": [
+        {
+          "id": "claim:detail-source-v1:34ed77bab2b38e505c240c7b4fcaf930041daf74d1709fab15bad839ccc5ec88",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "StorageInfo: const char* name/transport; uint32_t spaceused/capacity; ABI size requires ffi.sizeof.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:920ecf3e47f9dcd94897863ada6f0ffe18f710de5c941b0fef7a0cc8eab1a25d",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "GetComponentData(component,cargo): keyed ware->item amount; occupied volume=sum(amount*GetWareData(ware,transport,volume)); GetStorageData capacity/stored; GetWareCapacity is per-ware items; reservations separate.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:9f03360aa878de626b5c0cf36a3415b42afcf05ef26a1385913af5fa573085bb",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "GetNumCargoTransportTypes(component,true); GetCargoTransportTypes(buf,n,component,true,false); 0..returned_count-1; capacity/spaceused volume; transport tags split by vanilla helper.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:f7cf65a47261fae150b071da2e708d6161f556f3e95d4e5d481e706bd32129a0",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "ReadText(1001,110): m³ storage display; ware volume m³/item by observed formula.",
+          "coverage": "complete"
+        }
+      ],
+      "coverage": "partial",
+      "entity": "GetComponentData.cargo",
+      "query": "GetComponentData cargo capacity occupied volume",
+      "conflicts": [],
+      "next_cursor": null,
+      "inspect_pages": 3,
+      "search_limit": 5,
+      "entity_id": "entity:3e392d0bcc2568481e08343f00b04495e84fa5060917ad89f44638eeadf79e6b"
+    },
+    {
+      "claims": [
+        {
+          "id": "claim:detail-source-v1:29063bf0d5e462491e45b102657a5786e208cdb7414a5a671f6f48fb33c9ed3f",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "Static roles service(engineering75/morale25), marine(boarding90/morale10), thresholds0/25/80; passenger/prisoner/trainee_group/worker independent, unassigned; not live presence.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:34a6219f765ba6c2549444d66383511e3137b0dd8437fdb1e7c8b732f0a75095",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "RoleTierData: const char* name; int32_t skilllevel; uint32_t amount; ABI dependent, copy strings.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:6c3be027aeda9410a207b82392dfa9e83717906de54dd50b0881a446c34e0ed5",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "Combined role raw skill normalization100, display_thirds=floor(raw*15/100), stars=thirds/3; individual skills value/3 uses separate0..15 display scale; runtime bounds unknown; highest matching raw lower threshold.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:792329a80316b62e154370593b9c29b15563508c34ab48845bf2c8a207640e3e",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "PeopleInfo: const char* id/name/desc; uint32_t amount/numtiers; bool canhire; ABI dependent, no packed layout, copy strings.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:c2de7f1e55941337727a599a52824362bfaf2dcb0c3ed4f090afe81ae2b73ac2",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "GetRoleTiers(buf,numtiers,object,role_id), 0..returned_count-1; amount people, skilllevel raw lower threshold; hidden zero fallback is not all-person zero skill; NPCSeed=uint64, no individual expansion required.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:e54c2d6a543e14324b9947999440b48848981ce95d5be4da99871df7f2c8f379",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "GetNumAllRoles(); GetPeople2(buf,n,object,true); preserve each role id/amount/numtiers/canhire; sum canhire only is UI hireable total, not all-person total; includes arriving.",
+          "coverage": "partial"
+        }
+      ],
+      "coverage": "partial",
+      "entity": "PeopleInfo",
+      "query": "PeopleInfo",
+      "conflicts": [],
+      "next_cursor": null,
+      "inspect_pages": 5,
+      "search_limit": 5,
+      "entity_id": "entity:b3f4f5040ff2b403f8ef692f1237403f35c40d4ee4f2390e399a62f06d1c32f1"
+    },
+    {
+      "claims": [
+        {
+          "id": "claim:detail-source-v1:187ba4efb292a79be66677a159dc31ea9ef943810a2f0c1c265c09cc3facb045",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "GetNumUpgradeSlots/GetNumVirtualUpgradeSlots return size_t; GetUpgradeSlotCurrentComponent returns UniverseID; current macro/group and virtual macro getters; software count/fill uint32.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:2c714ad6e8a35eb0cf585d683714a6b9bac55204226b3ca14b67653a96a129e2",
+          "authority_class": "inference",
+          "epistemic_class": "inferred",
+          "conclusion": "thruster selector/thrustertypes library; virtual macro template representation; physical component not guaranteed; inference retained.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:786a3a8466c6a1dfa3a6b886c113b11c414e2ca520f61506d65cabe2aed11d16",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "Physical count(object,empty_macro,type), slots1..N; component(object,type,j), macro(object,0,type,j), group(object,empty_macro,type,j); component0 omitted but macro-only pseudogroups possible. Virtual count(object,empty_macro,type), macro(object,type,j), slots1..N, no component getter. Software count/fill(object,empty_macro), current/max, indices0..returned_count-1. GetLoadout2 templates excluded.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:b60a6b4a18acf41f8df0af41a06fef0ee60c38d4f5a900bbff70f40355699901",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "SoftwareSlot: const char* max/current; ABI dependent, copy strings.",
+          "coverage": "complete"
+        }
+      ],
+      "coverage": "partial",
+      "entity": "GetUpgradeSlotCurrentComponent.installed",
+      "query": "GetUpgradeSlotCurrentComponent",
+      "conflicts": [],
+      "next_cursor": null,
+      "inspect_pages": 4,
+      "search_limit": 5,
+      "entity_id": "entity:22ee7d20f5282bb08c58dcf06ee1a89cfaf90780b5ef06aa2235430c484808e8"
+    },
+    {
+      "claims": [
+        {
+          "id": "claim:detail-source-v1:0dccf968211434a3e1b834d5a0344a0b141c9c938bccb991a45e486d228246bd",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "AmmoData: const char* macro/ware; uint32_t amount/capacity; ABI dependent.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:4767e30fbe0fe8e096a1347947052b4a6a852f92a609f3d7215322f6d78a26c9",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "GetMissileCargo(UIWareInfo*,uint32_t,UniverseID) and GetUnitCargo(UIWareInfo*,uint32_t,UniverseID,bool) return uint32_t; signed amount preserved; semantics/completeness not proven.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:571c37bacffb68e851c8847d0b82dd070784766abf595ed0c2598d027e18cc78",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "UIWareInfo: const char* ware/macro; int amount; ABI dependent, copy strings.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:c2c9b17e563462e0f4033a31f664900b450b279d715502be75d599cd8dd11c29",
+          "authority_class": "inference",
+          "epistemic_class": "inferred",
+          "conclusion": "Cargo getter quantities in items inferred from related resource/AmmoData paths; direct getter call sites, signed range/negative values and installed-inventory completeness remain unknown.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:eac69e66d41197836b5e917a8cd3be168cfe93bdff77e133725eb2cec777e856",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "Installed AmmoData amount items; missile storage usage amount*ware volume; other ammo classes default volume1 in this UI; capacities not universally item counts.",
+          "coverage": "partial"
+        }
+      ],
+      "coverage": "partial",
+      "entity": "UIWareInfo",
+      "query": "UIWareInfo",
+      "conflicts": [],
+      "next_cursor": null,
+      "inspect_pages": 3,
+      "search_limit": 5,
+      "entity_id": "entity:f51159a146a176a4dc304981a87e738d507b728ed5d5e346c5b1bd28a4a571c1"
+    },
+    {
+      "claims": [
+        {
+          "id": "claim:detail-source-v1:581e078b5f3537191ced85d782313d3b62f07ea1d919bc05e180a0d12aab9732",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "UnitData: const char* macro/category; uint32_t amount; ABI dependent, copy strings.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:a186964a528b601a4c43b6f259939fed361139a291c81bedd14f509370e9ec47",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "GetAllUnits(buf,n,object,false); indices0..returned_count-1; macro/category, amount items; preserve raw unfiltered categories separately from downstream drone UI exclusions.",
+          "coverage": "partial"
+        }
+      ],
+      "coverage": "partial",
+      "entity": "UnitData",
+      "query": "UnitData",
+      "conflicts": [],
+      "next_cursor": null,
+      "inspect_pages": 1,
+      "search_limit": 5,
+      "entity_id": "entity:0c6a494435ed2a6ad472e9a5c85656b29ad66e14659b702faaad8c123f56f7fb"
+    },
+    {
+      "claims": [
+        {
+          "id": "claim:detail-source-v1:332c3d984531f2fb25206ec8c6d2e9edc1776c0b30284cbae030ec51fc1cf0c5",
+          "authority_class": "inference",
+          "epistemic_class": "inferred",
+          "conclusion": "Service/mission classifications from specific first-party usage, not universal boolean fields: civilian/criminal/smuggler mission substitutions, outlaw patrol exclusion, ownerless fallback, holyorderfanatic missioncue-owned fleets not faction expiry; visitor tag declared, lifetime unknown. No-economic/fixed-relations/no-diplomat cannot exclude XEN/KHK.",
+          "coverage": "partial"
+        },
+        {
+          "id": "claim:detail-source-v1:6a150b768b1e34bedc48fbc40abd60c791fb360e5e62965691bfe185aa4dbed9",
+          "authority_class": "declared_schema",
+          "epistemic_class": "documented",
+          "conclusion": "Base plus all seven installed Egosoft DLC layers; preserve patch/context duplicates. DLC additions boron,loanshark,scavenger,court,fallensplit,freesplit,split,pioneers,terran,yaki,kaori; DLC modification to vanilla id does not change origin. No campaign independence/lifecycle or mod-added coverage; no universal origin/service/temporary selector.",
+          "coverage": "complete"
+        },
+        {
+          "id": "claim:detail-source-v1:ffa07a7af100b02336483495c665f01823fca92bd3455ea7ca8c77c8142443ae",
+          "authority_class": "observed_source",
+          "epistemic_class": "observed",
+          "conclusion": "Selected metadata name/policefaction/isrelationlocked does not establish origin/service/mission; universal temporary lifetime and campaign-specific scenario/story availability unknown.",
+          "coverage": "partial"
+        }
+      ],
+      "coverage": "partial",
+      "entity": "GetFactionData.origin",
+      "query": "GetFactionData faction origin vanilla DLC service temporary",
+      "conflicts": [],
+      "next_cursor": null,
+      "inspect_pages": 12,
+      "search_limit": 5,
+      "entity_id": "entity:06629263343287d35253c5fa2652c1c09a8cebff248d727650a5ec9a8d207cd0"
+    }
+  ],
+  "capture_readiness": {
+    "reason": "Source and collector support census/core only; bounded detail capture invocation and sink unverified",
+    "native_latency": "unknown",
+    "stalled_call_interruptible": false,
+    "status": "blocked",
+    "checked_revision": "79081b3e15389fddab0dbbb1c0aee88708a4d0d5"
+  }
+}

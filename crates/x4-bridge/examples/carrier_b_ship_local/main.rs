@@ -15,8 +15,8 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).map(PathBuf::from).collect();
-    let [root, host, script, data] = args.as_slice() else {
-        return Err("expected root host script data".into());
+    let [root, host, script, data, scenario] = args.as_slice() else {
+        return Err("expected root host script data scenario".into());
     };
     let database = data.join("observations.sqlite3");
     let mut receiver = session(&database)?;
@@ -26,6 +26,9 @@ fn main() -> Result<()> {
     first.finish()?;
     drop(receiver);
     readback::verify(&database, &[1, 2], &completion1.1)?;
+    if scenario == Path::new("heavy-ship-detail") {
+        readback::verify_cargo(&database)?;
+    }
     let mut receiver = session(&database)?;
     if receiver
         .next_revision(&key)

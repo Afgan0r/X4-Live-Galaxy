@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -File tests/heavy-ship-evidence.ps1 -SelfTest",
+  "targetTest": "preparation_allows_pending_runtime",
+  "targetFile": "tests/heavy-ship-evidence.ps1",
+  "expected": "Source-valid preparation accepts pending runtime without runtime acceptance",
+  "actual": "Preparation returns EVIDENCE_BLOCKED: pending_implementation",
+  "output": "not ok 1 - preparation_allows_pending_runtime\n# assertion failed: preparation must accept source-valid pending runtime; actual EVIDENCE_BLOCKED: pending_implementation\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
+  "exitCode": 1
+}

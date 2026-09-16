@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -File tests/carrier-b-local.ps1 -SelfTest -Scenario heavy-ship-detail",
+  "targetTest": "actual_chain_cargo_has_independent_durable_readback",
+  "targetFile": "crates/x4-bridge/examples/carrier_b_ship_local/readback.rs",
+  "expected": "Cargo passes real owned DLL/pipe/receiver and independent reopened durable readback",
+  "actual": "Core revisions1/2 reopen, but cargo revision is missing",
+  "output": "not ok 1 - actual_chain_cargo_has_independent_durable_readback\nassertion failed: missing cargo revision after actual DLL/pipe core publication\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
+  "exitCode": 1
+}
