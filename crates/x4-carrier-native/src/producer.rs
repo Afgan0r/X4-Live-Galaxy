@@ -35,6 +35,7 @@ pub struct Producer {
     pub(super) next_batch_index: usize,
     pub(super) pending: Option<Pending>,
     pub(super) connection_generation: u64,
+    pub(super) reconciliation: Option<crate::producer_recovery::CompletionOutcome>,
 }
 
 impl Producer {
@@ -62,6 +63,7 @@ impl Producer {
             next_batch_index: 0,
             pending: Some(Pending::new(bytes, "bootstrap", now_millis)),
             connection_generation: 0,
+            reconciliation: None,
         })
     }
 
@@ -130,11 +132,16 @@ impl Producer {
     }
 
     pub fn reset(&mut self, source: ProducerSource, now_millis: u64) -> Result<(), ProducerError> {
-        *self = Self::new(self.limits, source, now_millis)?;
+        let mut replacement = Self::new(self.limits, source, now_millis)?;
+        self.remember_completion();
+        replacement.reconciliation = self.reconciliation.take();
+        replacement.revision = self.revision;
+        *self = replacement;
         Ok(())
     }
 
     pub(super) fn discard_incomplete(&mut self) {
+        self.remember_completion();
         self.evidence = None;
         self.expected_records = 0;
         self.records.clear();

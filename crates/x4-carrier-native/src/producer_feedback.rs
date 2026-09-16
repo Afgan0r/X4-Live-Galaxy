@@ -123,6 +123,7 @@ impl Producer {
             _ => return Err(ProducerError::InvalidTransition),
         }
         self.discard_incomplete();
+        self.reconciliation = None;
         self.revision = self
             .revision
             .checked_add(1)

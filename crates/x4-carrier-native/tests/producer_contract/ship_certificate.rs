@@ -10,6 +10,10 @@ use observation_ingest::{
 use x4_carrier_native::{Producer, ProducerError, ProducerLimits, SectionEvidence};
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "ordered streaming trace keeps independent certificate assertions beside each handoff"
+)]
 fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
     let source = support::source(7);
     let limits = ProducerLimits {
@@ -98,5 +102,62 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
     assert!(
         done.raw_bytes > limits.max_raw_bytes,
         "builder bound is independent of total certificate bytes"
+    );
+}
+
+#[test]
+fn builder_and_encoded_message_bounds_reject_without_splitting_records() {
+    let (mut producer, source) = super::ship_support::ready_ship(0);
+    producer
+        .begin_ship_section(
+            SectionEvidence::point_measurement("x4:faction:argon:ships"),
+            4,
+        )
+        .unwrap();
+    for _ in 0..3 {
+        producer.push_ship_core(&ship("9007199254740993")).unwrap();
+    }
+    assert_eq!(
+        producer.push_ship_core(&ship("9007199254740995")),
+        Err(ProducerError::DataLimit)
+    );
+    assert_eq!(producer.pending_bytes(), None);
+    producer.fail_section();
+    let limits = ProducerLimits {
+        max_records: 4,
+        max_batches: 4,
+        max_raw_bytes: 512,
+        data_message_bytes: 64,
+        ..ProducerLimits::bring_up()
+    };
+    let mut bounded = Producer::new(limits, source.clone(), 0).unwrap();
+    bounded.mark_local_handoff(0).unwrap();
+    for body in [
+        support::handshake(),
+        ControlBody::CollectionIntent(CollectionIntentBody {
+            section_key: "ship_core".to_owned(),
+            next_revision: 1,
+            max_records: 4,
+            max_raw_bytes: 512,
+            max_work: 4,
+        }),
+        ControlBody::Demand(DemandBody { credit: 1 }),
+    ] {
+        bounded
+            .apply_control(&support::control(&source, body), 0)
+            .unwrap();
+    }
+    bounded
+        .begin_ship_section(
+            SectionEvidence::point_measurement("x4:faction:argon:ships"),
+            1,
+        )
+        .unwrap();
+    bounded.push_ship_core(&ship("9007199254740993")).unwrap();
+    assert_eq!(bounded.progress(1, 0), Err(ProducerError::DataLimit));
+    assert_eq!(
+        bounded.pending_bytes(),
+        None,
+        "an oversize envelope never publishes a prefix"
     );
 }

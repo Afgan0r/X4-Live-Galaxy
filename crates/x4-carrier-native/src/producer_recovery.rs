@@ -1,12 +1,39 @@
 use crate::producer::{Pending, Readiness, bootstrap_bytes};
 use crate::{Producer, ProducerError, ProducerOutcome, ProducerState};
 
+/// The only retained authority after source discard: no source records or wire bytes.
+pub(super) struct CompletionOutcome {
+    id: String,
+    digest: String,
+    revision: u64,
+}
+
 impl Producer {
+    pub(super) fn remember_completion(&mut self) {
+        if self.profile != crate::producer_types::ProducerProfile::ShipCore {
+            return;
+        }
+        if let Some(pending) = self.pending.as_ref().filter(|pending| {
+            pending.handed_off
+                && pending.id == format!("message:complete:ship_core:{}", self.revision)
+        }) {
+            self.reconciliation = Some(CompletionOutcome {
+                id: pending.id.clone(),
+                digest: digest(&pending.bytes),
+                revision: self.revision,
+            });
+        }
+    }
+
     pub fn reconcile_committed(
         &mut self,
         message_id: &str,
         message_digest: &str,
     ) -> Result<ProducerOutcome, ProducerError> {
+        self.remember_completion();
+        if self.reconciliation.is_some() {
+            return self.reconcile_discarded(message_id, message_digest);
+        }
         let pending = self
             .pending
             .as_ref()
@@ -28,6 +55,36 @@ impl Producer {
             .ok_or(ProducerError::InvalidTransition)?;
         self.state = ProducerState::Ready;
         self.readiness = Readiness::Intent;
+        Ok(ProducerOutcome::Committed)
+    }
+
+    fn reconcile_discarded(
+        &mut self,
+        id: &str,
+        digest: &str,
+    ) -> Result<ProducerOutcome, ProducerError> {
+        let outcome = self
+            .reconciliation
+            .as_ref()
+            .ok_or(ProducerError::InvalidTransition)?;
+        if outcome.id != id || outcome.digest != digest {
+            return Err(ProducerError::InvalidInput);
+        }
+        let floor = outcome
+            .revision
+            .checked_add(1)
+            .ok_or(ProducerError::InvalidTransition)?;
+        if matches!(
+            self.state,
+            ProducerState::PendingCompletion | ProducerState::PausedAfterFailure
+        ) && self.pending.is_some()
+        {
+            self.discard_incomplete();
+            self.state = ProducerState::Ready;
+            self.readiness = Readiness::Intent;
+        }
+        self.revision = self.revision.max(floor);
+        self.reconciliation = None;
         Ok(ProducerOutcome::Committed)
     }
 

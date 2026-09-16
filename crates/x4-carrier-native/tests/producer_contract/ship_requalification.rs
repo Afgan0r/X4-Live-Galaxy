@@ -5,6 +5,10 @@ use x4_carrier_native::{ProducerError, ProducerOutcome, ProducerState, SectionEv
 use super::{ship_support::*, support};
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "recovery trace keeps discard, reconciliation and new baseline assertions in causal order"
+)]
 fn discarded_completion_reconciles_without_replaying_capture_or_skipping_handshake() {
     for boundary in [
         SourceBoundary::GameLoaded,
@@ -27,6 +31,13 @@ fn discarded_completion_reconciles_without_replaying_capture_or_skipping_handsha
         source.source_epoch_status = SourceEpochStatus::BoundaryUncertain;
         producer.reset(source.clone(), 21).unwrap();
         let bootstrap = producer.pending_bytes().unwrap().to_vec();
+        let mut stale = source.clone();
+        stale.transport_epoch -= 1;
+        assert_eq!(
+            producer.apply_control(&disposition(&stale, &bytes, "committed"), 21),
+            Err(ProducerError::StaleEpoch)
+        );
+        assert_eq!(producer.pending_bytes(), Some(bootstrap.as_slice()));
         assert_eq!(
             producer.reconcile_committed(id, &digest),
             Ok(ProducerOutcome::Committed),
