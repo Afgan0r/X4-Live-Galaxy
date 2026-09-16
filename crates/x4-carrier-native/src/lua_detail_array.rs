@@ -8,12 +8,23 @@ pub unsafe fn read<T>(
     state: *mut c_void,
     key: &str,
     limit: usize,
+    row: impl FnMut(i32) -> Option<T>,
+) -> Option<Vec<T>> {
+    unsafe { read_at(api, state, 2, key, limit, row) }
+}
+
+pub unsafe fn read_at<T>(
+    api: LuaApi,
+    state: *mut c_void,
+    index: i32,
+    key: &str,
+    limit: usize,
     mut row: impl FnMut(i32) -> Option<T>,
 ) -> Option<Vec<T>> {
     let top = unsafe { (api.get_top)(state) };
     unsafe {
         (api.push_string)(state, key.as_ptr().cast(), key.len());
-        (api.raw_get)(state, 2);
+        (api.raw_get)(state, index);
     }
     let result = unsafe { read_table(api, state, top + 1, limit, &mut row) };
     unsafe { (api.set_top)(state, top) };

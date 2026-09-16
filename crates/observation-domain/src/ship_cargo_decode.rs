@@ -1,36 +1,8 @@
+use crate::ship_detail_codec::{dependency, field};
 use crate::{
-    CaptureWindow, CargoObservation, CargoStorage, CargoWare, ObservationPolicyVersion,
-    SectionRevisionId, ShipDetailDependency, ShipDetailError, ShipIdentity, ShipOwner,
-    SourceEvidenceRef, detail_number, detail_outcome,
+    CargoObservation, CargoStorage, CargoWare, ShipDetailError, detail_number, detail_outcome,
 };
 
-fn field<'a>(lines: &mut std::str::Lines<'a>, prefix: &str) -> Result<&'a str, ShipDetailError> {
-    lines
-        .next()
-        .and_then(|v| v.strip_prefix(prefix))
-        .ok_or(ShipDetailError::InvalidField)
-}
-fn dependency(lines: &mut std::str::Lines<'_>) -> Result<ShipDetailDependency, ShipDetailError> {
-    Ok(ShipDetailDependency {
-        identity: ShipIdentity::new(field(lines, "identity=")?)
-            .map_err(|_| ShipDetailError::InvalidField)?,
-        owner: ShipOwner::new(field(lines, "owner=")?)
-            .map_err(|_| ShipDetailError::InvalidField)?,
-        core_revision: SectionRevisionId::new(detail_number(field(lines, "core_revision=")?)?)
-            .ok_or(ShipDetailError::InvalidNumber)?,
-        member_revision: SectionRevisionId::new(detail_number(field(lines, "member_revision=")?)?)
-            .ok_or(ShipDetailError::InvalidNumber)?,
-        policy: ObservationPolicyVersion::new(detail_number(field(lines, "policy=")?)?)
-            .ok_or(ShipDetailError::InvalidNumber)?,
-        capture: CaptureWindow::new(
-            detail_number(field(lines, "capture_start=")?)?,
-            detail_number(field(lines, "capture_end=")?)?,
-        )
-        .ok_or(ShipDetailError::InvalidNumber)?,
-        source: SourceEvidenceRef::new(field(lines, "source=")?)
-            .ok_or(ShipDetailError::InvalidField)?,
-    })
-}
 fn rows(
     lines: std::str::Lines<'_>,
     maximum: usize,

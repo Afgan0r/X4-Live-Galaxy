@@ -12,7 +12,10 @@ mod session;
 mod ship_cargo;
 mod ship_cargo_decode;
 mod ship_core;
+mod ship_crew;
+mod ship_crew_decode;
 mod ship_detail;
+mod ship_detail_codec;
 mod ship_field;
 mod ship_group;
 
@@ -45,6 +48,7 @@ pub use ship_cargo::{CargoObservation, CargoStorage, CargoWare};
 pub use ship_core::{
     ShipClass, ShipCoreError, ShipCoreRecord, ShipIdentity, ShipLocation, ShipOwner, ShipType,
 };
+pub use ship_crew::{CrewObservation, CrewRole, CrewTier};
 pub use ship_detail::{
     ShipDetailDependency, ShipDetailError, detail_number, detail_outcome, detail_token,
 };
