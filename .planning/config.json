@@ -83,7 +83,8 @@
     "security_block_on": "high",
     "tdd_mode": true,
     "use_worktrees": true,
-    "context_coverage_gate": true
+    "context_coverage_gate": true,
+    "_auto_chain_active": false
   },
   "ship": {
     "pr_body_sections": []
