@@ -26,6 +26,10 @@ loads only the relevant evidence and shared Docs MCP contract.
 - A missing value is not an empty value unless the source contract proves it.
 - Trace which system owns a value, event, command, or patch before proposing an
   integration seam.
+- Runtime outcome claims prove the recorded result, not an executable FFI
+  signature, argument order or native buffer type. Before calling declaration
+  research closed, distinguish exact declared signatures and source call/buffer
+  evidence from outcome-only probe records; retain their separate provenance.
 
 ## Integration Context
 

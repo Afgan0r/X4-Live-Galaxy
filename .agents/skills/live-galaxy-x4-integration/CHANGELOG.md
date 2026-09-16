@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-16
+
+- Clarified declaration versus runtime-outcome evidence. Phase 05.5 Plan 01
+  halted because outcome-only probe records did not expose faction FFI
+  signatures or buffer types; registered declaration enrichment closed that
+  source gap without promoting outcome observations to API guarantees.
+
 ## 2026-09-10
 
 - Required one-shot lifecycle boundaries with bounded Lua latching and recurring
