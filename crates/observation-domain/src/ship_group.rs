@@ -21,7 +21,18 @@ impl ShipGroupDescriptor {
         policy_version: ObservationPolicyVersion,
         members: impl IntoIterator<Item = ShipIdentity>,
     ) -> Result<Self, ShipGroupError> {
-        let members = members.into_iter().collect();
+        // Ship identities are canonical decimal strings. Bytewise string
+        // order is intentional so every language can reproduce it without
+        // numeric coercion or loss above Lua's exact-number range.
+        let mut members: Vec<_> = members.into_iter().collect();
+        members.sort_unstable();
+        if let Some(duplicate) = members
+            .windows(2)
+            .find(|pair| pair[0] == pair[1])
+            .map(|pair| pair[0].clone())
+        {
+            return Err(ShipGroupError::DuplicateIdentity(duplicate));
+        }
         Ok(Self {
             source_scope,
             core_revision,

@@ -8,6 +8,7 @@ impl SourceEvidenceRef {
         (!value.trim().is_empty()).then_some(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }

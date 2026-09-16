@@ -16,6 +16,7 @@ impl ShipIdentity {
         Ok(Self(value))
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -37,6 +38,7 @@ macro_rules! required_text {
                 }
             }
 
+            #[must_use]
             pub fn as_str(&self) -> &str {
                 &self.0
             }
