@@ -341,7 +341,38 @@ Plans:
 
 **Research:** Required; owner discussion approved on 2026-09-11. Exact ship APIs, faction classification, completeness, applicability and workload limits require source-backed research and checked plans, followed by owner approval before execution.
 **Canonical refs:** `.planning/phases/05.5-heavy-faction-ship-conformance/05.5-CONTEXT.md`; `docs/architecture-decisions.md` ADR-LG-022; `docs/architecture-verification.md` VER-LG-003/011/012.
-**Plans:** 0; ready for research and planning, not approved for execution.
+**Plans:** 8 plans; research and plan-check passed, ready for owner-approved execution.
+**Wave 1**
+
+- [ ] 05.5-01-PLAN.md
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05.5-02-PLAN.md
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05.5-03-PLAN.md
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05.5-04-PLAN.md
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 05.5-05-PLAN.md
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 05.5-06-PLAN.md
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 05.5-07-PLAN.md
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 05.5-08-PLAN.md
 
 ### Phase 05.6: Station-Specific Observation Remainder
 
@@ -438,7 +469,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
 | 05.3. Generic Observation Contracts and Durable Publication | 5/5 | Complete    | 2026-09-05 |
 | 05.4. Owned Carrier B and Production Observation Path | 5/5 | Complete | 2026-09-11 |
-| 05.5. Heavy Faction Ship Conformance | 0/TBD | Discussion approved; research and planning next | - |
+| 05.5. Heavy Faction Ship Conformance | 0/8 | Planned    |  |
 | 05.6. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.5 | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |
