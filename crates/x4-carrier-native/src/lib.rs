@@ -28,6 +28,7 @@ mod producer_feedback;
 mod producer_feedback_codec;
 mod producer_message;
 mod producer_recovery;
+mod producer_seal;
 mod producer_types;
 mod producer_validation;
 mod transport;

@@ -18,6 +18,7 @@ mod hydration_validation;
 mod legacy_candidate;
 mod legacy_generation;
 mod model;
+mod producer_certificate_stream;
 mod producer_completion;
 mod runtime_facts;
 mod scheduler;
@@ -69,6 +70,7 @@ use observation_domain::{
     EntityId, ObservationSource, ObservationTime, ObservationVersion, SectionDescriptor,
     SectionQuality,
 };
+pub use producer_certificate_stream::ProducerCertificateStream;
 pub use producer_completion::bind_completion_certificate;
 pub use runtime_facts::{
     RuntimeAsset, RuntimeCapacity, RuntimeFactAvailability, RuntimeFactQuality, RuntimeFacts,

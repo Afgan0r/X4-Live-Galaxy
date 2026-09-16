@@ -11,6 +11,45 @@ use super::{
 };
 
 #[test]
+fn receipts_reopen_collection_before_the_section_finishes() {
+    let (mut producer, source) = ready_ship(0);
+    producer
+        .begin_ship_section(
+            SectionEvidence::point_measurement("x4:faction:argon:ships"),
+            2,
+        )
+        .expect("reserve");
+    producer.progress(1, 0).expect("start without records");
+    let _start = take_current(&mut producer, &source, "received", 0);
+    assert_eq!(producer.pending_bytes(), None);
+    producer
+        .push_ship_core(&ship("9007199254740993"))
+        .expect("first");
+    producer.progress(1, 1).expect("first batch before finish");
+    let first = take_current(&mut producer, &source, "received", 1);
+    assert!(
+        matches!(decode_complete_message(&first, 4096).expect("batch"),
+        CompleteMessage::ImmutableBatch(value) if value.section_ordinal == 1)
+    );
+    assert_eq!(producer.pending_bytes(), None);
+    producer
+        .push_ship_core(&ship("9007199254740995"))
+        .expect("second after receipt");
+    producer.progress(1, 2).expect("second batch");
+    let _second = take_current(&mut producer, &source, "received", 2);
+    assert_eq!(producer.pending_bytes(), None);
+    producer
+        .finish_section(support::finish(3))
+        .expect("finish drained builder");
+    producer.progress(1, 3).expect("completion");
+    let done = take_current(&mut producer, &source, "committed", 3);
+    assert!(
+        matches!(decode_complete_message(&done, 4096).expect("completion"),
+        CompleteMessage::SectionCompletion(value) if value.record_count == 2)
+    );
+}
+
+#[test]
 fn ship_section_accepts_multiple_complete_records() {
     let (mut producer, _) = ready_ship(0);
     let evidence = SectionEvidence::point_measurement("x4:faction:argon:ships");

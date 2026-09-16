@@ -8,22 +8,19 @@ use observation_ingest::{ContractVersions, bind_completion_certificate, encode_c
 use crate::producer_types::{PreparedRecord, ProducerProfile};
 use crate::{ProducerError, ProducerSource, SectionEvidence};
 
-#[derive(Clone)]
 pub struct SectionMessages {
-    pub start: Vec<u8>,
-    pub batches: Vec<Vec<u8>>,
-    pub completion: Vec<u8>,
     pub section_key: String,
+    pub certificate: observation_ingest::ProducerCertificateStream,
 }
 
 pub fn assemble(
     source: &ProducerSource,
     evidence: &SectionEvidence,
     profile: ProducerProfile,
-    records: &[PreparedRecord],
+    expected_records: usize,
     revision: u64,
     limit: usize,
-) -> Result<SectionMessages, ProducerError> {
+) -> Result<Vec<u8>, ProducerError> {
     let scope =
         SourceScopeId::new(evidence.source_scope.clone()).ok_or(ProducerError::InvalidInput)?;
     let producer = ProducerIncarnationId::new(source.producer_incarnation.clone())
@@ -38,34 +35,14 @@ pub fn assemble(
         transport_epoch: epoch,
         section_key: key.clone(),
         section_revision: revision,
-        expected_records: records.len(),
+        expected_records,
         sender_evidence: evidence.sender.clone(),
     };
-    let batches = records
-        .iter()
-        .enumerate()
-        .map(|(index, record)| {
-            let ordinal = index.checked_add(1).ok_or(ProducerError::DataLimit)?;
-            batch(source, &scope, record, section_key, revision, ordinal)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let completion = completion(evidence, scope, producer, epoch, key, revision, &batches)?;
-    Ok(SectionMessages {
-        start: encode_complete_message(&CompleteMessage::SectionStart(start), limit)
-            .map_err(|_| ProducerError::DataLimit)?,
-        batches: batches
-            .iter()
-            .cloned()
-            .map(|batch| encode_complete_message(&CompleteMessage::ImmutableBatch(batch), limit))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| ProducerError::DataLimit)?,
-        completion: encode_complete_message(&CompleteMessage::SectionCompletion(completion), limit)
-            .map_err(|_| ProducerError::DataLimit)?,
-        section_key: section_key.to_owned(),
-    })
+    encode_complete_message(&CompleteMessage::SectionStart(start), limit)
+        .map_err(|_| ProducerError::DataLimit)
 }
 
-fn batch(
+pub(super) fn batch(
     source: &ProducerSource,
     scope: &SourceScopeId,
     record: &PreparedRecord,
@@ -89,8 +66,12 @@ fn batch(
         .ok_or(ProducerError::InvalidInput)?,
         section_ordinal: ordinal,
         records: vec![EnvelopeRecord {
-            record_id: RecordId::new(format!("carrier-b:{}:{ordinal}", revision.get()))
-                .ok_or(ProducerError::InvalidInput)?,
+            record_id: RecordId::new(if section_key == "ship_core" {
+                format!("carrier-b:{}:{ordinal:020}", revision.get())
+            } else {
+                format!("carrier-b:{}:{ordinal}", revision.get())
+            })
+            .ok_or(ProducerError::InvalidInput)?,
             entity_id: EntityId::new(record.entity_id.clone())
                 .ok_or(ProducerError::InvalidInput)?,
             observation_version: ObservationVersion::new(revision.get())
@@ -101,14 +82,14 @@ fn batch(
     })
 }
 
-fn completion(
+pub(super) fn completion(
     evidence: &SectionEvidence,
     scope: SourceScopeId,
     producer: ProducerIncarnationId,
     epoch: TransportEpoch,
     key: SectionKey,
     revision: SectionRevisionId,
-    batches: &[ImmutableBatchEnvelope],
+    certificate: &observation_ingest::ProducerCertificateStream,
 ) -> Result<SectionCompletionEnvelope, ProducerError> {
     let versions = ContractVersions::new(
         evidence.sender.schema_version,
@@ -144,8 +125,9 @@ fn completion(
             },
             sender_evidence: evidence.sender.clone(),
         },
-        batches,
+        &[],
         versions,
     )
+    .map(|envelope| certificate.bind(envelope))
     .ok_or(ProducerError::InvalidInput)
 }

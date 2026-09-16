@@ -84,11 +84,19 @@ impl Producer {
 
     #[must_use]
     pub(crate) fn collection_admitted(&self) -> bool {
-        self.state == ProducerState::Ready && matches!(self.readiness, Readiness::Ready)
+        matches!(
+            self.state,
+            ProducerState::Ready | ProducerState::SectionReserved | ProducerState::Collecting
+        ) && matches!(self.readiness, Readiness::Ready)
+            && self.pending.is_none()
+            && !self.finished
     }
 
     pub(crate) fn selection_status(&self) -> (&'static str, usize) {
-        let remaining = self.limits.max_records.saturating_sub(self.records.len());
+        let remaining = self
+            .limits
+            .max_records
+            .saturating_sub(self.next_batch_index + self.records.len());
         if matches!(self.readiness, Readiness::Ready) {
             (self.profile.section_key(), remaining)
         } else {

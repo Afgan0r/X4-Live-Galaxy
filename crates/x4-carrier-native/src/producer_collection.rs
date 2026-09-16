@@ -22,7 +22,6 @@ impl Producer {
         }
         self.begin(evidence, expected_records)
     }
-
     pub fn push_ship_core(
         &mut self,
         record: &observation_domain::ShipCoreRecord,
@@ -53,14 +52,12 @@ impl Producer {
             content,
         })
     }
-
     pub fn begin_section(&mut self, evidence: SectionEvidence) -> Result<(), ProducerError> {
         if self.profile != ProducerProfile::Clock {
             return Err(ProducerError::InvalidTransition);
         }
         self.begin(evidence, 1)
     }
-
     fn begin(
         &mut self,
         evidence: SectionEvidence,
@@ -74,7 +71,6 @@ impl Producer {
         self.state = ProducerState::SectionReserved;
         Ok(())
     }
-
     pub fn push_record(&mut self, fact: &TypedFact) -> Result<(), ProducerError> {
         if self.profile != ProducerProfile::Clock {
             return Err(ProducerError::InvalidTransition);
@@ -90,14 +86,23 @@ impl Producer {
             ),
         })
     }
-
     fn push(&mut self, record: PreparedRecord) -> Result<(), ProducerError> {
         if !matches!(
             self.state,
             ProducerState::SectionReserved | ProducerState::Collecting
-        ) || self.records.len() >= self.expected_records
+        ) || self.next_batch_index + self.records.len() >= self.expected_records
         {
             return Err(ProducerError::InvalidTransition);
+        }
+        let bytes = self
+            .records
+            .iter()
+            .try_fold(record.content.len(), |total, value| {
+                total.checked_add(value.content.len())
+            })
+            .ok_or(ProducerError::DataLimit)?;
+        if self.profile == ProducerProfile::ShipCore && bytes > self.limits.max_raw_bytes {
+            return Err(ProducerError::DataLimit);
         }
         self.records.push(record);
         self.state = ProducerState::Collecting;
@@ -108,7 +113,7 @@ impl Producer {
         if !matches!(
             self.state,
             ProducerState::SectionReserved | ProducerState::Collecting
-        ) || self.records.len() != self.expected_records
+        ) || self.next_batch_index + self.records.len() != self.expected_records
         {
             return Err(ProducerError::InvalidTransition);
         }
@@ -152,12 +157,16 @@ impl Producer {
         if self.pending.is_some() {
             return Ok(ProducerOutcome::CapacityUnavailable);
         }
-        if self.state != ProducerState::Collecting
-            || !self.finished
-            || work_units == 0
+        if !matches!(
+            self.state,
+            ProducerState::Collecting | ProducerState::SectionReserved
+        ) || work_units == 0
             || work_units > self.limits.max_work
         {
             return Err(ProducerError::InvalidTransition);
+        }
+        if self.messages.is_some() {
+            return self.seal_next(now_millis);
         }
         let evidence = self
             .evidence
@@ -167,12 +176,12 @@ impl Producer {
             &self.source,
             evidence,
             self.profile,
-            &self.records,
+            self.expected_records,
             self.revision,
             self.limits.data_message_bytes,
         )?;
         self.pending = Some(Pending::new(
-            messages.start.clone(),
+            messages,
             format!(
                 "message:start:{}:{}",
                 self.profile.section_key(),
@@ -180,7 +189,10 @@ impl Producer {
             ),
             now_millis,
         ));
-        self.messages = Some(messages);
+        self.messages = Some(crate::producer_message::SectionMessages {
+            section_key: self.profile.section_key().to_owned(),
+            certificate: observation_ingest::ProducerCertificateStream::default(),
+        });
         self.next_batch_index = 0;
         self.state = ProducerState::PendingStart;
         Ok(ProducerOutcome::Progress)

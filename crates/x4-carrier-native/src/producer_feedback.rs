@@ -1,11 +1,9 @@
 use observation_ingest::{ControlBody, complete_message_digest, decode_carrier_control};
 
-use crate::producer::{Pending, Readiness, identity};
-use crate::producer_feedback_codec::{batch_identity, disposition, hex};
+use crate::producer::{Readiness, identity};
+use crate::producer_feedback_codec::{disposition, hex};
 use crate::producer_types::ProducerProfile;
 use crate::{Producer, ProducerError, ProducerFeedback, ProducerOutcome, ProducerState};
-
-type NextPending = Option<(Vec<u8>, String, ProducerState)>;
 
 impl Producer {
     pub fn apply_control(
@@ -107,23 +105,17 @@ impl Producer {
         feedback: ProducerFeedback,
         now: u64,
     ) -> Result<ProducerOutcome, ProducerError> {
-        let messages = self
-            .messages
-            .clone()
-            .ok_or(ProducerError::InvalidTransition)?;
-        let next = match self.state {
+        match self.state {
             ProducerState::PendingStart | ProducerState::PendingBatch
                 if feedback == ProducerFeedback::Received =>
             {
-                self.next_after_batch(&messages)?
+                self.pending = None;
+                self.state = ProducerState::Collecting;
+                self.seal_next(now)?;
+                return Ok(ProducerOutcome::Received);
             }
-            ProducerState::PendingCompletion if feedback == ProducerFeedback::Committed => None,
+            ProducerState::PendingCompletion if feedback == ProducerFeedback::Committed => {}
             _ => return Err(ProducerError::InvalidTransition),
-        };
-        if let Some((bytes, id, state)) = next {
-            self.pending = Some(Pending::new(bytes, id, now));
-            self.state = state;
-            return Ok(ProducerOutcome::Received);
         }
         self.discard_incomplete();
         self.revision = self
@@ -133,31 +125,6 @@ impl Producer {
         self.state = ProducerState::Ready;
         self.readiness = Readiness::Intent;
         Ok(ProducerOutcome::Committed)
-    }
-
-    fn next_after_batch(
-        &mut self,
-        messages: &crate::producer_message::SectionMessages,
-    ) -> Result<NextPending, ProducerError> {
-        if let Some(batch) = messages.batches.get(self.next_batch_index) {
-            self.next_batch_index = self
-                .next_batch_index
-                .checked_add(1)
-                .ok_or(ProducerError::InvalidTransition)?;
-            return Ok(Some((
-                batch.clone(),
-                batch_identity(batch, self.limits.data_message_bytes)?,
-                ProducerState::PendingBatch,
-            )));
-        }
-        Ok(Some((
-            messages.completion.clone(),
-            format!(
-                "message:complete:{}:{}",
-                messages.section_key, self.revision
-            ),
-            ProducerState::PendingCompletion,
-        )))
     }
 
     fn retry(&mut self, now: u64) -> ProducerOutcome {
