@@ -25,13 +25,25 @@ function observation.new(options)
     end
     if type(getter) ~= "function" then return nil, "getter_unavailable" end
     if type(clock_getter) ~= "function" then return nil, "clock_unavailable" end
-    return {
+    local adapter = {
         getter = getter,
         clock_getter = clock_getter,
         begin_evidence = observation.begin_evidence,
         finish_evidence = observation.finish_evidence,
         capture = observation.capture,
     }
+    if options.profile == "ship_core" then
+        local module = require("live_galaxy.lua.live_galaxy_ship_collection")
+        local collector, err = module.new(options, adapter)
+        if collector == nil then return nil, err end
+        adapter.collector = collector
+        function adapter:advance(context, carrier, status)
+            return self.collector:tick(context, carrier, status)
+        end
+    elseif options.profile ~= nil and options.profile ~= "carrier_b_realtime_sample" then
+        return nil, "restart_required"
+    end
+    return adapter
 end
 
 function observation:begin_evidence()

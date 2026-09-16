@@ -12,7 +12,7 @@ describe("owned Carrier B adapter", function()
 
     local function native(options)
         options = options or {}
-        local calls, fact, begin, finish = {}, nil, nil, nil
+        local calls, fact, begin, finish, monotonic = {}, nil, nil, nil, 10000
         local function record(name, result)
             return function(_, value)
                 calls[#calls + 1] = name
@@ -26,9 +26,10 @@ describe("owned Carrier B adapter", function()
                 end
                 if current == nil then current = 0 end
                 if name == "progress" then
+                    monotonic = monotonic + 1
                     local capacity = options.capacity or "available:0"
                     if type(capacity) == "function" then capacity = capacity() end
-                    return current, "ready", "connected", "10001",
+                    return current, "ready", "connected", tostring(monotonic),
                         capacity, "producer:1", options.selection or "carrier_b_realtime_sample",
                         options.remaining or "1"
                 end
@@ -136,17 +137,25 @@ describe("owned Carrier B adapter", function()
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
         local observation = assert(fixture.load("live_galaxy_observation").new({
             profile = "ship_core", faction_id = "argon", ship_api = api,
+            ship_limits = { max_records = 4, max_allocation_bytes = 128,
+                max_work = 100, max_attempts = 2, max_age_millis = 1000,
+                faction_pointer_bytes = 8 },
             getter = function() return 0 end, clock_getter = function() return 1 end,
         }))
         local scheduler = fixture.load("live_galaxy_scheduler")
         local result
-        for _ = 1, 10 do
+        for _ = 1, 20 do
+            local before = #env.calls
             result = scheduler.tick("telemetry_tick", carrier, observation)
+            assert.equals("progress", env.calls[before + 1])
+            assert.equals("poll_control", env.calls[before + 2])
             if result.disposition == "sampled" then break end
         end
 
         assert.same({ "census", "count:argon", "allocate:2", "fill:2:argon",
-            "core:9007199254740993", "core:9007199254740995" }, source_calls)
+            "core:9007199254740993", "core:9007199254740993",
+            "core:9007199254740995", "core:9007199254740995" }, source_calls)
+        assert.equals("sampled", result.disposition)
         assert.equals("ship_core", env.fact().profile)
         assert.equals("9007199254740995", env.fact().identity)
     end)

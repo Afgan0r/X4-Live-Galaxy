@@ -36,6 +36,16 @@ function scheduler.tick(context, carrier, observation)
         return finish("producer_busy", progress)
     end
 
+    if type(observation.advance) == "function" then
+        local ok, result = pcall(observation.advance, observation, context, carrier, progress_status)
+        if not ok or type(result) ~= "table" then
+            if observation.collector then observation.collector:discard(carrier, "source_failure") end
+            return finish("source_failure", nil)
+        end
+        context.reentry_guard = false
+        return result
+    end
+
     local begin, begin_error = call(observation, "begin_evidence")
     if begin == nil then return finish(begin_error, nil) end
     begin.source_epoch_status = context.source_epoch_status or "unknown"
