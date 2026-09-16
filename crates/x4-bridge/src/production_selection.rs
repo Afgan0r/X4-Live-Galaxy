@@ -40,21 +40,31 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         self.heavy_limits.as_ref()
     }
     pub fn heavy_revision_floor(&self) -> Result<u64, ProductionError> {
-        let Some(limits) = &self.heavy_limits else {
+        if self.heavy_limits.is_none() {
             return self.next_revision(
                 &SectionKey::new(self.collection_key()).ok_or(ProductionError::InvalidLimits)?,
             );
-        };
-        let mut floor = self
-            .next_revision(&SectionKey::new("ship_core").ok_or(ProductionError::InvalidLimits)?)?;
-        for (group, family) in (0..limits.bridge.max_candidate_records).flat_map(|group| {
-            ["ship_cargo", "ship_crew", "ship_loadout"].map(|family| (group, family))
-        }) {
-            let key = SectionKey::new(format!("{family}:g{group}"))
-                .ok_or(ProductionError::InvalidLimits)?;
-            floor = floor.max(self.next_revision(&key)?);
         }
-        Ok(floor)
+        // Scan actual durable section identities, not the resource envelope.
+        // This also preserves old groups after a smaller replacement census.
+        self.lifecycle
+            .current_snapshot()
+            .map_err(|_| ProductionError::Storage)?
+            .iter()
+            .filter(|v| {
+                v.revision().section_key.as_str() == "ship_core"
+                    || crate::receiver_ship_detail::is_key(v.revision().section_key.as_str())
+            })
+            .try_fold(1, |floor, v| {
+                let next = v
+                    .receipt()
+                    .revision
+                    .get()
+                    .checked_add(1)
+                    .filter(|n| *n <= observation_ingest::MAX_DURABLE_SECTION_REVISION)
+                    .ok_or(ProductionError::RevisionExhausted)?;
+                Ok(floor.max(next))
+            })
     }
     pub(crate) fn next_ship_key(&self, previous: &str) -> Result<String, ProductionError> {
         if self.heavy_limits.is_none() {

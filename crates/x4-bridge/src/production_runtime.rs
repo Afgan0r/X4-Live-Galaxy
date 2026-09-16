@@ -136,7 +136,12 @@ fn next(
     key: &mut String,
 ) -> Option<()> {
     // Pump and reconcile the completion response before fresh source admission.
-    wait_interval(peer, limits).ok()?;
+    let interval = session
+        .heavy_limits()
+        .map_or(limits.availability_interval_millis, |profile| {
+            profile.rate_interval_millis
+        });
+    wait_interval(peer, limits, interval).ok()?;
     if let Some(schedule) = schedule {
         *key = session.next_ship_key(key).ok()?;
         if !schedule.admit(key) {

@@ -1,5 +1,6 @@
 local collection = {}
 local source = require("live_galaxy.lua.live_galaxy_ship_source")
+local order = require("live_galaxy.lua.live_galaxy_ship_order")
 local MAX_INTEGER = 9007199254740991
 
 local function integer(value)
@@ -8,10 +9,6 @@ end
 local function token(value, limit)
     return type(value) == "string" and #value > 0 and #value <= limit
         and value:match("^[%w_:%-]+$") ~= nil
-end
-local function ordered(left, right)
-    if #left ~= #right then return #left < #right end
-    return left < right
 end
 local function same_core(left, right)
     for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
@@ -43,6 +40,7 @@ function collection:discard(carrier, reason)
     if self.reserved then carrier:fail_section(reason) end
     self.reserved, self.buffer, self.identities, self.pending = false, nil, nil, nil
     self.cores = nil
+    self.seen, self.copy_index, self.sort = nil, nil, nil
     self.faction_buffer, self.factions, self.boundary, self.incarnation = nil, nil, nil, nil
     self.attempts = self.attempts + 1
     self.stage = self.attempts <= self.limits.max_attempts and "census" or "halted"
@@ -98,19 +96,20 @@ function collection:tick(context, carrier, status)
         end
         self.faction_buffer, self.stage = nil, "select"
     elseif stage == "select" then
-        local found, seen = false, {}
         if type(self.factions) ~= "table" then return self:discard(carrier, "invalid_fact") end
-        for _, faction in ipairs(self.factions) do
-            if not token(faction, 64) or seen[faction] then return self:discard(carrier, "invalid_fact") end
-            seen[faction], found = true, found or faction == self.faction
+        self.seen, self.copy_index = self.seen or {}, self.copy_index or 1
+        for i = self.copy_index, math.min(self.copy_index + 31, #self.factions) do
+            local faction = self.factions[i]
+            if not token(faction, 64) or self.seen[faction] then return self:discard(carrier, "invalid_fact") end
+            self.seen[faction], self.found, self.copy_index = true, self.found or faction == self.faction, i + 1
         end
-        self.factions = nil
-        if not found then return self:discard(carrier, "selection_unavailable") end
-        self.stage = "count"
+        if self.copy_index > #self.factions then
+            if not self.found then return self:discard(carrier, "selection_unavailable") end
+            self.factions, self.seen, self.copy_index, self.found, self.stage = nil, nil, nil, nil, "count"
+        end
     elseif stage == "count" then
         self.count = api:count_ships(self.faction)
-        if not integer(self.count) or self.count > self.limits.max_records
-            or self.count > math.floor(self.limits.max_allocation_bytes / 8)
+        if not integer(self.count) or self.count > math.floor(self.limits.max_allocation_bytes / 8)
             or self.count * 3 + 4 > self.limits.max_work - self.work then
             return self:discard(carrier, "collection_overflow")
         end
@@ -125,15 +124,21 @@ function collection:tick(context, carrier, status)
         end
         self.stage = "identities"
     elseif stage == "identities" then
-        self.identities = {}
-        local seen = {}
-        for i = 0, self.count - 1 do
+        self.identities, self.seen, self.copy_index = self.identities or {}, self.seen or {}, self.copy_index or 0
+        for i = self.copy_index, math.min(self.copy_index + 31, self.count - 1) do
             local id = source.identity(self.buffer[i])
-            if id == nil or seen[id] then return self:discard(carrier, "identity_invalid") end
-            seen[id], self.identities[i + 1] = true, id
+            if id == nil or self.seen[id] then return self:discard(carrier, "identity_invalid") end
+            self.seen[id], self.identities[i + 1] = true, id
+            self.copy_index = i + 1
         end
-        table.sort(self.identities, ordered)
-        self.buffer, self.stage = nil, "reserve"
+        if self.copy_index == self.count then
+            self.sort = order.new(self.identities, function(a, b) return a < b end)
+            self.buffer, self.seen, self.copy_index, self.stage = nil, nil, nil, "order"
+        end
+    elseif stage == "order" then
+        local done, err = self.sort()
+        if err then return self:discard(carrier, "identity_invalid") end
+        if done then self.sort, self.stage = nil, "reserve" end
     elseif stage == "reserve" then
         local begin, err = self.clock:begin_evidence()
         if begin == nil then return self:discard(carrier, err) end

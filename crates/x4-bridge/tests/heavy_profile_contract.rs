@@ -17,22 +17,28 @@ fn heavy_profile_refuses_unknown_duplicate_zero_overflow_and_policy_disagreement
         ("\"heavy_permits\": 1", "\"heavy_permits\": 0"),
         ("\"group_members\": 1", "\"group_members\": 2"),
         (
-            "\"max_aggregate_records\": 128",
+            "\"max_aggregate_records\": 134217728",
             "\"max_aggregate_records\": 127",
         ),
         (
-            "\"max_aggregate_batches\": 128",
+            "\"max_aggregate_batches\": 134217728",
             "\"max_aggregate_batches\": 127",
         ),
         (
-            "\"max_aggregate_work\": 131072",
+            "\"max_aggregate_work\": 134217728",
             "\"max_aggregate_work\": 131071",
         ),
-        ("\"max_inner_records\": 64", "\"max_inner_records\": 129"),
-        ("\"max_native_calls\": 384", "\"max_native_calls\": 513"),
         (
-            "\"max_allocation_bytes\": 8192",
-            "\"max_allocation_bytes\": 65537",
+            "\"max_inner_records\": 1048576",
+            "\"max_inner_records\": 129",
+        ),
+        (
+            "\"max_native_calls\": 67108864",
+            "\"max_native_calls\": 67108865",
+        ),
+        (
+            "\"max_allocation_bytes\": 4194304",
+            "\"max_allocation_bytes\": 67108865",
         ),
         (
             "\"callback_budget_millis\": 2",

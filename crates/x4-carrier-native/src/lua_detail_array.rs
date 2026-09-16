@@ -53,6 +53,10 @@ unsafe fn read_table<T>(
         count += 1;
         unsafe { (api.set_top)(state, -2) };
     }
+    let allocation_bytes = count.checked_mul(core::mem::size_of::<T>())?;
+    if allocation_bytes > usize::try_from(isize::MAX).ok()? {
+        return None;
+    }
     let mut values = Vec::with_capacity(count);
     for index in 1..=count {
         unsafe {

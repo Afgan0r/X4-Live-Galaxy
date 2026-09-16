@@ -1,4 +1,5 @@
 local capture = {}
+local order = require("live_galaxy.lua.live_galaxy_ship_order")
 local function unsigned(value, maximum)
     return type(value) == "number" and value >= 0 and value <= maximum and value % 1 == 0
 end
@@ -26,19 +27,29 @@ function capture.step(self)
         local rows = api:crew_fill(id, self.buffer, self.count)
         self.buffer = nil
         if type(rows) ~= "table" or #rows > self.count then return nil, "enumeration_incomplete" end
-        local seen = {}
-        for _, role in ipairs(rows) do
-            if type(role.id) ~= "string" or not role.id:match("^[%w_:%-]+$") or seen[role.id]
+        self.rows, self.row_index, self.seen, self.stage = rows, 1, {}, "crew_validate"
+    elseif stage == "crew_validate" then
+        for i = self.row_index, math.min(self.row_index + 31, #self.rows) do
+            local role = self.rows[i]
+            if type(role.id) ~= "string" or not role.id:match("^[%w_:%-]+$") or self.seen[role.id]
                 or not unsigned(role.amount_people, 4294967295)
                 or not unsigned(role.reported_numtiers, self.limit) or type(role.canhire) ~= "boolean" then
                 return nil, "invalid_fact"
             end
-            seen[role.id] = true
+            self.seen[role.id], self.row_index = true, i + 1
         end
-        table.sort(rows, function(a, b) return a.id < b.id end)
-        self.pending.roles, self.role_index = rows, 1
-        self.pending.roles_outcome = #rows == 0 and "empty" or "value"
-        self.stage = #rows == 0 and "record" or "crew_tier_allocate"
+        if self.row_index > #self.rows then
+            self.sort, self.stage = order.new(self.rows, function(a, b) return a.id < b.id end), "crew_order"
+        end
+    elseif stage == "crew_order" then
+        local done, err = self.sort()
+        if err then return nil, "invalid_fact" end
+        if done then
+            self.pending.roles, self.role_index = self.rows, 1
+            self.pending.roles_outcome = #self.rows == 0 and "empty" or "value"
+            self.stage = #self.rows == 0 and "record" or "crew_tier_allocate"
+            self.rows, self.seen, self.sort = nil, nil, nil
+        end
     elseif stage == "crew_tier_allocate" then
         local count = self.pending.roles[self.role_index].reported_numtiers
         if not allocation(self, count, api:crew_tier_size()) then return nil, "collection_overflow" end
@@ -48,16 +59,23 @@ function capture.step(self)
         local tiers = api:crew_tier_fill(id, role.id, self.buffer, role.reported_numtiers)
         self.buffer = nil
         if type(tiers) ~= "table" or #tiers > role.reported_numtiers then return nil, "enumeration_incomplete" end
-        for _, tier in ipairs(tiers) do
+        self.rows, self.row_index, self.stage = tiers, 1, "crew_tier_validate"
+    elseif stage == "crew_tier_validate" then
+        for i = self.row_index, math.min(self.row_index + 31, #self.rows) do
+            local tier = self.rows[i]
             if type(tier.name) ~= "string" or #tier.name == 0 or #tier.name > 128
                 or tier.name:find("[|\n\r]") or type(tier.skill_lower_threshold) ~= "number"
                 or tier.skill_lower_threshold < -2147483648 or tier.skill_lower_threshold > 2147483647
                 or tier.skill_lower_threshold % 1 ~= 0 or not unsigned(tier.amount_people, 4294967295) then
                 return nil, "invalid_fact"
             end
+            self.row_index = i + 1
         end
-        role.tiers, self.role_index = tiers, self.role_index + 1
-        self.stage = self.role_index > #self.pending.roles and "record" or "crew_tier_allocate"
+        if self.row_index > #self.rows then
+            self.pending.roles[self.role_index].tiers, self.role_index = self.rows, self.role_index + 1
+            self.rows = nil
+            self.stage = self.role_index > #self.pending.roles and "record" or "crew_tier_allocate"
+        end
     else return nil, "invalid_capture_stage" end
     return true
 end

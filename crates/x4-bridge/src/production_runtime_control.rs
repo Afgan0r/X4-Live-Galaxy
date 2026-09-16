@@ -6,10 +6,14 @@ use observation_ingest::{
 use std::time::Duration;
 use x4_carrier_native::BridgePeer;
 
-pub fn wait_interval(peer: &mut BridgePeer, limits: &ProductionLimits) -> Result<(), ()> {
+pub fn wait_interval(
+    peer: &mut BridgePeer,
+    limits: &ProductionLimits,
+    interval: usize,
+) -> Result<(), ()> {
     match peer.receive_timeout(
         limits.complete_message_bytes,
-        Duration::from_millis(limits.availability_interval_millis as u64),
+        Duration::from_millis(interval as u64),
     ) {
         Ok(None) => Ok(()),
         _ => Err(()),

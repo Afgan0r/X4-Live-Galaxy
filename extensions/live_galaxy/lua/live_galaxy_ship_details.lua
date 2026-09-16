@@ -2,6 +2,7 @@ local details = {}
 local source = require("live_galaxy.lua.live_galaxy_ship_source")
 local crew_capture = require("live_galaxy.lua.live_galaxy_ship_crew_capture")
 local loadout_capture = require("live_galaxy.lua.live_galaxy_ship_loadout_capture")
+local order = require("live_galaxy.lua.live_galaxy_ship_order")
 local MAX_INTEGER = 9007199254740991
 local function integer(v, maximum)
     return type(v) == "number" and v >= 0 and v <= maximum and v % 1 == 0
@@ -17,7 +18,7 @@ end
 
 function details.new(options, clock)
     local limit = options.max_inner
-    if not integer(limit, 65535) or limit == 0
+    if not integer(limit, MAX_INTEGER) or limit == 0
         or not integer(options.max_allocation_bytes, MAX_INTEGER)
         or options.max_allocation_bytes == 0 then return nil, "invalid_limits" end
     return setmetatable({ api = options.ship_api or source.runtime(), clock = clock,
@@ -54,15 +55,26 @@ function details:tick(context, carrier, status)
     elseif self.stage == "wares" then
         local raw = self.api:cargo_wares(group.members[self.index])
         if type(raw) ~= "table" or getmetatable(raw) ~= nil then return self:fail(carrier, "cargo_unknown") end
-        local wares = {}
-        for ware, amount in pairs(raw) do
-            if #wares >= self.limit or not token(ware) or not integer(amount, MAX_INTEGER) then
+        -- This table is owned Lua data. Unlike borrowed ffi strings it can be
+        -- validated/copied incrementally after the indivisible getter.
+        self.raw, self.pending, self.stage = raw, { wares = {} }, "ware_copy"
+    elseif self.stage == "ware_copy" then
+        for _ = 1, 32 do
+            local ware, amount = next(self.raw, self.ware_key)
+            if ware == nil then
+                self.raw, self.ware_key = nil, nil
+                self.sort, self.stage = order.new(self.pending.wares, function(a, b) return a.ware < b.ware end), "ware_order"
+                break
+            end
+            if #self.pending.wares >= self.limit or not token(ware) or not integer(amount, MAX_INTEGER) then
                 return self:fail(carrier, "collection_overflow")
             end
-            wares[#wares + 1] = { ware = ware, amount_items = amount }
+            self.pending.wares[#self.pending.wares + 1], self.ware_key = { ware = ware, amount_items = amount }, ware
         end
-        table.sort(wares, function(a, b) return a.ware < b.ware end)
-        self.pending, self.stage = { wares = wares }, "count"
+    elseif self.stage == "ware_order" then
+        local done, err = self.sort()
+        if err then return self:fail(carrier, "invalid_fact") end
+        if done then self.sort, self.stage = nil, "count" end
     elseif self.stage == "count" then
         self.count = self.api:cargo_storage_count(group.members[self.index])
         self.size = self.api:cargo_storage_size()
@@ -78,17 +90,26 @@ function details:tick(context, carrier, status)
         local rows = self.api:cargo_storage_fill(group.members[self.index], self.buffer, self.count)
         self.buffer = nil
         if type(rows) ~= "table" or #rows > self.count then return self:fail(carrier, "enumeration_incomplete") end
-        local seen = {}
-        for _, row in ipairs(rows) do
-            if not token(row.transport) or seen[row.transport]
+        self.rows, self.row_index, self.seen, self.stage = rows, 1, {}, "storage_validate"
+    elseif self.stage == "storage_validate" then
+        for i = self.row_index, math.min(self.row_index + 31, #self.rows) do
+            local row = self.rows[i]
+            if not token(row.transport) or self.seen[row.transport]
                 or not integer(row.capacity_cubic_metres, 4294967295)
                 or not integer(row.occupied_cubic_metres, row.capacity_cubic_metres) then
                 return self:fail(carrier, "invalid_fact")
             end
-            seen[row.transport] = true
+            self.seen[row.transport], self.row_index = true, i + 1
         end
-        table.sort(rows, function(a, b) return a.transport < b.transport end)
-        self.pending.storage, self.stage = rows, "record"
+        if self.row_index > #self.rows then
+            self.sort, self.stage = order.new(self.rows, function(a, b) return a.transport < b.transport end), "storage_order"
+        end
+    elseif self.stage == "storage_order" then
+        local done, err = self.sort()
+        if err then return self:fail(carrier, "invalid_fact") end
+        if done then
+            self.pending.storage, self.rows, self.seen, self.sort, self.stage = self.rows, nil, nil, nil, "record"
+        end
     elseif self.stage == "record" then
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end

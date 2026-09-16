@@ -22,8 +22,8 @@ function profile.validate(values)
     local v = copy
     if v.heavy_profile_version ~= 1 or v.experimental_profile ~= 1 or v.group_members ~= 1 or v.heavy_permits ~= 1
         or v.max_delivery_attempts ~= 1 or v.reconnect_attempts ~= 1 or v.control_message_bytes ~= 512
-        or v.availability_interval_millis ~= 5000 or v.complete_message_bytes > 8192
-        or v.max_candidate_records > 128 or v.max_inner_records > 64 or v.retained_revisions < 2
+        or v.availability_interval_millis ~= 5000 or v.complete_message_bytes > v.max_candidate_raw_bytes
+        or v.retained_revisions < 2
         or v.complete_message_bytes > v.max_pending_bytes or v.max_pending_bytes > v.max_total_bytes
         or v.max_candidate_raw_bytes > v.max_aggregate_bytes or v.max_publication_records > v.max_candidate_records
         or v.max_publication_content_bytes > v.max_total_bytes or v.max_candidate_work > v.max_lifecycle_work
@@ -34,6 +34,10 @@ function profile.validate(values)
     if v.max_candidate_records > v.max_aggregate_records or v.max_candidate_batches > v.max_aggregate_batches
         or v.max_candidate_work > v.max_aggregate_work or v.max_aggregate_bytes > v.max_total_bytes
         or v.max_message_inactivity_millis > v.max_message_age_millis then return nil, "invalid_limits" end
+    if v.max_candidate_records ~= v.max_candidate_raw_bytes or v.max_candidate_batches ~= v.max_candidate_raw_bytes
+        or v.max_aggregate_records ~= v.max_aggregate_bytes or v.max_aggregate_batches ~= v.max_aggregate_bytes
+        or v.max_publication_records ~= v.max_publication_content_bytes
+        or v.max_inner_records ~= v.complete_message_bytes then return nil, "invalid_limits" end
     return copy
 end
 function profile.options(values, faction)

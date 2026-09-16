@@ -58,11 +58,11 @@ pub unsafe fn inner(
     policy: ProducerAdmissionPolicy,
 ) -> Option<usize> {
     if heavy == Some(1) {
-        if policy.max_attempts != 1 || records > 128 {
+        if policy.max_attempts != 1 {
             return None;
         }
         let inner = unsafe { field_integer(api, state, 2, "max_inner_records") }?;
-        return (inner > 0 && inner <= 64 && inner <= records).then_some(inner);
+        return (inner > 0 && inner <= records).then_some(inner);
     }
     if heavy.is_some() || policy.max_age_millis != 5000 || policy.max_attempts != 2 {
         return None;

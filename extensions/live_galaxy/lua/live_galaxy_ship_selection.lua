@@ -96,9 +96,9 @@ function selection.advance(self, context, carrier, status)
     ok, err = self.budget:after(carrier)
     if not ok then return discard(self, carrier, err) end
     if result.disposition == "sampled" and self.key == "ship_core" then
-        local members = {}; for i, id in ipairs(self.collector.identities) do members[i] = id end
-        table.sort(members)
-        self.pending = { members = members, cores = self.collector.cores, revision = self.revision,
+        -- Transfer owned, already bytewise-ordered membership; do not repeat an
+        -- unbounded copy/sort after the incremental collector has completed.
+        self.pending = { members = self.collector.identities, cores = self.collector.cores, revision = self.revision,
             boundary = self.boundary, incarnation = self.incarnation }
     end
     if result.disposition == "sampled" then result.capture_metrics = metrics(self) end

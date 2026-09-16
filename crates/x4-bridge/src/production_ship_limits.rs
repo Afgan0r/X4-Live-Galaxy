@@ -99,9 +99,15 @@ impl HeavyShipLimits {
             && self.bridge.max_message_age_millis <= self.admission_window_millis
             && self.freshness_millis <= self.admission_window_millis
             && self.retained_revisions >= 2
-            && self.bridge.max_candidate_records <= 128
-            && self.max_inner_records <= 64
-            && self.bridge.complete_message_bytes <= 8192
+            && self.bridge.complete_message_bytes <= self.bridge.max_candidate_raw_bytes
+            // Compatibility count fields are resource-derived: even the
+            // smallest record/batch/operation consumes a byte/work unit.
+            && self.bridge.max_candidate_records == self.bridge.max_candidate_raw_bytes
+            && self.bridge.max_candidate_batches == self.bridge.max_candidate_raw_bytes
+            && self.bridge.max_aggregate_records == self.bridge.max_aggregate_bytes
+            && self.bridge.max_aggregate_batches == self.bridge.max_aggregate_bytes
+            && self.bridge.max_publication_records == self.bridge.max_publication_content_bytes
+            && self.max_inner_records == self.bridge.complete_message_bytes
             && self.bridge.control_message_bytes == 512
             && self.bridge.availability_interval_millis == 5000
             && self.bridge.max_candidate_records <= self.bridge.max_aggregate_records

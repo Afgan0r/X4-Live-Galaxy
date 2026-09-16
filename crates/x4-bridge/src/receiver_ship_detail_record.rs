@@ -39,7 +39,9 @@ pub fn validate_batch(
     Ok(())
 }
 pub fn record_dependency(content: &str) -> Result<ShipDetailDependency, ProductionError> {
-    record_dependency_with_limit(content, 64)
+    // Each nested row consumes at least one wire byte. The enclosing admitted
+    // frame/candidate bounds content; this is not a world population quota.
+    record_dependency_with_limit(content, content.len())
 }
 pub fn record_dependency_with_limit(
     content: &str,
