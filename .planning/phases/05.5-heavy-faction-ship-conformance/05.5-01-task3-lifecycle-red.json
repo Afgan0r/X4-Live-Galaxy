@@ -3,7 +3,7 @@
   "exitCode": 1,
   "output": "not ok 1 - registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evidence\nassertion failed: stale progress must not return replacement state\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
   "targetTest": "registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evidence",
-  "targetFile": "crates/x4-carrier-native/tests/ship_abi_contract.rs",
+  "targetFile": "crates/x4-carrier-native/tests/abi_contract/ship_abi_contract.rs",
   "expected": "stale progress rejects before accessing replacement producer state",
   "actual": "registered stale progress returns eight values including replacement state"
 }
