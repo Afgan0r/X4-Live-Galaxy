@@ -1,5 +1,8 @@
 use std::path::Path;
 
+#[path = "production_selection.rs"]
+mod selection;
+
 use observation_application::{
     LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
     ObservationLifecycle, PublicationReconciler,
@@ -26,6 +29,7 @@ pub enum ProductionError {
 pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     lifecycle: ObservationLifecycle<R>,
     last_received: Option<(BatchId, Vec<u8>, LifecycleContext)>,
+    ship_scope: Option<SourceScopeId>,
 }
 
 impl ProductionObservationSession {
@@ -64,6 +68,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 lifecycle_limits,
             ),
             last_received: None,
+            ship_scope: None,
         };
         session
             .restore_current_snapshot()
@@ -90,6 +95,12 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             self.lifecycle.complete_message_limit(),
         )
         .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
+        crate::receiver_ship::validate(&message, self.ship_scope.as_ref())?;
+        if crate::receiver_ship_replay::is_committed(&self.lifecycle, &message)? {
+            return Ok(LifecycleResult::Disposition(
+                observation_ingest::ReceiverDisposition::Committed,
+            ));
+        }
         let context = if let Some((prior_identity, prior_bytes, prior_context)) =
             &self.last_received
             && prior_identity == &identity
@@ -149,24 +160,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         max_age: u64,
     ) -> DecisionEligibility {
         self.lifecycle.decision_eligibility(required, now, max_age)
-    }
-
-    pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
-        let current = self
-            .lifecycle
-            .current_revision(key)
-            .map_err(|_| ProductionError::Storage)?;
-        current.map_or(Ok(1), |value| {
-            let next = value
-                .revision()
-                .revision
-                .get()
-                .checked_add(1)
-                .ok_or(ProductionError::RevisionExhausted)?;
-            (next <= observation_ingest::MAX_DURABLE_SECTION_REVISION)
-                .then_some(next)
-                .ok_or(ProductionError::RevisionExhausted)
-        })
     }
 
     fn receiver_context(&self, bytes: &[u8]) -> Result<LifecycleContext, ProductionError> {

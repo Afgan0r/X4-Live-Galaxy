@@ -7,6 +7,11 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[[example]]
+name = "carrier-b-ship-local"
+path = "examples/carrier_b_ship_local/main.rs"
+test = false
+
 [dependencies]
 observation-application = { path = "../observation-application" }
 observation-domain = { path = "../observation-domain" }

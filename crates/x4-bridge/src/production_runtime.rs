@@ -55,7 +55,15 @@ fn serve(
     };
     let next_revision = revision_floor(session, history)?;
     history.bind_session(&identity.session_id, identity.epoch.get());
-    if send_initial_controls(peer, &identity, next_revision, limits).is_err() {
+    if send_initial_controls(
+        peer,
+        &identity,
+        session.collection_key(),
+        next_revision,
+        limits,
+    )
+    .is_err()
+    {
         let _ = history.record("rejected", "control-response-loss");
         return None;
     }
@@ -121,6 +129,7 @@ fn send_next_demand(
 fn send_initial_controls(
     peer: &mut BridgePeer,
     identity: &observation_ingest::CarrierIdentity,
+    section_key: &str,
     next_revision: u64,
     limits: &ProductionLimits,
 ) -> Result<(), ()> {
@@ -134,7 +143,7 @@ fn send_initial_controls(
             digest_version: 1,
         }),
         ControlBody::CollectionIntent(CollectionIntentBody {
-            section_key: "carrier_b_realtime_sample".to_owned(),
+            section_key: section_key.to_owned(),
             next_revision,
             max_records: limits.max_candidate_records,
             max_raw_bytes: limits.max_candidate_raw_bytes,
@@ -151,7 +160,7 @@ fn revision_floor(
     session: &ProductionObservationSession,
     history: &mut OperationalHistory,
 ) -> Option<u64> {
-    let key = observation_domain::SectionKey::new("carrier_b_realtime_sample")?;
+    let key = observation_domain::SectionKey::new(session.collection_key())?;
     session.next_revision(&key).map_or_else(
         |_| {
             let _ = history.record("rejected", "revision-floor-unavailable");

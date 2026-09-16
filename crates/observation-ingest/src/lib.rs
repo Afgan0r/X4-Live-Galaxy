@@ -9,6 +9,7 @@ mod carrier_control_types;
 mod completed_scope;
 mod completion;
 mod completion_digest;
+mod completion_evidence;
 mod completion_types;
 mod eligibility;
 mod feedback;
