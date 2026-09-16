@@ -6,6 +6,21 @@ use crate::{
 };
 
 impl Producer {
+    pub fn begin_ship_section(
+        &mut self,
+        _evidence: SectionEvidence,
+        _expected_records: usize,
+    ) -> Result<(), ProducerError> {
+        Err(ProducerError::InvalidTransition)
+    }
+
+    pub fn push_ship_core(
+        &mut self,
+        _record: &observation_domain::ShipCoreRecord,
+    ) -> Result<(), ProducerError> {
+        Err(ProducerError::InvalidTransition)
+    }
+
     pub fn begin_section(&mut self, evidence: SectionEvidence) -> Result<(), ProducerError> {
         if self.state != ProducerState::Ready || self.readiness != Readiness::Ready {
             return Err(ProducerError::InvalidTransition);
