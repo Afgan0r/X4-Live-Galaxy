@@ -54,11 +54,12 @@ impl Producer {
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::Disposition(value) => self.apply_disposition(&value, now_millis),
-            ControlBody::Reset(_) => {
+            ControlBody::Reset(_) if self.profile == ProducerProfile::ShipCore => {
                 self.fail_section();
                 self.readiness = Readiness::Awaiting;
                 Ok(ProducerOutcome::Disconnected)
             }
+            ControlBody::Reset(_) => Ok(ProducerOutcome::Disconnected),
             _ => Err(ProducerError::InvalidTransition),
         }
     }

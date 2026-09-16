@@ -136,7 +136,6 @@ fn source_resets_discard_copied_records_for_load_reload_and_uncertainty() {
             producer.finish_section(support::finish(2)),
             Err(ProducerError::InvalidTransition)
         );
-        let _source = source;
     }
 }
 
