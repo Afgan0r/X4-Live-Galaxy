@@ -57,6 +57,40 @@ describe("bounded faction core continuation", function()
         }
     end
 
+    it("collects 129 owned identities incrementally without a population quota", function()
+        local now, pushed, identity_reads, busy = 0, {}, 0, true
+        local buffer = setmetatable({}, { __index = function(_, i)
+            identity_reads = identity_reads + 1; return tostring(129 - i)
+        end })
+        local api = { list_factions = function() return { "argon" } end,
+            count_ships = function() return 129 end, new_buffer = function() return buffer end,
+            fill_ships = function() return 129 end,
+            read_core = function(_, id) return { identity = id, owner = "argon", type = "ship",
+                class = "ship", location = "sector:1" } end }
+        local collector = assert(module.new({ faction_id = "argon", ship_api = api,
+            ship_limits = { max_records = 4, max_allocation_bytes = 4096, max_work = 2000,
+                max_attempts = 1, max_age_millis = 30000, faction_pointer_bytes = 8 } },
+            { begin_evidence = function() return {} end, finish_evidence = function() return {} end }))
+        local carrier = { begin_section = function() return 0 end,
+            push_record = function(_, row)
+                if busy then busy = false; return -21 end
+                pushed[#pushed + 1] = row.identity; return 0
+            end, finish_section = function() return 0 end, fail_section = function() end }
+        local result
+        for _ = 1, 2000 do
+            now = now + 1
+            local before = identity_reads
+            result = collector:tick({}, carrier, { selection = "ship_core", monotonic_millis = tostring(now),
+                producer_incarnation = "1" })
+            assert.is_true(identity_reads - before <= 32, "identity copying must yield")
+            if result.disposition ~= "collecting" and result.disposition ~= "producer_busy" then break end
+        end
+        assert.equals("sampled", result.disposition, "byte-safe census must not hit the old count quota")
+        assert.equals(129, #pushed)
+        local expected = {}; for i = 1, 129 do expected[i] = tostring(i) end; table.sort(expected)
+        assert.same(expected, pushed)
+    end)
+
     it("rejects limits and selection before touching X4", function()
         assert.same({ nil, "selection_unavailable" }, { module.new({}, {}) })
         assert.same({ nil, "limits_unavailable" }, { module.new({ faction_id = "argon" }, {}) })
