@@ -117,6 +117,30 @@ fn retry_keeps_exact_bytes_but_reconnect_discards_the_attempt() {
 }
 
 #[test]
+fn source_resets_discard_copied_records_for_load_reload_and_uncertainty() {
+    use observation_domain::{SourceBoundary, SourceEpochStatus};
+    for boundary in [SourceBoundary::GameLoaded, SourceBoundary::LuaReload] {
+        let (mut producer, mut source) = completed_ship_section(0);
+        let old = producer.pending_bytes().expect("old start").to_vec();
+        source.transport_epoch += 1;
+        source.source_boundary = boundary;
+        source.source_epoch_status = SourceEpochStatus::BoundaryUncertain;
+        producer.reset(source.clone(), 1).expect("source reset");
+        assert_eq!(producer.state(), ProducerState::AwaitingCompatibility);
+        assert_ne!(producer.pending_bytes(), Some(old.as_slice()));
+        assert_eq!(
+            producer.push_ship_core(&ship("9007199254740997")),
+            Err(ProducerError::InvalidTransition)
+        );
+        assert_eq!(
+            producer.finish_section(support::finish(2)),
+            Err(ProducerError::InvalidTransition)
+        );
+        let _source = source;
+    }
+}
+
+#[test]
 fn exact_durable_reconciliation_never_republishes_completion() {
     let (mut producer, source) = completed_ship_section(20);
     let _start = take_current(&mut producer, &source, "received", 20);

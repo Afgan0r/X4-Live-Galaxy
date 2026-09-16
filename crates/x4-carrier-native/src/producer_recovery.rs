@@ -58,6 +58,8 @@ impl Producer {
         };
         let mut source = self.source.clone();
         source.transport_epoch = transport_epoch;
+        source.source_boundary = observation_domain::SourceBoundary::TransportReconnect;
+        source.source_epoch_status = observation_domain::SourceEpochStatus::BoundaryUncertain;
         let bootstrap = bootstrap_bytes(&source, self.limits.control_message_bytes)?;
 
         self.discard_incomplete();

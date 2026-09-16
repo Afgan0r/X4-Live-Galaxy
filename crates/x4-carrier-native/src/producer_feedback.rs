@@ -54,7 +54,11 @@ impl Producer {
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::Disposition(value) => self.apply_disposition(&value, now_millis),
-            ControlBody::Reset(_) => Ok(ProducerOutcome::Disconnected),
+            ControlBody::Reset(_) => {
+                self.fail_section();
+                self.readiness = Readiness::Awaiting;
+                Ok(ProducerOutcome::Disconnected)
+            }
             _ => Err(ProducerError::InvalidTransition),
         }
     }
