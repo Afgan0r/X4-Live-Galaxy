@@ -95,10 +95,20 @@ pub(crate) enum ProducerProfile {
     Clock,
     ShipCore,
     ShipCargo,
+    ShipCrew,
+    ShipLoadout,
 }
 
 impl ProducerProfile {
     pub(crate) fn from_section_key(value: &str) -> Option<Self> {
+        if let Some(group) = value.strip_prefix("ship_loadout:g") {
+            let index = group.parse::<u16>().ok()?;
+            return (index.to_string() == group).then_some(Self::ShipLoadout);
+        }
+        if let Some(group) = value.strip_prefix("ship_crew:g") {
+            let index = group.parse::<u16>().ok()?;
+            return (index.to_string() == group).then_some(Self::ShipCrew);
+        }
         if let Some(group) = value.strip_prefix("ship_cargo:g") {
             let index = group.parse::<u16>().ok()?;
             return (index.to_string() == group).then_some(Self::ShipCargo);

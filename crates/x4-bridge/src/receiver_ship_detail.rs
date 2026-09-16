@@ -1,8 +1,8 @@
 use crate::ProductionError;
+use crate::receiver_ship_detail_record::record_dependency;
+pub use crate::receiver_ship_detail_record::validate_batch;
 use observation_application::{LifecycleError, ObservationLifecycle};
-use observation_domain::{
-    CargoObservation, CompleteMessage, ImmutableBatchEnvelope, SectionKey, SectionRevisionId,
-};
+use observation_domain::{CompleteMessage, ImmutableBatchEnvelope, SectionKey, SectionRevisionId};
 use observation_persistence::{CurrentRevision, ObservationRepository};
 use std::collections::BTreeMap;
 
@@ -11,8 +11,12 @@ const fn rejected() -> ProductionError {
 }
 
 pub fn is_key(key: &str) -> bool {
-    key.strip_prefix("ship_cargo:g")
-        .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
+    ["ship_cargo:g", "ship_crew:g", "ship_loadout:g"]
+        .iter()
+        .any(|prefix| {
+            key.strip_prefix(prefix)
+                .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
+        })
 }
 
 fn core<R: ObservationRepository>(
@@ -35,7 +39,8 @@ fn group(
         ObservationPolicyVersion, ShipDetailGroup, ShipGroupDescriptor, ShipIdentity,
     };
     let ordinal = key
-        .strip_prefix("ship_cargo:g")
+        .split_once(":g")
+        .map(|(_, ordinal)| ordinal)
         .and_then(|v| v.parse::<u16>().ok())
         .ok_or_else(rejected)?;
     let members = parent
@@ -71,31 +76,6 @@ pub fn dependencies<R: ObservationRepository>(
         current.revision().section_key.clone(),
         current.receipt().revision,
     )]))
-}
-
-pub fn validate_batch(
-    batch: &ImmutableBatchEnvelope,
-    faction: &str,
-) -> Result<(), ProductionError> {
-    if batch.records.len() != 1 || batch.optional_detail.is_some() || batch.section_ordinal == 0 {
-        return Err(rejected());
-    }
-    let record = batch.records.first().ok_or_else(rejected)?;
-    let cargo = CargoObservation::from_content(&record.content, 64).map_err(|_| rejected())?;
-    if cargo.dependency.owner.as_str() != faction
-        || cargo.dependency.identity.as_str().parse::<u64>().is_err()
-        || record.entity_id.as_str() != format!("x4:ship:{}", cargo.dependency.identity.as_str())
-        || record.record_id.as_str()
-            != format!(
-                "carrier-b:{}:{:020}",
-                batch.section_revision.get(),
-                batch.section_ordinal
-            )
-        || record.observation_version.get() != batch.section_revision.get()
-    {
-        return Err(rejected());
-    }
-    Ok(())
 }
 
 pub fn validate_dependency<R: ObservationRepository>(
@@ -170,8 +150,7 @@ fn validate_members(
     parent: &observation_persistence::RevisionRecord,
 ) -> Result<(), ProductionError> {
     for record in &batch.records {
-        let cargo = CargoObservation::from_content(&record.content, 64).map_err(|_| rejected())?;
-        let dependency = &cargo.dependency;
+        let dependency = record_dependency(&record.content)?;
         if dependency.core_revision != parent.revision
             || dependency.member_revision != parent.revision
             || dependency.capture.start_millis()

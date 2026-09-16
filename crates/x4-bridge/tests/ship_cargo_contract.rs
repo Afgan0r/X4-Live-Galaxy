@@ -32,6 +32,9 @@ fn cargo_dependency_and_nested_failures_preserve_accepted_core() {
     }
 }
 fn run_case(index: usize, from: &str, to: &str) {
+    run_family_case(index, "ship_cargo", CONTENT, from, to);
+}
+fn run_family_case(index: usize, family: &str, content: &str, from: &str, to: &str) {
     let database = carrier_b_support::database(&format!("cargo-negative-{index}"));
     let mut receiver = ProductionObservationSession::open(
         database.path(),
@@ -44,7 +47,7 @@ fn run_case(index: usize, from: &str, to: &str) {
     receiver.select_ship_core("argon").expect("selection");
     let messages = ship_support::messages(1, "argon");
     publish_core(&mut receiver, &messages);
-    let key = SectionKey::new("ship_cargo:g0").expect("key");
+    let key = SectionKey::new(format!("{family}:g0")).expect("key");
     assert_eq!(
         submit(
             &mut receiver,
@@ -57,7 +60,7 @@ fn run_case(index: usize, from: &str, to: &str) {
     assert!(
         submit(
             &mut receiver,
-            detail_batch(&messages[1], &key, from, to),
+            detail_batch(&messages[1], &key, content, from, to),
             "detail:batch",
             5
         )
@@ -121,16 +124,50 @@ fn detail_start(bytes: &[u8], key: &SectionKey) -> Vec<u8> {
     }
     encode_complete_message(&message, 4096).expect("encode")
 }
-fn detail_batch(bytes: &[u8], key: &SectionKey, from: &str, to: &str) -> Vec<u8> {
+fn detail_batch(bytes: &[u8], key: &SectionKey, content: &str, from: &str, to: &str) -> Vec<u8> {
     let mut message = decode_complete_message(bytes, 4096).expect("decode");
     if let CompleteMessage::ImmutableBatch(value) = &mut message {
         value.section_key = key.clone();
         value.section_revision = observation_domain::SectionRevisionId::new(2).expect("revision");
-        value.records[0].content = CONTENT.replace(from, to);
+        value.records[0].content = content.replace(from, to);
         value.records[0].record_id =
             observation_domain::RecordId::new("carrier-b:2:00000000000000000001").expect("id");
         value.records[0].observation_version =
             observation_domain::ObservationVersion::new(2).expect("version");
     }
     encode_complete_message(&message, 4096).expect("encode")
+}
+
+#[test]
+fn crew_and_loadout_wrong_parent_member_profile_and_signed_ranges_cannot_gain_authority() {
+    let header = CONTENT.split_once("\nwares_outcome").expect("header").0;
+    let crew = format!(
+        "{}\ncapacity_outcome=value\nincludepilot=true\nincludearriving=true\nrole_coverage=observed_count_fill_only\nroles_outcome=value\ncapacity_people=12\nrole=passenger|2|1|false\ntier=passenger|raw|-25|2",
+        header.replace("ship_cargo", "ship_crew")
+    );
+    let loadout = format!(
+        "{}\nphysical_outcome=value\nvirtual_outcome=empty\nsoftware_outcome=empty\nmissiles_outcome=value\nunits_outcome=empty\nmissile_semantics=raw_signed_inferred_items\nunits_selector=false\nvirtual_semantics=observed_macro_thruster_inferred\nphysical=engine|1|0|macro|..|\nmissile=ware|macro|-3",
+        header.replace("ship_cargo", "ship_loadout")
+    );
+    for (family, content) in [("ship_crew", crew), ("ship_loadout", loadout)] {
+        for (index, (from, to)) in [
+            ("core_revision=1", "core_revision=9"),
+            ("member_revision=1", "member_revision=9"),
+            ("owner=argon", "owner=teladi"),
+            ("profile=ship_", "profile=wrong_"),
+            ("capture_end=11", "capture_end=9"),
+            ("9007199254740993", "9007199254740994"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            run_family_case(index, family, &content, from, to);
+        }
+        let (from, to) = if family == "ship_crew" {
+            ("|-25|", "|2147483648|")
+        } else {
+            ("|-3", "|-2147483649")
+        };
+        run_family_case(9, family, &content, from, to);
+    }
 }

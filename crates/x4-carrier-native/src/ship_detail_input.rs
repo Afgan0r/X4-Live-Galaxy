@@ -89,7 +89,7 @@ pub unsafe fn cargo(
     Some((source_scope, record))
 }
 
-unsafe fn dependency(api: LuaApi, state: *mut c_void) -> Option<ShipDetailDependency> {
+pub(crate) unsafe fn dependency(api: LuaApi, state: *mut c_void) -> Option<ShipDetailDependency> {
     let string = |key, limit| unsafe { field_string(api, state, 2, key, limit) };
     Some(ShipDetailDependency {
         identity: ShipIdentity::new(string("identity", 20)?).ok()?,

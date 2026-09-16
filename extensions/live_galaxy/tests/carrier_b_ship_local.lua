@@ -2,7 +2,7 @@ local root, mode, result_path = ...
 package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 local carrier = assert(require("extensions.live_galaxy.lua.live_galaxy_carrier").new({
     limits = { data_message_bytes = 4096, control_message_bytes = 512, max_records = 16,
-        max_content_bytes = 512, max_canonical_bytes = 4096, max_batches = 16, max_work = 129,
+        max_content_bytes = 2048, max_canonical_bytes = 4096, max_batches = 16, max_work = 129,
         max_age_millis = 5000, pending_slots = 1, max_attempts = 2, max_retry_age_millis = 5000,
         availability_interval_millis = 5000 },
     source = { source_scope = "x4:faction:argon:ships", source_epoch_status = "unknown",
@@ -86,12 +86,75 @@ if mode == "heavy-ship-detail" then
         end
     end
     source.cargo_wares = function(_, id) called(); return { energycells = 7, ore = 11 } end
+    source.crew_capacity = function() called(); return 12 + revision end
+    source.crew_count = function() called(); return 2 end
+    source.crew_size = function() return 40 end
+    source.crew_allocate = function() return {} end
+    source.crew_fill = function()
+        called(); return {
+            { id = "service", amount_people = 7, reported_numtiers = 1, canhire = true, tiers = {} },
+            { id = "passenger", amount_people = 2, reported_numtiers = 1, canhire = false, tiers = {} } }
+    end
+    source.crew_tier_size = function() return 16 end
+    source.crew_tier_allocate = function() return {} end
+    source.crew_tier_fill = function(_, id, role)
+        called(); return { { name = "raw", skill_lower_threshold = -25, amount_people = role == "service" and 7 or 2 } }
+    end
+    source.physical_count = function() called(); return 1 end
+    source.physical_component = function() called(); return "0" end
+    source.physical_macro = function(_, id, kind) called(); return kind .. "_installed_macro" end
+    source.physical_group = function() called(); return { path = "..", group = "" } end
+    source.virtual_count = function(_, id, kind) called(); return kind == "thruster" and 1 or 0 end
+    source.virtual_macro = function() called(); return "thruster_current_macro" end
+    source.software_count = function() called(); return 1 end
+    source.software_size = function() return 16 end
+    source.software_allocate = function() return {} end
+    source.software_fill = function() called(); return { { maximum = "software_max", current = "software_current" } } end
+    source.missiles_count = function() called(); return 1 end
+    source.missiles_size = function() return 24 end
+    source.missiles_allocate = function() return {} end
+    source.missiles_fill = function() called(); return { { ware = "missile_ware", macro_name = "missile_macro", amount_raw = -revision } } end
+    source.units_count = function() called(); return 2 end
+    source.units_size = function() return 24 end
+    source.units_allocate = function() return {} end
+    source.units_fill = function() called(); return {
+        { macro_name = "drone_macro", category = "defence", amount_items = 7 },
+        { macro_name = "unit_macro", category = "unfiltered_raw", amount_items = 2 } } end
     source.cargo_storage_count = function() called(); return 1 end
     source.cargo_storage_size = function() return 24 end
     source.cargo_storage_allocate = function() return {} end
     source.cargo_storage_fill = function()
         called(); return { { transport = "solid", capacity_cubic_metres = 1200,
             occupied_cubic_metres = 110 } }
+    end
+    local function copy(value)
+        if type(value) ~= "table" then return value end
+        local result = {}; for key, item in pairs(value) do result[key] = copy(item) end
+        return result
+    end
+    local function invalid_detail(observation, family)
+        local mutations = family == "ship_crew" and {
+            function(v) v.capacity_people = "12" end,
+            function(v) v.roles[1].tiers[1].skill_lower_threshold = 2147483648 end,
+            function(v) v.roles[1].canhire = 1 end,
+            function(v) setmetatable(v.roles[1], {}) end,
+        } or {
+            function(v) v.physical[1].component = 0 end,
+            function(v) v.physical[1].slot = 0 end,
+            function(v) v.missiles[1].amount_raw = "-3" end,
+            function(v) v.onlydrones = true end,
+            function(v) setmetatable(v.units[1], {}) end,
+        }
+        for _, mutate in ipairs(mutations) do
+            local value = copy(observation.pending)
+            value.profile, value.source_scope = family, "x4:faction:argon:ships"
+            value.identity, value.owner = observation.group.members[1], "argon"
+            value.core_revision, value.member_revision, value.policy_version = "1", "1", 2
+            value.capture_start_millis, value.capture_end_millis = tostring(20 + revision), tostring(30 + revision)
+            value.source_evidence = "x4-9.00-steam-23660954-ship-detail-source-v1"
+            mutate(value)
+            assert(carrier:push_record(value) == -20, "strict detail ABI must reject malformed nested input")
+        end
     end
     for cycle = 1, 2 do
         for group_index = 0, 1 do
@@ -127,6 +190,39 @@ if mode == "heavy-ship-detail" then
             until false
             revision = revision + 1
         end
+    end
+    for _, family in ipairs({ "ship_crew", "ship_loadout" }) do
+    for cycle = 1, 2 do
+        for group_index = 0, 1 do
+            local members = {}
+            for i = 1, 4 do members[i] = "900719925474099" .. tostring(group_index * 4 + i + 1) end
+            local detail_begin, detail_finish = {}, {}
+            for k, v in pairs(begin) do detail_begin[k] = v end
+            for k, v in pairs(finish) do detail_finish[k] = v end
+            detail_begin.capture_start_millis, detail_finish.capture_end_millis = tostring(20 + revision), tostring(30 + revision)
+            local key = family .. ":g" .. group_index
+            local observation = assert(require("live_galaxy.lua.live_galaxy_ship_details").new({
+                ship_api = source, max_inner = 16, max_allocation_bytes = 2048,
+                source_scope = "x4:faction:argon:ships", group = { key = key,
+                    members = members, owner = "argon", core_revision = "1" } },
+                { begin_evidence = function() return detail_begin end, finish_evidence = function() return detail_finish end }))
+            local sampled, deadline = false, host_monotonic_millis() + 15000
+            repeat
+                local _, status = carrier:progress(1)
+                local control = carrier:poll_control()
+                if not sampled and status and status.capacity:match("^available:") and status.selection == key then
+                    if observation.stage == "record" and observation.index == 1 then invalid_detail(observation, family) end
+                    local result = observation:tick({}, carrier, status)
+                    assert(result.disposition == "collecting" or result.disposition == "sampled" or result.disposition == "producer_busy", result.disposition)
+                    sampled = result.disposition == "sampled"
+                end
+                if sampled and control == 5 then break end
+                assert(host_monotonic_millis() < deadline, "crew commit watchdog")
+                host_sleep(1)
+            until false
+            revision = revision + 1
+        end
+    end
     end
 end
 if mode == "heavy-ship-restart" then

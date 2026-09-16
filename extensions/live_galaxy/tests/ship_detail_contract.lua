@@ -72,3 +72,103 @@ describe("source-faithful resumable cargo", function()
         assert.equals(0, #rejected); assert.equals(0, completed); assert.equals(1, failed)
     end)
 end)
+
+describe("resumable aggregate crew and installed state", function()
+    local fixture, module
+    before_each(function() fixture = helper.new(); module = fixture.load("live_galaxy_ship_details") end)
+    after_each(function() fixture.restore() end)
+    local function run(family, api, maximum)
+        local record, failure, calls = nil, nil, 0
+        local wrapped = {}
+        for name, fn in pairs(api) do
+            wrapped[name] = function(...)
+                if not name:match("_size$") then calls = calls + 1 end
+                return fn(...)
+            end
+        end
+        local carrier = {
+            begin_section = function() return 0 end,
+            push_record = function(_, value) record = value; return 0 end,
+            finish_section = function() return 0 end,
+            fail_section = function(_, reason) failure = reason; return 0 end,
+        }
+        local key = family .. ":g0"
+        local collector = assert(module.new({ ship_api = wrapped, max_inner = maximum or 8,
+            max_allocation_bytes = 256, source_scope = "x4:faction:argon:ships",
+            group = { key = key, owner = "argon", core_revision = "7", members = { "9007199254740993" } } }, {
+            begin_evidence = function() return { capture_start_millis = "100" } end,
+            finish_evidence = function() return { capture_end_millis = "110" } end,
+        }))
+        for _ = 1, 100 do
+            local before = calls
+            local result = collector:tick({}, carrier, { selection = key })
+            assert.is_true(calls - before <= 1, "one native getter or allocation per callback")
+            if result.disposition ~= "collecting" then return record, failure, result end
+        end
+        error("bounded fixture did not finish")
+    end
+    local function crew()
+        return {
+            crew_capacity = function() return 12 end, crew_count = function() return 2 end,
+            crew_size = function() return 40 end, crew_allocate = function() return {} end,
+            crew_fill = function() return {
+                { id = "service", amount_people = 7, reported_numtiers = 1, canhire = true },
+                { id = "passenger", amount_people = 2, reported_numtiers = 0, canhire = false } } end,
+            crew_tier_size = function() return 16 end, crew_tier_allocate = function() return {} end,
+            crew_tier_fill = function(_, _, role) return role == "service" and {
+                { name = "Raw tier", skill_lower_threshold = -25, amount_people = 7 } } or {} end,
+        }
+    end
+    it("keeps non-hireable roles, absent pilot and signed qualification tiers", function()
+        local record, failure, result = run("ship_crew", crew())
+        assert.is_nil(failure); assert.equals("sampled", result.disposition)
+        assert.is_true(record.includepilot); assert.equals(12, record.capacity_people)
+        assert.equals(2, #record.roles); assert.equals("passenger", record.roles[1].id)
+        assert.is_false(record.roles[1].canhire); assert.equals(0, #record.roles[1].tiers)
+        assert.equals(-25, record.roles[2].tiers[1].skill_lower_threshold)
+    end)
+    it("refuses crew count before allocation and raw tier overflow before publication", function()
+        local api = crew(); api.crew_count = function() return 9 end
+        local record, failure = run("ship_crew", api)
+        assert.is_nil(record); assert.equals("collection_overflow", failure)
+        api = crew(); api.crew_tier_fill = function(_, _, role) return role == "service" and {
+            { name = "raw", skill_lower_threshold = 2147483648, amount_people = 7 } } or {} end
+        record, failure = run("ship_crew", api)
+        assert.is_nil(record); assert.equals("invalid_fact", failure)
+    end)
+    local function loadout()
+        local api = {
+            physical_count = function() return 1 end, physical_component = function() return "0" end,
+            physical_macro = function(_, _, kind) return kind .. "_installed_macro" end,
+            physical_group = function() return { path = "..", group = "" } end,
+            virtual_count = function(_, _, kind) return kind == "thruster" and 1 or 0 end,
+            virtual_macro = function() return "thruster_macro" end,
+        }
+        for _, family in ipairs({ "software", "missiles", "units" }) do
+            api[family .. "_count"] = function() return 1 end
+            api[family .. "_size"] = function() return 24 end
+            api[family .. "_allocate"] = function() return {} end
+        end
+        api.software_fill = function() return { { maximum = "max", current = "current" } } end
+        api.missiles_fill = function() return { { ware = "missile", macro_name = "macro", amount_raw = -3 } } end
+        api.units_fill = function() return { { macro_name = "unit", category = "unfiltered_raw", amount_items = 2 } } end
+        return api
+    end
+    it("keeps installed macro-only pseudo-groups and every distinct field family", function()
+        local record, failure, result = run("ship_loadout", loadout())
+        assert.is_nil(failure); assert.equals("sampled", result.disposition)
+        assert.equals(4, #record.physical); assert.equals("0", record.physical[1].component)
+        assert.equals("..", record.physical[1].path); assert.equals("", record.physical[1].group)
+        assert.equals("thruster", record.virtual_slots[1].kind)
+        assert.equals("current", record.software[1].current)
+        assert.equals(-3, record.missiles[1].amount_raw)
+        assert.equals("unfiltered_raw", record.units[1].category); assert.is_false(record.onlydrones)
+    end)
+    it("refuses cumulative physical slots and array allocation overflow", function()
+        local record, failure = run("ship_loadout", loadout(), 3)
+        assert.is_nil(record); assert.equals("collection_overflow", failure)
+        local api = loadout(); api.software_size = function() return 257 end
+        record, failure = run("ship_loadout", api)
+        assert.is_nil(record); assert.equals("collection_overflow", failure)
+    end)
+end)

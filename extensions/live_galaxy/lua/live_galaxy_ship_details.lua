@@ -1,11 +1,18 @@
 local details = {}
 local source = require("live_galaxy.lua.live_galaxy_ship_source")
+local crew_capture = require("live_galaxy.lua.live_galaxy_ship_crew_capture")
+local loadout_capture = require("live_galaxy.lua.live_galaxy_ship_loadout_capture")
 local MAX_INTEGER = 9007199254740991
 local function integer(v, maximum)
     return type(v) == "number" and v >= 0 and v <= maximum and v % 1 == 0
 end
 local function token(v)
     return type(v) == "string" and #v > 0 and #v <= 128 and v:match("^[%w_:%-]+$") ~= nil
+end
+local function start_stage(kind)
+    if kind == "ship_crew" then return "crew_capacity" end
+    if kind == "ship_loadout" then return "loadout_init" end
+    return "wares"
 end
 
 function details.new(options, clock)
@@ -15,7 +22,8 @@ function details.new(options, clock)
         or options.max_allocation_bytes == 0 then return nil, "invalid_limits" end
     return setmetatable({ api = options.ship_api or source.runtime(), clock = clock,
         limit = limit, allocation = options.max_allocation_bytes, stage = "reserve",
-        group = options.group, scope = options.source_scope }, { __index = details })
+        group = options.group, scope = options.source_scope,
+        kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
 end
 
 function details:fail(carrier, reason)
@@ -36,7 +44,13 @@ function details:tick(context, carrier, status)
         begin.source_epoch_status, begin.source_boundary = "unknown", context.source_boundary or "runtime_start"
         if carrier:begin_section(begin) ~= 0 then return self:fail(carrier, "reservation_failed") end
         self.reserved, self.index, self.capture_start = true, 1, begin.capture_start_millis
-        self.stage = "wares"
+        self.stage = start_stage(self.kind)
+    elseif self.stage:match("^crew_") then
+        local ok, err = crew_capture.step(self)
+        if not ok then return self:fail(carrier, err) end
+    elseif self.stage:match("^loadout_") then
+        local ok, err = loadout_capture.step(self)
+        if not ok then return self:fail(carrier, err) end
     elseif self.stage == "wares" then
         local raw = self.api:cargo_wares(group.members[self.index])
         if type(raw) ~= "table" or getmetatable(raw) ~= nil then return self:fail(carrier, "cargo_unknown") end
@@ -79,19 +93,21 @@ function details:tick(context, carrier, status)
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end
         local record = self.pending
-        record.profile, record.source_scope = "ship_cargo", self.scope
+        record.profile, record.source_scope = self.kind, self.scope
         record.identity, record.owner = group.members[self.index], group.owner
         record.core_revision, record.member_revision = group.core_revision, group.core_revision
         record.policy_version = 2
         record.capture_start_millis, record.capture_end_millis = self.capture_start, finish.capture_end_millis
         record.source_evidence = "x4-9.00-steam-23660954-ship-detail-source-v1"
-        record.wares_outcome = #record.wares == 0 and "empty" or "value"
-        record.storage_outcome = #record.storage == 0 and "empty" or "value"
+        if self.kind == "ship_cargo" then
+            record.wares_outcome = #record.wares == 0 and "empty" or "value"
+            record.storage_outcome = #record.storage == 0 and "empty" or "value"
+        end
         local code = carrier:push_record(record)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then return self:fail(carrier, "fact_rejected") end
         self.index, self.pending = self.index + 1, nil
-        self.stage = self.index > #group.members and "complete" or "wares"
+        self.stage = self.index > #group.members and "complete" or start_stage(self.kind)
     elseif self.stage == "complete" then
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end

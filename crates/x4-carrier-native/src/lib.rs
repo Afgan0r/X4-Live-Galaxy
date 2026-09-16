@@ -20,6 +20,7 @@ mod lua_producer_operations;
 #[cfg(all(test, windows))]
 mod lua_producer_test_support;
 mod lua_progress;
+mod lua_record_operation;
 mod lua_ship_input;
 mod lua_table;
 mod lua_transport;
@@ -33,7 +34,9 @@ mod producer_seal;
 mod producer_ship_detail;
 mod producer_types;
 mod producer_validation;
+mod ship_crew_input;
 mod ship_detail_input;
+mod ship_loadout_input;
 mod transport;
 mod transport_peer;
 mod transport_types;

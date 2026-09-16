@@ -15,7 +15,7 @@ end
 function source.runtime()
     local ffi = require("ffi")
     local C = ffi.C
-    return {
+    local api = {
         count_factions = function() return C.GetNumAllFactions(false) end,
         new_faction_buffer = function(_, count) return ffi.new("const char*[?]", count) end,
         fill_factions = function(_, buffer, count) return C.GetAllFactions(buffer, count, false) end,
@@ -37,6 +37,34 @@ function source.runtime()
         cargo_wares = function(_, identity)
             return GetComponentData(ConvertStringToLuaID(identity), "cargo")
         end,
+        crew_capacity = function(_, identity)
+            return tonumber(C.GetPeopleCapacity(ConvertStringToLuaID(identity), true))
+        end,
+        crew_count = function() return tonumber(C.GetNumAllRoles()) end,
+        crew_size = function() return ffi.sizeof("PeopleInfo") end,
+        crew_allocate = function(_, count) return ffi.new("PeopleInfo[?]", count) end,
+        crew_fill = function(_, identity, buffer, count)
+            local returned = tonumber(C.GetPeople2(buffer, count, ConvertStringToLuaID(identity), true))
+            if returned == nil or returned < 0 or returned > count then return nil end
+            local rows = {}
+            for i = 0, returned - 1 do
+                rows[i + 1] = { id = ffi.string(buffer[i].id), amount_people = tonumber(buffer[i].amount),
+                    reported_numtiers = tonumber(buffer[i].numtiers), canhire = buffer[i].canhire, tiers = {} }
+            end
+            return rows
+        end,
+        crew_tier_size = function() return ffi.sizeof("RoleTierData") end,
+        crew_tier_allocate = function(_, count) return ffi.new("RoleTierData[?]", count) end,
+        crew_tier_fill = function(_, identity, role, buffer, count)
+            local returned = tonumber(C.GetRoleTiers(buffer, count, ConvertStringToLuaID(identity), role))
+            if returned == nil or returned < 0 or returned > count then return nil end
+            local rows = {}
+            for i = 0, returned - 1 do
+                rows[i + 1] = { name = ffi.string(buffer[i].name),
+                    skill_lower_threshold = tonumber(buffer[i].skilllevel), amount_people = tonumber(buffer[i].amount) }
+            end
+            return rows
+        end,
         cargo_storage_count = function(_, identity)
             return tonumber(C.GetNumCargoTransportTypes(ConvertStringToLuaID(identity), true))
         end,
@@ -56,6 +84,8 @@ function source.runtime()
             return copied
         end,
     }
+    require("live_galaxy.lua.live_galaxy_ship_loadout_source").extend(api, ffi, C, source.identity)
+    return api
 end
 
 return source

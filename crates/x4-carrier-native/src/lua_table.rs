@@ -67,6 +67,32 @@ pub unsafe fn field_bool(api: LuaApi, state: *mut c_void, index: c_int, key: &st
     value
 }
 
+pub unsafe fn field_signed(
+    api: LuaApi,
+    state: *mut c_void,
+    index: c_int,
+    key: &str,
+) -> Option<i32> {
+    let table = unsafe { absolute(api, state, index) };
+    unsafe {
+        push_key(api, state, key);
+        (api.raw_get)(state, table);
+    }
+    let number = unsafe { (api.to_number)(state, -1) };
+    let value = if unsafe { (api.lua_type)(state, -1) } == 3
+        && number.is_finite()
+        && number.fract() == 0.0
+        && number >= f64::from(i32::MIN)
+        && number <= f64::from(i32::MAX)
+    {
+        i32::try_from(unsafe { (api.to_integer)(state, -1) }).ok()
+    } else {
+        None
+    };
+    unsafe { pop(api, state) };
+    value
+}
+
 unsafe fn strict_string(
     api: LuaApi,
     state: *mut c_void,

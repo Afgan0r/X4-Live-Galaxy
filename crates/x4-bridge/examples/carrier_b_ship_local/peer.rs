@@ -129,7 +129,7 @@ pub fn qualify(
             section_key: "ship_core".into(),
             next_revision: floor,
             max_records: 16,
-            max_raw_bytes: 512,
+            max_raw_bytes: 2048,
             max_work: 129,
         }),
         ControlBody::Demand(DemandBody { credit: 1 }),

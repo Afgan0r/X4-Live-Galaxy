@@ -17,6 +17,14 @@ pub fn serve(receiver: &mut ProductionObservationSession) -> Result<Trace> {
         ("ship_cargo:g1", 3, 4),
         ("ship_cargo:g0", 4, 4),
         ("ship_cargo:g1", 5, 4),
+        ("ship_crew:g0", 6, 4),
+        ("ship_crew:g1", 7, 4),
+        ("ship_crew:g0", 8, 4),
+        ("ship_crew:g1", 9, 4),
+        ("ship_loadout:g0", 10, 4),
+        ("ship_loadout:g1", 11, 4),
+        ("ship_loadout:g0", 12, 4),
+        ("ship_loadout:g1", 13, 4),
     ]
     .into_iter()
     .enumerate()
@@ -50,7 +58,7 @@ fn demand(
             section_key: key.into(),
             next_revision: revision,
             max_records: 16,
-            max_raw_bytes: 512,
+            max_raw_bytes: 2048,
             max_work: 129,
         }),
     )?;
@@ -71,7 +79,9 @@ fn cycle(
 ) -> Result<Vec<u8>> {
     let mut last = Vec::new();
     for ordinal in 0..count + 2 {
-        let bytes = wire::receive(peer)?;
+        let bytes = wire::receive(peer).map_err(|error| {
+            format!("detail receive key={key} revision={revision} ordinal={ordinal}: {error}")
+        })?;
         let (id, observed) = wire::message_identity(&bytes)?;
         if observed != revision {
             return Err("detail revision drift".into());

@@ -32,12 +32,18 @@ fn main() -> Result<()> {
         readback::verify_cargo(&database)?;
         crew_readback::verify(&database)?;
         let mut receiver = session(&database)?;
-        for completion in completions.iter().skip(3) {
+        // Exact replay reconciles the current revision for each group. Earlier
+        // retained revisions were independently read above, not republished.
+        for (_, completion) in completions
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| matches!(index, 3 | 4 | 7 | 8 | 11 | 12))
+        {
             peer::replay(&mut receiver, completion)?;
         }
         writeln!(
             std::io::stdout(),
-            "PASS actual_chain_cargo independent_history_current=true groups=2 revisions=2,3,4,5"
+            "PASS actual_chain_cargo_crew_loadout independent_history_current=true groups=2 revisions=2..13 replay=current_exact"
         )?;
         return Ok(());
     }

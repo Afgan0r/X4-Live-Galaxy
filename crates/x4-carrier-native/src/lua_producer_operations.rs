@@ -37,22 +37,7 @@ pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
     unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
 }
 
-pub unsafe extern "C" fn push_record(state: *mut c_void) -> c_int {
-    let Some((api, handle)) = (unsafe { context(state) }) else {
-        return invalid(state);
-    };
-    let Some(input) = (unsafe { crate::lua_input::record(api, state) }) else {
-        return unsafe { push_code(api, state, -20) };
-    };
-    let result = with_producer(handle, |producer| match input {
-        crate::lua_input::RecordInput::Clock(fact) => producer.push_record(&fact),
-        crate::lua_input::RecordInput::ShipCore(record) => producer.push_ship_core(&record),
-        crate::lua_input::RecordInput::ShipCargo(scope, record) => {
-            producer.push_ship_cargo(&scope, &record)
-        }
-    });
-    unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
-}
+pub use crate::lua_record_operation::push_record;
 
 pub unsafe extern "C" fn finish_section(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {

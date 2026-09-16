@@ -18,6 +18,8 @@ mod ship_detail;
 mod ship_detail_codec;
 mod ship_field;
 mod ship_group;
+mod ship_loadout;
+mod ship_loadout_decode;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
 pub use identity::{
@@ -54,3 +56,6 @@ pub use ship_detail::{
 };
 pub use ship_field::{FieldApplicability, FieldOutcome, SourceEvidenceRef};
 pub use ship_group::{ShipDetailGroup, ShipGroupDescriptor, ShipGroupError};
+pub use ship_loadout::{
+    InstalledSlot, InstalledSoftware, LoadoutObservation, MissileCargo, ShipUnit, VirtualSlot,
+};

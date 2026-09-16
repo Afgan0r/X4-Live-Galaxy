@@ -2,9 +2,12 @@ use observation_domain::SenderEvidence;
 
 pub fn is_ship_section(key: &str) -> bool {
     key == "ship_core"
-        || key
-            .strip_prefix("ship_cargo:g")
-            .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
+        || ["ship_cargo:g", "ship_crew:g", "ship_loadout:g"]
+            .iter()
+            .any(|prefix| {
+                key.strip_prefix(prefix)
+                    .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
+            })
 }
 
 pub fn ship_order_matches(

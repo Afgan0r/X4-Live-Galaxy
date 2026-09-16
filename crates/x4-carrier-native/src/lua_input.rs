@@ -21,6 +21,8 @@ pub enum RecordInput {
     Clock(TypedFact),
     ShipCore(observation_domain::ShipCoreRecord),
     ShipCargo(String, observation_domain::CargoObservation),
+    ShipCrew(String, observation_domain::CrewObservation),
+    ShipLoadout(String, observation_domain::LoadoutObservation),
 }
 
 const BEGIN_KEYS: [&str; 11] = [
@@ -59,7 +61,11 @@ pub unsafe fn begin(
     source: &ProducerSource,
 ) -> Option<BeginInput> {
     let section_key = unsafe { field_string(api, state, 2, "section_key", 64) }?;
-    if section_key == "ship_core" || section_key.starts_with("ship_cargo:g") {
+    if section_key == "ship_core"
+        || section_key.starts_with("ship_cargo:g")
+        || section_key.starts_with("ship_crew:g")
+        || section_key.starts_with("ship_loadout:g")
+    {
         return unsafe { crate::lua_ship_input::begin(api, state, source, &BEGIN_KEYS) };
     }
     if !unsafe { exact_keys(api, state, 2, &BEGIN_KEYS) }
@@ -105,6 +111,26 @@ pub unsafe fn begin(
 }
 
 pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
+    if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_loadout") {
+        let limit = crate::abi::PRODUCER
+            .lock()
+            .ok()?
+            .as_ref()?
+            .limits
+            .max_records;
+        return unsafe { crate::ship_loadout_input::loadout(api, state, limit) }
+            .map(|(scope, record)| RecordInput::ShipLoadout(scope, record));
+    }
+    if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_crew") {
+        let limit = crate::abi::PRODUCER
+            .lock()
+            .ok()?
+            .as_ref()?
+            .limits
+            .max_records;
+        return unsafe { crate::ship_crew_input::crew(api, state, limit) }
+            .map(|(scope, record)| RecordInput::ShipCrew(scope, record));
+    }
     if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_cargo") {
         let limit = crate::abi::PRODUCER
             .lock()
