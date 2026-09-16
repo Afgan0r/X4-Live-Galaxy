@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 13
+open_count: 12
 waived_count: 0
-fixed_count: 0
+fixed_count: 1
 total_count: 13
-last_updated: 2026-09-16T07:11:20.927Z
+last_updated: 2026-09-16T12:02:25.890Z
 ---
 
 # Broken Windows Ledger
@@ -27,7 +27,7 @@ last_updated: 2026-09-16T07:11:20.927Z
 | 10 | 05.1 | deviation | crates/observation-ingest/src/generation.rs |  | Explicit resume generation was added to preserve restart replay and stale-generation rejection. | open |  | 2026-08-31T21:28:12.067Z |  |
 | 11 | 05.1 | deviation | crates/observation-ingest/tests/batch_bounds.rs |  | Task 2 began green because the Task 1 tracer already supplied streamed legacy-bound isolation. | open |  | 2026-08-31T21:28:12.451Z |  |
 | 12 | 05.3 | deviation | .planning/STATE.md |  | Corrected stale out-of-order sequential plan counter after Plan 05 completion | open |  | 2026-09-04T22:24:07.147Z |  |
-| 13 | 05.5 | unrun-verify | tests/carrier-b-local.ps1 |  | Plan 01 heavy-ship-core end-to-end verification not run: exact faction API call shapes are not available through registered evidence. | open |  | 2026-09-16T07:11:20.927Z |  |
+| 13 | 05.5 | unrun-verify | tests/carrier-b-local.ps1 |  | Plan 01 heavy-ship-core end-to-end verification not run: exact faction API call shapes are not available through registered evidence. | fixed |  | 2026-09-16T07:11:20.927Z | 2026-09-16T12:02:25.890Z |
 
 ````json
 [
@@ -182,10 +182,10 @@ last_updated: 2026-09-16T07:11:20.927Z
     "file": "tests/carrier-b-local.ps1",
     "line": null,
     "description": "Plan 01 heavy-ship-core end-to-end verification not run: exact faction API call shapes are not available through registered evidence.",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-16T07:11:20.927Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-16T12:02:25.890Z"
   }
 ]
 ````
