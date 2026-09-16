@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-17
+
+- Clarified fixed-pipe test isolation after Phase 05.5 Plan 09's workspace
+  regression collided with its running heavy recovery scenario. The clean
+  serial regression passed after the owned endpoint was released; see
+  `05.5-09-SUMMARY.md` and implementation commit `5e3f45a`.
+
 ## 2026-09-10
 
 - Required offline readback of both earlier and current revisions after the

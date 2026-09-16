@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: paused
-stopped_at: Phase 05.5 remaining work replanned and checked; owner approval pending
-last_updated: "2026-09-16T12:03:37.472Z"
-last_activity: 2026-09-16
-last_activity_desc: Phase 05.5 plans 09-11 independently checked; no game run
-state_head: a7e5a2c9b314fff4065f7a16eb1122f94cd6e163
+stopped_at: Phase 05.5 Plan 09 locally complete; Plan 10 initial experiment approval pending
+last_updated: "2026-09-16T19:27:51Z"
+last_activity: 2026-09-17
+last_activity_desc: Phase 05.5 Plan 09 locally complete and pushed; no game run
+state_head: b718c67
 progress:
   total_phases: 14
   completed_phases: 7
-  total_plans: 55
-  completed_plans: 48
+  total_plans: 51
+  completed_plans: 49
   percent: 43
 ---
 
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 ## Current Position
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PAUSED
-Plan: 1 of 4 active plans complete; next is 09
-Status: Plan 01 complete; plans 02-08 superseded; checked plans 09-11 await owner approval
-Last activity: 2026-09-16 — Remaining work replanned; independent plan-check passed; no game run
+Plan: 2 of 4 active plans complete; next is 10
+Status: Plans 01 and 09 complete locally; Plan 10 initial experiment requires explicit owner consent
+Last activity: 2026-09-17 — Production details, shared limits, history and recovery locally verified and pushed; no game run
 
-Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 1 of 4 active plans complete)
+Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
 ## Performance Metrics
 
@@ -218,7 +218,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: Independent plan-check passed for the revised 01 -> 09 -> 10 -> 11 chain. Owner approval is pending. Plan 09 Task 1 owns selective integration of useful old-02 preparation from commits `cab157d`/`64b68b8`, without old SUMMARY/STATE/halt metadata. All 21 unperformed runtime outcomes remain pending; no experiment envelope or game run is approved.
+- [Phase 05.5]: Owner approved the checked revised 01 -> 09 -> 10 -> 11 chain. Plan 09 is locally complete and pushed, including selective source integration, copied UpgradeGroup fields, actual Lua/DLL/pipe/production-runtime history, validated profile and interrupted-family recovery. Package source is `5e3f45a`; manifest SHA-256 is `0a72f75c9373842b88e3658b2ec7fb4f1f176e8e44fa0b218e496f295acf9d7e`. All 21 runtime outcomes remain pending; proposed 60-second experimental envelope and game actions require separate Plan 10 consent. Core count above 128 is refused, not truncated; a synchronous native call cannot be preempted.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -251,6 +251,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-16
-Stopped at: Phase 05.5 checked replan awaits owner approval
-Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
+Last session: 2026-09-17
+Stopped at: Phase 05.5 Plan 10 initial experimental consent
+Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-09-SUMMARY.md

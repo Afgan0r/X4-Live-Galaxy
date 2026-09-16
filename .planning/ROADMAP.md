@@ -341,14 +341,14 @@ Plans:
 
 **Research:** Required; owner discussion approved on 2026-09-11. Exact ship APIs, faction classification, completeness, applicability and workload limits require source-backed research and checked plans, followed by owner approval before execution.
 **Canonical refs:** `.planning/phases/05.5-heavy-faction-ship-conformance/05.5-CONTEXT.md`; `docs/architecture-decisions.md` ADR-LG-022; `docs/architecture-verification.md` VER-LG-003/011/012.
-**Plans:** 1/4 active plans executed; owner-requested replan 09–11 passed independent plan-check and awaits owner approval. Historical 02–08 are superseded, not completed; see `05.5-EXECUTION-REVISION.md` for source integration and migration.
+**Plans:** 2/4 active plans executed locally (01, 09); owner approved checked replan 09–11. Plan 10 awaits separate initial experimental consent and X4 evidence. Historical 02–08 are superseded, not completed; see `05.5-EXECUTION-REVISION.md` for source integration and migration.
 **Wave 1**
 
 - [x] 05.5-01-PLAN.md
 
 **Wave 2** *(includes bounded source-preparation integration in Task 1)*
 
-- [ ] 05.5-09-PLAN.md — Production ordinary-faction details, effective bounds, recovery and calibration package.
+- [x] 05.5-09-PLAN.md — Production ordinary-faction details, effective bounds, recovery and calibration package (locally verified; game evidence pending).
 
 **Wave 3** *(after 09)*
 

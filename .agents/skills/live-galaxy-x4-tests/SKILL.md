@@ -40,6 +40,10 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   reconnects. After multiple commits, exercise offline readback for both an
   earlier retained revision and the current revision; checking only current
   cannot prove independently readable history.
+  Serialize suites that share a fixed native pipe endpoint and wait for the
+  preceding scenario to release it. A `PipeCreationFailed` caused by another
+  owned test is an isolation failure, not production evidence; establish the
+  result with a clean serial run before claiming regression success.
 - **XT-05 — In-game evidence:** Use a disposable Creative Custom campaign or
   approved test copy under a written plan. The user performs all X4 actions.
   Report a scenario as `observed in X4` only after expected behavior and its
