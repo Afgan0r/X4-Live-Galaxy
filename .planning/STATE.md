@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
-status: executing
-stopped_at: Phase 05.5 Plan 01 locally complete; Plan 02 source probe preparation
+status: paused
+stopped_at: Phase 05.5 Plan 02 Task 1 prepared; detail source enrichment required before owner probe
 last_updated: "2026-09-16T12:03:37.472Z"
 last_activity: 2026-09-16
-last_activity_desc: Phase 05.5 Plan 01 locally verified and merged; Plan 02 next
+last_activity_desc: Phase 05.5 Plan 02 halted at source and owner checkpoint; no game run
 state_head: a7e5a2c9b314fff4065f7a16eb1122f94cd6e163
 progress:
   total_phases: 14
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — EXECUTING
+Phase: 05.5 (Heavy Faction Ship Conformance) — PAUSED
 Plan: 2 of 8
-Status: Plan 01 locally complete; preparing Plan 02 source probe
-Last activity: 2026-09-16 — Five tracer tasks verified locally and merged; phase gates remain pending
+Status: Plan 01 complete; Plan 02 Task 1 prepared, Tasks 2-3 pending
+Last activity: 2026-09-16 — Source/checker preparation halted before owner probe; 14 self-tests pass
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 1 of 8 plans complete)
 
@@ -218,6 +218,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration source gap is closed by registered snapshot `x4-9.00-steam-23660954-faction-ship-observation-v1`; Plan 01 is locally complete and merged. Required detail-source evidence, measured limits, owner-operated Gate A/B and phase reviews remain pending.
+- [Phase 05.5]: Plan 02 needs cargo keys/units/capacity/volume, PeopleInfo layout and qualification scale, installed-slot traversal/software/virtual representation, UIWareInfo/UnitData layouts and faction origin evidence. Count/capacity declarations already available are excluded from enrichment. Task 1 preparation is retained on local branch `worktree-agent-p02-1789559999` at `79081b3`, unmerged and unpublished. Artifact ID: `live-galaxy-05.5-wave2`; locator: `%LOCALAPPDATA%/Codex/gsd-checkpoints/live-galaxy-05.5-wave2/locator.json`. No nonzero runtime envelope or owner run is approved.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -251,5 +252,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-16
-Stopped at: Phase 05.5 Plan 01 locally complete; Plan 02 next
-Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-01-SUMMARY.md
+Stopped at: Phase 05.5 Plan 02 source and owner checkpoint
+Resume file: Plan 02 halted summary on local branch worktree-agent-p02-1789559999
