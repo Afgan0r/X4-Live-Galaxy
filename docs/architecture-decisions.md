@@ -128,6 +128,11 @@ renumbering the ledger.
   transport slot, pipe receive, Rust candidate, accepted-history store, and
   diagnostic stream has independent finite byte, work, count, memory, and age
   bounds as applicable. Per-candidate bounds coexist with aggregate bounds.
+  Counts are not independent quotas on the observed world's ship population
+  or nested detail population. For heavy ship observation, derive allocation
+  admission from checked count-times-element-size arithmetic and resource
+  budgets; use resumable processing and downstream backpressure to control
+  load. Emergency resource refusal remains explicit and never truncates data.
 - **Rationale:** one finite queue can still hide an unsafe native allocation,
   one huge message, an unbounded receiver-local retained allocation, or
   unbounded accepted history.
@@ -135,6 +140,11 @@ renumbering the ledger.
   terminal and control traffic retains capacity that data cannot consume.
   Numerical values are configurable and evidence-derived, beginning generous
   rather than inheriting old fixtures.
+  Owner clarification during Phase 05.5: required observation demand must be
+  below measured collection, delivery and durable publication capacity with
+  demonstrable headroom. Increasing total count ceilings or extending timeouts
+  is not evidence of throughput or freeze prevention. Native count/fill calls
+  remain indivisible and require their own latency evidence.
 - **Supersedes:** the 129-component native ceiling as durable policy and any
   interpretation of “remove the old cap” as “allow unbounded state.”
 
