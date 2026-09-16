@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-bridge --test heavy_profile_contract",
+  "exitCode": 1,
+  "targetTest": "shared_nonzero_experimental_profile_is_accepted_by_production_validator",
+  "targetFile": "crates/x4-bridge/tests/heavy_profile_contract.rs",
+  "expected": "The existing production validator accepts the strict nonzero experimental heavy profile before any source work.",
+  "actual": "The clock-only production validator rejects the heavy profile.",
+  "output": "TAP version 13\nnot ok 1 - shared_nonzero_experimental_profile_is_accepted_by_production_validator\n  ---\n  message: 'assertion failed: shared_nonzero_experimental_profile_is_accepted_by_production_validator: validated heavy profile rejected'\n  ...\n1..1\n# tests 1\n# pass 0\n# fail 1"
+}
