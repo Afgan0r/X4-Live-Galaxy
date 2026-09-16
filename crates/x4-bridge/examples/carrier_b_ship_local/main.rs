@@ -1,5 +1,6 @@
 use std::io::Write as _;
 mod cargo_readback;
+mod crew_readback;
 mod detail_peer;
 mod peer;
 mod readback;
@@ -29,6 +30,7 @@ fn main() -> Result<()> {
         host.finish()?;
         drop(receiver);
         readback::verify_cargo(&database)?;
+        crew_readback::verify(&database)?;
         let mut receiver = session(&database)?;
         for completion in completions.iter().skip(3) {
             peer::replay(&mut receiver, completion)?;

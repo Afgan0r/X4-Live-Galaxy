@@ -1,0 +1,9 @@
+{
+  "command": "pwsh -NoProfile -File tests/carrier-b-local.ps1 -SelfTest -Scenario heavy-ship-detail",
+  "exitCode": 1,
+  "targetTest": "actual_chain_crew_and_installed_loadout_have_independent_durable_readback",
+  "targetFile": "crates/x4-bridge/examples/carrier_b_ship_local/crew_readback.rs",
+  "expected": "Crew and actual installed loadout have independently reopened durable records through the actual Lua/DLL/pipe/receiver path.",
+  "actual": "Actual chain completes cargo but independent crew/loadout readback fails: missing detail revision.",
+  "output": "TAP version 13\nnot ok 1 - actual_chain_crew_and_installed_loadout_have_independent_durable_readback\n  ---\n  message: 'assertion failed: actual_chain_crew_and_installed_loadout_have_independent_durable_readback: missing detail revision'\n  ...\n1..1\n# tests 1\n# pass 0\n# fail 1"
+}
