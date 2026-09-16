@@ -1,0 +1,9 @@
+{
+  "command": "busted --lpath=extensions/?.lua;extensions/live_galaxy/tests/?.lua --filter=collects one selected faction extensions/live_galaxy/tests/carrier_b_contract.lua",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - collects one selected faction through resumable count fill core stages\n1..1\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n",
+  "targetTest": "collects one selected faction through resumable count fill core stages",
+  "targetFile": "extensions/live_galaxy/tests/carrier_b_contract.lua",
+  "expected": "census, count, checked allocation, fill and ordered core reads across callbacks",
+  "actual": "the source call trace was empty because the observation remained clock-only"
+}

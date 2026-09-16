@@ -106,6 +106,51 @@ describe("owned Carrier B adapter", function()
         assert.equals("10500", env.finish().capture_end_millis)
     end)
 
+    it("collects one selected faction through resumable count fill core stages", function()
+        local env = native({ selection = "ship_core", remaining = "4" })
+        local source_calls = {}
+        local api = {
+            list_factions = function()
+                source_calls[#source_calls + 1] = "census"
+                return { "argon", "teladi" }
+            end,
+            count_ships = function(_, faction)
+                source_calls[#source_calls + 1] = "count:" .. faction
+                return 2
+            end,
+            new_buffer = function(_, count)
+                source_calls[#source_calls + 1] = "allocate:" .. count
+                return {}
+            end,
+            fill_ships = function(_, buffer, count, faction)
+                source_calls[#source_calls + 1] = "fill:" .. count .. ":" .. faction
+                buffer[0], buffer[1] = "9007199254740995", "9007199254740993"
+                return 2
+            end,
+            read_core = function(_, identity)
+                source_calls[#source_calls + 1] = "core:" .. identity
+                return { identity = identity, owner = "argon", type = "destroyer_macro",
+                    class = "destroyer", location = "sector:argon_prime" }
+            end,
+        }
+        local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+        local observation = assert(fixture.load("live_galaxy_observation").new({
+            profile = "ship_core", faction_id = "argon", ship_api = api,
+            getter = function() return 0 end, clock_getter = function() return 1 end,
+        }))
+        local scheduler = fixture.load("live_galaxy_scheduler")
+        local result
+        for _ = 1, 10 do
+            result = scheduler.tick("telemetry_tick", carrier, observation)
+            if result.disposition == "sampled" then break end
+        end
+
+        assert.same({ "census", "count:argon", "allocate:2", "fill:2:argon",
+            "core:9007199254740993", "core:9007199254740995" }, source_calls)
+        assert.equals("ship_core", env.fact().profile)
+        assert.equals("9007199254740995", env.fact().identity)
+    end)
+
     for _, value in ipairs({ false, "0", 1.5 }) do
         it("rejects malformed native result " .. tostring(value), function()
             local env = native({ progress_code = value })
