@@ -22,3 +22,30 @@ pub(crate) fn next_member(
         _ => Err(ProductionError::InvalidLimits),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::next_member;
+
+    #[test]
+    fn replacement_parents_resume_identity_and_unfinished_family() {
+        let reordered = ["x4:ship:3".into(), "x4:ship:1".into(), "x4:ship:2".into()];
+        assert_eq!(
+            next_member(&reordered, "ship_core", Some(("x4:ship:1", "ship_cargo"))),
+            Ok("ship_crew:g0".into())
+        );
+        let replaced = ["x4:ship:4".into(), "x4:ship:2".into(), "x4:ship:1".into()];
+        assert_eq!(
+            next_member(&replaced, "ship_core", Some(("x4:ship:1", "ship_crew"))),
+            Ok("ship_loadout:g0".into())
+        );
+        assert_eq!(
+            next_member(&replaced, "ship_core", Some(("x4:ship:1", "ship_loadout"))),
+            Ok("ship_cargo:g1".into())
+        );
+        assert_eq!(
+            next_member(&replaced, "ship_core", Some(("x4:ship:3", "ship_cargo"))),
+            Ok("ship_cargo:g2".into())
+        );
+    }
+}
