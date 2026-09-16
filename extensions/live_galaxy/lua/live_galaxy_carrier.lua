@@ -44,7 +44,8 @@ end
 
 local function invoke(self, name, ...)
     if self.closed then return nil, "closed" end
-    local ok, code, producer_state, transport_state, monotonic, capacity, incarnation =
+    local ok, code, producer_state, transport_state, monotonic, capacity, incarnation,
+        selection, remaining =
         pcall(self.api[name], self.token, ...)
     if not ok then return nil, "operation_failure" end
     if type(code) ~= "number" or code % 1 ~= 0 then return nil, "result_shape" end
@@ -54,13 +55,17 @@ local function invoke(self, name, ...)
             or type(transport_state) ~= "string" or #transport_state > 16
             or type(monotonic) ~= "string" or not monotonic:match("^%d+$") or #monotonic > 20
             or type(capacity) ~= "string" or #capacity > 16
-            or type(incarnation) ~= "string" or #incarnation > 64 then
+            or type(incarnation) ~= "string" or #incarnation > 64
+            or type(selection) ~= "string" or #selection > 64
+            or type(remaining) ~= "string" or not remaining:match("^%d+$")
+            or #remaining > 20 then
             return nil, "result_shape"
         end
         status = {
             producer_state = producer_state, transport_state = transport_state,
             monotonic_millis = monotonic, capacity = capacity,
             producer_incarnation = incarnation,
+            selection = selection, remaining_capacity = remaining,
         }
         self.current_status = status
     end

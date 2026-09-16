@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SelfTest,
-    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload')]
+    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload', 'heavy-ship-core')]
     [string]$Scenario = 'actual-chain',
     [ValidateSet('bridge-first', 'native-first')]
     [string]$StartupOrder = 'bridge-first',
@@ -183,6 +183,11 @@ if ($Calibration) {
 }
 $hostExecutable = Build-Host $run
 $data = Join-Path $run 'data'; [IO.Directory]::CreateDirectory($data) | Out-Null
+if ($Scenario -eq 'heavy-ship-core') {
+    & cargo run --locked -p x4-bridge --example carrier-b-ship-local -- $run $hostExecutable (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_ship_local.lua') $data
+    if ($LASTEXITCODE -ne 0) { throw 'HEAVY_SHIP_LOCAL_FAILED' }
+    return
+}
 $result = Join-Path $run 'result.lua'; $marker = Join-Path $run 'kill.marker'
 $bridge = $null; $bridgePeak = 0L; $hostPeak = 0L
 $timer = [Diagnostics.Stopwatch]::StartNew()

@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-carrier-native --lib lua_producer_operations::tests::abi_poll_control_retains_control_and_state_while_clock_is_unavailable -- --exact --nocapture",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - lua_producer_operations::tests::abi_poll_control_retains_control_and_state_while_clock_is_unavailable\n1..1\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n",
+  "targetTest": "lua_producer_operations::tests::abi_poll_control_retains_control_and_state_while_clock_is_unavailable",
+  "targetFile": "crates/x4-carrier-native/src/lua_producer_operations_tests.rs",
+  "expected": "progress returns profile selection and remaining bounded capacity",
+  "actual": "progress returned six values instead of the required eight"
+}

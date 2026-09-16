@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-carrier-native --test abi_contract incompatible_ship_selection -- --nocapture",
+  "exitCode": 1,
+  "output": "not ok 1 - incompatible_ship_selection_requires_restart_through_registered_operations\nassertion failed: incompatible profile must latch restart-required state\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
+  "targetTest": "incompatible_ship_selection_requires_restart_through_registered_operations",
+  "targetFile": "crates/x4-carrier-native/tests/abi_contract/ship_abi_contract.rs",
+  "expected": "unsupported collection profile latches incompatible restart-required state",
+  "actual": "registered DLL operations retain ready state after incompatible intent"
+}

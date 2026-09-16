@@ -91,6 +91,35 @@ pub struct TypedFact {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProducerProfile {
+    Clock,
+    ShipCore,
+}
+
+impl ProducerProfile {
+    pub(crate) const fn section_key(self) -> &'static str {
+        match self {
+            Self::Clock => "carrier_b_realtime_sample",
+            Self::ShipCore => "ship_core",
+        }
+    }
+
+    pub(crate) fn from_section_key(value: &str) -> Option<Self> {
+        match value {
+            "carrier_b_realtime_sample" => Some(Self::Clock),
+            "ship_core" => Some(Self::ShipCore),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PreparedRecord {
+    pub(crate) entity_id: String,
+    pub(crate) content: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProducerState {
     AwaitingCompatibility,
     Ready,

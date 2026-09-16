@@ -5,27 +5,29 @@ use observation_domain::{
 };
 use observation_ingest::{ContractVersions, bind_completion_certificate, encode_complete_message};
 
-use crate::{ProducerError, ProducerSource, SectionEvidence, TypedFact};
+use crate::producer_types::{PreparedRecord, ProducerProfile};
+use crate::{ProducerError, ProducerSource, SectionEvidence};
 
 pub struct SectionMessages {
-    pub start: Vec<u8>,
-    pub batch: Vec<u8>,
-    pub completion: Vec<u8>,
+    pub section_key: String,
+    pub certificate: observation_ingest::ProducerCertificateStream,
 }
 
 pub fn assemble(
     source: &ProducerSource,
     evidence: &SectionEvidence,
-    fact: &TypedFact,
+    profile: ProducerProfile,
+    expected_records: usize,
     revision: u64,
     limit: usize,
-) -> Result<SectionMessages, ProducerError> {
+) -> Result<Vec<u8>, ProducerError> {
     let scope =
         SourceScopeId::new(evidence.source_scope.clone()).ok_or(ProducerError::InvalidInput)?;
     let producer = ProducerIncarnationId::new(source.producer_incarnation.clone())
         .ok_or(ProducerError::InvalidInput)?;
     let epoch = TransportEpoch::new(source.transport_epoch).ok_or(ProducerError::StaleEpoch)?;
-    let key = SectionKey::new("carrier_b_realtime_sample").ok_or(ProducerError::InvalidInput)?;
+    let section_key = profile.section_key();
+    let key = SectionKey::new(section_key).ok_or(ProducerError::InvalidInput)?;
     let revision = SectionRevisionId::new(revision).ok_or(ProducerError::InvalidInput)?;
     let start = SectionStartEnvelope {
         source_scope: scope.clone(),
@@ -33,52 +35,61 @@ pub fn assemble(
         transport_epoch: epoch,
         section_key: key.clone(),
         section_revision: revision,
-        expected_records: 1,
+        expected_records,
         sender_evidence: evidence.sender.clone(),
     };
-    let content = format!(
-        "getter={}\nraw_value={}\nsemantics={}",
-        fact.getter, fact.raw_value, fact.semantics
-    );
-    let batch_id = BatchId::new(format!("carrier-b:{}:{}:1", revision.get(), epoch.get()))
-        .ok_or(ProducerError::InvalidInput)?;
-    let batch = ImmutableBatchEnvelope {
+    encode_complete_message(&CompleteMessage::SectionStart(start), limit)
+        .map_err(|_| ProducerError::DataLimit)
+}
+
+pub(super) fn batch(
+    source: &ProducerSource,
+    scope: &SourceScopeId,
+    record: &PreparedRecord,
+    section_key: &str,
+    revision: SectionRevisionId,
+    ordinal: usize,
+) -> Result<ImmutableBatchEnvelope, ProducerError> {
+    Ok(ImmutableBatchEnvelope {
         source_scope: scope.clone(),
-        producer_incarnation: producer.clone(),
-        transport_epoch: epoch,
-        section_key: key.clone(),
+        producer_incarnation: ProducerIncarnationId::new(source.producer_incarnation.clone())
+            .ok_or(ProducerError::InvalidInput)?,
+        transport_epoch: TransportEpoch::new(source.transport_epoch)
+            .ok_or(ProducerError::StaleEpoch)?,
+        section_key: SectionKey::new(section_key).ok_or(ProducerError::InvalidInput)?,
         section_revision: revision,
-        batch_id,
-        section_ordinal: 1,
+        batch_id: BatchId::new(format!(
+            "carrier-b:{}:{}:{ordinal}",
+            revision.get(),
+            source.transport_epoch
+        ))
+        .ok_or(ProducerError::InvalidInput)?,
+        section_ordinal: ordinal,
         records: vec![EnvelopeRecord {
-            record_id: RecordId::new(format!("carrier-b:{}:1", revision.get()))
+            record_id: RecordId::new(if section_key == "ship_core" {
+                format!("carrier-b:{}:{ordinal:020}", revision.get())
+            } else {
+                format!("carrier-b:{}:{ordinal}", revision.get())
+            })
+            .ok_or(ProducerError::InvalidInput)?,
+            entity_id: EntityId::new(record.entity_id.clone())
                 .ok_or(ProducerError::InvalidInput)?,
-            entity_id: EntityId::new(fact.entity_id.clone()).ok_or(ProducerError::InvalidInput)?,
             observation_version: ObservationVersion::new(revision.get())
                 .ok_or(ProducerError::InvalidInput)?,
-            content,
+            content: record.content.clone(),
         }],
         optional_detail: None,
-    };
-    let completion = completion(evidence, scope, producer, epoch, key, revision, &batch)?;
-    Ok(SectionMessages {
-        start: encode_complete_message(&CompleteMessage::SectionStart(start), limit)
-            .map_err(|_| ProducerError::DataLimit)?,
-        batch: encode_complete_message(&CompleteMessage::ImmutableBatch(batch), limit)
-            .map_err(|_| ProducerError::DataLimit)?,
-        completion: encode_complete_message(&CompleteMessage::SectionCompletion(completion), limit)
-            .map_err(|_| ProducerError::DataLimit)?,
     })
 }
 
-fn completion(
+pub(super) fn completion(
     evidence: &SectionEvidence,
     scope: SourceScopeId,
     producer: ProducerIncarnationId,
     epoch: TransportEpoch,
     key: SectionKey,
     revision: SectionRevisionId,
-    batch: &ImmutableBatchEnvelope,
+    certificate: &observation_ingest::ProducerCertificateStream,
 ) -> Result<SectionCompletionEnvelope, ProducerError> {
     let versions = ContractVersions::new(
         evidence.sender.schema_version,
@@ -102,11 +113,21 @@ fn completion(
             policy_version: versions.policy(),
             canonicalization_version: versions.canonicalization(),
             digest_version: versions.digest(),
-            coverage: CompletionCoverage::PointMeasurement,
+            coverage: match evidence.sender.section_state.coverage() {
+                observation_domain::SectionCoverage::Complete => CompletionCoverage::Complete,
+                observation_domain::SectionCoverage::KnownEmpty => CompletionCoverage::KnownEmpty,
+                observation_domain::SectionCoverage::Partial => CompletionCoverage::Partial,
+                observation_domain::SectionCoverage::Unknown => CompletionCoverage::Unknown,
+                observation_domain::SectionCoverage::Unsupported => CompletionCoverage::Unsupported,
+                observation_domain::SectionCoverage::PointMeasurement => {
+                    CompletionCoverage::PointMeasurement
+                }
+            },
             sender_evidence: evidence.sender.clone(),
         },
-        core::slice::from_ref(batch),
+        &[],
         versions,
     )
+    .map(|envelope| certificate.bind(envelope))
     .ok_or(ProducerError::InvalidInput)
 }

@@ -1,9 +1,8 @@
 use observation_ingest::{CarrierControl, CarrierIdentity, ControlBody, encode_carrier_control};
 
 use crate::producer_message::SectionMessages;
-use crate::{
-    ProducerError, ProducerLimits, ProducerSource, ProducerState, SectionEvidence, TypedFact,
-};
+use crate::producer_types::{PreparedRecord, ProducerProfile};
+use crate::{ProducerError, ProducerLimits, ProducerSource, ProducerState, SectionEvidence};
 
 pub(super) struct Pending {
     pub(super) bytes: Vec<u8>,
@@ -28,11 +27,15 @@ pub struct Producer {
     pub(super) readiness: Readiness,
     pub(super) revision: u64,
     pub(super) evidence: Option<SectionEvidence>,
-    pub(super) fact: Option<TypedFact>,
+    pub(super) profile: ProducerProfile,
+    pub(super) expected_records: usize,
+    pub(super) records: Vec<PreparedRecord>,
     pub(super) finished: bool,
     pub(super) messages: Option<SectionMessages>,
+    pub(super) next_batch_index: usize,
     pub(super) pending: Option<Pending>,
     pub(super) connection_generation: u64,
+    pub(super) reconciliation: Option<crate::producer_recovery::CompletionOutcome>,
 }
 
 impl Producer {
@@ -52,11 +55,15 @@ impl Producer {
             readiness: Readiness::Awaiting,
             revision: 1,
             evidence: None,
-            fact: None,
+            profile: ProducerProfile::Clock,
+            expected_records: 0,
+            records: Vec::new(),
             finished: false,
             messages: None,
+            next_batch_index: 0,
             pending: Some(Pending::new(bytes, "bootstrap", now_millis)),
             connection_generation: 0,
+            reconciliation: None,
         })
     }
 
@@ -79,7 +86,24 @@ impl Producer {
 
     #[must_use]
     pub(crate) fn collection_admitted(&self) -> bool {
-        self.state == ProducerState::Ready && matches!(self.readiness, Readiness::Ready)
+        matches!(
+            self.state,
+            ProducerState::Ready | ProducerState::SectionReserved | ProducerState::Collecting
+        ) && matches!(self.readiness, Readiness::Ready)
+            && self.pending.is_none()
+            && !self.finished
+    }
+
+    pub(crate) fn selection_status(&self) -> (&'static str, usize) {
+        let remaining = self
+            .limits
+            .max_records
+            .saturating_sub(self.next_batch_index + self.records.len());
+        if matches!(self.readiness, Readiness::Ready) {
+            (self.profile.section_key(), remaining)
+        } else {
+            ("none", remaining)
+        }
     }
 
     pub fn mark_local_handoff(&mut self, now_millis: u64) -> Result<(), ProducerError> {
@@ -108,15 +132,22 @@ impl Producer {
     }
 
     pub fn reset(&mut self, source: ProducerSource, now_millis: u64) -> Result<(), ProducerError> {
-        *self = Self::new(self.limits, source, now_millis)?;
+        let mut replacement = Self::new(self.limits, source, now_millis)?;
+        self.remember_completion();
+        replacement.reconciliation = self.reconciliation.take();
+        replacement.revision = self.revision;
+        *self = replacement;
         Ok(())
     }
 
     pub(super) fn discard_incomplete(&mut self) {
+        self.remember_completion();
         self.evidence = None;
-        self.fact = None;
+        self.expected_records = 0;
+        self.records.clear();
         self.finished = false;
         self.messages = None;
+        self.next_batch_index = 0;
         self.pending = None;
     }
 }

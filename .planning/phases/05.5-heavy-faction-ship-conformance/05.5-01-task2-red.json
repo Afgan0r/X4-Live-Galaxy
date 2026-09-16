@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-carrier-native --test producer_contract ship_section_accepts_multiple_complete_records",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - ship_section_accepts_multiple_complete_records\n1..1\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n",
+  "targetTest": "ship_section_accepts_multiple_complete_records",
+  "targetFile": "crates/x4-carrier-native/tests/producer_contract.rs",
+  "expected": "a ship-core section accepts two bounded complete records",
+  "actual": "begin_ship_section returned InvalidTransition"
+}

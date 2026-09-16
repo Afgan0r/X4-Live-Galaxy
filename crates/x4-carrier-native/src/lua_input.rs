@@ -9,6 +9,19 @@ use crate::abi_windows::LuaApi;
 use crate::lua_table::{exact_keys, field_bool, field_integer, field_string};
 use crate::{ProducerSource, SectionEvidence, SectionFinishEvidence, TypedFact};
 
+pub enum BeginInput {
+    Clock(SectionEvidence),
+    ShipCore {
+        evidence: SectionEvidence,
+        expected_records: usize,
+    },
+}
+
+pub enum RecordInput {
+    Clock(TypedFact),
+    ShipCore(observation_domain::ShipCoreRecord),
+}
+
 const BEGIN_KEYS: [&str; 11] = [
     "section_key",
     "expected_records",
@@ -43,9 +56,13 @@ pub unsafe fn begin(
     api: LuaApi,
     state: *mut c_void,
     source: &ProducerSource,
-) -> Option<SectionEvidence> {
+) -> Option<BeginInput> {
+    let section_key = unsafe { field_string(api, state, 2, "section_key", 64) }?;
+    if section_key == "ship_core" {
+        return unsafe { crate::lua_ship_input::begin(api, state, source, &BEGIN_KEYS) };
+    }
     if !unsafe { exact_keys(api, state, 2, &BEGIN_KEYS) }
-        || unsafe { field_string(api, state, 2, "section_key", 64) }? != "carrier_b_realtime_sample"
+        || section_key != "carrier_b_realtime_sample"
         || unsafe { field_integer(api, state, 2, "expected_records") }? != 1
         || unsafe { field_string(api, state, 2, "capture_clock", 32) }? != "game_time_millis"
         || unsafe { field_string(api, state, 2, "quality", 32) }? != "unknown"
@@ -80,17 +97,20 @@ pub unsafe fn begin(
         };
     sender.source_consistency = SourceConsistency::Unknown;
     sender.stable_identity = false;
-    Some(SectionEvidence {
+    Some(BeginInput::Clock(SectionEvidence {
         source_scope: source.source_scope.clone(),
         sender,
-    })
+    }))
 }
 
-pub unsafe fn fact(api: LuaApi, state: *mut c_void) -> Option<TypedFact> {
+pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
+    if unsafe { crate::lua_ship_input::is_ship_core(api, state) } {
+        return unsafe { crate::lua_ship_input::record(api, state) }.map(RecordInput::ShipCore);
+    }
     if !unsafe { exact_keys(api, state, 2, &FACT_KEYS) } {
         return None;
     }
-    Some(TypedFact {
+    Some(RecordInput::Clock(TypedFact {
         entity_id: unsafe { field_string(api, state, 2, "entity_id", 128) }?,
         observation_version: u64::try_from(unsafe {
             field_integer(api, state, 2, "observation_version")
@@ -99,7 +119,7 @@ pub unsafe fn fact(api: LuaApi, state: *mut c_void) -> Option<TypedFact> {
         getter: unsafe { field_string(api, state, 2, "getter", 32) }?,
         raw_value: unsafe { field_string(api, state, 2, "raw_value", 96) }?,
         semantics: unsafe { field_string(api, state, 2, "semantics", 32) }?,
-    })
+    }))
 }
 
 pub unsafe fn finish(api: LuaApi, state: *mut c_void) -> Option<SectionFinishEvidence> {
@@ -120,10 +140,12 @@ pub unsafe fn finish(api: LuaApi, state: *mut c_void) -> Option<SectionFinishEvi
         },
         coverage: match unsafe { field_string(api, state, 2, "coverage", 32) }?.as_str() {
             "point_measurement" => SectionCoverage::PointMeasurement,
+            "partial" => SectionCoverage::Partial,
             _ => return None,
         },
         consistency: match unsafe { field_string(api, state, 2, "consistency", 32) }?.as_str() {
             "unknown" => SourceConsistency::Unknown,
+            "observed_count_fill_only" => SourceConsistency::ObservedCountFillOnly,
             _ => return None,
         },
         stable_identity: unsafe { field_bool(api, state, 2, "stable_identity") }?,

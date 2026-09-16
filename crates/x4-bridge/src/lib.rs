@@ -17,6 +17,8 @@ mod production_runtime_message;
 mod production_startup;
 mod protocol;
 mod receiver_context;
+mod receiver_ship;
+mod receiver_ship_replay;
 mod server;
 mod session;
 mod telemetry;

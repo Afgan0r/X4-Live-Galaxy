@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p x4-bridge --test ship_contract",
+  "exitCode": 1,
+  "output": "not ok 1 - malformed_ship_owner_cannot_replace_durable_core\nassertion failed: receiver must reject malformed ship owner before publication: Ok(Disposition(Received))\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
+  "targetTest": "malformed_ship_owner_cannot_replace_durable_core",
+  "targetFile": "crates/x4-bridge/tests/ship_contract.rs",
+  "expected": "Malformed core is rejected before publication and prior durable revision remains current",
+  "actual": "Receiver returns Received for a newline-injected owner in a real Producer batch"
+}

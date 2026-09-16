@@ -20,12 +20,18 @@ pub fn assemble<R: ObservationRepository>(
                 .map_err(|_| ProductionError::Storage)?
                 .map(|value| value.receipt().revision);
             let evidence = &start.sender_evidence;
+            let versions = if start.section_key.as_str() == "ship_core" {
+                crate::receiver_ship::validate_evidence(evidence)?;
+                observation_domain::SenderEvidence::legacy_default()
+            } else {
+                evidence.clone()
+            };
             Ok(LifecycleContext::Start(CandidateContext::new(
                 ContractVersions::new(
-                    evidence.schema_version,
-                    evidence.policy_version,
-                    evidence.canonicalization_version,
-                    evidence.digest_version,
+                    versions.schema_version,
+                    versions.policy_version,
+                    versions.canonicalization_version,
+                    versions.digest_version,
                 ),
                 evidence.section_state.capture_window(),
                 evidence.section_state,

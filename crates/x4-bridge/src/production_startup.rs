@@ -62,6 +62,11 @@ pub fn run_production(
         limits.max_blockers,
     )
     .map_err(StartupError::Production)?;
+    if let Some(faction) = parsed.ship_faction {
+        session
+            .select_ship_core(&faction)
+            .map_err(StartupError::Production)?;
+    }
     crate::production_runtime::run(&limits, &mut history, &mut session)
 }
 
@@ -71,6 +76,7 @@ struct StartupArguments {
     readback: bool,
     section_key: Option<String>,
     section_revision: Option<u64>,
+    ship_faction: Option<String>,
 }
 
 impl StartupArguments {
@@ -82,6 +88,7 @@ impl StartupArguments {
             readback: false,
             section_key: None,
             section_revision: None,
+            ship_faction: None,
         };
         while let Some(argument) = values.next() {
             match argument.to_str().ok_or(StartupError::UnknownArgument)? {
@@ -90,6 +97,7 @@ impl StartupArguments {
                 "--limits-file" => parsed.limits_file = Some(PathBuf::from(next(&mut values)?)),
                 "--section-key" => parsed.section_key = Some(text(&next(&mut values)?)),
                 "--section-revision" => parsed.set_revision(&next(&mut values)?)?,
+                "--ship-faction" => parsed.ship_faction = Some(text(&next(&mut values)?)),
                 _ => return Err(StartupError::UnknownArgument),
             }
         }

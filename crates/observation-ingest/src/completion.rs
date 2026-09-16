@@ -1,12 +1,11 @@
-use observation_domain::{
-    CompletionCoverage, SectionCompletionEnvelope, SectionCoverage, SourceSessionIdentity,
-};
-
 use crate::completion_digest::{candidate_material, content_digest};
 use crate::completion_types::{
     CandidateContext, CompletionCertificate, CompletionCurrent, CompletionOutcome,
 };
 use crate::{GenerationStager, ReceiverDisposition, RejectionReason, ValidatedSectionRevision};
+use observation_domain::{
+    CompletionCoverage, SectionCompletionEnvelope, SectionCoverage, SourceSessionIdentity,
+};
 
 impl GenerationStager {
     pub fn start_section_with_context(
@@ -84,6 +83,22 @@ impl GenerationStager {
         let Some(candidate) = self.drop_candidate(&key) else {
             return CompletionOutcome::Rejected(RejectionReason::CompletionMismatch);
         };
+        let context = if candidate.start.section_key.as_str() == "ship_core" {
+            CandidateContext::new(
+                context.versions(),
+                certificate
+                    .envelope
+                    .sender_evidence
+                    .section_state
+                    .capture_window(),
+                certificate.envelope.sender_evidence.section_state,
+                context.dependencies().clone(),
+                context.expected_current(),
+                context.stable_identity(),
+            )
+        } else {
+            context
+        };
         CompletionOutcome::Validated(Box::new(ValidatedSectionRevision {
             source_scope: candidate.start.source_scope,
             source_session: SourceSessionIdentity::new(
@@ -131,8 +146,14 @@ fn completion_is_exact(
         && candidate.start.producer_incarnation == certificate.envelope.producer_incarnation
         && candidate.start.transport_epoch == certificate.envelope.transport_epoch
         && candidate.start.section_revision == certificate.envelope.section_revision
-        && candidate.start.sender_evidence == certificate.envelope.sender_evidence
+        && (candidate.start.sender_evidence == certificate.envelope.sender_evidence
+            || (candidate.start.section_key.as_str() == "ship_core"
+                && crate::completion_evidence::finish_matches(
+                    &candidate.start.sender_evidence,
+                    &certificate.envelope.sender_evidence,
+                )))
         && candidate.start.expected_records == records.len()
+        && crate::completion_evidence::ship_order_matches(&candidate.start.section_key, records)
         && certificate.envelope.record_count == records.len()
         && certificate.batch_count == candidate.batches.len()
         && certificate.record_count == records.len()
