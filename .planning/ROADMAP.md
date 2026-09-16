@@ -341,38 +341,22 @@ Plans:
 
 **Research:** Required; owner discussion approved on 2026-09-11. Exact ship APIs, faction classification, completeness, applicability and workload limits require source-backed research and checked plans, followed by owner approval before execution.
 **Canonical refs:** `.planning/phases/05.5-heavy-faction-ship-conformance/05.5-CONTEXT.md`; `docs/architecture-decisions.md` ADR-LG-022; `docs/architecture-verification.md` VER-LG-003/011/012.
-**Plans:** 1/8 plans executed; research and plan-check passed, ready for owner-approved execution.
+**Plans:** 1/4 active plans executed; owner-requested replan 09–11 passed independent plan-check and awaits owner approval. Historical 02–08 are superseded, not completed; see `05.5-EXECUTION-REVISION.md` for source integration and migration.
 **Wave 1**
 
 - [x] 05.5-01-PLAN.md
 
-**Wave 2** *(blocked on Wave 1 completion)*
+**Wave 2** *(includes bounded source-preparation integration in Task 1)*
 
-- [ ] 05.5-02-PLAN.md
+- [ ] 05.5-09-PLAN.md — Production ordinary-faction details, effective bounds, recovery and calibration package.
 
-**Wave 3** *(blocked on Wave 2 completion)*
+**Wave 3** *(after 09)*
 
-- [ ] 05.5-03-PLAN.md
+- [ ] 05.5-10-PLAN.md — Finite production calibration, approved limits and Gate A; dynamic full-set production expansion.
 
-**Wave 4** *(blocked on Wave 3 completion)*
+**Wave 4** *(after 10)*
 
-- [ ] 05.5-04-PLAN.md
-
-**Wave 5** *(blocked on Wave 4 completion)*
-
-- [ ] 05.5-05-PLAN.md
-
-**Wave 6** *(blocked on Wave 5 completion)*
-
-- [ ] 05.5-06-PLAN.md
-
-**Wave 7** *(blocked on Wave 6 completion)*
-
-- [ ] 05.5-07-PLAN.md
-
-**Wave 8** *(blocked on Wave 7 completion)*
-
-- [ ] 05.5-08-PLAN.md
+- [ ] 05.5-11-PLAN.md — Converged reviews/regression, owner Gate B and goal verification.
 
 ### Phase 05.6: Station-Specific Observation Remainder
 
@@ -469,7 +453,7 @@ both the research artifact from Phase 2 and operational evidence from Phase 7.
 | 05.2. Layered Lua and X4 Verification Foundation | 10/10 | Historical completion; tooling retired | - |
 | 05.3. Generic Observation Contracts and Durable Publication | 5/5 | Complete    | 2026-09-05 |
 | 05.4. Owned Carrier B and Production Observation Path | 5/5 | Complete | 2026-09-11 |
-| 05.5. Heavy Faction Ship Conformance | 1/8 | In Progress|  |
+| 05.5. Heavy Faction Ship Conformance | 1/4 active | Replan awaiting check/approval |  |
 | 05.6. Station-Specific Observation Remainder | 0/TBD | Conditional after 05.5 | - |
 | 6. Correlated Reports and Diagnostics | 0/TBD | Not started | - |
 | 7. X4 Operational Proof | 0/TBD | Not started | - |
