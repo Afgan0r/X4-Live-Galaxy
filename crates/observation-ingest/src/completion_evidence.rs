@@ -1,11 +1,23 @@
 use observation_domain::SenderEvidence;
 
+pub fn is_ship_section(key: &str) -> bool {
+    key == "ship_core"
+        || key
+            .strip_prefix("ship_cargo:g")
+            .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
+}
+
 pub fn ship_order_matches(
     key: &observation_domain::SectionKey,
     records: &[observation_domain::EnvelopeRecord],
 ) -> bool {
-    if key.as_str() != "ship_core" {
+    if !is_ship_section(key.as_str()) {
         return true;
+    }
+    if key.as_str() != "ship_core" {
+        return records
+            .windows(2)
+            .all(|pair| pair[0].entity_id.as_str() < pair[1].entity_id.as_str());
     }
     let mut previous = 0;
     for record in records {

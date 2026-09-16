@@ -20,6 +20,7 @@ pub enum BeginInput {
 pub enum RecordInput {
     Clock(TypedFact),
     ShipCore(observation_domain::ShipCoreRecord),
+    ShipCargo(String, observation_domain::CargoObservation),
 }
 
 const BEGIN_KEYS: [&str; 11] = [
@@ -58,7 +59,7 @@ pub unsafe fn begin(
     source: &ProducerSource,
 ) -> Option<BeginInput> {
     let section_key = unsafe { field_string(api, state, 2, "section_key", 64) }?;
-    if section_key == "ship_core" {
+    if section_key == "ship_core" || section_key.starts_with("ship_cargo:g") {
         return unsafe { crate::lua_ship_input::begin(api, state, source, &BEGIN_KEYS) };
     }
     if !unsafe { exact_keys(api, state, 2, &BEGIN_KEYS) }
@@ -104,6 +105,16 @@ pub unsafe fn begin(
 }
 
 pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
+    if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_cargo") {
+        let limit = crate::abi::PRODUCER
+            .lock()
+            .ok()?
+            .as_ref()?
+            .limits
+            .max_records;
+        return unsafe { crate::ship_detail_input::cargo(api, state, limit) }
+            .map(|(scope, record)| RecordInput::ShipCargo(scope, record));
+    }
     if unsafe { crate::lua_ship_input::is_ship_core(api, state) } {
         return unsafe { crate::lua_ship_input::record(api, state) }.map(RecordInput::ShipCore);
     }

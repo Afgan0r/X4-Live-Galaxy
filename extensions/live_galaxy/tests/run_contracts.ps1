@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'loader', 'syntax', 'xml', 'carrier_b_actual')]
+    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'loader', 'syntax', 'xml', 'carrier_b_actual', 'ship_detail')]
     [string]$Suite = 'all',
     [string]$Filter,
     [string]$ExtensionRoot = (Split-Path -Parent $PSScriptRoot)
@@ -54,6 +54,7 @@ try {
         if ($Filter) { $arguments += @('--filter', $Filter) }
         $files = switch ($Suite) {
             'component_discovery' { 'component_discovery_contract.lua' }
+            'ship_detail' { 'ship_detail_contract.lua' }
             'x4_discovery' { 'carrier_b_contract.lua' }
             'telemetry' { 'telemetry_spec.lua' }
             'scheduler' { 'carrier_b_contract.lua' }

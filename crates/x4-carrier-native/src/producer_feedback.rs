@@ -35,7 +35,8 @@ impl Producer {
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::CollectionIntent(value)
-                if self.readiness == Readiness::Handshake
+                if matches!(self.readiness, Readiness::Handshake | Readiness::Intent)
+                    && self.state == ProducerState::Ready
                     && value.next_revision > 0
                     && value.max_records >= self.limits.max_records
                     && value.max_raw_bytes >= self.limits.max_raw_bytes
@@ -44,6 +45,7 @@ impl Producer {
                 let profile = ProducerProfile::from_section_key(&value.section_key)
                     .ok_or_else(|| self.incompatible())?;
                 self.profile = profile;
+                self.selected_key = value.section_key;
                 self.revision = self.revision.max(value.next_revision);
                 self.readiness = Readiness::Intent;
                 Ok(ProducerOutcome::Accepted)
@@ -55,7 +57,7 @@ impl Producer {
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::Disposition(value) => self.apply_disposition(&value, now_millis),
-            ControlBody::Reset(_) if self.profile == ProducerProfile::ShipCore => {
+            ControlBody::Reset(_) if self.profile != ProducerProfile::Clock => {
                 self.fail_section();
                 self.readiness = Readiness::Awaiting;
                 Ok(ProducerOutcome::Disconnected)

@@ -26,10 +26,12 @@ pub fn validate(
         CompleteMessage::SectionCompletion(v) => (&v.section_key, &v.source_scope),
         CompleteMessage::Control(_) => return Ok(()),
     };
-    if selected.is_some() && (key.as_str() != "ship_core" || selected != Some(source)) {
+    let detail = crate::receiver_ship_detail::is_key(key.as_str());
+    if selected.is_some() && ((key.as_str() != "ship_core" && !detail) || selected != Some(source))
+    {
         return Err(rejected());
     }
-    if key.as_str() != "ship_core" {
+    if key.as_str() != "ship_core" && !detail {
         return Ok(());
     }
     if selected != Some(source) {
@@ -51,7 +53,11 @@ pub fn validate(
             }
         }
         CompleteMessage::ImmutableBatch(v) => {
-            validate_batch(v, faction)?;
+            if detail {
+                crate::receiver_ship_detail::validate_batch(v, faction)?;
+            } else {
+                validate_batch(v, faction)?;
+            }
         }
         CompleteMessage::SectionCompletion(v) => {
             validate_evidence(&v.sender_evidence)?;

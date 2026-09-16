@@ -1,0 +1,193 @@
+use crate::ProductionError;
+use observation_application::{LifecycleError, ObservationLifecycle};
+use observation_domain::{
+    CargoObservation, CompleteMessage, ImmutableBatchEnvelope, SectionKey, SectionRevisionId,
+};
+use observation_persistence::{CurrentRevision, ObservationRepository};
+use std::collections::BTreeMap;
+
+const fn rejected() -> ProductionError {
+    ProductionError::Lifecycle(LifecycleError::AuthorityRejected)
+}
+
+pub fn is_key(key: &str) -> bool {
+    key.strip_prefix("ship_cargo:g")
+        .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
+}
+
+fn core<R: ObservationRepository>(
+    lifecycle: &ObservationLifecycle<R>,
+) -> Result<CurrentRevision, ProductionError> {
+    let key = SectionKey::new("ship_core").ok_or_else(rejected)?;
+    lifecycle
+        .current_revision(&key)
+        .map_err(|_| ProductionError::Storage)?
+        .ok_or_else(rejected)
+}
+
+// Finite local experiment grouping, not a runtime-accepted safety bound.
+const GROUP_MEMBERS: usize = 4;
+fn group(
+    parent: &observation_persistence::RevisionRecord,
+    key: &str,
+) -> Result<observation_domain::ShipDetailGroup, ProductionError> {
+    use observation_domain::{
+        ObservationPolicyVersion, ShipDetailGroup, ShipGroupDescriptor, ShipIdentity,
+    };
+    let ordinal = key
+        .strip_prefix("ship_cargo:g")
+        .and_then(|v| v.parse::<u16>().ok())
+        .ok_or_else(rejected)?;
+    let members = parent
+        .records
+        .iter()
+        .map(|v| {
+            v.entity_id
+                .as_str()
+                .strip_prefix("x4:ship:")
+                .ok_or_else(rejected)
+                .and_then(|id| ShipIdentity::new(id).map_err(|_| rejected()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let descriptor = ShipGroupDescriptor::new(
+        parent.source_scope.clone(),
+        parent.revision,
+        ObservationPolicyVersion::new(2).ok_or_else(rejected)?,
+        members,
+    )
+    .map_err(|_| rejected())?;
+    ShipDetailGroup::new(descriptor, ordinal, GROUP_MEMBERS).map_err(|_| rejected())
+}
+
+pub fn dependencies<R: ObservationRepository>(
+    lifecycle: &ObservationLifecycle<R>,
+    key: &str,
+) -> Result<BTreeMap<SectionKey, SectionRevisionId>, ProductionError> {
+    if !is_key(key) {
+        return Ok(BTreeMap::new());
+    }
+    let current = core(lifecycle)?;
+    Ok(BTreeMap::from([(
+        current.revision().section_key.clone(),
+        current.receipt().revision,
+    )]))
+}
+
+pub fn validate_batch(
+    batch: &ImmutableBatchEnvelope,
+    faction: &str,
+) -> Result<(), ProductionError> {
+    if batch.records.len() != 1 || batch.optional_detail.is_some() || batch.section_ordinal == 0 {
+        return Err(rejected());
+    }
+    let record = batch.records.first().ok_or_else(rejected)?;
+    let cargo = CargoObservation::from_content(&record.content, 64).map_err(|_| rejected())?;
+    if cargo.dependency.owner.as_str() != faction
+        || cargo.dependency.identity.as_str().parse::<u64>().is_err()
+        || record.entity_id.as_str() != format!("x4:ship:{}", cargo.dependency.identity.as_str())
+        || record.record_id.as_str()
+            != format!(
+                "carrier-b:{}:{:020}",
+                batch.section_revision.get(),
+                batch.section_ordinal
+            )
+        || record.observation_version.get() != batch.section_revision.get()
+    {
+        return Err(rejected());
+    }
+    Ok(())
+}
+
+pub fn validate_dependency<R: ObservationRepository>(
+    lifecycle: &ObservationLifecycle<R>,
+    message: &CompleteMessage,
+) -> Result<(), ProductionError> {
+    let (key, scope, incarnation, epoch) = match message {
+        CompleteMessage::SectionStart(v) => (
+            &v.section_key,
+            &v.source_scope,
+            &v.producer_incarnation,
+            v.transport_epoch,
+        ),
+        CompleteMessage::ImmutableBatch(v) => (
+            &v.section_key,
+            &v.source_scope,
+            &v.producer_incarnation,
+            v.transport_epoch,
+        ),
+        CompleteMessage::SectionCompletion(v) => (
+            &v.section_key,
+            &v.source_scope,
+            &v.producer_incarnation,
+            v.transport_epoch,
+        ),
+        CompleteMessage::Control(_) => return Ok(()),
+    };
+    if !is_key(key.as_str()) {
+        return Ok(());
+    }
+    let current = core(lifecycle)?;
+    let parent = current.revision();
+    let expected_group = group(parent, key.as_str())?;
+    if &parent.source_scope != scope
+        || parent.source_session.producer_incarnation() != incarnation
+        || parent.source_session.transport_epoch() != epoch
+    {
+        return Err(rejected());
+    }
+    if let CompleteMessage::ImmutableBatch(batch) = message {
+        validate_members(batch, parent)?;
+        let member = expected_group
+            .members()
+            .get(batch.section_ordinal.saturating_sub(1))
+            .ok_or_else(rejected)?;
+        if batch
+            .records
+            .first()
+            .is_none_or(|v| v.entity_id.as_str() != format!("x4:ship:{}", member.as_str()))
+        {
+            return Err(rejected());
+        }
+    }
+    validate_group_count(message, expected_group.members().len())?;
+    Ok(())
+}
+
+fn validate_group_count(message: &CompleteMessage, expected: usize) -> Result<(), ProductionError> {
+    let count = match message {
+        CompleteMessage::SectionStart(v) => Some(v.expected_records),
+        CompleteMessage::SectionCompletion(v) => Some(v.record_count),
+        _ => None,
+    };
+    if count.is_some_and(|v| v != expected) {
+        return Err(rejected());
+    }
+    Ok(())
+}
+
+fn validate_members(
+    batch: &ImmutableBatchEnvelope,
+    parent: &observation_persistence::RevisionRecord,
+) -> Result<(), ProductionError> {
+    for record in &batch.records {
+        let cargo = CargoObservation::from_content(&record.content, 64).map_err(|_| rejected())?;
+        let dependency = &cargo.dependency;
+        if dependency.core_revision != parent.revision
+            || dependency.member_revision != parent.revision
+            || dependency.capture.start_millis()
+                < parent
+                    .context
+                    .candidate(parent.dependencies.clone(), parent.expected_current)
+                    .state()
+                    .capture_window()
+                    .end_millis()
+            || !parent
+                .records
+                .iter()
+                .any(|v| v.entity_id == record.entity_id)
+        {
+            return Err(rejected());
+        }
+    }
+    Ok(())
+}

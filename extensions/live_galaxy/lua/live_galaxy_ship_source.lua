@@ -34,6 +34,27 @@ function source.runtime()
             return { identity = identity, owner = owner, type = macro,
                 class = class, location = "sector:" .. sector_identity }
         end,
+        cargo_wares = function(_, identity)
+            return GetComponentData(ConvertStringToLuaID(identity), "cargo")
+        end,
+        cargo_storage_count = function(_, identity)
+            return tonumber(C.GetNumCargoTransportTypes(ConvertStringToLuaID(identity), true))
+        end,
+        cargo_storage_size = function() return ffi.sizeof("StorageInfo") end,
+        cargo_storage_allocate = function(_, count) return ffi.new("StorageInfo[?]", count) end,
+        cargo_storage_fill = function(_, identity, buffer, count)
+            local returned = tonumber(C.GetCargoTransportTypes(buffer, count,
+                ConvertStringToLuaID(identity), true, false))
+            if returned == nil or returned < 0 or returned > count then return nil end
+            -- Copy every pointer-backed string before returning/yielding.
+            local copied = {}
+            for i = 0, returned - 1 do
+                copied[i + 1] = { transport = ffi.string(buffer[i].transport),
+                    capacity_cubic_metres = tonumber(buffer[i].capacity),
+                    occupied_cubic_metres = tonumber(buffer[i].spaceused) }
+            end
+            return copied
+        end,
     }
 end
 

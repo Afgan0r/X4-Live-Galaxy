@@ -28,6 +28,7 @@ pub struct Producer {
     pub(super) revision: u64,
     pub(super) evidence: Option<SectionEvidence>,
     pub(super) profile: ProducerProfile,
+    pub(super) selected_key: String,
     pub(super) expected_records: usize,
     pub(super) records: Vec<PreparedRecord>,
     pub(super) finished: bool,
@@ -56,6 +57,7 @@ impl Producer {
             revision: 1,
             evidence: None,
             profile: ProducerProfile::Clock,
+            selected_key: "carrier_b_realtime_sample".to_owned(),
             expected_records: 0,
             records: Vec::new(),
             finished: false,
@@ -94,13 +96,13 @@ impl Producer {
             && !self.finished
     }
 
-    pub(crate) fn selection_status(&self) -> (&'static str, usize) {
+    pub(crate) fn selection_status(&self) -> (&str, usize) {
         let remaining = self
             .limits
             .max_records
             .saturating_sub(self.next_batch_index + self.records.len());
         if matches!(self.readiness, Readiness::Ready) {
-            (self.profile.section_key(), remaining)
+            (&self.selected_key, remaining)
         } else {
             ("none", remaining)
         }

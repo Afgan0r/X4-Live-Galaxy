@@ -18,6 +18,7 @@ mod production_startup;
 mod protocol;
 mod receiver_context;
 mod receiver_ship;
+mod receiver_ship_detail;
 mod receiver_ship_replay;
 mod server;
 mod session;

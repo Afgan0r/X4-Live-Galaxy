@@ -9,7 +9,10 @@ mod section;
 mod section_state;
 mod sender_evidence;
 mod session;
+mod ship_cargo;
+mod ship_cargo_decode;
 mod ship_core;
+mod ship_detail;
 mod ship_field;
 mod ship_group;
 
@@ -38,8 +41,12 @@ pub use sender_evidence::{
     CaptureClock, SenderEvidence, SourceBoundary, SourceConsistency, SourceEpochStatus,
 };
 pub use session::SourceSessionIdentity;
+pub use ship_cargo::{CargoObservation, CargoStorage, CargoWare};
 pub use ship_core::{
     ShipClass, ShipCoreError, ShipCoreRecord, ShipIdentity, ShipLocation, ShipOwner, ShipType,
 };
+pub use ship_detail::{
+    ShipDetailDependency, ShipDetailError, detail_number, detail_outcome, detail_token,
+};
 pub use ship_field::{FieldApplicability, FieldOutcome, SourceEvidenceRef};
-pub use ship_group::{ShipGroupDescriptor, ShipGroupError};
+pub use ship_group::{ShipDetailGroup, ShipGroupDescriptor, ShipGroupError};

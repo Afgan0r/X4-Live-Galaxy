@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use observation_application::{LifecycleContext, ObservationLifecycle};
 use observation_domain::{
     CompleteMessage, SourceBoundary, SourceEpochStatus, SourceSessionIdentity,
@@ -20,7 +18,9 @@ pub fn assemble<R: ObservationRepository>(
                 .map_err(|_| ProductionError::Storage)?
                 .map(|value| value.receipt().revision);
             let evidence = &start.sender_evidence;
-            let versions = if start.section_key.as_str() == "ship_core" {
+            let versions = if start.section_key.as_str() == "ship_core"
+                || crate::receiver_ship_detail::is_key(start.section_key.as_str())
+            {
                 crate::receiver_ship::validate_evidence(evidence)?;
                 observation_domain::SenderEvidence::legacy_default()
             } else {
@@ -35,7 +35,7 @@ pub fn assemble<R: ObservationRepository>(
                 ),
                 evidence.section_state.capture_window(),
                 evidence.section_state,
-                BTreeMap::new(),
+                crate::receiver_ship_detail::dependencies(lifecycle, start.section_key.as_str())?,
                 current,
                 evidence.stable_identity,
             )))
@@ -47,7 +47,7 @@ pub fn assemble<R: ObservationRepository>(
                 .map_err(|_| ProductionError::Storage)?
                 .map(|value| value.receipt().revision);
             Ok(LifecycleContext::Completion(CompletionCurrent::new(
-                BTreeMap::new(),
+                crate::receiver_ship_detail::dependencies(lifecycle, done.section_key.as_str())?,
                 current,
             )))
         }

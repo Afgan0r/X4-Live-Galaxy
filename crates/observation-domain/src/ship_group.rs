@@ -3,6 +3,8 @@ use crate::{ObservationPolicyVersion, SectionRevisionId, ShipIdentity, SourceSco
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ShipGroupError {
     DuplicateIdentity(ShipIdentity),
+    InvalidBound,
+    MissingGroup,
 }
 
 #[must_use]
@@ -12,6 +14,53 @@ pub struct ShipGroupDescriptor {
     core_revision: SectionRevisionId,
     policy_version: ObservationPolicyVersion,
     members: Vec<ShipIdentity>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ShipDetailGroup {
+    parent: ShipGroupDescriptor,
+    ordinal: u16,
+    members: Vec<ShipIdentity>,
+}
+
+impl ShipDetailGroup {
+    pub fn new(
+        parent: ShipGroupDescriptor,
+        ordinal: u16,
+        maximum: usize,
+    ) -> Result<Self, ShipGroupError> {
+        if maximum == 0 {
+            return Err(ShipGroupError::InvalidBound);
+        }
+        let start = usize::from(ordinal)
+            .checked_mul(maximum)
+            .ok_or(ShipGroupError::InvalidBound)?;
+        let end = start
+            .checked_add(maximum)
+            .ok_or(ShipGroupError::InvalidBound)?
+            .min(parent.members.len());
+        let members = parent
+            .members
+            .get(start..end)
+            .filter(|v| !v.is_empty())
+            .ok_or(ShipGroupError::MissingGroup)?
+            .to_vec();
+        Ok(Self {
+            parent,
+            ordinal,
+            members,
+        })
+    }
+    pub const fn parent(&self) -> &ShipGroupDescriptor {
+        &self.parent
+    }
+    #[must_use]
+    pub const fn ordinal(&self) -> u16 {
+        self.ordinal
+    }
+    pub fn members(&self) -> &[ShipIdentity] {
+        &self.members
+    }
 }
 
 impl ShipGroupDescriptor {

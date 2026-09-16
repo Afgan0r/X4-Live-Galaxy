@@ -94,17 +94,15 @@ pub struct TypedFact {
 pub(crate) enum ProducerProfile {
     Clock,
     ShipCore,
+    ShipCargo,
 }
 
 impl ProducerProfile {
-    pub(crate) const fn section_key(self) -> &'static str {
-        match self {
-            Self::Clock => "carrier_b_realtime_sample",
-            Self::ShipCore => "ship_core",
-        }
-    }
-
     pub(crate) fn from_section_key(value: &str) -> Option<Self> {
+        if let Some(group) = value.strip_prefix("ship_cargo:g") {
+            let index = group.parse::<u16>().ok()?;
+            return (index.to_string() == group).then_some(Self::ShipCargo);
+        }
         match value {
             "carrier_b_realtime_sample" => Some(Self::Clock),
             "ship_core" => Some(Self::ShipCore),

@@ -10,12 +10,12 @@ pub(super) struct CompletionOutcome {
 
 impl Producer {
     pub(super) fn remember_completion(&mut self) {
-        if self.profile != crate::producer_types::ProducerProfile::ShipCore {
+        if self.profile == crate::producer_types::ProducerProfile::Clock {
             return;
         }
         if let Some(pending) = self.pending.as_ref().filter(|pending| {
             pending.handed_off
-                && pending.id == format!("message:complete:ship_core:{}", self.revision)
+                && pending.id == format!("message:complete:{}:{}", self.selected_key, self.revision)
         }) {
             self.reconciliation = Some(CompletionOutcome {
                 id: pending.id.clone(),

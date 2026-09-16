@@ -96,6 +96,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )
         .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
         crate::receiver_ship::validate(&message, self.ship_scope.as_ref())?;
+        crate::receiver_ship_detail::validate_dependency(&self.lifecycle, &message)?;
         if crate::receiver_ship_replay::is_committed(&self.lifecycle, &message)? {
             return Ok(LifecycleResult::Disposition(
                 observation_ingest::ReceiverDisposition::Committed,

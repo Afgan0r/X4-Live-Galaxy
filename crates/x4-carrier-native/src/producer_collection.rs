@@ -13,7 +13,7 @@ impl Producer {
         evidence: SectionEvidence,
         expected_records: usize,
     ) -> Result<(), ProducerError> {
-        if self.profile != ProducerProfile::ShipCore
+        if self.profile == ProducerProfile::Clock
             || expected_records > self.limits.max_records
             || expected_records > self.limits.max_batches
             || (expected_records == 0 && !qualified_empty(&evidence))
@@ -58,7 +58,7 @@ impl Producer {
         }
         self.begin(evidence, 1)
     }
-    fn begin(
+    pub(super) fn begin(
         &mut self,
         evidence: SectionEvidence,
         expected_records: usize,
@@ -86,7 +86,7 @@ impl Producer {
             ),
         })
     }
-    fn push(&mut self, record: PreparedRecord) -> Result<(), ProducerError> {
+    pub(super) fn push(&mut self, record: PreparedRecord) -> Result<(), ProducerError> {
         if !matches!(
             self.state,
             ProducerState::SectionReserved | ProducerState::Collecting
@@ -101,7 +101,7 @@ impl Producer {
                 total.checked_add(value.content.len())
             })
             .ok_or(ProducerError::DataLimit)?;
-        if self.profile == ProducerProfile::ShipCore && bytes > self.limits.max_raw_bytes {
+        if self.profile != ProducerProfile::Clock && bytes > self.limits.max_raw_bytes {
             return Err(ProducerError::DataLimit);
         }
         self.records.push(record);
@@ -175,22 +175,18 @@ impl Producer {
         let messages = assemble(
             &self.source,
             evidence,
-            self.profile,
+            &self.selected_key,
             self.expected_records,
             self.revision,
             self.limits.data_message_bytes,
         )?;
         self.pending = Some(Pending::new(
             messages,
-            format!(
-                "message:start:{}:{}",
-                self.profile.section_key(),
-                self.revision
-            ),
+            format!("message:start:{}:{}", self.selected_key, self.revision),
             now_millis,
         ));
         self.messages = Some(crate::producer_message::SectionMessages {
-            section_key: self.profile.section_key().to_owned(),
+            section_key: self.selected_key.clone(),
             certificate: observation_ingest::ProducerCertificateStream::default(),
         });
         self.next_batch_index = 0;

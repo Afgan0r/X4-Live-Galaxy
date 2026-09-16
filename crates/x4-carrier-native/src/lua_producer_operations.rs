@@ -10,13 +10,21 @@ pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
         return invalid(state);
     };
-    let source = PRODUCER
-        .lock()
-        .ok()
-        .and_then(|producer| producer.as_ref().map(|value| value.source().clone()));
-    let Some(input) =
-        source.and_then(|source| unsafe { crate::lua_input::begin(api, state, &source) })
-    else {
+    let source = PRODUCER.lock().ok().and_then(|producer| {
+        producer.as_ref().map(|value| {
+            (
+                value.source().clone(),
+                value.selection_status().0.to_owned(),
+            )
+        })
+    });
+    let Some(input) = source.and_then(|(source, selected)| {
+        let key = unsafe { crate::lua_table::field_string(api, state, 2, "section_key", 128) }?;
+        if key != selected {
+            return None;
+        }
+        unsafe { crate::lua_input::begin(api, state, &source) }
+    }) else {
         return unsafe { push_code(api, state, -20) };
     };
     let result = with_producer(handle, |producer| match input {
@@ -39,6 +47,9 @@ pub unsafe extern "C" fn push_record(state: *mut c_void) -> c_int {
     let result = with_producer(handle, |producer| match input {
         crate::lua_input::RecordInput::Clock(fact) => producer.push_record(&fact),
         crate::lua_input::RecordInput::ShipCore(record) => producer.push_ship_core(&record),
+        crate::lua_input::RecordInput::ShipCargo(scope, record) => {
+            producer.push_ship_cargo(&scope, &record)
+        }
     });
     unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
 }

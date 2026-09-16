@@ -5,7 +5,7 @@ use observation_domain::{
 };
 use observation_ingest::{ContractVersions, bind_completion_certificate, encode_complete_message};
 
-use crate::producer_types::{PreparedRecord, ProducerProfile};
+use crate::producer_types::PreparedRecord;
 use crate::{ProducerError, ProducerSource, SectionEvidence};
 
 pub struct SectionMessages {
@@ -16,7 +16,7 @@ pub struct SectionMessages {
 pub fn assemble(
     source: &ProducerSource,
     evidence: &SectionEvidence,
-    profile: ProducerProfile,
+    section_key: &str,
     expected_records: usize,
     revision: u64,
     limit: usize,
@@ -26,7 +26,6 @@ pub fn assemble(
     let producer = ProducerIncarnationId::new(source.producer_incarnation.clone())
         .ok_or(ProducerError::InvalidInput)?;
     let epoch = TransportEpoch::new(source.transport_epoch).ok_or(ProducerError::StaleEpoch)?;
-    let section_key = profile.section_key();
     let key = SectionKey::new(section_key).ok_or(ProducerError::InvalidInput)?;
     let revision = SectionRevisionId::new(revision).ok_or(ProducerError::InvalidInput)?;
     let start = SectionStartEnvelope {
@@ -66,7 +65,7 @@ pub(super) fn batch(
         .ok_or(ProducerError::InvalidInput)?,
         section_ordinal: ordinal,
         records: vec![EnvelopeRecord {
-            record_id: RecordId::new(if section_key == "ship_core" {
+            record_id: RecordId::new(if section_key.starts_with("ship_") {
                 format!("carrier-b:{}:{ordinal:020}", revision.get())
             } else {
                 format!("carrier-b:{}:{ordinal}", revision.get())

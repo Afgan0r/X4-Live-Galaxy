@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use std::time::Duration;
 use x4_bridge::ProductionObservationSession;
 use x4_carrier_native::BridgePeer;
-pub(super) fn submit(
+pub fn submit(
     receiver: &mut ProductionObservationSession,
     identity: &CarrierIdentity,
     id: &str,
@@ -25,16 +25,12 @@ pub(super) fn submit(
         )
         .map_err(|e| format!("receiver:{e:?}").into())
 }
-pub(super) fn receive(peer: &mut BridgePeer) -> Result<Vec<u8>> {
+pub fn receive(peer: &mut BridgePeer) -> Result<Vec<u8>> {
     peer.receive_timeout(4096, Duration::from_secs(10))
         .map_err(|e| format!("pipe read:{e:?}"))?
         .ok_or_else(|| "pipe read watchdog".into())
 }
-pub(super) fn send(
-    peer: &mut BridgePeer,
-    identity: &CarrierIdentity,
-    body: ControlBody,
-) -> Result<()> {
+pub fn send(peer: &mut BridgePeer, identity: &CarrierIdentity, body: ControlBody) -> Result<()> {
     let bytes = encode_carrier_control(
         &CarrierControl {
             identity: identity.clone(),
@@ -46,7 +42,7 @@ pub(super) fn send(
     peer.send_control(&bytes)
         .map_err(|e| format!("control write:{e:?}").into())
 }
-pub(super) fn respond(
+pub fn respond(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
     id: &str,
@@ -63,30 +59,45 @@ pub(super) fn respond(
         identity,
         ControlBody::Disposition(DispositionBody {
             message_id: id.into(),
-            section_key: "ship_core".into(),
+            section_key: match decode_complete_message(bytes, 4096)
+                .map_err(|e| format!("decode:{e:?}"))?
+            {
+                CompleteMessage::SectionStart(v) => v.section_key.as_str().into(),
+                CompleteMessage::ImmutableBatch(v) => v.section_key.as_str().into(),
+                CompleteMessage::SectionCompletion(v) => v.section_key.as_str().into(),
+                CompleteMessage::Control(_) => return Err("unexpected control".into()),
+            },
             section_revision: revision,
             message_digest: digest,
             disposition: result.into(),
         }),
     )
 }
-pub(super) fn message_identity(bytes: &[u8]) -> Result<(String, u64)> {
+pub fn message_identity(bytes: &[u8]) -> Result<(String, u64)> {
     match decode_complete_message(bytes, 4096).map_err(|e| format!("decode:{e:?}"))? {
         CompleteMessage::SectionStart(v) => Ok((
-            format!("message:start:ship_core:{}", v.section_revision.get()),
+            format!(
+                "message:start:{}:{}",
+                v.section_key.as_str(),
+                v.section_revision.get()
+            ),
             v.section_revision.get(),
         )),
         CompleteMessage::ImmutableBatch(v) => {
             Ok((v.batch_id.as_str().into(), v.section_revision.get()))
         }
         CompleteMessage::SectionCompletion(v) => Ok((
-            format!("message:complete:ship_core:{}", v.section_revision.get()),
+            format!(
+                "message:complete:{}:{}",
+                v.section_key.as_str(),
+                v.section_revision.get()
+            ),
             v.section_revision.get(),
         )),
         CompleteMessage::Control(_) => Err("unexpected control".into()),
     }
 }
-pub(super) fn now() -> u64 {
+pub fn now() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |v| u64::try_from(v.as_millis()).unwrap_or(u64::MAX))

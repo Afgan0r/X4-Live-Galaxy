@@ -1,6 +1,9 @@
 use std::io::Write as _;
+mod cargo_readback;
+mod detail_peer;
 mod peer;
 mod readback;
+mod wire;
 
 use observation_application::LifecycleLimits;
 use observation_domain::SectionKey;
@@ -20,15 +23,28 @@ fn main() -> Result<()> {
     };
     let database = data.join("observations.sqlite3");
     let mut receiver = session(&database)?;
+    if scenario == Path::new("heavy-ship-detail") {
+        let mut host = Host::start(root, host, script, data, "heavy-ship-detail")?;
+        let (_, completions) = detail_peer::serve(&mut receiver)?;
+        host.finish()?;
+        drop(receiver);
+        readback::verify_cargo(&database)?;
+        let mut receiver = session(&database)?;
+        for completion in completions.iter().skip(3) {
+            peer::replay(&mut receiver, completion)?;
+        }
+        writeln!(
+            std::io::stdout(),
+            "PASS actual_chain_cargo independent_history_current=true groups=2 revisions=2,3,4,5"
+        )?;
+        return Ok(());
+    }
     let key = SectionKey::new("ship_core").ok_or("section key")?;
     let mut first = Host::start(root, host, script, data, "heavy-ship-core")?;
     let (identity1, completion1) = peer::serve(&mut receiver, 2, false)?;
     first.finish()?;
     drop(receiver);
     readback::verify(&database, &[1, 2], &completion1.1)?;
-    if scenario == Path::new("heavy-ship-detail") {
-        readback::verify_cargo(&database)?;
-    }
     let mut receiver = session(&database)?;
     if receiver
         .next_revision(&key)

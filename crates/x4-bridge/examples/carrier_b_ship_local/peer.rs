@@ -1,13 +1,12 @@
 type Trace = (String, (CarrierIdentity, Vec<u8>));
 use super::Result;
+use super::wire;
 use observation_application::LifecycleResult;
 use observation_domain::{BatchId, SectionKey};
 use observation_ingest::{
     CarrierIdentity, CollectionIntentBody, ControlBody, DemandBody, HandshakeBody,
     ReceiverDisposition, decode_carrier_bootstrap,
 };
-#[path = "wire.rs"]
-mod wire;
 use std::time::{Duration, Instant};
 use wire::{message_identity, now, receive, respond, send, submit};
 use x4_bridge::{PIPE_ENDPOINT, ProductionObservationSession};
@@ -92,7 +91,9 @@ fn reject_replacement(
     Ok(())
 }
 
-fn qualify(receiver: &ProductionObservationSession) -> Result<(BridgePeer, CarrierIdentity, u64)> {
+pub fn qualify(
+    receiver: &ProductionObservationSession,
+) -> Result<(BridgePeer, CarrierIdentity, u64)> {
     let config = TransportConfig {
         pipe_name: PIPE_ENDPOINT.into(),
         max_data_message_bytes: 4096,

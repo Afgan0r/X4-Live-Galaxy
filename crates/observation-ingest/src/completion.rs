@@ -83,22 +83,23 @@ impl GenerationStager {
         let Some(candidate) = self.drop_candidate(&key) else {
             return CompletionOutcome::Rejected(RejectionReason::CompletionMismatch);
         };
-        let context = if candidate.start.section_key.as_str() == "ship_core" {
-            CandidateContext::new(
-                context.versions(),
-                certificate
-                    .envelope
-                    .sender_evidence
-                    .section_state
-                    .capture_window(),
-                certificate.envelope.sender_evidence.section_state,
-                context.dependencies().clone(),
-                context.expected_current(),
-                context.stable_identity(),
-            )
-        } else {
-            context
-        };
+        let context =
+            if crate::completion_evidence::is_ship_section(candidate.start.section_key.as_str()) {
+                CandidateContext::new(
+                    context.versions(),
+                    certificate
+                        .envelope
+                        .sender_evidence
+                        .section_state
+                        .capture_window(),
+                    certificate.envelope.sender_evidence.section_state,
+                    context.dependencies().clone(),
+                    context.expected_current(),
+                    context.stable_identity(),
+                )
+            } else {
+                context
+            };
         CompletionOutcome::Validated(Box::new(ValidatedSectionRevision {
             source_scope: candidate.start.source_scope,
             source_session: SourceSessionIdentity::new(
@@ -147,7 +148,7 @@ fn completion_is_exact(
         && candidate.start.transport_epoch == certificate.envelope.transport_epoch
         && candidate.start.section_revision == certificate.envelope.section_revision
         && (candidate.start.sender_evidence == certificate.envelope.sender_evidence
-            || (candidate.start.section_key.as_str() == "ship_core"
+            || (crate::completion_evidence::is_ship_section(candidate.start.section_key.as_str())
                 && crate::completion_evidence::finish_matches(
                     &candidate.start.sender_evidence,
                     &certificate.envelope.sender_evidence,
@@ -180,7 +181,6 @@ fn completion_is_exact(
         && certificate.ordered_batch_manifest_digest == candidate_material(candidate).0
         && certificate.canonical_content_digest == content_digest(records)
 }
-
 fn coverage_is_consistent(
     context: &CandidateContext,
     terminal: CompletionCoverage,

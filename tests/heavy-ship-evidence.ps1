@@ -164,8 +164,9 @@ function Invoke-SelfTests {
 }
 
 if ($SelfTest) { Invoke-SelfTests; exit 0 }
-if (-not $EvidenceFile) { throw 'Specify -SelfTest or -EvidenceFile (implementation readiness).' }
+if ($Preparation -and $RuntimeAcceptance) { throw 'EVIDENCE_MODE_CONFLICT' }
+if (-not $EvidenceFile) { throw 'Specify -SelfTest or -EvidenceFile with -Preparation or -RuntimeAcceptance.' }
 $evidence = Get-Content -LiteralPath $EvidenceFile -Raw | ConvertFrom-Json -AsHashtable
-$errors = @(Test-Evidence $evidence)
+$errors = @(Test-Evidence $evidence -Preparation:$Preparation)
 if ($errors.Count) { Write-Output "EVIDENCE_BLOCKED: $($errors -join ',')"; exit 1 }
 Write-Output 'EVIDENCE_SHAPE_OK: artifact consistency only; no runtime authentication or approval'

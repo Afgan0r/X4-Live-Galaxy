@@ -60,6 +60,75 @@ for collection = 1, expected do
     assert(getters == 20 * collections, "getter work must be exactly bounded per census")
     assert(stages > 0 and stages <= 129 * collections, "stage work bound")
 end
+if mode == "heavy-ship-detail" then
+    local revision = 2
+    local function invalid_abi()
+        local function record()
+            return { profile = "ship_cargo", source_scope = "x4:faction:argon:ships",
+                identity = "9007199254740993", owner = "argon", core_revision = "1",
+                member_revision = "1", policy_version = 2, capture_start_millis = "20",
+                capture_end_millis = "30", source_evidence = "x4-9.00-steam-23660954-ship-detail-source-v1",
+                wares_outcome = "value", storage_outcome = "empty",
+                wares = { { ware = "ore", amount_items = 1 } }, storage = {} }
+        end
+        for _, mutate in ipairs({
+            function(v) v.wares[1].amount_items = "1" end,
+            function(v) v.wares[1].amount_items = 9007199254740992 end,
+            function(v) v.wares[1].amount_items = -1 end,
+            function(v) v.extra = true end,
+            function(v) setmetatable(v, {}) end,
+            function(v) setmetatable(v.wares[1], {}) end,
+            function(v) v.wares[3], v.wares[1] = v.wares[1], nil end,
+            function(v) for i = 1, 17 do v.wares[i] = { ware = "ore" .. i, amount_items = i } end end,
+        }) do
+            local value = record(); mutate(value)
+            assert(carrier:push_record(value) == -20, "strict cargo ABI must reject malformed nested input")
+        end
+    end
+    source.cargo_wares = function(_, id) called(); return { energycells = 7, ore = 11 } end
+    source.cargo_storage_count = function() called(); return 1 end
+    source.cargo_storage_size = function() return 24 end
+    source.cargo_storage_allocate = function() return {} end
+    source.cargo_storage_fill = function()
+        called(); return { { transport = "solid", capacity_cubic_metres = 1200,
+            occupied_cubic_metres = 110 } }
+    end
+    for cycle = 1, 2 do
+        for group_index = 0, 1 do
+            local members = {}
+            for i = 1, 4 do members[i] = "900719925474099" .. tostring(group_index * 4 + i + 1) end
+            local detail_begin, detail_finish = {}, {}
+            for k, v in pairs(begin) do detail_begin[k] = v end
+            for k, v in pairs(finish) do detail_finish[k] = v end
+            detail_begin.capture_start_millis = tostring(20 + revision)
+            detail_finish.capture_end_millis = tostring(30 + revision)
+            local observation = assert(require("live_galaxy.lua.live_galaxy_ship_details").new({
+                ship_api = source, max_inner = 16, max_allocation_bytes = 2048,
+                source_scope = "x4:faction:argon:ships", group = { key = "ship_cargo:g" .. group_index,
+                    members = members, owner = "argon", core_revision = "1" } },
+                { begin_evidence = function() return detail_begin end,
+                    finish_evidence = function() return detail_finish end }))
+            local sampled = false
+            local deadline = host_monotonic_millis() + 15000
+            repeat
+                local _, status = carrier:progress(1)
+                local control = carrier:poll_control()
+                if not sampled and status and status.capacity:match("^available:")
+                    and status.selection == "ship_cargo:g" .. group_index then
+                    if observation.stage == "reserve" then invalid_abi() end
+                    local result = observation:tick({ source_boundary = "runtime_start" }, carrier, status)
+                    assert(result.disposition == "collecting" or result.disposition == "sampled"
+                        or result.disposition == "producer_busy", result.disposition)
+                    sampled = result.disposition == "sampled"
+                end
+                if sampled and control == 5 then break end
+                assert(host_monotonic_millis() < deadline, "cargo commit watchdog")
+                host_sleep(1)
+            until false
+            revision = revision + 1
+        end
+    end
+end
 if mode == "heavy-ship-restart" then
     local deadline = host_monotonic_millis() + 15000
     repeat

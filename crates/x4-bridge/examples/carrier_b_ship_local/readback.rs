@@ -5,17 +5,7 @@ use std::io::Write as _;
 use std::path::Path;
 
 pub fn verify_cargo(database: &Path) -> Result<()> {
-    let repository = SqliteObservationRepository::open(database, publication_limits()?)
-        .map_err(|e| format!("independent cargo reopen:{e:?}"))?;
-    let key = SectionKey::new("ship_cargo").ok_or("cargo key")?;
-    if repository
-        .current(&key)
-        .map_err(|e| format!("cargo current:{e:?}"))?
-        .is_none()
-    {
-        return Err("assertion failed: actual_chain_cargo_has_independent_durable_readback: missing cargo revision".into());
-    }
-    Ok(())
+    super::cargo_readback::verify(database)
 }
 
 pub fn verify(database: &Path, revisions: &[u64], completion: &[u8]) -> Result<()> {
