@@ -45,7 +45,7 @@ end
 local function invoke(self, name, ...)
     if self.closed then return nil, "closed" end
     local ok, code, producer_state, transport_state, monotonic, capacity, incarnation,
-        selection, remaining =
+        selection, remaining, revision =
         pcall(self.api[name], self.token, ...)
     if not ok then return nil, "operation_failure" end
     if type(code) ~= "number" or code % 1 ~= 0 then return nil, "result_shape" end
@@ -66,6 +66,7 @@ local function invoke(self, name, ...)
             monotonic_millis = monotonic, capacity = capacity,
             producer_incarnation = incarnation,
             selection = selection, remaining_capacity = remaining,
+            collection_revision = revision,
         }
         self.current_status = status
     end

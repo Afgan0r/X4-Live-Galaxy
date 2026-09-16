@@ -94,10 +94,14 @@ unsafe fn open_inner(state: *mut c_void) -> c_int {
         source_boundary: args.boundary,
     };
     let producer = Producer::new(args.limits, source, 0);
-    let (Ok(transport), Ok(producer)) = (transport, producer) else {
+    let (Ok(transport), Ok(mut producer)) = (transport, producer) else {
         let _closed = REGISTRY.lock().map(|mut registry| registry.close(token));
         return unsafe { push_code(api, state, -18) };
     };
+    if producer.configure_admission(args.policy).is_err() {
+        let _closed = REGISTRY.lock().map(|mut registry| registry.close(token));
+        return unsafe { push_code(api, state, -20) };
+    }
     let (Ok(mut active_transport), Ok(mut active_producer)) = (TRANSPORT.lock(), PRODUCER.lock())
     else {
         let _closed = REGISTRY.lock().map(|mut registry| registry.close(token));

@@ -1,4 +1,4 @@
-use observation_ingest::{CarrierControl, CarrierIdentity, ControlBody, encode_carrier_control};
+pub(super) use crate::producer_identity::{bootstrap_bytes, identity};
 
 use crate::producer_message::SectionMessages;
 use crate::producer_types::{PreparedRecord, ProducerProfile};
@@ -21,6 +21,10 @@ pub(super) enum Readiness {
 }
 
 pub struct Producer {
+    pub(super) policy: crate::ProducerAdmissionPolicy,
+    pub(super) raw_bytes: usize,
+    pub(super) last_progress_at: u64,
+    pub(super) section_started_at: Option<u64>,
     pub(super) limits: ProducerLimits,
     pub(super) source: ProducerSource,
     pub(super) state: ProducerState,
@@ -50,6 +54,14 @@ impl Producer {
         }
         let bytes = bootstrap_bytes(&source, limits.control_message_bytes)?;
         Ok(Self {
+            policy: crate::ProducerAdmissionPolicy {
+                max_inner_records: limits.max_records,
+                max_attempts: 2,
+                max_age_millis: 5000,
+            },
+            raw_bytes: 0,
+            last_progress_at: now_millis,
+            section_started_at: None,
             limits,
             source,
             state: ProducerState::AwaitingCompatibility,
@@ -135,6 +147,7 @@ impl Producer {
 
     pub fn reset(&mut self, source: ProducerSource, now_millis: u64) -> Result<(), ProducerError> {
         let mut replacement = Self::new(self.limits, source, now_millis)?;
+        replacement.policy = self.policy;
         self.remember_completion();
         replacement.reconciliation = self.reconciliation.take();
         replacement.revision = self.revision;
@@ -146,6 +159,8 @@ impl Producer {
         self.remember_completion();
         self.evidence = None;
         self.expected_records = 0;
+        self.raw_bytes = 0;
+        self.section_started_at = None;
         self.records.clear();
         self.finished = false;
         self.messages = None;
@@ -164,37 +179,4 @@ impl Pending {
             first_attempt_at: now,
         }
     }
-}
-
-pub(super) fn identity(source: &ProducerSource) -> Result<CarrierIdentity, ProducerError> {
-    let identity = CarrierIdentity {
-        session_id: source.session_id.clone(),
-        producer_incarnation: source.producer_incarnation.clone(),
-        epoch: observation_domain::TransportEpoch::new(source.transport_epoch)
-            .ok_or(ProducerError::StaleEpoch)?,
-    };
-    observation_ingest::validate_carrier_identity(&identity)
-        .map_err(|_| ProducerError::InvalidInput)?;
-    Ok(identity)
-}
-
-pub(super) fn bootstrap_bytes(
-    source: &ProducerSource,
-    limit: usize,
-) -> Result<Vec<u8>, ProducerError> {
-    encode_carrier_control(
-        &CarrierControl {
-            identity: identity(source)?,
-            body: ControlBody::Handshake(observation_ingest::HandshakeBody {
-                native_abi: 2,
-                envelope_contract: 2,
-                schema_version: 1,
-                policy_version: 2,
-                canonicalization_version: 3,
-                digest_version: 1,
-            }),
-        },
-        limit,
-    )
-    .map_err(|_| ProducerError::ControlLimit)
 }

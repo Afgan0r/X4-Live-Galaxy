@@ -105,7 +105,7 @@ and a specific finite experiment is explicitly approved:
 Run the source-preparation checker without declaring runtime acceptance:
 
 ```powershell
-pwsh -NoProfile -File tests/heavy-ship-evidence.ps1 -Preparation
+pwsh -NoProfile -File tests/heavy-ship-evidence.ps1 -Preparation -EvidenceFile tests/fixtures/heavy-ship-source-contract.json
 pwsh -NoProfile -File tests/heavy-ship-evidence.ps1 -SelfTest
 pwsh -NoProfile -File tests/carrier-b-local.ps1 -SelfTest -Scenario heavy-ship-detail
 ```
@@ -115,7 +115,95 @@ units and the pending result schema. `-RuntimeAcceptance` rejects pending rows.
 The default checker remains strict runtime acceptance. Neither Preparation nor
 the local actual-chain harness grants owner approval or phase closure.
 
-## Runtime targets still pending
+## Prepared finite experiment profile
+
+`config/heavy-ship-experiment.json` is proposed experimental policy, not an
+accepted X4 performance envelope. The package materializes the exact validated
+JSON into `live_galaxy_config.lua` and includes its SHA-256 identity. The bridge
+uses the same JSON; unknown, duplicate, zero, overflowing or inconsistent fields
+are refused before collection. The clock-only profile remains separate.
+
+The initial cohort is ordinary faction `argon`, with complete bounded core
+membership and one core-qualified ship per detail group. A whole faction array
+over 128 ships is refused, never represented as a complete prefix. This small
+cohort does not establish the later heavy-faction Gate A/B cohort.
+
+<!-- markdownlint-disable MD013 -->
+
+| Bound | Proposed value | Local arithmetic or purpose |
+| --- | --- | --- |
+| Admission window | 60,000 ms | One bridge-run window, not renewed on reconnect |
+| Core membership | 128 ships | 128 × 8-byte UniverseID = 1,024 bytes |
+| Detail group | 1 ship | Separate cargo, crew and installed-loadout captures |
+| Inner collection | 64 entries | Count checked before allocating or filling |
+| Per allocation | 8,192 bytes | Count × actual target `ffi.sizeof` must fit |
+| Aggregate allocation | 65,536 bytes | Cumulative across nested allocations in one capture |
+| Native calls / steps | 384 / 512 | Core's two reads per member need 256 calls; all stages remain bounded |
+| Heavy permits | 1 per callback | Getter or allocation, with control pumping first |
+| Callback target | 2 ms | Measured after synchronous return; an overrun stops capture |
+| Rate interval | 50 ms | Existing Rust scheduler; transport-byte work is charged independently |
+| Message / control | 8,192 / 512 bytes | Whole immutable records, no byte-chunk collection |
+| Candidate raw / work | 131,072 / 131,072 | Cumulative native and receiver capture ceilings |
+| Aggregate decoded / pending / total | 262,144 / 8,192 / 524,288 bytes | One pending slot and bounded staging |
+| Capture age / inactivity | 30,000 / 10,000 ms | Distinct total-age and feedback-stall bounds |
+| Parent freshness | 30,000 ms | Receiver receipt age and producer-owned monotonic age |
+| Attempts / reconnect attempts | 1 / 1 | Incomplete captures require fresh qualification |
+| Retention | Current plus 2 unprotected prior receipts per section | Referenced parents, decision pins and ambiguous replay evidence are protected |
+
+<!-- markdownlint-enable MD013 -->
+
+Local fixtures use PeopleInfo=40, RoleTierData=16, software=16, UIWareInfo=24
+and UnitData=24 bytes: 64 entries need respectively 2,560, 1,024, 1,024, 1,536
+and 1,536 bytes. These are fixture ABI sizes, not packed-layout promises for X4.
+Production uses target `ffi.sizeof`; every allocation must satisfy both per-call
+and cumulative ceilings. A nested role/tier population can exceed the cumulative
+ceiling even when individual counts fit, and is then refused before allocation.
+
+Build and verify locally before any owner-operated installation:
+
+<!-- markdownlint-disable MD013 -->
+
+```powershell
+pwsh -NoProfile -File tests/carrier-b-local.ps1 -SelfTest -Scenario heavy-ship-recovery -LimitsFile config/heavy-ship-experiment.json
+pwsh -NoProfile -File tools/package-live-galaxy.ps1 -SelfTest -LimitsFile config/heavy-ship-experiment.json
+pwsh -NoProfile -File tools/package-live-galaxy.ps1 -OutputDirectory dist/live-galaxy-heavy-experiment -LimitsFile config/heavy-ship-experiment.json
+```
+
+<!-- markdownlint-enable MD013 -->
+
+The bundle is labelled `prepared-heavy-experiment`, not ready or accepted. Its
+startup procedure invokes the packaged bridge with `--ship-faction argon` and
+the packaged limits file. Record manifest/source revision, native SHA-256,
+profile SHA-256 and bundle manifest SHA-256 before owner approval. Never mix a
+different limits file or DLL into that identity.
+
+An already-entered synchronous X4 call has unknown latency and cannot be
+interrupted by this timer. The 2-ms target detects an overrun only after return;
+the entire call can still freeze a frame. This residual risk is an owner decision,
+not a requirement to supply prior game timings before preparing the package.
+After explicit Plan 10 approval, the owner alone installs the exact bundle,
+starts a disposable Creative Custom campaign, and runs the finite normal-time
+cohort. Do not use player saves. Stop on a source/identity change, frozen or
+backward clock, allocation/count/work/byte refusal, feedback stall or overrun.
+The owner stops the bridge and disables the experimental extension between
+runs; if a call does not return, the owner exits the disposable game session.
+Fresh producer qualification is required after load/reload or restart.
+
+Record normal-time and separately approved SETA samples: package/profile/run
+identity, real/game time and SETA factor, count/fill cardinalities, target ABI
+sizes, getter latency, callback duration, cumulative calls/allocations/work,
+record/message bytes, queue/pending occupancy, receipt ages, stop reason and
+independent earlier/current readback. Expand faction/cohort/count ceilings only
+after reviewing those measurements and explicit owner selection. Missing
+cases, all 21 runtime rows and numerical acceptance remain pending.
+
+Retain private run evidence outside Git in the shared contract's durable
+machine-local artifact store, with owner-only permissions and a stable locator
+containing logical run ID, exact retained paths and verified digests. Public
+handoffs name the logical ID and locator, not raw game payloads or local paths.
+Verify retained files and digests before ending the checkpoint.
+
+## Pending runtime interpretation
 
 Preserve count/fill observation strength as Partial/Unknown; a committed transfer
 is not source completeness or deletion proof. Target checks include actual

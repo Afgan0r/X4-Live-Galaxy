@@ -1,7 +1,7 @@
 use std::io::Write as _;
 use std::process::ExitCode;
 
-use x4_bridge::ProductionLimits;
+use x4_bridge::{HeavyShipLimits, ProductionLimits};
 
 fn main() -> ExitCode {
     let mut arguments = std::env::args_os().skip(1);
@@ -12,7 +12,8 @@ fn main() -> ExitCode {
     if flag != "--limits-file" {
         return reject(b"usage: validate_limits --limits-file <path>\n");
     }
-    if ProductionLimits::read(&std::path::PathBuf::from(path)).is_none() {
+    let path = std::path::PathBuf::from(path);
+    if ProductionLimits::read(&path).is_none() && HeavyShipLimits::read(&path).is_none() {
         return reject(b"limits rejected by the production parser\n");
     }
     ExitCode::SUCCESS

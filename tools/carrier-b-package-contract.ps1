@@ -1,5 +1,22 @@
 Set-StrictMode -Version Latest
 
+function Write-HeavyProfileLua([string]$LimitsRaw, [string]$Target) {
+    $values = $LimitsRaw | ConvertFrom-Json
+    if (-not ($values.PSObject.Properties.Name -ccontains 'heavy_profile_version')) { return $false }
+    $rows = @($values.PSObject.Properties | Sort-Object Name | ForEach-Object {
+        if ($_.Name -notmatch '^[a-z_]+$' -or $_.Value -isnot [long] -and $_.Value -isnot [int]) {
+            throw 'HEAVY_LUA_PROFILE_SHAPE'
+        }
+        "    $($_.Name) = $($_.Value),"
+    })
+    $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($LimitsRaw))).ToLowerInvariant()
+    $lua = @('local config = {}', "config.profile_sha256 = '$digest'", 'function config.options()',
+        "    return require('live_galaxy.lua.live_galaxy_ship_profile').options({") + $rows + @(
+        "    }, 'argon')", 'end', 'return config', '')
+    [IO.File]::WriteAllText($Target, ($lua -join "`n"), [Text.UTF8Encoding]::new($false))
+    return $true
+}
+
 function Assert-CarrierBManifest($Manifest, [string]$ExpectedCandidate) {
     if ($Manifest.product -cne 'live_galaxy' -or $Manifest.product_version -cne '0.1.0' -or
         $Manifest.source_revision -notmatch '^[0-9a-f]{40}$' -or

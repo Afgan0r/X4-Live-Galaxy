@@ -10,6 +10,9 @@ pub unsafe extern "C" fn push_record(state: *mut c_void) -> c_int {
             .copied()
             .map_or(0, |api| unsafe { push_code(api, state, -20) });
     };
+    if let Err(error) = with_producer(handle, |_| Ok(())) {
+        return unsafe { push_code(api, state, error_code(error)) };
+    }
     let Some(input) = (unsafe { crate::lua_input::record(api, state) }) else {
         return unsafe { push_code(api, state, -20) };
     };

@@ -31,6 +31,36 @@ pub struct ProductionLimits {
 }
 
 impl ProductionLimits {
+    pub(crate) fn valid(&self) -> bool {
+        [
+            self.complete_message_bytes,
+            self.control_message_bytes,
+            self.max_candidate_raw_bytes,
+            self.max_candidate_records,
+            self.max_candidate_batches,
+            self.max_candidate_work,
+            self.max_message_age_millis,
+            self.max_message_inactivity_millis,
+            self.max_candidates,
+            self.max_aggregate_bytes,
+            self.max_aggregate_records,
+            self.max_aggregate_batches,
+            self.max_aggregate_work,
+            self.max_publication_records,
+            self.max_publication_content_bytes,
+            self.max_pending_bytes,
+            self.max_total_bytes,
+            self.max_lifecycle_work,
+            self.max_delivery_attempts,
+            self.max_blockers,
+            self.reconnect_attempts,
+            self.reconnect_delay_millis,
+            self.availability_interval_millis,
+        ]
+        .iter()
+        .all(|value| *value > 0)
+            && self.relationships_valid()
+    }
     #[must_use]
     pub fn read(path: &Path) -> Option<Self> {
         let contents = std::fs::read_to_string(path).ok()?;

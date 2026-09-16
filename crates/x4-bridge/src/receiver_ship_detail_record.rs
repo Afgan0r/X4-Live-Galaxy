@@ -39,16 +39,22 @@ pub fn validate_batch(
     Ok(())
 }
 pub fn record_dependency(content: &str) -> Result<ShipDetailDependency, ProductionError> {
+    record_dependency_with_limit(content, 64)
+}
+pub fn record_dependency_with_limit(
+    content: &str,
+    limit: usize,
+) -> Result<ShipDetailDependency, ProductionError> {
     if content.starts_with("profile=ship_cargo\n") {
-        Ok(CargoObservation::from_content(content, 64)
+        Ok(CargoObservation::from_content(content, limit)
             .map_err(|_| rejected())?
             .dependency)
     } else if content.starts_with("profile=ship_crew\n") {
-        Ok(CrewObservation::from_content(content, 64)
+        Ok(CrewObservation::from_content(content, limit)
             .map_err(|_| rejected())?
             .dependency)
     } else if content.starts_with("profile=ship_loadout\n") {
-        Ok(LoadoutObservation::from_content(content, 64)
+        Ok(LoadoutObservation::from_content(content, limit)
             .map_err(|_| rejected())?
             .dependency)
     } else {

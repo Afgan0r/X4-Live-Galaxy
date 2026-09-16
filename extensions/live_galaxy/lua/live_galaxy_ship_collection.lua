@@ -42,6 +42,7 @@ end
 function collection:discard(carrier, reason)
     if self.reserved then carrier:fail_section(reason) end
     self.reserved, self.buffer, self.identities, self.pending = false, nil, nil, nil
+    self.cores = nil
     self.faction_buffer, self.factions, self.boundary, self.incarnation = nil, nil, nil, nil
     self.attempts = self.attempts + 1
     self.stage = self.attempts <= self.limits.max_attempts and "census" or "halted"
@@ -166,6 +167,9 @@ function collection:tick(context, carrier, status)
         local code = carrier:push_record(self.pending)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then return self:discard(carrier, "fact_rejected") end
+        self.cores = self.cores or {}
+        self.cores[self.pending.identity] = { identity = self.pending.identity, owner = self.pending.owner,
+            type = self.pending.type, class = self.pending.class, location = self.pending.location }
         self.pending, self.index = nil, self.index + 1
         self.stage = self.index > self.count and "complete" or "core"
     elseif stage == "complete" then
@@ -176,6 +180,7 @@ function collection:tick(context, carrier, status)
         self.reserved, self.stage = false, "done"
         return { disposition = "sampled", source_transition_accepted = true }
     elseif stage == "done" then
+        self.cores = nil
         self.stage, self.started, self.last_step, self.work, self.attempts = "census", nil, nil, 0, 1
     end
     return { disposition = "collecting" }

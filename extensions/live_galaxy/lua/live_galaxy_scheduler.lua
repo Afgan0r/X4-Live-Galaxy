@@ -11,6 +11,10 @@ local function call(target, name, ...)
     end
     return target[name](target, ...)
 end
+local function discard(observation, carrier, reason)
+    if observation.discard then pcall(observation.discard, observation, carrier, reason)
+    elseif observation.collector then pcall(observation.collector.discard, observation.collector, carrier, reason) end
+end
 
 function scheduler.tick(context, carrier, observation)
     if context == "telemetry_tick" then
@@ -26,10 +30,15 @@ function scheduler.tick(context, carrier, observation)
 
     local progress, progress_status = call(carrier, "progress", 1)
     if progress == nil then return finish(progress_status, nil) end
-    if terminal[progress] then return finish(terminal[progress], progress) end
+    if terminal[progress] then discard(observation, carrier, terminal[progress]); return finish(terminal[progress], progress) end
     local control, control_error = call(carrier, "poll_control")
     if control == nil then return finish(control_error, nil) end
-    if terminal[control] then return finish(terminal[control], control) end
+    if type(observation.feedback) == "function" then
+        local ok, result = pcall(observation.feedback, observation, context, carrier, progress_status, control)
+        if not ok then discard(observation, carrier, "source_failure"); return finish("source_failure", nil) end
+        if result then context.reentry_guard = false; return result end
+    end
+    if terminal[control] then discard(observation, carrier, terminal[control]); return finish(terminal[control], control) end
     if type(progress_status) ~= "table"
         or type(progress_status.capacity) ~= "string"
         or not progress_status.capacity:match("^available:%d+$") then
@@ -39,7 +48,8 @@ function scheduler.tick(context, carrier, observation)
     if type(observation.advance) == "function" then
         local ok, result = pcall(observation.advance, observation, context, carrier, progress_status)
         if not ok or type(result) ~= "table" then
-            if observation.collector then observation.collector:discard(carrier, "source_failure") end
+            if observation.discard then observation:discard(carrier, "source_failure")
+            elseif observation.collector then observation.collector:discard(carrier, "source_failure") end
             return finish("source_failure", nil)
         end
         context.reentry_guard = false

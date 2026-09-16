@@ -111,12 +111,12 @@ fn abi_poll_control_retains_control_and_state_while_clock_is_unavailable() {
         }
     };
     assert_eq!(
-        status_count, 8,
-        "status includes profile and remaining capacity"
+        status_count, 9,
+        "status includes profile, remaining capacity and exact revision"
     );
     assert_eq!(
         &state_value.pushed_strings[5..],
-        ["none", "1"],
+        ["none", "1", "1"],
         "status exposes a bounded inactive selection"
     );
 

@@ -22,7 +22,7 @@ function details.new(options, clock)
         or options.max_allocation_bytes == 0 then return nil, "invalid_limits" end
     return setmetatable({ api = options.ship_api or source.runtime(), clock = clock,
         limit = limit, allocation = options.max_allocation_bytes, stage = "reserve",
-        group = options.group, scope = options.source_scope,
+        group = options.group, scope = options.source_scope, expected_core = options.expected_core,
         kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
 end
 
@@ -108,7 +108,18 @@ function details:tick(context, carrier, status)
         if code ~= 0 then return self:fail(carrier, "fact_rejected") end
         self.index, self.pending = self.index + 1, nil
         self.stage = self.index > #group.members and "complete" or start_stage(self.kind)
+    elseif self.stage == "revalidate" then
+        local current = self.api:read_core(self.expected_core.identity)
+        if type(current) ~= "table" then return self:fail(carrier, "core_changed") end
+        for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
+            if current[key] ~= self.expected_core[key] then return self:fail(carrier, "core_changed") end
+        end
+        self.validated, self.stage = true, "complete"
     elseif self.stage == "complete" then
+        if self.expected_core and not self.validated then
+            self.stage = "revalidate"
+            return { disposition = "collecting" }
+        end
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end
         finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true

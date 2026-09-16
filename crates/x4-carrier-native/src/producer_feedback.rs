@@ -40,7 +40,8 @@ impl Producer {
                     && value.next_revision > 0
                     && value.max_records >= self.limits.max_records
                     && value.max_raw_bytes >= self.limits.max_raw_bytes
-                    && value.max_work >= 1 =>
+                    && value.max_work >= 1
+                    && self.intent_limits_match(&value) =>
             {
                 let profile = ProducerProfile::from_section_key(&value.section_key)
                     .ok_or_else(|| self.incompatible())?;
@@ -147,7 +148,7 @@ impl Producer {
         let Some(pending) = self.pending.as_mut() else {
             return ProducerOutcome::PausedAfterFailure;
         };
-        if pending.attempts >= 2
+        if pending.attempts >= self.policy.max_attempts
             || now.saturating_sub(pending.first_attempt_at) > self.limits.max_retry_age_millis
         {
             self.state = ProducerState::PausedAfterFailure;

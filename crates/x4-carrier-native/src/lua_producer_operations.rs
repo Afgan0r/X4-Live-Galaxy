@@ -10,6 +10,9 @@ pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
         return invalid(state);
     };
+    if let Err(error) = with_producer(handle, |_| Ok(())) {
+        return unsafe { push_code(api, state, error_code(error)) };
+    }
     let source = PRODUCER.lock().ok().and_then(|producer| {
         producer.as_ref().map(|value| {
             (
@@ -43,6 +46,9 @@ pub unsafe extern "C" fn finish_section(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
         return invalid(state);
     };
+    if let Err(error) = with_producer(handle, |_| Ok(())) {
+        return unsafe { push_code(api, state, error_code(error)) };
+    }
     let Some(evidence) = (unsafe { crate::lua_input::finish(api, state) }) else {
         return unsafe { push_code(api, state, -20) };
     };
@@ -54,6 +60,9 @@ pub unsafe extern "C" fn fail_section(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
         return invalid(state);
     };
+    if let Err(error) = with_producer(handle, |_| Ok(())) {
+        return unsafe { push_code(api, state, error_code(error)) };
+    }
     let Some(reason) = (unsafe { bytes(api, state, 2, 64) }) else {
         return unsafe { push_code(api, state, -20) };
     };
@@ -93,6 +102,9 @@ pub unsafe extern "C" fn progress(state: *mut c_void) -> c_int {
     let Some(now) = snapshot.monotonic_millis else {
         return unsafe { push_code(api, state, -22) };
     };
+    if work == 0 {
+        return unsafe { crate::lua_progress::push(api, state, 0, producer, transport, now) };
+    }
     if producer
         .observe_connection(snapshot.connection_generation, now)
         .is_err()

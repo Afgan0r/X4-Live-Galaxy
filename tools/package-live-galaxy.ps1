@@ -154,6 +154,7 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
             Copy-Item -LiteralPath $_.FullName -Destination $extensionTarget -Recurse
         }
         Copy-Item -LiteralPath $nativeSource -Destination (Join-Path $extensionTarget $ownedNative)
+        $heavyProfile = Write-HeavyProfileLua $limitsRaw (Join-Path $extensionTarget 'lua/live_galaxy_config.lua')
         Copy-Item -LiteralPath $bridgeSource -Destination (Join-Path $stage 'live-galaxy-bridge.exe')
         [IO.File]::WriteAllText((Join-Path $stage 'carrier-b-limits.json'), $limitsRaw, [Text.UTF8Encoding]::new($false))
         $startup = @(
@@ -164,6 +165,10 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
             'Starting X4 first is also supported; the bridge reconnects within the configured finite budget.',
             'Do not hot-replace the native image. Restart X4 after DLL, Lua, ABI, or contract changes.'
         ) -join [Environment]::NewLine
+        if ($heavyProfile) {
+            $startup = $startup.Replace('--limits-file carrier-b-limits.json.', '--limits-file carrier-b-limits.json --ship-faction argon.')
+            $startup += [Environment]::NewLine + 'PREPARED EXPERIMENT ONLY. All X4 runtime acceptance remains pending; obtain owner risk approval before game actions.'
+        }
         [IO.File]::WriteAllText((Join-Path $stage 'STARTUP.txt'), $startup, [Text.UTF8Encoding]::new($false))
         Assert-SourceRegistration $extensionTarget
         Assert-OwnedPe (Join-Path $extensionTarget $ownedNative)
@@ -175,14 +180,14 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
         }
         $manifest = [ordered]@{
             product = 'live_galaxy'; product_version = '0.1.0'; source_revision = (git -C $repo rev-parse HEAD)
-            candidate = $(if ($Calibration) { 'local-calibration-only' } else { 'ready-for-user-x4-checkpoint' })
+            candidate = $(if ($heavyProfile) { 'prepared-heavy-experiment' } elseif ($Calibration) { 'local-calibration-only' } else { 'ready-for-user-x4-checkpoint' })
             architecture = 'amd64-pe32+'; initializer = $requiredExport
             native_abi_version = 2; control_contract_version = 3; envelope_contract_version = 2
             semantic_versions = [ordered]@{ schema = 1; policy = 2; canonicalization = 3; digest = 1 }
             files = $hashes
         }
         $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'manifest.json') -Encoding utf8NoBOM
-        $candidate = if ($Calibration) { 'local-calibration-only' } else { 'ready-for-user-x4-checkpoint' }
+        $candidate = if ($heavyProfile) { 'prepared-heavy-experiment' } elseif ($Calibration) { 'local-calibration-only' } else { 'ready-for-user-x4-checkpoint' }
         Assert-Bundle $stage $candidate
         if (Test-Path -LiteralPath $destination) {
             $old = "$destination.old"
@@ -215,7 +220,7 @@ function Invoke-SelfTest {
         $selectedLimits = if ($LimitsFile) { Assert-Contained (Join-Path $repo $LimitsFile) $repo } else { $fixture }
         $bundle = Write-Bundle (Join-Path $scratch 'bundle') $selectedLimits (-not [bool]$LimitsFile)
         $manifest = Get-Content -LiteralPath (Join-Path $bundle 'manifest.json') -Raw | ConvertFrom-Json
-        $expectedCandidate = if ($LimitsFile) { 'ready-for-user-x4-checkpoint' } else { 'local-calibration-only' }
+        $expectedCandidate = if ($manifest.candidate -ceq 'prepared-heavy-experiment') { 'prepared-heavy-experiment' } elseif ($LimitsFile) { 'ready-for-user-x4-checkpoint' } else { 'local-calibration-only' }
         $wrongVersions = @{
             native_abi_version = @(1, 3)
             control_contract_version = @(1, 2, 4)

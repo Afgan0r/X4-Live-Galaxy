@@ -16,7 +16,7 @@ impl Producer {
             return Err(ProducerError::InvalidInput);
         }
         record
-            .validate(self.limits.max_records)
+            .validate(self.inner_limit())
             .map_err(|_| ProducerError::InvalidInput)?;
         let content = record.canonical_content();
         if content.len() > self.limits.max_raw_bytes {
@@ -41,7 +41,7 @@ impl Producer {
             return Err(ProducerError::InvalidInput);
         }
         record
-            .validate(self.limits.max_records)
+            .validate(self.inner_limit())
             .map_err(|_| ProducerError::InvalidInput)?;
         let content = record.canonical_content();
         if content.len() > self.limits.max_raw_bytes {
@@ -66,7 +66,7 @@ impl Producer {
             return Err(ProducerError::InvalidInput);
         }
         record
-            .validate(self.limits.max_records)
+            .validate(self.inner_limit())
             .map_err(|_| ProducerError::InvalidInput)?;
         let content = record.canonical_content();
         if content.len() > self.limits.max_raw_bytes {

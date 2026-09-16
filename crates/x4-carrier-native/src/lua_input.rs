@@ -112,32 +112,17 @@ pub unsafe fn begin(
 
 pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
     if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_loadout") {
-        let limit = crate::abi::PRODUCER
-            .lock()
-            .ok()?
-            .as_ref()?
-            .limits
-            .max_records;
+        let limit = crate::abi::PRODUCER.lock().ok()?.as_ref()?.inner_limit();
         return unsafe { crate::ship_loadout_input::loadout(api, state, limit) }
             .map(|(scope, record)| RecordInput::ShipLoadout(scope, record));
     }
     if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_crew") {
-        let limit = crate::abi::PRODUCER
-            .lock()
-            .ok()?
-            .as_ref()?
-            .limits
-            .max_records;
+        let limit = crate::abi::PRODUCER.lock().ok()?.as_ref()?.inner_limit();
         return unsafe { crate::ship_crew_input::crew(api, state, limit) }
             .map(|(scope, record)| RecordInput::ShipCrew(scope, record));
     }
     if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_cargo") {
-        let limit = crate::abi::PRODUCER
-            .lock()
-            .ok()?
-            .as_ref()?
-            .limits
-            .max_records;
+        let limit = crate::abi::PRODUCER.lock().ok()?.as_ref()?.inner_limit();
         return unsafe { crate::ship_detail_input::cargo(api, state, limit) }
             .map(|(scope, record)| RecordInput::ShipCargo(scope, record));
     }

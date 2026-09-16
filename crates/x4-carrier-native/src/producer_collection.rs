@@ -95,16 +95,14 @@ impl Producer {
             return Err(ProducerError::InvalidTransition);
         }
         let bytes = self
-            .records
-            .iter()
-            .try_fold(record.content.len(), |total, value| {
-                total.checked_add(value.content.len())
-            })
+            .raw_bytes
+            .checked_add(record.content.len())
             .ok_or(ProducerError::DataLimit)?;
         if self.profile != ProducerProfile::Clock && bytes > self.limits.max_raw_bytes {
             return Err(ProducerError::DataLimit);
         }
         self.records.push(record);
+        self.raw_bytes = bytes;
         self.state = ProducerState::Collecting;
         Ok(())
     }
@@ -154,6 +152,7 @@ impl Producer {
         work_units: usize,
         now_millis: u64,
     ) -> Result<ProducerOutcome, ProducerError> {
+        self.observe_progress(now_millis)?;
         if self.pending.is_some() {
             return Ok(ProducerOutcome::CapacityUnavailable);
         }

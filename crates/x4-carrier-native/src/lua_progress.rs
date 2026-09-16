@@ -24,6 +24,7 @@ pub unsafe fn push(
     );
     let (selection, remaining) = producer.selection_status();
     let remaining = remaining.to_string();
+    let revision = producer.collection_revision().to_string();
     let fields = [
         state_name(producer.state()),
         if snapshot.connected {
@@ -38,12 +39,13 @@ pub unsafe fn push(
         producer.source().producer_incarnation.as_str(),
         selection,
         remaining.as_str(),
+        revision.as_str(),
     ];
     unsafe { (api.push_integer)(state, code) };
     for field in fields {
         unsafe { (api.push_string)(state, field.as_ptr().cast(), field.len()) };
     }
-    8
+    9
 }
 
 const fn state_name(state: ProducerState) -> &'static str {

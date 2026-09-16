@@ -14,6 +14,7 @@ mod lua_detail_array;
 mod lua_generation;
 mod lua_input;
 mod lua_open;
+mod lua_open_limits;
 mod lua_operations;
 mod lua_producer_context;
 mod lua_producer_operations;
@@ -28,7 +29,9 @@ mod producer;
 mod producer_collection;
 mod producer_feedback;
 mod producer_feedback_codec;
+mod producer_identity;
 mod producer_message;
+mod producer_policy;
 mod producer_recovery;
 mod producer_seal;
 mod producer_ship_detail;
@@ -47,6 +50,7 @@ mod types;
 
 pub use handle::HandleRegistry;
 pub use producer::Producer;
+pub use producer_policy::ProducerAdmissionPolicy;
 pub use producer_types::{
     ProducerError, ProducerFeedback, ProducerLimits, ProducerOutcome, ProducerSource,
     ProducerState, SectionEvidence, SectionFinishEvidence, TypedFact,

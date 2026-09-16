@@ -41,7 +41,12 @@ pub fn run_production(
             .map_err(StartupError::Diagnostic);
     }
     let limits_file = parsed.limits_file.ok_or(StartupError::MissingArgument)?;
-    let limits = ProductionLimits::read(&limits_file).ok_or(StartupError::InvalidLimits)?;
+    let heavy = crate::HeavyShipLimits::read(&limits_file);
+    let limits = heavy
+        .as_ref()
+        .map(|profile| profile.bridge.clone())
+        .or_else(|| ProductionLimits::read(&limits_file))
+        .ok_or(StartupError::InvalidLimits)?;
     let mut history =
         OperationalHistory::open(&parsed.data_dir).map_err(StartupError::Diagnostic)?;
     let mut session = ProductionObservationSession::open(
@@ -62,6 +67,14 @@ pub fn run_production(
         limits.max_blockers,
     )
     .map_err(StartupError::Production)?;
+    if let Some(heavy) = heavy {
+        if parsed.ship_faction.is_none() {
+            return Err(StartupError::MissingArgument);
+        }
+        session
+            .configure_heavy(heavy)
+            .map_err(StartupError::Production)?;
+    }
     if let Some(faction) = parsed.ship_faction {
         session
             .select_ship_core(&faction)

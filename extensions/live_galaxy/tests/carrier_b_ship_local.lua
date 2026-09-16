@@ -2,7 +2,7 @@ local root, mode, result_path = ...
 package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 local carrier = assert(require("extensions.live_galaxy.lua.live_galaxy_carrier").new({
     limits = { data_message_bytes = 4096, control_message_bytes = 512, max_records = 16,
-        max_content_bytes = 2048, max_canonical_bytes = 4096, max_batches = 16, max_work = 129,
+        max_content_bytes = 8192, max_canonical_bytes = 4096, max_batches = 16, max_work = 129,
         max_age_millis = 5000, pending_slots = 1, max_attempts = 2, max_retry_age_millis = 5000,
         availability_interval_millis = 5000 },
     source = { source_scope = "x4:faction:argon:ships", source_epoch_status = "unknown",

@@ -33,6 +33,9 @@ function observation.new(options)
         capture = observation.capture,
     }
     if options.profile == "ship_core" then
+        if options.heavy_limits then
+            return require("live_galaxy.lua.live_galaxy_ship_selection").attach(adapter, options)
+        end
         local module = require("live_galaxy.lua.live_galaxy_ship_collection")
         local collector, err = module.new(options, adapter)
         if collector == nil then return nil, err end

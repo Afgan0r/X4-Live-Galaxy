@@ -2,9 +2,9 @@ use core::ffi::c_void;
 
 use observation_domain::{SourceBoundary, SourceEpochStatus};
 
-use crate::ProducerLimits;
 use crate::abi_windows::LuaApi;
 use crate::lua_table::{exact_keys, field_integer, field_string};
+use crate::{ProducerAdmissionPolicy, ProducerLimits};
 
 const LIMIT_KEYS: [&str; 12] = [
     "data_message_bytes",
@@ -23,6 +23,7 @@ const LIMIT_KEYS: [&str; 12] = [
 const SOURCE_KEYS: [&str; 3] = ["source_scope", "source_epoch_status", "source_boundary"];
 
 pub struct OpenArgs {
+    pub policy: ProducerAdmissionPolicy,
     pub limits: ProducerLimits,
     pub source_scope: String,
     pub epoch_status: SourceEpochStatus,
@@ -30,54 +31,24 @@ pub struct OpenArgs {
 }
 
 pub unsafe fn decode(api: LuaApi, state: *mut c_void) -> Option<OpenArgs> {
+    let heavy = unsafe { field_integer(api, state, 2, "heavy_profile_version") };
+    let mut keys = LIMIT_KEYS.to_vec();
+    if heavy.is_some() {
+        keys.extend(["heavy_profile_version", "max_inner_records"]);
+    }
     if unsafe { crate::abi::integer(api, state, 1) } != Some(2)
-        || !unsafe { exact_keys(api, state, 2, &LIMIT_KEYS) }
+        || !unsafe { exact_keys(api, state, 2, &keys) }
         || !unsafe { exact_keys(api, state, 3, &SOURCE_KEYS) }
     {
         return None;
     }
-    let data = unsafe { field_integer(api, state, 2, "data_message_bytes") }?;
-    let control = unsafe { field_integer(api, state, 2, "control_message_bytes") }?;
-    let records = unsafe { field_integer(api, state, 2, "max_records") }?;
-    let content = unsafe { field_integer(api, state, 2, "max_content_bytes") }?;
-    let canonical = unsafe { field_integer(api, state, 2, "max_canonical_bytes") }?;
-    let batches = unsafe { field_integer(api, state, 2, "max_batches") }?;
-    let work = unsafe { field_integer(api, state, 2, "max_work") }?;
-    let age = unsafe { field_integer(api, state, 2, "max_age_millis") }?;
-    let slots = unsafe { field_integer(api, state, 2, "pending_slots") }?;
-    let attempts = unsafe { field_integer(api, state, 2, "max_attempts") }?;
-    let retry = unsafe { field_integer(api, state, 2, "max_retry_age_millis") }?;
-    let availability = unsafe { field_integer(api, state, 2, "availability_interval_millis") }?;
-    if data == 0
-        || control == 0
-        || records == 0
-        || content == 0
-        || canonical != data
-        || batches < records
-        || work == 0
-        || age != 5_000
-        || slots != 1
-        || attempts != 2
-        || availability != 5_000
-    {
-        return None;
-    }
-    let retry = u64::try_from(retry).ok()?;
-    let limits = ProducerLimits {
-        data_message_bytes: data,
-        control_message_bytes: control,
-        max_records: records,
-        max_raw_bytes: content,
-        max_batches: batches,
-        max_work: work,
-        max_retry_age_millis: retry,
-    };
-    if !limits.valid() {
-        return None;
-    }
+    let (limits, mut policy) = unsafe { crate::lua_open_limits::decode(api, state) }?;
+    policy.max_inner_records =
+        unsafe { crate::lua_open_limits::inner(api, state, heavy, limits.max_records, policy) }?;
     let (source_scope, epoch_status, boundary) = unsafe { decode_source(api, state) }?;
     let _validated_scope = observation_domain::SourceScopeId::new(source_scope.clone())?;
     Some(OpenArgs {
+        policy,
         limits,
         source_scope,
         epoch_status,

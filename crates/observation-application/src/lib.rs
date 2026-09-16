@@ -5,6 +5,7 @@ mod lifecycle_publication;
 mod lifecycle_queries;
 mod lifecycle_reconciliation;
 mod lifecycle_restore;
+mod lifecycle_retention;
 mod publication;
 mod types;
 

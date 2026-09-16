@@ -20,7 +20,7 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
         max_records: 129,
         max_batches: 129,
         max_work: 129,
-        max_raw_bytes: 512,
+        max_raw_bytes: 129 * 512,
         data_message_bytes: 4096,
         ..ProducerLimits::bring_up()
     };
@@ -32,7 +32,7 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
             section_key: "ship_core".to_owned(),
             next_revision: 1,
             max_records: 129,
-            max_raw_bytes: 512,
+            max_raw_bytes: 129 * 512,
             max_work: 129,
         }),
         ControlBody::Demand(DemandBody { credit: 1 }),
@@ -100,9 +100,34 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
     );
     assert_eq!((done.batch_count, done.record_count), (129, 129));
     assert!(
-        done.raw_bytes > limits.max_raw_bytes,
-        "builder bound is independent of total certificate bytes"
+        done.raw_bytes <= limits.max_raw_bytes,
+        "the complete certificate remains within the cumulative section budget"
     );
+}
+
+#[test]
+fn section_raw_budget_survives_receipts_and_rejects_a_later_record() {
+    let (mut producer, source) = super::ship_support::ready_ship(0);
+    producer
+        .begin_ship_section(
+            SectionEvidence::point_measurement("x4:faction:argon:ships"),
+            4,
+        )
+        .unwrap();
+    producer.progress(1, 0).unwrap();
+    take_current(&mut producer, &source, "received", 0);
+    for ordinal in 1..=3 {
+        producer.push_ship_core(&ship("9007199254740993")).unwrap();
+        producer.progress(1, ordinal).unwrap();
+        take_current(&mut producer, &source, "received", ordinal);
+    }
+    assert_eq!(producer.pending_bytes(), None);
+    assert_eq!(
+        producer.push_ship_core(&ship("9007199254740995")),
+        Err(ProducerError::DataLimit)
+    );
+    assert_eq!(producer.pending_bytes(), None);
+    producer.fail_section();
 }
 
 #[test]

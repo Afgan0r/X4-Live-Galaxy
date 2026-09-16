@@ -29,11 +29,10 @@ fn core<R: ObservationRepository>(
         .ok_or_else(rejected)
 }
 
-// Finite local experiment grouping, not a runtime-accepted safety bound.
-const GROUP_MEMBERS: usize = 4;
 fn group(
     parent: &observation_persistence::RevisionRecord,
     key: &str,
+    group_members: usize,
 ) -> Result<observation_domain::ShipDetailGroup, ProductionError> {
     use observation_domain::{
         ObservationPolicyVersion, ShipDetailGroup, ShipGroupDescriptor, ShipIdentity,
@@ -61,7 +60,7 @@ fn group(
         members,
     )
     .map_err(|_| rejected())?;
-    ShipDetailGroup::new(descriptor, ordinal, GROUP_MEMBERS).map_err(|_| rejected())
+    ShipDetailGroup::new(descriptor, ordinal, group_members).map_err(|_| rejected())
 }
 
 pub fn dependencies<R: ObservationRepository>(
@@ -81,6 +80,9 @@ pub fn dependencies<R: ObservationRepository>(
 pub fn validate_dependency<R: ObservationRepository>(
     lifecycle: &ObservationLifecycle<R>,
     message: &CompleteMessage,
+    group_members: usize,
+    inner_limit: usize,
+    freshness: Option<(u64, u64)>,
 ) -> Result<(), ProductionError> {
     let (key, scope, incarnation, epoch) = match message {
         CompleteMessage::SectionStart(v) => (
@@ -107,8 +109,13 @@ pub fn validate_dependency<R: ObservationRepository>(
         return Ok(());
     }
     let current = core(lifecycle)?;
+    if freshness.is_some_and(|(now, max_age)| {
+        now < current.receipt().accepted_at || now - current.receipt().accepted_at > max_age
+    }) {
+        return Err(rejected());
+    }
     let parent = current.revision();
-    let expected_group = group(parent, key.as_str())?;
+    let expected_group = group(parent, key.as_str(), group_members)?;
     if &parent.source_scope != scope
         || parent.source_session.producer_incarnation() != incarnation
         || parent.source_session.transport_epoch() != epoch
@@ -116,6 +123,12 @@ pub fn validate_dependency<R: ObservationRepository>(
         return Err(rejected());
     }
     if let CompleteMessage::ImmutableBatch(batch) = message {
+        for record in &batch.records {
+            crate::receiver_ship_detail_record::record_dependency_with_limit(
+                &record.content,
+                inner_limit,
+            )?;
+        }
         validate_members(batch, parent)?;
         let member = expected_group
             .members()

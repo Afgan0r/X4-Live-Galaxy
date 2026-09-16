@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SelfTest,
-    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload', 'heavy-ship-core', 'heavy-ship-detail')]
+    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload', 'heavy-ship-core', 'heavy-ship-detail', 'heavy-ship-recovery')]
     [string]$Scenario = 'actual-chain',
     [ValidateSet('bridge-first', 'native-first')]
     [string]$StartupOrder = 'bridge-first',
@@ -179,10 +179,21 @@ if ($Calibration) {
     Copy-Item -LiteralPath (Resolve-Path $sourceLimits) -Destination $limits
     $expectedLimitsHash = '440a55d8a0aed233f29fca14a6e06482c5880a0655f5beb98675f075303f4748'
     $actualLimitsHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualLimitsHash -cne $expectedLimitsHash) { throw 'FROZEN_LIMITS_DIGEST_MISMATCH' }
+    if ($Scenario -ne 'heavy-ship-recovery' -and $actualLimitsHash -cne $expectedLimitsHash) { throw 'FROZEN_LIMITS_DIGEST_MISMATCH' }
 }
 $hostExecutable = Build-Host $run
 $data = Join-Path $run 'data'; [IO.Directory]::CreateDirectory($data) | Out-Null
+if ($Scenario -eq 'heavy-ship-recovery') {
+    & (Join-Path $repo 'target/release/validate_limits.exe') --limits-file $limits
+    if ($LASTEXITCODE -ne 0) { throw 'HEAVY_PROFILE_REJECTED' }
+    . (Join-Path $repo 'tools/carrier-b-package-contract.ps1')
+    if (-not (Write-HeavyProfileLua (Get-Content -LiteralPath $limits -Raw) (Join-Path $run 'extensions/live_galaxy/lua/live_galaxy_config.lua'))) {
+        throw 'HEAVY_PROFILE_REQUIRED'
+    }
+    . (Join-Path $repo 'tests/carrier-b-heavy-configured.ps1')
+    Invoke-HeavyConfiguredRestart $run $hostExecutable $data $limits $repo
+    return
+}
 if ($Scenario -in @('heavy-ship-core', 'heavy-ship-detail')) {
     & cargo run --locked -p x4-bridge --example carrier-b-ship-local -- $run $hostExecutable (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_ship_local.lua') $data $Scenario
     if ($LASTEXITCODE -ne 0) { throw 'HEAVY_SHIP_LOCAL_FAILED' }

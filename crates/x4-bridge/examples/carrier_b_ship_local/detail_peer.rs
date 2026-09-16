@@ -58,7 +58,7 @@ fn demand(
             section_key: key.into(),
             next_revision: revision,
             max_records: 16,
-            max_raw_bytes: 2048,
+            max_raw_bytes: 8192,
             max_work: 129,
         }),
     )?;

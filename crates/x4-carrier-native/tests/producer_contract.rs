@@ -13,6 +13,8 @@ use x4_carrier_native::{
 
 #[path = "producer_contract/failure_paths.rs"]
 mod failure_paths;
+#[path = "producer_contract/heavy_policy.rs"]
+mod heavy_policy;
 #[path = "producer_contract/ship_certificate.rs"]
 mod ship_certificate;
 #[path = "producer_contract/ship_requalification.rs"]

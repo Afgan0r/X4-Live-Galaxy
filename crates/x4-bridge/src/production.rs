@@ -1,5 +1,7 @@
 use std::path::Path;
 
+#[path = "production_retention.rs"]
+mod retention;
 #[path = "production_selection.rs"]
 mod selection;
 
@@ -30,6 +32,7 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     lifecycle: ObservationLifecycle<R>,
     last_received: Option<(BatchId, Vec<u8>, LifecycleContext)>,
     ship_scope: Option<SourceScopeId>,
+    heavy_limits: Option<crate::HeavyShipLimits>,
 }
 
 impl ProductionObservationSession {
@@ -69,6 +72,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             ),
             last_received: None,
             ship_scope: None,
+            heavy_limits: None,
         };
         session
             .restore_current_snapshot()
@@ -96,7 +100,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )
         .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
         crate::receiver_ship::validate(&message, self.ship_scope.as_ref())?;
-        crate::receiver_ship_detail::validate_dependency(&self.lifecycle, &message)?;
+        self.validate_detail_dependency(&message, now)?;
         if crate::receiver_ship_replay::is_committed(&self.lifecycle, &message)? {
             return Ok(LifecycleResult::Disposition(
                 observation_ingest::ReceiverDisposition::Committed,
@@ -170,11 +174,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )
         .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
         crate::receiver_context::assemble(&self.lifecycle, &message)
-    }
-
-    #[must_use]
-    pub fn restore_current_snapshot(&mut self) -> bool {
-        self.lifecycle.restore_current_snapshot()
     }
 }
 

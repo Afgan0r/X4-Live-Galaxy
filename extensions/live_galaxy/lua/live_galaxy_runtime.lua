@@ -11,7 +11,9 @@ local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
 local active_carrier, active_observation
 local initialized, callback_active = false, false
 local last_diagnostic
+local diagnostic_gap_count = 0
 local pending_boundary
+local profile_identity = "clock"
 local boundaries = {
     telemetry_tick = { source_epoch_status = "unknown", source_boundary = "runtime_start" },
     telemetry_game_loaded = {
@@ -30,16 +32,33 @@ local safe_details = {
     restart_required = true, clock_unavailable = true, source_failure = true,
     invalid_fact = true, fact_rejected = true, finish_rejected = true,
     reservation_failed = true, result_shape = true,
+    collecting = true, core_changed = true, stale_parent = true, collection_overflow = true,
+    allocation_limit = true, native_call_limit = true, callback_budget_exceeded = true,
+    source_boundary_changed = true, selection_unavailable = true, admission_window_exhausted = true,
 }
 
-local function diagnostic(event, detail)
+local function diagnostic(event, detail, metrics)
     local safe = safe_details[detail] and detail or "unknown"
     local value = event .. ":" .. safe
-    if value == last_diagnostic then return end
-    last_diagnostic = value
+    if value == last_diagnostic and not metrics then return true end
     if type(DebugError) == "function" then
-        DebugError("Live Galaxy Carrier B: event=" .. event .. " detail=" .. safe)
+        local text = "Live Galaxy Carrier B: event=" .. event .. " detail=" .. safe
+        if profile_identity ~= "clock" then text = text .. " profile=" .. profile_identity end
+        if diagnostic_gap_count > 0 then text = text .. " diagnostic_gap_count=" .. diagnostic_gap_count end
+        if metrics then
+            text = text .. " section=" .. metrics.section .. " revision=" .. metrics.revision
+                .. " run=" .. metrics.incarnation .. " calls=" .. metrics.calls
+                .. " allocation_bytes=" .. metrics.allocation_bytes .. " steps=" .. metrics.steps
+                .. " duration_millis=" .. metrics.duration_millis .. " backlog=1"
+        end
+        if not pcall(DebugError, text) then
+            diagnostic_gap_count = math.min(diagnostic_gap_count + 1, 65535)
+            return false
+        end
+        diagnostic_gap_count = 0
     end
+    last_diagnostic = value
+    return true
 end
 
 function runtime.handle_tick(_, event_parameter)
@@ -59,15 +78,21 @@ function runtime.handle_tick(_, event_parameter)
     if result.disposition == "sampled" and boundary == pending_boundary then
         pending_boundary = nil
     end
-    if result.disposition ~= "producer_busy" then
-        diagnostic("transition", result.disposition)
+    if result.disposition ~= "producer_busy" and result.disposition ~= "collecting" then
+        if not diagnostic("transition", result.disposition, result.capture_metrics) then return false, "diagnostic_failure" end
     end
     return result.disposition == "sampled", result.disposition
 end
 
 function runtime.initialize(options)
     if initialized then return true, "already_initialized" end
-    options = options or {}
+    if options == nil then
+        local config = require("live_galaxy.lua.live_galaxy_config")
+        profile_identity = config.profile_sha256 or "clock"
+        local reason
+        options, reason = config.options()
+        if type(options) ~= "table" then return false, reason or "invalid_limits" end
+    end
     local carrier, carrier_error = carrier_module.new(options.carrier)
     if carrier == nil then
         diagnostic("carrier_unavailable", carrier_error)

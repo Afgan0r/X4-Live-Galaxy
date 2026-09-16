@@ -239,6 +239,21 @@ describe("owned Carrier B adapter", function()
         assert.is_nil(diagnostic:match("[A-Z]:\\"))
         assert.is_nil(diagnostic:match("[%c]"))
     end)
+    it("keeps valid work running while exposing logger failure and a bounded recovery gap", function()
+        local env, tick, samples, recovered = native(), nil, 0, nil
+        package.loadlib = env.loadlib
+        _G.GetCurRealTime = function() samples = samples + 1; return 2 end
+        package.preload.ffi = function() return { C = { GetCurrentGameTime = function() return 0 end } } end
+        _G.DebugError = function() error("failed sink") end
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        fixture.runtime()
+        assert.same({ false, "diagnostic_failure" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.same({ false, "diagnostic_failure" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.equals(2, samples, "diagnostic failure does not cancel valid observation work")
+        _G.DebugError = function(value) recovered = value end
+        assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.is_truthy(recovered:match("diagnostic_gap_count=3"))
+    end)
 
     for code, reason in pairs({
         [6] = "permanently_rejected", [7] = "ambiguous_commit",

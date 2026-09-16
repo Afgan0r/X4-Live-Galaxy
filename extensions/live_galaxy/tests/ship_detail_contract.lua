@@ -12,6 +12,7 @@ describe("source-faithful resumable cargo", function()
         options = options or {}
         local calls, records, finished, failed = {}, {}, 0, 0
         local api = {
+            read_core = function() calls[#calls + 1] = "revalidate"; return options.current_core end,
             cargo_wares = function() calls[#calls + 1] = "wares"; return options.wares or { ore = 17 } end,
             cargo_storage_count = function() calls[#calls + 1] = "count"; return options.count or 1 end,
             cargo_storage_size = function() return options.size or 24 end,
@@ -29,6 +30,7 @@ describe("source-faithful resumable cargo", function()
             fail_section = function() failed = failed + 1; return 0 end,
         }
         local collector = assert(module.new({ ship_api = api, max_inner = 2,
+            expected_core = options.expected_core,
             max_allocation_bytes = 48, source_scope = "x4:faction:argon:ships",
             group = { key = "ship_cargo:g0", owner = "argon", core_revision = "7",
                 members = { "9007199254740993" } } }, {
@@ -70,6 +72,19 @@ describe("source-faithful resumable cargo", function()
         local _, rejected, completed, failed = run({ rows = {
             { transport = "solid", capacity_cubic_metres = 1000, occupied_cubic_metres = 1001 } } })
         assert.equals(0, #rejected); assert.equals(0, completed); assert.equals(1, failed)
+    end)
+    it("revalidates owner and location after detail collection before completing", function()
+        local expected = { identity = "9007199254740993", owner = "argon", type = "ship_macro",
+            class = "destroyer", location = "sector:argon_prime" }
+        local _, _, completed, failed = run({ expected_core = expected, current_core = expected })
+        assert.equals(1, completed); assert.equals(0, failed)
+        for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
+            local changed = {}; for name, value in pairs(expected) do changed[name] = value end
+            changed[key] = "changed"
+            local _, records, finish, failures, last = run({ expected_core = expected, current_core = changed })
+            assert.equals(1, #records, "a staged batch is not a complete observation")
+            assert.equals(0, finish); assert.equals(1, failures); assert.equals("core_changed", last.disposition)
+        end
     end)
 end)
 

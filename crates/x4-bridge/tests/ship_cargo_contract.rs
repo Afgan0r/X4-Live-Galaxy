@@ -1,5 +1,7 @@
 #![expect(clippy::expect_used, reason = "contract fixtures fail immediately")]
 mod carrier_b_support;
+#[path = "ship_support/heavy_receiver.rs"]
+mod heavy_receiver;
 mod ship_support;
 use observation_application::LifecycleResult;
 use observation_domain::{BatchId, CompleteMessage, SectionKey, TransportEpoch};
