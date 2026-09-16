@@ -1,5 +1,7 @@
 use crate::producer::{Pending, Readiness};
 use crate::producer_message::assemble;
+use crate::producer_types::{PreparedRecord, ProducerProfile};
+use crate::producer_validation::{invalid_clock, qualified_empty};
 use crate::{
     Producer, ProducerError, ProducerOutcome, ProducerState, SectionEvidence,
     SectionFinishEvidence, TypedFact,
@@ -8,42 +10,106 @@ use crate::{
 impl Producer {
     pub fn begin_ship_section(
         &mut self,
-        _evidence: SectionEvidence,
-        _expected_records: usize,
+        evidence: SectionEvidence,
+        expected_records: usize,
     ) -> Result<(), ProducerError> {
-        Err(ProducerError::InvalidTransition)
+        if self.profile != ProducerProfile::ShipCore
+            || expected_records > self.limits.max_records
+            || expected_records > self.limits.max_batches
+            || (expected_records == 0 && !qualified_empty(&evidence))
+        {
+            return Err(ProducerError::InvalidInput);
+        }
+        self.begin(evidence, expected_records)
     }
 
     pub fn push_ship_core(
         &mut self,
-        _record: &observation_domain::ShipCoreRecord,
+        record: &observation_domain::ShipCoreRecord,
     ) -> Result<(), ProducerError> {
-        Err(ProducerError::InvalidTransition)
+        if self.profile != ProducerProfile::ShipCore {
+            return Err(ProducerError::InvalidTransition);
+        }
+        let content = format!(
+            "profile=ship_core\nidentity={}\nowner={}\ntype={}\nclass={}\nlocation={}",
+            record.identity().as_str(),
+            record.owner().as_str(),
+            record.ship_type().as_str(),
+            record.class().as_str(),
+            record.location().as_str()
+        );
+        let expected_scope = self
+            .evidence
+            .as_ref()
+            .map(|value| value.source_scope.as_str())
+            .ok_or(ProducerError::InvalidTransition)?;
+        if record.source_scope().as_str() != expected_scope
+            || content.len() > self.limits.max_raw_bytes
+        {
+            return Err(ProducerError::DataLimit);
+        }
+        self.push(PreparedRecord {
+            entity_id: format!("x4:ship:{}", record.identity().as_str()),
+            content,
+        })
     }
 
     pub fn begin_section(&mut self, evidence: SectionEvidence) -> Result<(), ProducerError> {
+        if self.profile != ProducerProfile::Clock {
+            return Err(ProducerError::InvalidTransition);
+        }
+        self.begin(evidence, 1)
+    }
+
+    fn begin(
+        &mut self,
+        evidence: SectionEvidence,
+        expected_records: usize,
+    ) -> Result<(), ProducerError> {
         if self.state != ProducerState::Ready || self.readiness != Readiness::Ready {
             return Err(ProducerError::InvalidTransition);
         }
         self.evidence = Some(evidence);
+        self.expected_records = expected_records;
         self.state = ProducerState::SectionReserved;
         Ok(())
     }
 
     pub fn push_record(&mut self, fact: &TypedFact) -> Result<(), ProducerError> {
-        if self.state != ProducerState::SectionReserved || self.fact.is_some() {
+        if self.profile != ProducerProfile::Clock {
             return Err(ProducerError::InvalidTransition);
         }
-        if invalid(fact, self.limits.max_raw_bytes) {
+        if invalid_clock(fact, self.limits.max_raw_bytes) {
             return Err(ProducerError::DataLimit);
         }
-        self.fact = Some(fact.clone());
+        self.push(PreparedRecord {
+            entity_id: fact.entity_id.clone(),
+            content: format!(
+                "getter={}\nraw_value={}\nsemantics={}",
+                fact.getter, fact.raw_value, fact.semantics
+            ),
+        })
+    }
+
+    fn push(&mut self, record: PreparedRecord) -> Result<(), ProducerError> {
+        if !matches!(
+            self.state,
+            ProducerState::SectionReserved | ProducerState::Collecting
+        ) || self.records.len() >= self.expected_records
+        {
+            return Err(ProducerError::InvalidTransition);
+        }
+        self.records.push(record);
         self.state = ProducerState::Collecting;
         Ok(())
     }
 
     pub fn finish_section(&mut self, finish: SectionFinishEvidence) -> Result<(), ProducerError> {
-        if self.state != ProducerState::Collecting {
+        if !matches!(
+            self.state,
+            ProducerState::SectionReserved | ProducerState::Collecting
+        ) || self.records.len() != self.expected_records
+        {
             return Err(ProducerError::InvalidTransition);
         }
         let evidence = self
@@ -97,34 +163,26 @@ impl Producer {
             .evidence
             .as_ref()
             .ok_or(ProducerError::InvalidTransition)?;
-        let fact = self.fact.as_ref().ok_or(ProducerError::InvalidTransition)?;
         let messages = assemble(
             &self.source,
             evidence,
-            fact,
+            self.profile,
+            &self.records,
             self.revision,
             self.limits.data_message_bytes,
         )?;
         self.pending = Some(Pending::new(
             messages.start.clone(),
-            format!("message:start:carrier_b_realtime_sample:{}", self.revision),
+            format!(
+                "message:start:{}:{}",
+                self.profile.section_key(),
+                self.revision
+            ),
             now_millis,
         ));
         self.messages = Some(messages);
+        self.next_batch_index = 0;
         self.state = ProducerState::PendingStart;
         Ok(ProducerOutcome::Progress)
     }
-}
-
-fn invalid(fact: &TypedFact, max_raw_bytes: usize) -> bool {
-    fact.raw_value.is_empty()
-        || fact.raw_value.len() > max_raw_bytes
-        || fact
-            .raw_value
-            .parse::<f64>()
-            .map_or(true, |value| !value.is_finite())
-        || fact.entity_id != "x4:runtime:realtime_clock"
-        || fact.getter != "GetCurRealTime"
-        || fact.semantics != "opaque_runtime_number"
-        || fact.observation_version != 1
 }

@@ -1,12 +1,11 @@
 #![expect(
+    clippy::expect_used,
+    clippy::panic,
     clippy::unwrap_used,
     reason = "contract fixtures fail immediately when construction assumptions break"
 )]
 
-use observation_domain::{
-    CompleteMessage, SenderEvidence, ShipClass, ShipCoreRecord, ShipIdentity, ShipLocation,
-    ShipOwner, ShipType, SourceBoundary, SourceConsistency, SourceEpochStatus, SourceScopeId,
-};
+use observation_domain::{CompleteMessage, SourceBoundary, SourceConsistency, SourceEpochStatus};
 use observation_ingest::{ControlBody, DemandBody, decode_complete_message};
 use x4_carrier_native::{
     Producer, ProducerLimits, ProducerOutcome, ProducerSource, ProducerState, SectionEvidence,
@@ -14,31 +13,13 @@ use x4_carrier_native::{
 
 #[path = "producer_contract/failure_paths.rs"]
 mod failure_paths;
+#[path = "producer_contract/ship_stream.rs"]
+mod ship_stream;
+#[path = "producer_contract/ship_support.rs"]
+mod ship_support;
 #[path = "producer_contract/support.rs"]
 mod support;
 use support::{control, ready, sample, source, take};
-
-fn ship(identity: &str) -> ShipCoreRecord {
-    ShipCoreRecord::new(
-        SourceScopeId::new("x4:faction:argon:ships").expect("scope is valid"),
-        ShipIdentity::new(identity).expect("identity is canonical"),
-        ShipOwner::new("argon").expect("owner is valid"),
-        ShipType::new("ship_arg_l_destroyer_01_a_macro").expect("type is valid"),
-        ShipClass::new("destroyer").expect("class is valid"),
-        ShipLocation::new("sector:argon_prime").expect("location is valid"),
-        SenderEvidence::legacy_default(),
-    )
-}
-
-#[test]
-fn ship_section_accepts_multiple_complete_records() {
-    let (mut producer, _) = ready(0);
-    let evidence = SectionEvidence::point_measurement("x4:faction:argon:ships");
-
-    assert_eq!(producer.begin_ship_section(evidence, 2), Ok(()));
-    assert_eq!(producer.push_ship_core(&ship("9007199254740993")), Ok(()));
-    assert_eq!(producer.push_ship_core(&ship("9007199254740995")), Ok(()));
-}
 
 fn take_revision(
     producer: &mut Producer,

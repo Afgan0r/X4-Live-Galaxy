@@ -1,9 +1,8 @@
 use observation_ingest::{CarrierControl, CarrierIdentity, ControlBody, encode_carrier_control};
 
 use crate::producer_message::SectionMessages;
-use crate::{
-    ProducerError, ProducerLimits, ProducerSource, ProducerState, SectionEvidence, TypedFact,
-};
+use crate::producer_types::{PreparedRecord, ProducerProfile};
+use crate::{ProducerError, ProducerLimits, ProducerSource, ProducerState, SectionEvidence};
 
 pub(super) struct Pending {
     pub(super) bytes: Vec<u8>,
@@ -28,9 +27,12 @@ pub struct Producer {
     pub(super) readiness: Readiness,
     pub(super) revision: u64,
     pub(super) evidence: Option<SectionEvidence>,
-    pub(super) fact: Option<TypedFact>,
+    pub(super) profile: ProducerProfile,
+    pub(super) expected_records: usize,
+    pub(super) records: Vec<PreparedRecord>,
     pub(super) finished: bool,
     pub(super) messages: Option<SectionMessages>,
+    pub(super) next_batch_index: usize,
     pub(super) pending: Option<Pending>,
     pub(super) connection_generation: u64,
 }
@@ -52,9 +54,12 @@ impl Producer {
             readiness: Readiness::Awaiting,
             revision: 1,
             evidence: None,
-            fact: None,
+            profile: ProducerProfile::Clock,
+            expected_records: 0,
+            records: Vec::new(),
             finished: false,
             messages: None,
+            next_batch_index: 0,
             pending: Some(Pending::new(bytes, "bootstrap", now_millis)),
             connection_generation: 0,
         })
@@ -114,9 +119,11 @@ impl Producer {
 
     pub(super) fn discard_incomplete(&mut self) {
         self.evidence = None;
-        self.fact = None;
+        self.expected_records = 0;
+        self.records.clear();
         self.finished = false;
         self.messages = None;
+        self.next_batch_index = 0;
         self.pending = None;
     }
 }
