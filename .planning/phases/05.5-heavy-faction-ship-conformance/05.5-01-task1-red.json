@@ -1,0 +1,9 @@
+{
+  "command": "cargo test --locked -p observation-domain --test ship_contract",
+  "exitCode": 1,
+  "output": "TAP version 13\nok 1 - core_requires_identity_owner_type_class_and_location\nok 2 - field_states_preserve_each_locked_distinction\nnot ok 3 - group_order_is_canonical_and_duplicate_identity_is_rejected\n1..3\n# tests 3\n# pass 2\n# fail 1\n# cancelled 0\n",
+  "targetTest": "group_order_is_canonical_and_duplicate_identity_is_rejected",
+  "targetFile": "crates/observation-domain/tests/ship_contract.rs",
+  "expected": "members sorted by canonical identity and duplicate identities rejected",
+  "actual": "members preserved caller order, so two input permutations differed"
+}

@@ -9,6 +9,9 @@ mod section;
 mod section_state;
 mod sender_evidence;
 mod session;
+mod ship_core;
+mod ship_field;
+mod ship_group;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
 pub use identity::{
@@ -35,3 +38,8 @@ pub use sender_evidence::{
     CaptureClock, SenderEvidence, SourceBoundary, SourceConsistency, SourceEpochStatus,
 };
 pub use session::SourceSessionIdentity;
+pub use ship_core::{
+    ShipClass, ShipCoreError, ShipCoreRecord, ShipIdentity, ShipLocation, ShipOwner, ShipType,
+};
+pub use ship_field::{FieldApplicability, FieldOutcome, SourceEvidenceRef};
+pub use ship_group::{ShipGroupDescriptor, ShipGroupError};
