@@ -76,24 +76,13 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .current_revision(&key)
             .map_err(|_| ProductionError::Storage)?
             .ok_or(ProductionError::InvalidLimits)?;
-        if previous == "ship_core" {
-            return Ok("ship_cargo:g0".into());
-        }
-        let (family, group) = previous
-            .split_once(":g")
-            .ok_or(ProductionError::InvalidLimits)?;
-        let group = group
-            .parse::<usize>()
-            .map_err(|_| ProductionError::InvalidLimits)?;
-        match family {
-            "ship_cargo" => Ok(format!("ship_crew:g{group}")),
-            "ship_crew" => Ok(format!("ship_loadout:g{group}")),
-            "ship_loadout" if group + 1 < parent.revision().records.len() => {
-                Ok(format!("ship_cargo:g{}", group + 1))
-            }
-            "ship_loadout" => Ok("ship_core".into()),
-            _ => Err(ProductionError::InvalidLimits),
-        }
+        let members = parent
+            .revision()
+            .records
+            .iter()
+            .map(|record| record.entity_id.as_str().to_owned())
+            .collect::<Vec<_>>();
+        crate::production_ship_cursor::next_member(&members, previous, None)
     }
     pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
         let current = self
