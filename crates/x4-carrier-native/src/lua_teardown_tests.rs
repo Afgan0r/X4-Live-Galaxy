@@ -7,11 +7,11 @@ use std::{num::NonZeroUsize, time::Duration};
 
 use observation_domain::{SourceBoundary, SourceEpochStatus};
 
-use super::{ABI_TEST_LOCK, FakeLuaState, fake_api};
 use crate::{
     CarrierLimits, HandleRegistry, NativeTransport, OpenConfig, Producer, ProducerLimits,
     ProducerSource, TransportConfig, TransportSendOutcome,
     abi::{API, PRODUCER, REGISTRY, TRANSPORT},
+    lua_producer_test_support::{ABI_TEST_LOCK, FakeLuaState, fake_api},
 };
 
 #[test]

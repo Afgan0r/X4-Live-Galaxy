@@ -29,7 +29,8 @@ describe("owned Carrier B adapter", function()
                     local capacity = options.capacity or "available:0"
                     if type(capacity) == "function" then capacity = capacity() end
                     return current, "ready", "connected", "10001",
-                        capacity, "producer:1"
+                        capacity, "producer:1", options.selection or "carrier_b_realtime_sample",
+                        options.remaining or "1"
                 end
                 return current
             end

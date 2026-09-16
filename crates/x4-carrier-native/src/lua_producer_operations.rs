@@ -1,9 +1,10 @@
 use core::ffi::{c_int, c_void};
 
-use crate::abi::{API, PRODUCER, REGISTRY, TRANSPORT, bytes, integer, push_code, token};
+use crate::abi::{API, PRODUCER, TRANSPORT, bytes, integer, push_code};
+use crate::lua_producer_context::{context, with_producer};
 use crate::lua_progress::{error_code, outcome_code};
 use crate::lua_transport::error_code_for_transport;
-use crate::{ProducerError, ProducerOutcome, TransportError, TransportPoll, TransportSendOutcome};
+use crate::{ProducerOutcome, TransportPoll, TransportSendOutcome};
 
 pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
@@ -13,12 +14,18 @@ pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
         .lock()
         .ok()
         .and_then(|producer| producer.as_ref().map(|value| value.source().clone()));
-    let Some(evidence) =
+    let Some(input) =
         source.and_then(|source| unsafe { crate::lua_input::begin(api, state, &source) })
     else {
         return unsafe { push_code(api, state, -20) };
     };
-    let result = with_producer(handle, |producer| producer.begin_section(evidence));
+    let result = with_producer(handle, |producer| match input {
+        crate::lua_input::BeginInput::Clock(evidence) => producer.begin_section(evidence),
+        crate::lua_input::BeginInput::ShipCore {
+            evidence,
+            expected_records,
+        } => producer.begin_ship_section(evidence, expected_records),
+    });
     unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
 }
 
@@ -26,10 +33,13 @@ pub unsafe extern "C" fn push_record(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
         return invalid(state);
     };
-    let Some(fact) = (unsafe { crate::lua_input::fact(api, state) }) else {
+    let Some(input) = (unsafe { crate::lua_input::record(api, state) }) else {
         return unsafe { push_code(api, state, -20) };
     };
-    let result = with_producer(handle, |producer| producer.push_record(&fact));
+    let result = with_producer(handle, |producer| match input {
+        crate::lua_input::RecordInput::Clock(fact) => producer.push_record(&fact),
+        crate::lua_input::RecordInput::ShipCore(record) => producer.push_ship_core(&record),
+    });
     unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }
 }
 
@@ -160,37 +170,11 @@ pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {
     unsafe { push_code(api, state, code) }
 }
 
-fn with_producer<T>(
-    handle: crate::HandleToken,
-    operation: impl FnOnce(&mut crate::Producer) -> Result<T, ProducerError>,
-) -> Result<T, ProducerError> {
-    if !REGISTRY
-        .lock()
-        .is_ok_and(|registry| registry.is_active(handle))
-    {
-        return Err(ProducerError::StaleEpoch);
-    }
-    PRODUCER
-        .lock()
-        .map_err(|_| ProducerError::InvalidTransition)?
-        .as_mut()
-        .ok_or(ProducerError::InvalidTransition)
-        .and_then(operation)
-}
-
-unsafe fn context(state: *mut c_void) -> Option<(crate::abi_windows::LuaApi, crate::HandleToken)> {
-    let api = API.get().copied()?;
-    let handle = unsafe { token(api, state) }?;
-    Some((api, handle))
-}
-
 fn invalid(state: *mut c_void) -> c_int {
     API.get()
         .copied()
         .map_or(0, |api| unsafe { push_code(api, state, -20) })
 }
-
-const _: Option<TransportError> = None;
 
 #[cfg(all(test, windows))]
 #[path = "lua_producer_operations_tests.rs"]

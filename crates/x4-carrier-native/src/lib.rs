@@ -14,8 +14,12 @@ mod lua_generation;
 mod lua_input;
 mod lua_open;
 mod lua_operations;
+mod lua_producer_context;
 mod lua_producer_operations;
+#[cfg(all(test, windows))]
+mod lua_producer_test_support;
 mod lua_progress;
+mod lua_ship_input;
 mod lua_table;
 mod lua_transport;
 mod producer;

@@ -87,6 +87,15 @@ impl Producer {
         self.state == ProducerState::Ready && matches!(self.readiness, Readiness::Ready)
     }
 
+    pub(crate) fn selection_status(&self) -> (&'static str, usize) {
+        let remaining = self.limits.max_records.saturating_sub(self.records.len());
+        if matches!(self.readiness, Readiness::Ready) {
+            (self.profile.section_key(), remaining)
+        } else {
+            ("none", remaining)
+        }
+    }
+
     pub fn mark_local_handoff(&mut self, now_millis: u64) -> Result<(), ProducerError> {
         let pending = self
             .pending
