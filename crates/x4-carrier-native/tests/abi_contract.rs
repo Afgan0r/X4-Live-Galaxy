@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 #[cfg(windows)]
-#[path = "ship_abi_contract.rs"]
+#[path = "abi_contract/ship_abi_contract.rs"]
 mod ship_abi_contract;
 use x4_carrier_native::{
     ABI_VERSION, CarrierError, CarrierLimits, CloseOutcome, ControlPollOutcome, HandleRegistry,

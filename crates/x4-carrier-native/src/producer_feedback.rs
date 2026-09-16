@@ -18,7 +18,7 @@ impl Producer {
         )
         .map_err(|error| match error {
             observation_ingest::CarrierCodecError::StaleEpoch => ProducerError::StaleEpoch,
-            observation_ingest::CarrierCodecError::RestartRequired => ProducerError::Incompatible,
+            observation_ingest::CarrierCodecError::RestartRequired => self.incompatible(),
             _ => ProducerError::InvalidInput,
         })?;
         match control.body {
@@ -41,8 +41,9 @@ impl Producer {
                     && value.max_raw_bytes >= self.limits.max_raw_bytes
                     && value.max_work >= 1 =>
             {
-                self.profile = ProducerProfile::from_section_key(&value.section_key)
-                    .ok_or(ProducerError::Incompatible)?;
+                let profile = ProducerProfile::from_section_key(&value.section_key)
+                    .ok_or_else(|| self.incompatible())?;
+                self.profile = profile;
                 self.revision = self.revision.max(value.next_revision);
                 self.readiness = Readiness::Intent;
                 Ok(ProducerOutcome::Accepted)
@@ -62,6 +63,13 @@ impl Producer {
             ControlBody::Reset(_) => Ok(ProducerOutcome::Disconnected),
             _ => Err(ProducerError::InvalidTransition),
         }
+    }
+
+    fn incompatible(&mut self) -> ProducerError {
+        self.discard_incomplete();
+        self.state = ProducerState::Incompatible;
+        self.readiness = Readiness::Awaiting;
+        ProducerError::Incompatible
     }
 
     fn apply_disposition(

@@ -78,6 +78,9 @@ pub unsafe extern "C" fn progress(state: *mut c_void) -> c_int {
     let Some(work) = (unsafe { integer(api, state, 2) }) else {
         return unsafe { push_code(api, state, -20) };
     };
+    if let Err(error) = with_producer(handle, |_| Ok(())) {
+        return unsafe { push_code(api, state, error_code(error)) };
+    }
     let Ok(mut producer_guard) = PRODUCER.lock() else {
         return unsafe { push_code(api, state, -18) };
     };
@@ -128,6 +131,9 @@ pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {
     let Some((api, handle)) = (unsafe { context(state) }) else {
         return invalid(state);
     };
+    if let Err(error) = with_producer(handle, |_| Ok(())) {
+        return unsafe { push_code(api, state, error_code(error)) };
+    }
     let Ok(mut producer_guard) = PRODUCER.lock() else {
         return unsafe { push_code(api, state, -18) };
     };

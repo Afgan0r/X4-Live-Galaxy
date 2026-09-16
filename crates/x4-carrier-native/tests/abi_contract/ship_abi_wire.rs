@@ -1,5 +1,4 @@
 #![expect(
-    clippy::expect_used,
     clippy::unwrap_used,
     clippy::panic,
     reason = "real ABI fixtures fail immediately when their contract is violated"
@@ -10,6 +9,7 @@ use observation_ingest::{
     CarrierControl, CollectionIntentBody, ControlBody, DemandBody, decode_carrier_bootstrap,
     decode_complete_message, encode_carrier_control,
 };
+use std::fmt::Write as _;
 use std::time::{Duration, Instant};
 use x4_carrier_native::{BridgePeer, TransportConfig};
 pub(super) fn connect() -> BridgePeer {
@@ -111,8 +111,10 @@ pub(super) fn receive(
     };
     let digest = observation_ingest::complete_message_digest(&bytes)
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+        .fold(String::with_capacity(64), |mut text, byte| {
+            write!(text, "{byte:02x}").unwrap();
+            text
+        });
     send(
         peer,
         identity,

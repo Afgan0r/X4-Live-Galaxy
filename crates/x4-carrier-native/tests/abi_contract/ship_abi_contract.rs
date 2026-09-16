@@ -1,10 +1,3 @@
-#![expect(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    reason = "real ABI fixtures fail immediately when their contract is violated"
-)]
-
 use observation_domain::{CompleteMessage, SourceBoundary, SourceEpochStatus};
 use observation_ingest::decode_carrier_bootstrap;
 #[path = "ship_abi_host.rs"]
@@ -13,8 +6,16 @@ mod host;
 mod wire;
 use host::Host;
 use wire::*;
+static PIPE_FIXTURE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+#[expect(
+    clippy::too_many_lines,
+    reason = "ordered DLL lifecycle trace remains one acceptance scenario"
+)]
 #[test]
 fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evidence() {
+    let _fixture = PIPE_FIXTURE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     for (mode, boundary) in [
         ("runtime_start", SourceBoundary::RuntimeStart),
         ("game_loaded", SourceBoundary::GameLoaded),
@@ -22,13 +23,7 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
         ("transport_reconnect", SourceBoundary::TransportReconnect),
     ] {
         let mut host = Host::start(mode);
-        let mut peer = match std::panic::catch_unwind(connect) {
-            Ok(peer) => peer,
-            Err(_) => {
-                host.finish();
-                panic!("peer failed");
-            }
-        };
+        let mut peer = connect();
         let identity = qualify(&mut peer);
         let CompleteMessage::SectionStart(start) = receive(&mut peer, &identity, "received") else {
             panic!("start");
@@ -103,14 +98,11 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
 
 #[test]
 fn incompatible_ship_selection_requires_restart_through_registered_operations() {
+    let _fixture = PIPE_FIXTURE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut host = Host::start("incompatible");
-    let mut peer = match std::panic::catch_unwind(connect) {
-        Ok(peer) => peer,
-        Err(_) => {
-            host.finish();
-            panic!("peer failed");
-        }
-    };
+    let mut peer = connect();
     let identity = decode_carrier_bootstrap(&peer.receive(512).unwrap(), 512).unwrap();
     send(&mut peer, &identity, super_handshake());
     send(&mut peer, &identity, intent("unsupported_ship_profile"));

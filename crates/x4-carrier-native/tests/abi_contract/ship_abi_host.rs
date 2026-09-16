@@ -1,11 +1,11 @@
 #![expect(
     clippy::expect_used,
     clippy::unwrap_used,
-    clippy::panic,
     reason = "real ABI fixtures fail immediately when their contract is violated"
 )]
 
 use std::{
+    io::Read as _,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     time::{Duration, Instant},
@@ -83,12 +83,12 @@ impl Host {
     }
     pub(super) fn wait_replacement(&mut self) {
         let deadline = Instant::now() + Duration::from_secs(10);
-        while !self.run.join("marker.txt").is_file() {
-            if self.child.try_wait().unwrap().is_some() {
-                self.finish();
-            }
+        while !self.run.join("marker.txt").is_file() && self.child.try_wait().unwrap().is_none() {
             assert!(Instant::now() < deadline, "replacement open watchdog");
             std::thread::yield_now();
+        }
+        if !self.run.join("marker.txt").is_file() {
+            self.finish();
         }
     }
     pub(super) fn release_peer(&self) {
@@ -101,7 +101,6 @@ impl Host {
             std::thread::yield_now();
         }
         let mut error = String::new();
-        use std::io::Read as _;
         self.child
             .stderr
             .as_mut()
@@ -128,15 +127,18 @@ impl Drop for Host {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        if std::thread::panicking() {
-            use std::io::Read as _;
-            let mut output = String::new();
-            if let Some(stderr) = self.child.stderr.as_mut() {
-                let _ = stderr.read_to_string(&mut output);
-            }
-            eprintln!("Lua host diagnostic: {output}");
-        }
+        diagnose_child(&mut self.child);
         // Only this owned ignored fixture directory is removed; never any repository source.
         let _ = std::fs::remove_dir_all(&self.run);
     }
+}
+fn diagnose_child(child: &mut Child) {
+    if !std::thread::panicking() {
+        return;
+    }
+    let mut output = String::new();
+    if let Some(stderr) = child.stderr.as_mut() {
+        let _ = stderr.read_to_string(&mut output);
+    }
+    eprintln!("Lua host diagnostic: {output}");
 }
