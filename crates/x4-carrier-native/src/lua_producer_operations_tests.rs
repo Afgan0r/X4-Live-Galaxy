@@ -19,6 +19,7 @@ struct FakeLuaState {
     token: Vec<u8>,
     reason: Option<Vec<u8>>,
     pushed: Vec<isize>,
+    pushed_strings: Vec<String>,
 }
 static ABI_TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -100,8 +101,33 @@ fn abi_poll_control_retains_control_and_state_while_clock_is_unavailable() {
         token: format!("{}:{}", token.generation, token.slot).into_bytes(),
         reason: None,
         pushed: Vec::new(),
+        pushed_strings: Vec::new(),
     };
     let state_pointer = (&raw mut state_value).cast();
+
+    let status_count = {
+        let producer = PRODUCER.lock().expect("producer lock");
+        let transport = TRANSPORT.lock().expect("transport lock");
+        unsafe {
+            crate::lua_progress::push(
+                fake_api(),
+                state_pointer,
+                0,
+                producer.as_ref().expect("producer retained"),
+                transport.as_ref().expect("transport retained"),
+                100,
+            )
+        }
+    };
+    assert_eq!(
+        status_count, 8,
+        "status includes profile and remaining capacity"
+    );
+    assert_eq!(
+        &state_value.pushed_strings[5..],
+        ["none", "1"],
+        "status exposes a bounded inactive selection"
+    );
 
     assert_eq!(unsafe { poll_control(state_pointer) }, 1);
     assert_eq!(state_value.pushed.pop(), Some(-22));
@@ -138,7 +164,7 @@ fn fake_api() -> LuaApi {
         create_table: noop_table,
         push_closure: noop_closure,
         push_integer,
-        push_string: noop_string,
+        push_string,
         set_field: noop_field,
         to_integer: noop_integer,
         to_string,
@@ -158,6 +184,12 @@ unsafe extern "C" fn push_integer(state: *mut c_void, value: isize) {
     unsafe { &mut *state.cast::<FakeLuaState>() }
         .pushed
         .push(value);
+}
+unsafe extern "C" fn push_string(state: *mut c_void, value: *const c_char, length: usize) {
+    let bytes = unsafe { core::slice::from_raw_parts(value.cast::<u8>(), length) };
+    unsafe { &mut *state.cast::<FakeLuaState>() }
+        .pushed_strings
+        .push(String::from_utf8_lossy(bytes).into_owned());
 }
 unsafe extern "C" fn to_string(
     state: *mut c_void,
@@ -179,7 +211,6 @@ unsafe extern "C" fn lua_type(state: *mut c_void, index: i32) -> i32 {
 }
 unsafe extern "C" fn noop_table(_: *mut c_void, _: i32, _: i32) {}
 unsafe extern "C" fn noop_closure(_: *mut c_void, _: Option<crate::abi_windows::LuaFn>, _: i32) {}
-unsafe extern "C" fn noop_string(_: *mut c_void, _: *const c_char, _: usize) {}
 unsafe extern "C" fn noop_field(_: *mut c_void, _: i32, _: *const c_char) {}
 unsafe extern "C" fn noop_integer(_: *mut c_void, _: i32) -> isize {
     0

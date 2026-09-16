@@ -123,6 +123,7 @@ fn assert_call_raw(operation: &str, token: &[u8], reason: Option<&[u8]>, expecte
         token: token.to_vec(),
         reason: reason.map(<[u8]>::to_vec),
         pushed: Vec::new(),
+        pushed_strings: Vec::new(),
     };
     assert_eq!(unsafe { function((&raw mut state).cast()) }, 1);
     assert_eq!(state.pushed, vec![expected]);
