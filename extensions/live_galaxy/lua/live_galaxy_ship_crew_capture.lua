@@ -7,8 +7,8 @@ local function allocation(self, count, size)
     return unsigned(count, self.limit) and unsigned(size, self.allocation)
         and size > 0 and count <= math.floor(self.allocation / size)
 end
--- One native getter or one checked allocation per callback; strings are copied
--- by the source before a callback can yield. No individual personnel are read.
+-- Synchronous aggregate capture; source-owned borrowed strings are copied by
+-- the source seam. No individual personnel are read.
 function capture.step(self)
     local api, id, stage = self.api, self.group.members[self.index], self.stage
     if stage == "crew_capacity" then
@@ -29,7 +29,8 @@ function capture.step(self)
         if type(rows) ~= "table" or #rows > self.count then return nil, "enumeration_incomplete" end
         self.rows, self.row_index, self.seen, self.stage = rows, 1, {}, "crew_validate"
     elseif stage == "crew_validate" then
-        for i = self.row_index, math.min(self.row_index + 31, #self.rows) do
+        for i = self.row_index, #self.rows do
+            if self.work_budget then self.work_budget:step() end
             local role = self.rows[i]
             if type(role.id) ~= "string" or not role.id:match("^[%w_:%-]+$") or self.seen[role.id]
                 or not unsigned(role.amount_people, 4294967295)
@@ -61,7 +62,8 @@ function capture.step(self)
         if type(tiers) ~= "table" or #tiers > role.reported_numtiers then return nil, "enumeration_incomplete" end
         self.rows, self.row_index, self.stage = tiers, 1, "crew_tier_validate"
     elseif stage == "crew_tier_validate" then
-        for i = self.row_index, math.min(self.row_index + 31, #self.rows) do
+        for i = self.row_index, #self.rows do
+            if self.work_budget then self.work_budget:step() end
             local tier = self.rows[i]
             if type(tier.name) ~= "string" or #tier.name == 0 or #tier.name > 128
                 or tier.name:find("[|\n\r]") or type(tier.skill_lower_threshold) ~= "number"

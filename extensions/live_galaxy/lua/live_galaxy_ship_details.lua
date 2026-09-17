@@ -24,17 +24,19 @@ function details.new(options, clock)
     return setmetatable({ api = options.ship_api or source.runtime(), clock = clock,
         limit = limit, allocation = options.max_allocation_bytes, stage = "reserve",
         group = options.group, scope = options.source_scope, expected_core = options.expected_core,
+        work_budget = options.work_budget,
         kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
 end
 
 function details:fail(carrier, reason)
-    if self.reserved then carrier:fail_section(reason) end
+    carrier:fail_section(reason)
     self.stage, self.pending, self.buffer = "failed", nil, nil
     return { disposition = reason }
 end
 
-function details:tick(context, carrier, status)
+function details:step(context, carrier, status)
     local group = self.group
+    if self.stage == "done" then return { disposition = "producer_busy" } end
     if self.stage == "failed" then return { disposition = "failed" } end
     if status.selection ~= group.key then return self:fail(carrier, "restart_required") end
     if self.stage == "reserve" then
@@ -43,8 +45,7 @@ function details:tick(context, carrier, status)
         begin.section_key, begin.expected_records = group.key, #group.members
         begin.coverage, begin.consistency, begin.stable_identity = "partial", "observed_count_fill_only", true
         begin.source_epoch_status, begin.source_boundary = "unknown", context.source_boundary or "runtime_start"
-        if carrier:begin_section(begin) ~= 0 then return self:fail(carrier, "reservation_failed") end
-        self.reserved, self.index, self.capture_start = true, 1, begin.capture_start_millis
+        self.begin, self.records, self.index, self.capture_start = begin, {}, 1, begin.capture_start_millis
         self.stage = start_stage(self.kind)
     elseif self.stage:match("^crew_") then
         local ok, err = crew_capture.step(self)
@@ -55,11 +56,11 @@ function details:tick(context, carrier, status)
     elseif self.stage == "wares" then
         local raw = self.api:cargo_wares(group.members[self.index])
         if type(raw) ~= "table" or getmetatable(raw) ~= nil then return self:fail(carrier, "cargo_unknown") end
-        -- This table is owned Lua data. Unlike borrowed ffi strings it can be
-        -- validated/copied incrementally after the indivisible getter.
+        -- Copy the returned owned values into the frozen selection record.
         self.raw, self.pending, self.stage = raw, { wares = {} }, "ware_copy"
     elseif self.stage == "ware_copy" then
-        for _ = 1, 32 do
+        while true do
+            if self.work_budget then self.work_budget:step() end
             local ware, amount = next(self.raw, self.ware_key)
             if ware == nil then
                 self.raw, self.ware_key = nil, nil
@@ -92,7 +93,8 @@ function details:tick(context, carrier, status)
         if type(rows) ~= "table" or #rows > self.count then return self:fail(carrier, "enumeration_incomplete") end
         self.rows, self.row_index, self.seen, self.stage = rows, 1, {}, "storage_validate"
     elseif self.stage == "storage_validate" then
-        for i = self.row_index, math.min(self.row_index + 31, #self.rows) do
+        for i = self.row_index, #self.rows do
+            if self.work_budget then self.work_budget:step() end
             local row = self.rows[i]
             if not token(row.transport) or self.seen[row.transport]
                 or not integer(row.capacity_cubic_metres, 4294967295)
@@ -124,19 +126,17 @@ function details:tick(context, carrier, status)
             record.wares_outcome = #record.wares == 0 and "empty" or "value"
             record.storage_outcome = #record.storage == 0 and "empty" or "value"
         end
-        local code = carrier:push_record(record)
-        if code == -21 then return { disposition = "producer_busy" } end
-        if code ~= 0 then return self:fail(carrier, "fact_rejected") end
+        self.records[self.index] = record
         self.index, self.pending = self.index + 1, nil
-        self.stage = self.index > #group.members and "complete" or start_stage(self.kind)
+        self.stage = self.index > #group.members and "capture_finish" or start_stage(self.kind)
     elseif self.stage == "revalidate" then
         local current = self.api:read_core(self.expected_core.identity)
         if type(current) ~= "table" then return self:fail(carrier, "core_changed") end
         for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
             if current[key] ~= self.expected_core[key] then return self:fail(carrier, "core_changed") end
         end
-        self.validated, self.stage = true, "complete"
-    elseif self.stage == "complete" then
+        self.validated, self.stage = true, "capture_finish"
+    elseif self.stage == "capture_finish" then
         if self.expected_core and not self.validated then
             self.stage = "revalidate"
             return { disposition = "collecting" }
@@ -144,11 +144,37 @@ function details:tick(context, carrier, status)
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end
         finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true
-        if carrier:finish_section(finish) ~= 0 then return self:fail(carrier, "finish_rejected") end
+        self.finish, self.index, self.pending, self.stage = finish, 1, self.records[1], "reserve_delivery"
+        if self.work_budget then
+            local ok, reason = self.work_budget:after(carrier)
+            if not ok then return self:fail(carrier, reason) end
+        end
+    elseif self.stage == "reserve_delivery" then
+        local code = carrier:begin_section(self.begin)
+        if code == -21 then return { disposition = "producer_busy" } end
+        if code ~= 0 then return self:fail(carrier, "reservation_failed") end
+        self.reserved, self.stage = true, "deliver"
+    elseif self.stage == "deliver" then
+        local code = carrier:push_record(self.pending)
+        if code == -21 then return { disposition = "producer_busy" } end
+        if code ~= 0 then return self:fail(carrier, "fact_rejected") end
+        self.index = self.index + 1
+        self.pending = self.records[self.index]
+        self.stage = self.pending and "deliver" or "complete"
+    elseif self.stage == "complete" then
+        if carrier:finish_section(self.finish) ~= 0 then return self:fail(carrier, "finish_rejected") end
         self.stage, self.reserved = "done", false
         return { disposition = "sampled" }
     end
     return { disposition = "collecting" }
+end
+
+function details:tick(context, carrier, status)
+    while true do
+        if self.work_budget then self.work_budget:step() end
+        local result = self:step(context, carrier, status)
+        if result.disposition ~= "collecting" then return result end
+    end
 end
 
 return details

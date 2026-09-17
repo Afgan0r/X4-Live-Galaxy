@@ -39,9 +39,7 @@ describe("source-faithful resumable cargo", function()
         }))
         local last
         for _ = 1, 20 do
-            local before = #calls
             last = collector:tick({}, carrier, { selection = "ship_cargo:g0" })
-            assert.is_true(#calls - before <= 1, "one heavy getter/allocation per callback")
             if last.disposition ~= "collecting" then break end
         end
         return calls, records, finished, failed, last
@@ -58,32 +56,38 @@ describe("source-faithful resumable cargo", function()
         assert.equals(17, records[1].wares[1].amount_items)
         assert.equals(170, records[1].storage[1].occupied_cubic_metres)
     end)
-    it("normalizes eighty owned wares across pulses and resumes a busy handoff", function()
-        local raw, pushed, busy, pulses = {}, nil, true, 0
+    it("captures eighty owned wares in one callback and resumes a busy handoff without getters", function()
+        local raw, pushed, busy, pulses, reads, finishes = {}, nil, true, 0, 0, 0
         for i = 1, 80 do raw["ware" .. string.format("%03d", i)] = i end
         local collector = assert(module.new({ max_inner = 4096, max_allocation_bytes = 4096,
             source_scope = "x4:faction:argon:ships", group = { key = "ship_cargo:g0",
                 owner = "argon", core_revision = "7", members = { "1" } }, ship_api = {
-                cargo_wares = function() return raw end, cargo_storage_count = function() return 0 end,
+                cargo_wares = function() reads = reads + 1; return raw end, cargo_storage_count = function() return 0 end,
                 cargo_storage_size = function() return 24 end, cargo_storage_allocate = function() return {} end,
                 cargo_storage_fill = function() return {} end } }, {
                 begin_evidence = function() return { capture_start_millis = "1" } end,
-                finish_evidence = function() return { capture_end_millis = "2" } end }))
+                finish_evidence = function() finishes = finishes + 1; return { capture_end_millis = "2" } end }))
         local carrier = { begin_section = function() return 0 end, finish_section = function() return 0 end,
             fail_section = function() error("valid eighty-row data must not fail") end,
             push_record = function(_, row) if busy then busy = false; return -21 end; pushed = row; return 0 end }
         local result
+        result = collector:tick({}, carrier, { selection = "ship_cargo:g0" })
+        assert.equals("producer_busy", result.disposition)
+        assert.equals(80, #collector.pending.wares, "capture must finish in the first callback")
+        assert.equals(1, reads)
+        raw.ware001 = 999
         for _ = 1, 200 do
-            local before = collector.pending and #collector.pending.wares or 0
             result = collector:tick({}, carrier, { selection = "ship_cargo:g0" })
-            if collector.pending then assert.is_true(#collector.pending.wares - before <= 32, "owned copy must yield") end
             pulses = pulses + 1
             if result.disposition == "sampled" then break end
             assert.is_true(result.disposition == "collecting" or result.disposition == "producer_busy")
         end
-        assert.equals("sampled", result.disposition); assert.is_true(pulses > 10)
+        assert.equals("sampled", result.disposition); assert.equals(1, pulses)
+        assert.equals(1, reads); assert.equals(2, finishes, "no evidence getter on delivery retry")
         assert.equals(80, #pushed.wares)
         for i = 1, 80 do assert.equals(i, pushed.wares[i].amount_items) end
+        assert.equals("producer_busy", collector:tick({}, carrier, { selection = "ship_cargo:g0" }).disposition)
+        assert.equals(1, reads, "a finished collector waits for the next selection without looping")
     end)
     it("rejects overflow before allocation or fill", function()
         for _, options in ipairs({ { count = 3 }, { size = 49 },
@@ -109,7 +113,7 @@ describe("source-faithful resumable cargo", function()
             local changed = {}; for name, value in pairs(expected) do changed[name] = value end
             changed[key] = "changed"
             local _, records, finish, failures, last = run({ expected_core = expected, current_core = changed })
-            assert.equals(1, #records, "a staged batch is not a complete observation")
+            assert.equals(0, #records, "revalidate before any delivery")
             assert.equals(0, finish); assert.equals(1, failures); assert.equals("core_changed", last.disposition)
         end
     end)
@@ -142,9 +146,7 @@ describe("resumable aggregate crew and installed state", function()
             finish_evidence = function() return { capture_end_millis = "110" } end,
         }))
         for _ = 1, 100 do
-            local before = calls
             local result = collector:tick({}, carrier, { selection = key })
-            assert.is_true(calls - before <= 1, "one native getter or allocation per callback")
             if result.disposition ~= "collecting" then return record, failure, result end
         end
         error("bounded fixture did not finish")

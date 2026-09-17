@@ -8,6 +8,9 @@ local function metrics(self)
     local b = self.budget
     return b and { calls = b.calls, allocation_bytes = b.allocation, steps = b.steps,
         duration_millis = (b.last or 0) - (b.started or 0), revision = self.revision,
+        max_callback_duration_millis = b.max_callback_duration,
+        max_callback_overrun_millis = b.max_callback_overrun,
+        source_value_bytes = b.source_value_bytes,
         section = self.key, incarnation = self.incarnation } or nil
 end
 local function discard(self, carrier, reason)
@@ -53,7 +56,7 @@ local function start(self, context, carrier, status)
     local options = self.options
     if key == "ship_core" then
         local core_options = {}; for name, value in pairs(options) do core_options[name] = value end
-        core_options.ship_api = self.budget.api
+        core_options.ship_api, core_options.work_budget = self.budget.api, self.budget
         self.collector = assert(core.new(core_options, clock))
     else
         if not key:match("^ship_cargo:g%d+$") and not key:match("^ship_crew:g%d+$")
@@ -69,7 +72,7 @@ local function start(self, context, carrier, status)
         self.collector = assert(detail.new({ ship_api = self.budget.api,
             max_inner = self.limits.max_inner_records, max_allocation_bytes = self.limits.max_allocation_bytes,
             source_scope = options.source_scope, expected_core = parent.cores[member],
-            group = { key = key, members = { member },
+            work_budget = self.budget, group = { key = key, members = { member },
                 owner = options.faction_id, core_revision = parent.revision } }, clock))
     end
     self.key, self.revision, self.boundary, self.incarnation = key, status.collection_revision,
@@ -100,7 +103,7 @@ function selection.advance(self, context, carrier, status)
     if not ok then return discard(self, carrier, err) end
     if result.disposition == "sampled" and self.key == "ship_core" then
         -- Transfer owned, already bytewise-ordered membership; do not repeat an
-        -- unbounded copy/sort after the incremental collector has completed.
+        -- copy/sort after the source collector has completed.
         self.pending = { members = self.collector.identities, cores = self.collector.cores, revision = self.revision,
             boundary = self.boundary, incarnation = self.incarnation }
     end

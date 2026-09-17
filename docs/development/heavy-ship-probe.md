@@ -178,7 +178,7 @@ The existing scheduler pumps feedback first and makes no source admission when
 the one-slot downstream queue is unavailable. A busy record handoff retains the
 same pending fact and resumes without repeating its getter.
 
-### Synchronous-first follow-up: approved, local implementation pending
+### Synchronous-first follow-up: implemented and locally verified
 
 The initial owner-approved normal-time game run initialized successfully but
 refused `ship_core` revision 1 with `collection_overflow`: four native calls,
@@ -196,6 +196,29 @@ experimental timing observation rather than a cancellation guard. Preserve
 byte/allocation/work safeguards and all numeric deadlines. The bridge's first
 data wait is 30 seconds from each collection demand; subsequent data progress
 uses the existing 10-second inactivity bound. No heartbeat/new protocol.
+
+The scoped implementation and focused RED/GREEN tests are complete. Independent
+standard-depth review found no open scoped blockers/warnings. Ordinary runtime
+diagnostics expose callback duration/overrun and charged represented source bytes
+(not exact Lua heap size). Fresh clock/30-second age refusal remains enforced
+before native admission. Final relevant local regression passed; these
+facts do not establish X4 timing, responsiveness or runtime headroom.
+
+Post-fix gates: 330 Rust tests (five unchanged ignored), workspace formatting,
+all-target Clippy, source-size checks, 86 Lua contracts, 20 syntax checks,
+XML/schema and serialized clock/native recovery passed. Actual core/detail and
+configured restart/interruption paths passed exact independent readback.
+Undelayed synthetic first/restart throughput took 5,286.9603/9,570.4167 ms,
+with 12 exact revisions, 129 core records and 80 nested entries; measured
+callback maxima were 1.4653/1.8998 ms. These are finite local fixtures, not
+whole-faction X4 capacity.
+
+Explicit interleave aging (two 16-second waits outside callback measurement)
+passed 19 exact revisions in 57,071.2118 ms. Core replacement resumed unfinished
+loadout:g0 and later advanced through g5. The history oracle proves one
+session/epoch without reconnect; callback maximum 1.7134 ms excludes waits.
+The corrected nonterminal diagnostic is `waiting/peer-inactive`, not a false
+disconnect. Deliberate aging/recovery elapsed time is not throughput headroom.
 
 Validate and review locally, regenerate the package and obtain separate consent
 before deployment or another X4 run. The installed `e661f36` package is unchanged;

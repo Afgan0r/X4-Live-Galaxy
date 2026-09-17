@@ -87,6 +87,7 @@ local observation = assert(require("live_galaxy.lua.live_galaxy_observation").ne
 local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
 local expected = interleave and 19 or (mode == "first" and 8 or 4)
 local committed, last, revisions = 0, "none", {}
+local pending_age_wait, synthetic_wait_count, synthetic_wait_total = nil, 0, 0
 local started, callback_durations, commit_durations, busy, produced, production_times = host_monotonic_millis(), {}, {}, 0, 0, {}
 local deadline = host_monotonic_millis() + options.observation.heavy_limits.admission_window_millis
 local feedback = observation.feedback
@@ -96,6 +97,7 @@ function observation:feedback(context, active_carrier, status, control)
     if control == 5 then
         committed = committed + 1; revisions[#revisions + 1] = revision
         commit_durations[#commit_durations + 1] = host_monotonic_millis() - (production_times[committed] or started)
+        if interleave and (committed == 2 or committed == 3) then pending_age_wait = 16000 end
     end
 end
 while committed < expected do
@@ -108,18 +110,26 @@ while committed < expected do
         local m = result.capture_metrics
         if m then captures[#captures + 1] = "capture section=" .. m.section .. " revision=" .. m.revision
             .. " duration_millis=" .. m.duration_millis .. " calls=" .. m.calls
-            .. " allocation_bytes=" .. m.allocation_bytes .. " steps=" .. m.steps end
+            .. " allocation_bytes=" .. m.allocation_bytes .. " steps=" .. m.steps
+            .. " max_callback_duration_millis=" .. m.max_callback_duration_millis
+            .. " max_callback_overrun_millis=" .. m.max_callback_overrun_millis end
     end
     last = result.disposition
     assert(host_monotonic_millis() < deadline, "configured heavy watchdog: " .. last)
     assert(last ~= "source_failure" and last ~= "core_changed" and last ~= "native_call_limit"
         and last ~= "allocation_limit" and last ~= "callback_budget_exceeded",
         last .. " revision=" .. revision .. " committed=" .. committed .. " calls=" .. calls)
+    if pending_age_wait then
+        local delay = pending_age_wait; pending_age_wait = nil
+        host_sleep(delay)
+        synthetic_wait_count = synthetic_wait_count + 1; synthetic_wait_total = synthetic_wait_total + delay
+    end
     host_sleep(1)
 end
 local file = assert(io.open(result_path, "wb"))
 assert(file:write("committed=" .. committed .. "\ncalls=" .. calls .. "\nrevisions=" .. table.concat(revisions, ",") .. "\n"))
 if throughput then
+    assert(file:write("synthetic_wait_count=" .. synthetic_wait_count .. "\nsynthetic_wait_total_millis=" .. synthetic_wait_total .. "\n"))
     local function percentile(rows, fraction) table.sort(rows); return rows[math.max(1, math.ceil(#rows * fraction))] end
     assert(file:write("synthetic_core_records=" .. population .. "\nnested_records=80\nelapsed_millis=" .. (host_monotonic_millis() - started)
         .. "\ncallback_samples=" .. #callback_durations .. "\ncallback_p95_millis=" .. percentile(callback_durations, .95)

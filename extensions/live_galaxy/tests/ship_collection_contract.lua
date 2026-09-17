@@ -34,7 +34,10 @@ describe("bounded faction core continuation", function()
         }
         local carrier = {
             begin_section = function() calls[#calls + 1] = "reserve"; return 0 end,
-            push_record = function(_, record) records[#records + 1] = record; return 0 end,
+            push_record = function(_, record)
+                if options.busy then return -21 end
+                records[#records + 1] = record; return 0
+            end,
             finish_section = function(_, evidence)
                 assert.equals("partial", evidence.coverage)
                 assert.equals("observed_count_fill_only", evidence.consistency)
@@ -57,7 +60,7 @@ describe("bounded faction core continuation", function()
         }
     end
 
-    it("collects 129 owned identities incrementally without a population quota", function()
+    it("collects 129 owned identities synchronously without a population quota", function()
         local now, pushed, identity_reads, busy = 0, {}, 0, true
         local buffer = setmetatable({}, { __index = function(_, i)
             identity_reads = identity_reads + 1; return tostring(129 - i)
@@ -79,10 +82,9 @@ describe("bounded faction core continuation", function()
         local result
         for _ = 1, 2000 do
             now = now + 1
-            local before = identity_reads
             result = collector:tick({}, carrier, { selection = "ship_core", monotonic_millis = tostring(now),
                 producer_incarnation = "1" })
-            assert.is_true(identity_reads - before <= 32, "identity copying must yield")
+            assert.equals(129, identity_reads, "one complete census, never repeated on busy delivery")
             if result.disposition ~= "collecting" and result.disposition ~= "producer_busy" then break end
         end
         assert.equals("sampled", result.disposition, "byte-safe census must not hit the old count quota")
@@ -103,7 +105,7 @@ describe("bounded faction core continuation", function()
         { options = { change = "owner" }, reason = "core_changed" },
         { options = { change = "location" }, reason = "core_changed" },
         { options = { work = 8 }, reason = "collection_overflow" },
-        { options = { age = 3 }, reason = "collection_overflow" },
+        { options = { age = 3, busy = true }, reason = "collection_overflow" },
     }) do
         it("abandons the whole attempt for " .. case.reason, function()
             local env, result = environment(case.options), nil
@@ -120,25 +122,26 @@ describe("bounded faction core continuation", function()
 
     it("bounds allocation before requesting the ship buffer", function()
         local env = environment({ allocation = 8 })
-        for _ = 1, 3 do env.step() end
+        env.step()
         assert.same({ "census", "count" }, env.calls)
     end)
 
     it("does no source work on a frozen callback clock", function()
         local env = environment()
         env.step()
+        local before = #env.calls
         assert.equals("clock_unavailable", env.step(nil, true).disposition)
-        assert.same({ "census" }, env.calls)
+        assert.equals(before, #env.calls)
     end)
 
     it("discards reserved source work on a load boundary", function()
-        local env = environment()
-        for _ = 1, 8 do env.step() end
+        local env = environment({ busy = true })
+        assert.equals("producer_busy", env.step().disposition)
         assert.equals("source_boundary_changed", env.step("game_loaded").disposition)
         local records, finished, failed = env.result()
         assert.same({ 0, 0, 1 }, { #records, finished, failed })
         env.step("game_loaded")
-        assert.equals("census", env.calls[#env.calls])
+        assert.equals("reserve", env.calls[#env.calls])
     end)
 
     it("never turns an empty observed count into known-empty", function()

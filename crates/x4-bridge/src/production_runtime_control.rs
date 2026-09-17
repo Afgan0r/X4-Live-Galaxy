@@ -1,9 +1,12 @@
-use crate::ProductionLimits;
+use crate::production_runtime::now;
+use crate::production_runtime_idle::ReceiveProgress;
+use crate::production_ship_schedule::ShipSchedule;
+use crate::{OperationalHistory, ProductionLimits, ProductionObservationSession};
 use observation_ingest::{
     CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody, DemandBody, HandshakeBody,
     encode_carrier_control,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use x4_carrier_native::BridgePeer;
 
 pub fn wait_interval(
@@ -25,7 +28,7 @@ pub fn initial(
     key: &str,
     revision: u64,
     limits: &ProductionLimits,
-) -> Result<(), ()> {
+) -> Result<Instant, ()> {
     send(
         peer,
         identity,
@@ -40,12 +43,14 @@ pub fn initial(
         limits,
     )?;
     intent(peer, identity, key, revision, limits)?;
+    let issued = Instant::now();
     send(
         peer,
         identity,
         ControlBody::Demand(DemandBody { credit: 1 }),
         limits,
-    )
+    )?;
+    Ok(issued)
 }
 pub fn intent(
     peer: &mut BridgePeer,
@@ -82,4 +87,86 @@ pub fn send(
     )
     .map_err(|_| ())?;
     peer.send_control(&bytes).map_err(|_| ())
+}
+
+pub fn recover_idle(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    session: &mut ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    key: &mut String,
+    progress: &mut ReceiveProgress,
+) -> bool {
+    if key == "ship_core" || !session.stale_ship_parent(now()) {
+        return false;
+    }
+    let Some(active) = schedule else {
+        return false;
+    };
+    active.complete();
+    let Some(issued) = next(peer, identity, limits, session, schedule, key) else {
+        return false;
+    };
+    *progress = ReceiveProgress::issued(issued, limits, true);
+    true
+}
+
+pub fn next(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    session: &mut ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    key: &mut String,
+) -> Option<Instant> {
+    // Reconcile completion before issuing fresh collection demand.
+    let interval = session
+        .heavy_limits()
+        .map_or(limits.availability_interval_millis, |profile| {
+            profile.rate_interval_millis
+        });
+    wait_interval(peer, limits, interval).ok()?;
+    if let Some(schedule) = schedule {
+        *key = session.next_ship_key(key, now()).ok()?;
+        if !schedule.admit(key) {
+            return None;
+        }
+        let revision = session.heavy_revision_floor().ok()?;
+        let issued_at = now();
+        intent(peer, identity, key, revision, limits).ok()?;
+        session.ship_intent_issued(identity, key, revision, issued_at);
+    }
+    let issued = Instant::now();
+    send(
+        peer,
+        identity,
+        ControlBody::Demand(DemandBody { credit: 1 }),
+        limits,
+    )
+    .ok()?;
+    Some(issued)
+}
+
+pub fn complete_selection(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    history: &mut OperationalHistory,
+    session: &mut ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    key: &mut String,
+) -> Option<Instant> {
+    if session.maintain_heavy_history().is_err() {
+        let _ = history.record("waiting", "heavy-retention-storage");
+        return None;
+    }
+    if let Some(schedule) = schedule {
+        schedule.complete();
+    }
+    let issued = next(peer, identity, limits, session, schedule, key);
+    if issued.is_none() {
+        let _ = history.record("waiting", "heavy-admission-or-peer-stop");
+    }
+    issued
 }

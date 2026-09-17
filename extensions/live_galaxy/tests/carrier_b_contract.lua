@@ -26,12 +26,12 @@ describe("owned Carrier B adapter", function()
                 end
                 if current == nil then current = 0 end
                 if name == "progress" then
-                    monotonic = monotonic + 1
+                    monotonic = monotonic + (options.monotonic_step or 1)
                     local capacity = options.capacity or "available:0"
                     if type(capacity) == "function" then capacity = capacity() end
                     return current, "ready", "connected", tostring(monotonic),
                         capacity, "producer:1", options.selection or "carrier_b_realtime_sample",
-                        options.remaining or "1"
+                        options.remaining or "1", options.revision or "1"
                 end
                 return current
             end
@@ -253,6 +253,28 @@ describe("owned Carrier B adapter", function()
         _G.DebugError = function(value) recovered = value end
         assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.is_truthy(recovered:match("diagnostic_gap_count=3"))
+    end)
+
+    it("renders measured heavy callback duration and overrun in ordinary runtime diagnostics", function()
+        local env, tick, diagnostic = native({ selection = "ship_core", remaining = "1", monotonic_step = 10 }), nil, nil
+        local file = assert(io.open("config/heavy-ship-experiment.json", "rb"))
+        local text = assert(file:read("*a")); assert(file:close())
+        local values = {}; for key, value in text:gmatch('"([%w_]+)"%s*:%s*(%d+)') do values[key] = tonumber(value) end
+        local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
+        options.getter, options.clock_getter = function() return 0 end, function() return 1 end
+        options.ship_api = {
+            list_factions = function() return { "argon" } end, count_ships = function() return 1 end,
+            new_buffer = function() return { [0] = "9007199254740993" } end, fill_ships = function() return 1 end,
+            read_core = function(_, id) return { identity = id, owner = "argon", type = "macro", class = "ship", location = "sector:1" } end,
+        }
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        _G.DebugError = function(value) diagnostic = value end
+        local runtime = fixture.runtime()
+        assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
+        assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.is_truthy(diagnostic:match("max_callback_duration_millis=20"))
+        assert.is_truthy(diagnostic:match("max_callback_overrun_millis=18"))
+        assert.is_truthy(diagnostic:match("source_value_bytes=%d+"))
     end)
 
     for code, reason in pairs({

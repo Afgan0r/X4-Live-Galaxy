@@ -33,13 +33,13 @@ function collection.new(options, clock)
     local api = options.ship_api or source.runtime()
     return setmetatable({ api = api, limits = copied, clock = clock, faction = options.faction_id,
         source_scope = options.source_scope or "x4:faction:" .. options.faction_id .. ":ships",
-        stage = "census", work = 0, attempts = 1 }, { __index = collection })
+        stage = "census", work = 0, attempts = 1, work_budget = options.work_budget }, { __index = collection })
 end
 
 function collection:discard(carrier, reason)
     if self.reserved then carrier:fail_section(reason) end
     self.reserved, self.buffer, self.identities, self.pending = false, nil, nil, nil
-    self.cores = nil
+    self.cores, self.records, self.begin, self.finish = nil, nil, nil, nil
     self.seen, self.copy_index, self.sort = nil, nil, nil
     self.faction_buffer, self.factions, self.boundary, self.incarnation = nil, nil, nil, nil
     self.attempts = self.attempts + 1
@@ -47,7 +47,7 @@ function collection:discard(carrier, reason)
     return { disposition = reason }
 end
 
-function collection:tick(context, carrier, status)
+function collection:step(context, carrier, status)
     if self.stage == "halted" then return { disposition = "retry_exhausted" } end
     if status.selection ~= "ship_core" then return self:discard(carrier, "restart_required") end
     local boundary = context.source_boundary or "runtime_start"
@@ -58,12 +58,12 @@ function collection:tick(context, carrier, status)
     self.boundary, self.incarnation = boundary, incarnation
     local now = tonumber(status.monotonic_millis)
     if not integer(now) then return self:discard(carrier, "clock_unavailable") end
-    if self.last_step and now <= self.last_step then return { disposition = "clock_unavailable" } end
     self.started = self.started or now
     if now - self.started > self.limits.max_age_millis or self.work >= self.limits.max_work then
         return self:discard(carrier, "collection_overflow")
     end
     self.last_step, self.work = now, self.work + 1
+    if self.work_budget then self.work_budget:step() end
     local api, stage = self.api, self.stage
     if stage == "census" then
         if api.list_factions then
@@ -98,7 +98,8 @@ function collection:tick(context, carrier, status)
     elseif stage == "select" then
         if type(self.factions) ~= "table" then return self:discard(carrier, "invalid_fact") end
         self.seen, self.copy_index = self.seen or {}, self.copy_index or 1
-        for i = self.copy_index, math.min(self.copy_index + 31, #self.factions) do
+        for i = self.copy_index, #self.factions do
+            if self.work_budget then self.work_budget:step() end
             local faction = self.factions[i]
             if not token(faction, 64) or self.seen[faction] then return self:discard(carrier, "invalid_fact") end
             self.seen[faction], self.found, self.copy_index = true, self.found or faction == self.faction, i + 1
@@ -125,7 +126,8 @@ function collection:tick(context, carrier, status)
         self.stage = "identities"
     elseif stage == "identities" then
         self.identities, self.seen, self.copy_index = self.identities or {}, self.seen or {}, self.copy_index or 0
-        for i = self.copy_index, math.min(self.copy_index + 31, self.count - 1) do
+        for i = self.copy_index, self.count - 1 do
+            if self.work_budget then self.work_budget:step() end
             local id = source.identity(self.buffer[i])
             if id == nil or self.seen[id] then return self:discard(carrier, "identity_invalid") end
             self.seen[id], self.identities[i + 1] = true, id
@@ -138,19 +140,21 @@ function collection:tick(context, carrier, status)
     elseif stage == "order" then
         local done, err = self.sort()
         if err then return self:discard(carrier, "identity_invalid") end
-        if done then self.sort, self.stage = nil, "reserve" end
-    elseif stage == "reserve" then
+        if done then self.sort, self.stage = nil, "capture_begin" end
+    elseif stage == "capture_begin" then
         local begin, err = self.clock:begin_evidence()
         if begin == nil then return self:discard(carrier, err) end
         begin.section_key, begin.expected_records = "ship_core", self.count
         begin.coverage, begin.consistency, begin.stable_identity = "partial", "observed_count_fill_only", true
         begin.source_epoch_status = context.source_epoch_status or "unknown"
         begin.source_boundary = boundary
-        local code = carrier:begin_section(begin)
+        self.begin, self.index, self.cores, self.records, self.stage = begin, 1, {}, {}, "core"
+    elseif stage == "reserve" then
+        local code = carrier:begin_section(self.begin)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then return self:discard(carrier, "reservation_failed") end
         self.reserved, self.index = true, 1
-        self.stage = self.count == 0 and "complete" or "core"
+        self.stage = "record"
     elseif stage == "core" then
         local core = api:read_core(self.identities[self.index])
         if type(core) ~= "table" or core.identity ~= self.identities[self.index]
@@ -166,22 +170,29 @@ function collection:tick(context, carrier, status)
         if type(current) ~= "table" or not same_core(self.pending, current) then
             return self:discard(carrier, "core_changed")
         end
-        self.stage = "record"
+        self.cores[self.pending.identity] = self.pending
+        self.records[self.index] = self.pending
+        self.pending, self.index = nil, self.index + 1
+        self.stage = self.index > self.count and "capture_finish" or "core"
+    elseif stage == "capture_finish" then
+        local finish, err = self.clock:finish_evidence()
+        if not finish then return self:discard(carrier, err) end
+        finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true
+        self.finish, self.index, self.stage = finish, 1, "reserve"
+        if self.work_budget then
+            local ok, reason = self.work_budget:after(carrier)
+            if not ok then return self:discard(carrier, reason) end
+        end
     elseif stage == "record" then
+        self.pending = self.records[self.index]
         self.pending.profile, self.pending.source_scope = "ship_core", self.source_scope
         local code = carrier:push_record(self.pending)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then return self:discard(carrier, "fact_rejected") end
-        self.cores = self.cores or {}
-        self.cores[self.pending.identity] = { identity = self.pending.identity, owner = self.pending.owner,
-            type = self.pending.type, class = self.pending.class, location = self.pending.location }
         self.pending, self.index = nil, self.index + 1
-        self.stage = self.index > self.count and "complete" or "core"
+        self.stage = self.index > self.count and "complete" or "record"
     elseif stage == "complete" then
-        local finish, err = self.clock:finish_evidence()
-        if finish == nil then return self:discard(carrier, err) end
-        finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true
-        if carrier:finish_section(finish) ~= 0 then return self:discard(carrier, "finish_rejected") end
+        if carrier:finish_section(self.finish) ~= 0 then return self:discard(carrier, "finish_rejected") end
         self.reserved, self.stage = false, "done"
         return { disposition = "sampled", source_transition_accepted = true }
     elseif stage == "done" then
@@ -189,6 +200,18 @@ function collection:tick(context, carrier, status)
         self.stage, self.started, self.last_step, self.work, self.attempts = "census", nil, nil, 0, 1
     end
     return { disposition = "collecting" }
+end
+
+function collection:tick(context, carrier, status)
+    local now = tonumber(status.monotonic_millis)
+    if not integer(now) or self.last_callback and now <= self.last_callback then
+        return { disposition = "clock_unavailable" }
+    end
+    self.last_callback = now
+    while true do
+        local result = self:step(context, carrier, status)
+        if result.disposition ~= "collecting" then return result end
+    end
 end
 
 return collection

@@ -1,3 +1,20 @@
+function Assert-HeavySamePeerInterleave([string]$Data) {
+    $events = @(Get-ChildItem -LiteralPath $Data -File | Where-Object { $_.Name -like 'operational-history.jsonl*' } |
+        ForEach-Object { Get-Content -LiteralPath $_.FullName | ForEach-Object { $_ | ConvertFrom-Json } })
+    $first = $events | Where-Object { $_.state -ceq 'committed' -and $_.revision -eq 1 } | Select-Object -First 1
+    $last = $events | Where-Object { $_.state -ceq 'committed' -and $_.revision -eq 19 } | Select-Object -First 1
+    if ($null -eq $first -or $null -eq $last) { throw 'THROUGHPUT_SAME_PEER_HISTORY_MISSING' }
+    $active = @($events | Where-Object { $_.at -ge $first.at -and $_.at -le $last.at })
+    if (@($active | Where-Object { $_.state -ceq 'disconnected' -or $_.reason -cin @('peer-disconnected', 'peer-absent', 'compatible-session') }).Count -gt 0) {
+        throw 'THROUGHPUT_SAME_PEER_CONTINUITY_LOSS'
+    }
+    if (@($active | Where-Object { $_.state -ceq 'waiting' -and $_.reason -ceq 'peer-inactive' }).Count -ne 1 -or
+        @($active.session | Sort-Object -Unique).Count -ne 1 -or @($active.epoch | Sort-Object -Unique).Count -ne 1) {
+        throw 'THROUGHPUT_SAME_PEER_REFRESH_MISSING'
+    }
+    Write-Output 'SAME_PEER_INTERLEAVE revisions=1..19 inactivity_recovery=waiting sessions=1 epochs=1 reconnect=false'
+}
+
 function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [string]$Data, [string]$Limits, [string]$Repo, [switch]$Throughput, [switch]$Interleave) {
     . (Join-Path $Repo 'tests/carrier-b-heavy-oracles.ps1')
     if ($Interleave -and -not $Throughput) { throw 'INTERLEAVE_REQUIRES_LOCAL_THROUGHPUT' }
@@ -27,6 +44,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
         }
         if (-not $Throughput) { $readbackRows = @(@('ship_core', 1), @('ship_core', 9), @('ship_cargo:g0', 2), @('ship_cargo:g0', 10), @('ship_crew:g0', 3), @('ship_crew:g0', 11), @('ship_loadout:g0', 4), @('ship_loadout:g0', 12)) }
         if ($Interleave -and @($readbackRows | Where-Object { $_[0] -ceq 'ship_core' }).Count -lt 2) { throw 'THROUGHPUT_PARENT_INTERLEAVING_MISSING' }
+        if ($Interleave) { Assert-HeavySamePeerInterleave $Data }
         $trace = @()
         foreach ($row in $readbackRows) {
             $readback = & (Join-Path $Repo 'target/release/x4-bridge.exe') --readback --data-dir $Data --section-key $row[0] --section-revision $row[1]

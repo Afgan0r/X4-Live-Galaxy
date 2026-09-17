@@ -62,6 +62,20 @@ pub const fn disposition_name(value: ReceiverDisposition) -> &'static str {
     }
 }
 
+pub fn record_disposition(history: &mut crate::OperationalHistory, value: ReceiverDisposition) {
+    let state = if value == ReceiverDisposition::Committed {
+        "committed"
+    } else {
+        "collection"
+    };
+    let _ = history.record(state, disposition_name(value));
+}
+
+pub const fn selection_finished(value: ReceiverDisposition, heavy: bool) -> bool {
+    matches!(value, ReceiverDisposition::Committed)
+        || (heavy && matches!(value, ReceiverDisposition::TimedOutOrSuperseded))
+}
+
 pub fn digest_hex(bytes: [u8; 32]) -> String {
     bytes
         .iter()

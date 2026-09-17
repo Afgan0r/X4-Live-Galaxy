@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 synchronous-first repair approved; implementation and local verification in progress
-last_updated: "2026-09-17T05:51:17Z"
+stopped_at: Phase 05.5 Plan 10 synchronous-first repair reviewed; final local regression in progress
+last_updated: "2026-09-17T06:03:25Z"
 last_activity: 2026-09-17
-last_activity_desc: Owner approved synchronous-first collection, measurement-only callback threshold and bounded preparation wait
-state_head: 644d9e4
+last_activity_desc: Scoped synchronous-first repair implemented and independently reviewed with no open findings
+state_head: e2ffa42
 progress:
   total_phases: 14
   completed_phases: 7
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — LOCAL REPAIR IN PROGRESS
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 synchronous-first repair approved; local review/regression and separate game consent pending
+Status: Plans 01 and 09 complete locally; Plan 10 synchronous-first repair reviewed; final local regression and separate game consent pending
 Last activity: 2026-09-17 — Owner approved simpler synchronous collection experiment; no repeat X4 run or installed-package replacement
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
@@ -218,7 +218,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: Owner approved the checked revised 01 -> 09 -> 10 -> 11 chain. Plan 10 local repair replaces standalone population quotas with resource admission, incremental work and throughput-first backpressure. Scoped review closed cursor starvation, native aggregate-admission, readback-oracle and game-time/wall-time defects; final Rust/Lua/XML/actual-chain regression passed. Current candidate is `prepared-heavy-experiment`, source `e661f3640af3a05b0f2f5336face8b239d1c33b5`, manifest SHA-256 `293ca4462909052e05a4a84772c3eb34ee1856d6313f7343c5c909e1d1dbc6f4`; all 29 file digests independently verified. The earlier Plan 09 package is historical. Final synthetic interleave passed 19 revisions in 59.473/60 seconds, leaving 0.527 seconds, while the synthetic restart callback max reached 10.764 ms: whole-faction headroom and prepared 2 ms game safety remain unproven despite local prepared-profile success. All 21 runtime outcomes, numerical acceptance and Gate A/B remain pending. The 60-second first game experiment requires separate Plan 10 consent; candidate/inactivity/parent-freshness deadlines remain 30/10/30 seconds. Synchronous native calls cannot be preempted.
+- [Phase 05.5]: Owner approved the checked 01 -> 09 -> 10 -> 11 chain. The installed `e661f36` candidate failed its initial game collection; its package and local evidence are historical. The approved synchronous-first repair captures one selection in one callback, retains owned data under backpressure and treats 2 ms as measurement-only. Every heavy demand has a finite 30-second first-data window followed by unchanged 10-second inactivity. Scoped review is clean; final local regression is in progress. Corrected interleave preserves 19 exact readbacks and unfinished-family/later-member progress across replacement core; its deliberate 32-second aging waits are not throughput evidence. A rebuilt package and separate deployment/run consent are still required. All 21 runtime outcomes, numerical acceptance, SETA and Gate A/B remain pending. X4 responsiveness/headroom remain unproven; synchronous native calls cannot be preempted.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
