@@ -298,6 +298,11 @@ the ordinal and exact dependencies to current membership. Before new detail
 admission, remaining parent age is compared with the observed family duration
 plus one configured rate interval. This estimate is not a worst-case native
 duration guarantee; an unknown first family may start against a fresh parent.
+The observation cost uses receiver wall time from intent issuance to the
+matching terminal committed receipt, including collection and persistence.
+SectionStart arrives after capture and cannot measure that whole interval.
+Canonical game-time capture timestamps remain source evidence, not receiver
+duration: accelerated game time must not inflate the proactive refresh estimate.
 Stale wire captures receive the existing superseded disposition, discard only
 incomplete staging, refresh core and resume that position on the same peer.
 Permanent refusal and ambiguous commits remain terminal.
