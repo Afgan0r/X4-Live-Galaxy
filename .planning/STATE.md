@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 revised package installed after owner consent; awaiting owner-loaded paused disposable campaign
+stopped_at: Phase 05.5 Plan 10 revised normal-time run refused invalid_fact; retained evidence and source diagnosis pending
 last_updated: "2026-09-17T06:21:42Z"
 last_activity: 2026-09-17
-last_activity_desc: Owner approved revised deployment/run; X4 closed and installed extension verified 26/26
+last_activity_desc: Revised 60-second run ended; game invalid_fact/retry_exhausted and exact core readback MissingRevision
 state_head: b4d6b65
 progress:
   total_phases: 14
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — REVISED GAME RUN READY
+Phase: 05.5 (Heavy Faction Ship Conformance) — REVISED SOURCE REFUSAL
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 revised package installed after owner consent; owner-controlled normal-time run pending
-Last activity: 2026-09-17 — Revised source b4d6b65 installed while X4 closed, backup retained and installed files verified 26/26; bridge not started
+Status: Plans 01 and 09 complete locally; Plan 10 revised normal-time run refused invalid_fact before publication; specific source cause unknown
+Last activity: 2026-09-18 — Revised source b4d6b65 run stopped after bounded window; six private artifacts retained with verified locator; owner responsiveness report pending
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -252,5 +252,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-17
-Stopped at: Phase 05.5 Plan 10 revised package installed; awaiting owner-loaded paused disposable campaign
+Stopped at: Phase 05.5 Plan 10 revised run failed source admission; diagnose exact invalid_fact field/stage
 Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
