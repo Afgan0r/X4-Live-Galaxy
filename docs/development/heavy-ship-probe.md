@@ -177,7 +177,7 @@ The existing scheduler pumps feedback first and makes no source admission when
 the one-slot downstream queue is unavailable. A busy record handoff retains the
 same pending fact and resumes without repeating its getter.
 
-Build and verify locally before any owner-operated installation:
+Build and verify locally before installation of the owned experimental package:
 
 <!-- markdownlint-disable MD013 -->
 
@@ -199,12 +199,18 @@ An already-entered synchronous X4 call has unknown latency and cannot be
 interrupted by this timer. The 2-ms target detects an overrun only after return;
 the entire call can still freeze a frame. This residual risk is an owner decision,
 not a requirement to supply prior game timings before preparing the package.
-After explicit Plan 10 approval, the owner alone installs the exact bundle,
-starts a disposable Creative Custom campaign, and runs the finite normal-time
-cohort. Do not use player saves. Stop on a source/identity change, frozen or
+For the initial experiment approved on 2026-09-17, the agent installs the exact
+owned bundle while X4 is closed, preserves a verified backup, checks installed
+digests and prepares the external bridge. Other installed mods and vanilla files
+remain read-only. The owner alone starts X4, enables Live Galaxy/disables Protected
+UI and other third-party extensions, starts a disposable Creative Custom campaign
+and performs the approved normal-time actions. Do not use player saves.
+The agent starts the bridge only after the disposable campaign is ready: its
+60-second experiment window begins with the bridge run, not after menu navigation.
+Stop on a source/identity change, frozen or
 backward clock, allocation/count/work/byte refusal, feedback stall or overrun.
-The owner stops the bridge and disables the experimental extension between
-runs; if a call does not return, the owner exits the disposable game session.
+The agent stops its bridge and the owner disables the experimental extension
+between runs; if a call does not return, the owner exits the disposable session.
 Fresh producer qualification is required after load/reload or restart.
 
 Record normal-time and separately approved SETA samples: package/profile/run

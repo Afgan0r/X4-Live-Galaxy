@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: paused
-stopped_at: Phase 05.5 Plan 10 local throughput repair verified; initial game experiment approval pending
-last_updated: "2026-09-17T04:07:00Z"
+stopped_at: Phase 05.5 Plan 10 initial experiment approved and package installed; waiting for disposable stand
+last_updated: "2026-09-17T05:16:42Z"
 last_activity: 2026-09-17
-last_activity_desc: Phase 05.5 Plan 10 local repair reviewed, regression passed and experiment package rebuilt; no game run
-state_head: e661f36
+last_activity_desc: Owner approved initial experiment; agent installed verified package with backup and prepared bridge; capture not started
+state_head: a7921e1
 progress:
   total_phases: 14
   completed_phases: 7
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PAUSED AT OWNER GAME CHECKPOINT
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 precheckpoint repair is verified; initial game experiment requires explicit owner consent
-Last activity: 2026-09-17 — Local repair review converged, final regression passed and prepared-heavy-experiment rebuilt; no game run
+Status: Plans 01 and 09 complete locally; Plan 10 initial experiment approved; installed package verified; disposable campaign/capture pending
+Last activity: 2026-09-17 — Agent installed exact experiment package, verified 26 files and old-mod backup; bridge prepared but not started
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -252,5 +252,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-17
-Stopped at: Phase 05.5 Plan 10 initial game experiment consent after verified local repair
+Stopped at: Phase 05.5 Plan 10 disposable stand preparation after initial risk consent
 Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
