@@ -1,4 +1,5 @@
 function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [string]$Data, [string]$Limits, [string]$Repo, [switch]$Throughput, [switch]$Interleave) {
+    . (Join-Path $Repo 'tests/carrier-b-heavy-oracles.ps1')
     if ($Interleave -and -not $Throughput) { throw 'INTERLEAVE_REQUIRES_LOCAL_THROUGHPUT' }
     $bridge = $null; $producer = $null
     $result = Join-Path $Run 'heavy-result.txt'
@@ -26,7 +27,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
         }
         if (-not $Throughput) { $readbackRows = @(@('ship_core', 1), @('ship_core', 9), @('ship_cargo:g0', 2), @('ship_cargo:g0', 10), @('ship_crew:g0', 3), @('ship_crew:g0', 11), @('ship_loadout:g0', 4), @('ship_loadout:g0', 12)) }
         if ($Interleave -and @($readbackRows | Where-Object { $_[0] -ceq 'ship_core' }).Count -lt 2) { throw 'THROUGHPUT_PARENT_INTERLEAVING_MISSING' }
-        $currentCore = $null
+        $trace = @()
         foreach ($row in $readbackRows) {
             $readback = & (Join-Path $Repo 'target/release/x4-bridge.exe') --readback --data-dir $Data --section-key $row[0] --section-revision $row[1]
             if ($LASTEXITCODE -ne 0) { throw 'HEAVY_CONFIGURED_INDEPENDENT_READBACK_FAILED' }
@@ -34,12 +35,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
             $count = if ($Throughput -and $row[0] -ceq 'ship_core') { 129 } else { 1 }
             if ($value.section_revision -ne $row[1] -or @($value.records).Count -ne $count) { throw 'HEAVY_CONFIGURED_READBACK_MISMATCH' }
             $content = $value.records[0].content
-            if ($Throughput -and $row[0] -ceq 'ship_core') { $currentCore = $value }
-            elseif ($Throughput) {
-                if ($content -notmatch "core_revision=$($currentCore.section_revision)(`n|$)" -or $content -notmatch "member_revision=$($currentCore.section_revision)(`n|$)") { throw 'THROUGHPUT_STALE_DEPENDENCY' }
-                $ordinal = [int]($row[0] -split ':g')[1]
-                if ($value.records[0].entity_id -cne $currentCore.records[$ordinal].entity_id) { throw 'THROUGHPUT_FAIR_MEMBER_REBINDING' }
-            }
+            $trace += [pscustomobject]@{ key = $row[0]; value = $value }
             if ($row[0] -like 'ship_crew:*' -and $content -notmatch "capacity_people=$([int]$row[1] + 12)(`n|$)") { throw 'HEAVY_CONFIGURED_CREW_VALUE_MISMATCH' }
             if ($row[0] -like 'ship_loadout:*' -and ($content -notmatch "missile=missile_ware\|missile_macro\|-$($row[1])(`n|$)" -or $content -notmatch 'units_selector=false')) { throw 'HEAVY_CONFIGURED_LOADOUT_VALUE_MISMATCH' }
             if ($Throughput -and $row[0] -like 'ship_cargo:*' -and @($content -split "`n" | Where-Object { $_ -like 'ware=*' }).Count -ne 80) { throw 'THROUGHPUT_NESTED_CARGO_LOSS' }
@@ -47,6 +43,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
             if ($Throughput -and $row[0] -like 'ship_loadout:*' -and @($content -split "`n" | Where-Object { $_ -like 'software=*' }).Count -ne 80) { throw 'THROUGHPUT_NESTED_LOADOUT_LOSS' }
             if ($Throughput) { Write-Output "READBACK section=$($row[0]) revision=$($row[1]) records=$count content_bytes=$([Text.Encoding]::UTF8.GetByteCount(($value.records.content -join "`n")))" }
         }
+        if ($Throughput) { Assert-HeavyCapturedTrace $trace $(if ($Interleave) { 1..19 } else { 1..12 }) }
         Write-Output 'PASS heavy-ship-recovery actual_lua_dll_pipe_production=true earlier_current_reopen=true runtime_acceptance=pending'
     } finally { Stop-Owned $producer; Stop-Owned $bridge }
     if (-not $Throughput) { foreach ($family in @('core', 'cargo', 'crew', 'loadout')) { Invoke-HeavyInterruptedRestart $Run $HostExecutable $Limits $Repo $family } }
