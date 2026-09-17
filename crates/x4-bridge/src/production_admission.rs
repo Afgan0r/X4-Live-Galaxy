@@ -62,15 +62,20 @@ pub fn admit(
     let (message_id, section_key, section_revision, scope) =
         identity(&decoded, carrier).map_err(|()| AdmitError::Identity)?;
     history.bind_message(message_id.as_str(), &section_key, section_revision);
-    let result = session
-        .submit_received(
-            carrier.epoch,
-            message_id.clone(),
-            bytes.to_owned(),
-            bytes.len(),
-            crate::production_runtime::now(),
-        )
-        .map_err(AdmitError::Production)?;
+    let result = session.submit_received(
+        carrier.epoch,
+        message_id.clone(),
+        bytes.to_owned(),
+        bytes.len(),
+        crate::production_runtime::now(),
+    );
+    let result = match result {
+        Err(crate::ProductionError::StaleShipParent) => {
+            session.invalidate_source_scope(&scope);
+            LifecycleResult::Disposition(ReceiverDisposition::TimedOutOrSuperseded)
+        }
+        value => value.map_err(AdmitError::Production)?,
+    };
     let LifecycleResult::Disposition(disposition) = result else {
         return Err(AdmitError::UnexpectedResult);
     };
@@ -104,6 +109,7 @@ const fn production_reason(error: crate::ProductionError) -> &'static str {
         crate::ProductionError::InvalidLimits => "production-invalid-limits",
         crate::ProductionError::RevisionExhausted => "production-revision-exhausted",
         crate::ProductionError::Storage => "production-storage",
+        crate::ProductionError::StaleShipParent => "stale-ship-parent",
         crate::ProductionError::Lifecycle(error) => lifecycle_reason(error),
     }
 }

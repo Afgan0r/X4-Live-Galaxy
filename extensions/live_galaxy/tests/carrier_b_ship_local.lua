@@ -155,6 +155,26 @@ if mode == "heavy-ship-detail" then
             mutate(value)
             assert(carrier:push_record(value) == -20, "strict detail ABI must reject malformed nested input")
         end
+        if family == "ship_crew" then
+            local value = copy(observation.pending)
+            value.profile, value.source_scope = family, "x4:faction:argon:ships"
+            value.identity, value.owner = observation.group.members[1], "argon"
+            value.core_revision, value.member_revision, value.policy_version = "1", "1", 2
+            value.capture_start_millis, value.capture_end_millis = tostring(20 + revision), tostring(30 + revision)
+            value.source_evidence = "x4-9.00-steam-23660954-ship-detail-source-v1"
+            local original = value.roles[1]
+            value.roles = {}
+            for i = 1, 16 do
+                local role = copy(original)
+                role.id, role.reported_numtiers, role.tiers = string.format("role%03d", i), 16, {}
+                for tier = 1, 16 do
+                    role.tiers[tier] = { name = string.rep("x", 128), skill_lower_threshold = tier, amount_people = 1 }
+                end
+                value.roles[i] = role
+            end
+            assert(carrier:push_record(value) == -20,
+                "shared native aggregate admission must refuse before copying and canonical serialization")
+        end
     end
     for cycle = 1, 2 do
         for group_index = 0, 1 do

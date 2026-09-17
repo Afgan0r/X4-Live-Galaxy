@@ -71,6 +71,9 @@ pub unsafe extern "C" fn fail_section(state: *mut c_void) -> c_int {
     }
     let result = with_producer(handle, |producer| {
         producer.fail_section();
+        if reason == b"stale_parent" {
+            producer.allow_core_refresh();
+        }
         Ok(())
     });
     unsafe { push_code(api, state, result.map_or_else(error_code, |()| 0)) }

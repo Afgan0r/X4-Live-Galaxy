@@ -58,6 +58,33 @@ describe("source-faithful resumable cargo", function()
         assert.equals(17, records[1].wares[1].amount_items)
         assert.equals(170, records[1].storage[1].occupied_cubic_metres)
     end)
+    it("normalizes eighty owned wares across pulses and resumes a busy handoff", function()
+        local raw, pushed, busy, pulses = {}, nil, true, 0
+        for i = 1, 80 do raw["ware" .. string.format("%03d", i)] = i end
+        local collector = assert(module.new({ max_inner = 4096, max_allocation_bytes = 4096,
+            source_scope = "x4:faction:argon:ships", group = { key = "ship_cargo:g0",
+                owner = "argon", core_revision = "7", members = { "1" } }, ship_api = {
+                cargo_wares = function() return raw end, cargo_storage_count = function() return 0 end,
+                cargo_storage_size = function() return 24 end, cargo_storage_allocate = function() return {} end,
+                cargo_storage_fill = function() return {} end } }, {
+                begin_evidence = function() return { capture_start_millis = "1" } end,
+                finish_evidence = function() return { capture_end_millis = "2" } end }))
+        local carrier = { begin_section = function() return 0 end, finish_section = function() return 0 end,
+            fail_section = function() error("valid eighty-row data must not fail") end,
+            push_record = function(_, row) if busy then busy = false; return -21 end; pushed = row; return 0 end }
+        local result
+        for _ = 1, 200 do
+            local before = collector.pending and #collector.pending.wares or 0
+            result = collector:tick({}, carrier, { selection = "ship_cargo:g0" })
+            if collector.pending then assert.is_true(#collector.pending.wares - before <= 32, "owned copy must yield") end
+            pulses = pulses + 1
+            if result.disposition == "sampled" then break end
+            assert.is_true(result.disposition == "collecting" or result.disposition == "producer_busy")
+        end
+        assert.equals("sampled", result.disposition); assert.is_true(pulses > 10)
+        assert.equals(80, #pushed.wares)
+        for i = 1, 80 do assert.equals(i, pushed.wares[i].amount_items) end
+    end)
     it("rejects overflow before allocation or fill", function()
         for _, options in ipairs({ { count = 3 }, { size = 49 },
             { wares = { ore = 9007199254740992 } }, { wares = { a = 1, b = 2, c = 3 } } }) do

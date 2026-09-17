@@ -6,6 +6,21 @@ pub struct ProducerAdmissionPolicy {
     pub max_age_millis: u64,
 }
 impl Producer {
+    pub(crate) fn intent_state_matches(&self, key: &str) -> bool {
+        use crate::producer::Readiness;
+        if self.readiness == Readiness::RefreshCore {
+            return key == "ship_core"
+                && matches!(
+                    self.state,
+                    crate::ProducerState::Ready | crate::ProducerState::PausedAfterFailure
+                );
+        }
+        matches!(self.readiness, Readiness::Handshake | Readiness::Intent)
+            && self.state == crate::ProducerState::Ready
+    }
+    pub(crate) fn allow_core_refresh(&mut self) {
+        self.readiness = crate::producer::Readiness::RefreshCore;
+    }
     pub(crate) const fn intent_limits_match(
         &self,
         value: &observation_ingest::CollectionIntentBody,

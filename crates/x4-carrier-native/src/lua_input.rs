@@ -111,6 +111,21 @@ pub unsafe fn begin(
 }
 
 pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
+    let profile = unsafe { field_string(api, state, 2, "profile", 32) };
+    if matches!(
+        profile.as_deref(),
+        Some("ship_cargo" | "ship_crew" | "ship_loadout")
+    ) {
+        let bytes = crate::abi::PRODUCER
+            .lock()
+            .ok()?
+            .as_ref()?
+            .limits
+            .data_message_bytes;
+        if !unsafe { crate::lua_detail_budget::admit(api, state, bytes) } {
+            return None;
+        }
+    }
     if unsafe { field_string(api, state, 2, "profile", 32) }.as_deref() == Some("ship_loadout") {
         let limit = crate::abi::PRODUCER.lock().ok()?.as_ref()?.inner_limit();
         return unsafe { crate::ship_loadout_input::loadout(api, state, limit) }

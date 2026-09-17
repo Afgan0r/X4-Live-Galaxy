@@ -87,7 +87,10 @@ function selection.advance(self, context, carrier, status)
     end
     if not self.collector or self.key ~= status.selection or self.collector.stage == "done" then
         local ok, err = start(self, context, carrier, status)
-        if not ok then return discard(self, carrier, err) end
+        if not ok then
+            if err == "stale_parent" then carrier:fail_section("stale_parent") end
+            return discard(self, carrier, err)
+        end
     end
     local ok, err = self.budget:before(status)
     if not ok then return discard(self, carrier, err) end

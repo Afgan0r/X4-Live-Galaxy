@@ -30,9 +30,14 @@ function scheduler.tick(context, carrier, observation)
 
     local progress, progress_status = call(carrier, "progress", 1)
     if progress == nil then return finish(progress_status, nil) end
-    if terminal[progress] then discard(observation, carrier, terminal[progress]); return finish(terminal[progress], progress) end
     local control, control_error = call(carrier, "poll_control")
     if control == nil then return finish(control_error, nil) end
+    if terminal[progress] then
+        discard(observation, carrier, terminal[progress])
+        -- A replacement core intent may recover a paused heavy producer.
+        -- Poll control before returning so that pause cannot starve recovery.
+        return finish(terminal[progress], progress)
+    end
     if type(observation.feedback) == "function" then
         local ok, result = pcall(observation.feedback, observation, context, carrier, progress_status, control)
         if not ok then discard(observation, carrier, "source_failure"); return finish("source_failure", nil) end

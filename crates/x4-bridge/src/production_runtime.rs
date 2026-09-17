@@ -82,7 +82,17 @@ fn receive_loop(
     let mut last_progress = Instant::now();
     let mut active_scope = None;
     let mut selected_key = session.collection_key().to_owned();
-    while let Ok(bytes) = await_progress(peer, limits, history, session, last_progress) {
+    loop {
+        let bytes = match await_progress(peer, limits, history, session, last_progress) {
+            Ok(bytes) => bytes,
+            Err(())
+                if recover_idle(peer, identity, limits, session, schedule, &mut selected_key) =>
+            {
+                last_progress = Instant::now();
+                continue;
+            }
+            Err(()) => break,
+        };
         last_progress = Instant::now();
         if let Some(schedule) = schedule {
             schedule.received(bytes.len());
@@ -108,7 +118,9 @@ fn receive_loop(
             "collection"
         };
         let _ = history.record(state, disposition_name(disposition));
-        if disposition != ReceiverDisposition::Committed {
+        if disposition != ReceiverDisposition::Committed
+            && !(disposition == ReceiverDisposition::TimedOutOrSuperseded && schedule.is_some())
+        {
             continue;
         }
         if session.maintain_heavy_history().is_err() {
@@ -127,6 +139,23 @@ fn receive_loop(
     let _ = history.record("waiting", "peer-disconnected");
     active_scope
 }
+fn recover_idle(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    session: &ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    key: &mut String,
+) -> bool {
+    if key == "ship_core" || !session.stale_ship_parent(now()) {
+        return false;
+    }
+    let Some(active) = schedule else {
+        return false;
+    };
+    active.complete();
+    next(peer, identity, limits, session, schedule, key).is_some()
+}
 fn next(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -143,7 +172,7 @@ fn next(
         });
     wait_interval(peer, limits, interval).ok()?;
     if let Some(schedule) = schedule {
-        *key = session.next_ship_key(key).ok()?;
+        *key = session.next_ship_key(key, now()).ok()?;
         if !schedule.admit(key) {
             return None;
         }

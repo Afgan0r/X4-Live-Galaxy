@@ -18,6 +18,7 @@ pub(super) enum Readiness {
     Handshake,
     Intent,
     Ready,
+    RefreshCore,
 }
 
 pub struct Producer {

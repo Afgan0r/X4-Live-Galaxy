@@ -17,6 +17,8 @@ mod failure_paths;
 mod heavy_policy;
 #[path = "producer_contract/ship_certificate.rs"]
 mod ship_certificate;
+#[path = "producer_contract/ship_refresh.rs"]
+mod ship_refresh;
 #[path = "producer_contract/ship_requalification.rs"]
 mod ship_requalification;
 #[path = "producer_contract/ship_stream.rs"]

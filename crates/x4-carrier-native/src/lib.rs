@@ -11,6 +11,7 @@ mod abi_windows_security;
 mod abi_windows_sid;
 mod handle;
 mod lua_detail_array;
+mod lua_detail_budget;
 mod lua_generation;
 mod lua_input;
 mod lua_open;

@@ -7,7 +7,7 @@ use observation_persistence::{ObservationRepository, SqliteObservationRepository
 use x4_bridge::{HeavyShipLimits, ProductionObservationSession};
 
 #[test]
-fn configured_receiver_rejects_stale_backward_oversize_and_wrong_group_without_publication() {
+fn configured_receiver_rejects_stale_backward_duplicate_and_wrong_group_without_publication() {
     for case in 0..4 {
         run_case(case);
     }
@@ -23,11 +23,10 @@ fn run_case(case: usize) {
     )
     .expect("session");
     receiver.select_ship_core("argon").expect("selection");
-    let mut limits = HeavyShipLimits::parse(include_str!(
+    let limits = HeavyShipLimits::parse(include_str!(
         "../../../../config/heavy-ship-experiment.json"
     ))
     .expect("profile");
-    limits.max_inner_records = 1;
     receiver.configure_heavy(limits).expect("configured");
     let messages = ship_support::messages(1, "argon");
     publish_core(&mut receiver, &messages);
@@ -55,11 +54,11 @@ fn run_case(case: usize) {
             &key,
             CONTENT,
             "ware=ore|17",
-            "ware=ore|17\nware=silicon|1",
+            "ware=ore|17\nware=ore|1",
         );
         assert!(
             submit(&mut receiver, bytes, "detail:batch", 5).is_err(),
-            "configured inner limit is independent of DLL"
+            "receiver rejects duplicate nested ware identities independently of DLL"
         );
     } else {
         assert!(result.is_err(), "configured refusal {case}");

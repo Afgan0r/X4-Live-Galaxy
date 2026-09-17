@@ -112,7 +112,7 @@ pub fn validate_dependency<R: ObservationRepository>(
     if freshness.is_some_and(|(now, max_age)| {
         now < current.receipt().accepted_at || now - current.receipt().accepted_at > max_age
     }) {
-        return Err(rejected());
+        return Err(ProductionError::StaleShipParent);
     }
     let parent = current.revision();
     let expected_group = group(parent, key.as_str(), group_members)?;

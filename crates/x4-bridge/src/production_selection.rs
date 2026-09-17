@@ -39,6 +39,21 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub(crate) const fn heavy_limits(&self) -> Option<&crate::HeavyShipLimits> {
         self.heavy_limits.as_ref()
     }
+    pub(crate) fn stale_ship_parent(&self, now: u64) -> bool {
+        let Some(limits) = self.heavy_limits.as_ref() else {
+            return false;
+        };
+        let Some(key) = SectionKey::new("ship_core") else {
+            return false;
+        };
+        self.lifecycle
+            .current_revision(&key)
+            .ok()
+            .flatten()
+            .is_some_and(|parent| {
+                now.saturating_sub(parent.receipt().accepted_at) >= limits.freshness_millis as u64
+            })
+    }
     pub fn heavy_revision_floor(&self) -> Result<u64, ProductionError> {
         if self.heavy_limits.is_none() {
             return self.next_revision(
@@ -66,7 +81,11 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 Ok(floor.max(next))
             })
     }
-    pub(crate) fn next_ship_key(&self, previous: &str) -> Result<String, ProductionError> {
+    pub(crate) fn next_ship_key(
+        &self,
+        previous: &str,
+        now: u64,
+    ) -> Result<String, ProductionError> {
         if self.heavy_limits.is_none() {
             return Ok(self.collection_key().into());
         }
@@ -82,7 +101,39 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .iter()
             .map(|record| record.entity_id.as_str().to_owned())
             .collect::<Vec<_>>();
-        crate::production_ship_cursor::next_member(&members, previous, None)
+        let snapshot = self
+            .lifecycle
+            .current_snapshot()
+            .map_err(|_| ProductionError::Storage)?;
+        let details = snapshot
+            .iter()
+            .filter(|value| {
+                crate::receiver_ship_detail::is_key(value.revision().section_key.as_str())
+                    && value.revision().source_scope == parent.revision().source_scope
+            })
+            .collect::<Vec<_>>();
+        let last = details
+            .iter()
+            .max_by_key(|value| value.receipt().revision.get());
+        let cursor = last.and_then(|value| durable_cursor(value));
+        let next = crate::production_ship_cursor::next_member(&members, previous, cursor)?;
+        let family = next.split_once(":g").map_or("", |value| value.0);
+        let observed = family_duration(&details, family);
+        let limits = self
+            .heavy_limits
+            .as_ref()
+            .ok_or(ProductionError::InvalidLimits)?;
+        let margin = limits.rate_interval_millis as u64;
+        if crate::production_ship_cursor::refresh_required(
+            now,
+            parent.receipt().accepted_at,
+            limits.freshness_millis as u64,
+            observed,
+            margin,
+        ) {
+            return Ok("ship_core".into());
+        }
+        Ok(next)
     }
     pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
         let current = self
@@ -115,4 +166,31 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             "carrier_b_realtime_sample"
         }
     }
+}
+
+fn capture_duration(content: &str) -> Option<u64> {
+    let field = |key: &str| {
+        content
+            .lines()
+            .find_map(|line| line.strip_prefix(key))?
+            .parse::<u64>()
+            .ok()
+    };
+    field("capture_end=")?.checked_sub(field("capture_start=")?)
+}
+
+fn durable_cursor(value: &observation_persistence::CurrentRevision) -> Option<(&str, &str)> {
+    let record = value.revision().records.first()?;
+    let (family, _) = value.revision().section_key.as_str().split_once(":g")?;
+    Some((record.entity_id.as_str(), family))
+}
+
+fn family_duration(details: &[&observation_persistence::CurrentRevision], family: &str) -> u64 {
+    details
+        .iter()
+        .filter(|value| value.revision().section_key.as_str().starts_with(family))
+        .filter_map(|value| value.revision().records.first())
+        .filter_map(|record| capture_duration(&record.content))
+        .max()
+        .unwrap_or(0)
 }

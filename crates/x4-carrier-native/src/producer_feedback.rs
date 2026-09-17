@@ -35,8 +35,7 @@ impl Producer {
                 Ok(ProducerOutcome::Accepted)
             }
             ControlBody::CollectionIntent(value)
-                if matches!(self.readiness, Readiness::Handshake | Readiness::Intent)
-                    && self.state == ProducerState::Ready
+                if self.intent_state_matches(&value.section_key)
                     && value.next_revision > 0
                     && value.max_records >= self.limits.max_records
                     && value.max_raw_bytes >= self.limits.max_raw_bytes
@@ -46,6 +45,7 @@ impl Producer {
                 let profile = ProducerProfile::from_section_key(&value.section_key)
                     .ok_or_else(|| self.incompatible())?;
                 self.profile = profile;
+                self.state = ProducerState::Ready;
                 self.selected_key = value.section_key;
                 self.revision = self.revision.max(value.next_revision);
                 self.readiness = Readiness::Intent;
@@ -96,6 +96,14 @@ impl Producer {
             return Err(ProducerError::InvalidInput);
         }
         let feedback = disposition(&value.disposition)?;
+        if feedback == ProducerFeedback::TimedOutOrSuperseded
+            && self.profile != ProducerProfile::Clock
+        {
+            self.discard_incomplete();
+            self.state = ProducerState::Ready;
+            self.readiness = Readiness::RefreshCore;
+            return Ok(ProducerOutcome::PermanentlyRejected);
+        }
         if feedback == ProducerFeedback::CapacityUnavailable {
             return Ok(self.retry(now));
         }

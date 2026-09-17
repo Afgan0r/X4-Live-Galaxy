@@ -25,6 +25,7 @@ pub enum ProductionError {
     InvalidLimits,
     RevisionExhausted,
     Storage,
+    StaleShipParent,
     Lifecycle(LifecycleError),
 }
 
