@@ -80,7 +80,12 @@ duplicating the logging policy owned by the code-conventions skill.
 
 ## TEST-07: Evidence and Regression
 
-State what was executed and what it proves. Separate locally verified behavior,
+State what was executed and what it proves. In performance evidence, distinguish
+measured CPU/callback duration from end-to-end wall time and simulated callback
+cadence. A large number of bounded steps multiplied by an assumed interval
+demonstrates scheduling delay, not continuous computation cost or an X4 freeze.
+Do not infer callback thread topology or frame impact from synchronous execution
+alone. Separate locally verified behavior,
 runtime evidence still pending, and behavior observed in X4. A regression test
 must fail for the original defect, not merely execute the edited line.
 

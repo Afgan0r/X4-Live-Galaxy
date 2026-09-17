@@ -140,8 +140,8 @@ prefix. This prepared profile does not establish Gate A/B acceptance.
 | Per allocation | 4 MiB | Count × actual target `ffi.sizeof` must fit before allocation |
 | Aggregate allocation | 64 MiB | Cumulative across nested allocations in one capture |
 | Native calls / steps | 64 MiB work units each | Finite emergency work envelope; the 30-second age guard remains independent |
-| Heavy permits | 1 per callback | Getter or allocation, with control pumping first |
-| Callback target | 2 ms | Measured after synchronous return; an overrun stops capture |
+| Heavy permits | Historical: 1 per callback | Synchronous-first repair removes this experimental multi-call rejection; control pumping remains first |
+| Callback target | 2 ms | Owner-approved next experiment: measurement-only; overrun does not cancel successful capture |
 | Rate interval | 50 ms | Existing Rust scheduler; transport-byte work is charged independently |
 | Message / control | 1 MiB / 512 bytes | Complete semantic records; the local ABI delivered 9.6–12 KiB detail content |
 | Candidate raw / work | 64 MiB / 64 MiB work units | Finite emergency envelope, not a measured safe X4 operating threshold |
@@ -167,7 +167,8 @@ message bytes. Each accepted row consumes at least one byte; these conservative
 derived guards therefore do not add an independent population restriction.
 The actual byte/work safeguards remain enforced by each consumer.
 
-Owned identities, cargo copies, storage validation, crew role/tier validation
+The historical `e661f36` package processes owned identities, cargo copies,
+storage validation, crew role/tier validation
 and merge ordering advance in at most 32 processing operations per callback.
 Membership transfers ownership without another full sort/copy. Native count/fill
 and immediate copying of borrowed strings are indivisible: neither this helper
@@ -176,6 +177,32 @@ and encode/progress remain measured callback work, not preemptible operations.
 The existing scheduler pumps feedback first and makes no source admission when
 the one-slot downstream queue is unavailable. A busy record handoff retains the
 same pending fact and resumes without repeating its getter.
+
+### Synchronous-first follow-up: approved, local implementation pending
+
+The initial owner-approved normal-time game run initialized successfully but
+refused `ship_core` revision 1 with `collection_overflow`: four native calls,
+7,736 allocated bytes, 570 steps and 29,978 ms last-successful-step duration.
+The bridge reconnected after repeated 10-second `peer-inactive` deadlines;
+independent revision-1 database readback returned `MissingRevision`. The owner
+confirmed immediate unpause and no visible freezes. No exact game population,
+continuous-sort CPU duration or callback thread topology was established.
+
+The owner then selected synchronous collection of one requested selection in
+one callback without artificial operation-count slices. Keep exact owned data,
+deterministic membership and parent binding; retain captured data under delivery
+backpressure without repeating getters or waiting for ACKs in Lua. Make 2 ms an
+experimental timing observation rather than a cancellation guard. Preserve
+byte/allocation/work safeguards and all numeric deadlines. The bridge's first
+data wait is 30 seconds from each collection demand; subsequent data progress
+uses the existing 10-second inactivity bound. No heartbeat/new protocol.
+
+Validate and review locally, regenerate the package and obtain separate consent
+before deployment or another X4 run. The installed `e661f36` package is unchanged;
+the earlier risk consent does not approve the revised synchronous run. Plan 10,
+Gate A/B, SETA and numerical acceptance remain pending. Retained initial evidence:
+logical ID `055-normal-e661f36-20260917-051641`, locator
+`%LOCALAPPDATA%/LiveGalaxy/runs/055-normal-e661f36-20260917-051641/locator.json`.
 
 Build and verify locally before installation of the owned experimental package:
 

@@ -83,6 +83,22 @@ renumbering the ledger.
 - **Supersedes:** complete scans every `N` seconds and loops that run until a
   sampled clock changes.
 
+### Phase 05.5 synchronous-first experimental exception
+
+After the first heavy experiment failed during preparation, the owner approved
+collecting one requested selection synchronously in one Lua callback before
+adding resumable slicing. Fixed 32-operation yields stretched a synthetic
+950-ID ordering into 594 callbacks; those waits are not measured CPU cost or
+proof that continuous ordering causes a freeze. The prepared 2 ms value becomes
+measurement-only for this experiment, with observed elapsed/overrun diagnostics.
+This scoped exception does not prove X4 callback thread topology or game safety.
+Keep X4 getters and immediate pointer copying on the established Lua seam,
+preserve emergency resource/age refusal and lossless transport backpressure,
+and never wait for receiver acknowledgments inside Lua. Reintroduce slicing
+only if measured problems justify it. The receiver waits up to the existing
+30-second collection deadline from demand for first data, then applies the
+existing 10-second inactivity bound; no heartbeat or protocol extension.
+
 ## ADR-LG-004: Initial scheduler callback seam
 
 - **Status:** evidence-gated

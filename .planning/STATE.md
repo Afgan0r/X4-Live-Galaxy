@@ -2,12 +2,12 @@
 gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
-status: paused
-stopped_at: Phase 05.5 Plan 10 initial X4 collection refused; evidence retained; diagnosis pending
-last_updated: "2026-09-17T05:33:00Z"
+status: executing
+stopped_at: Phase 05.5 Plan 10 synchronous-first repair approved; implementation and local verification in progress
+last_updated: "2026-09-17T05:51:17Z"
 last_activity: 2026-09-17
-last_activity_desc: Initial X4 ship_core collection_overflow; exact revision missing; bridge stopped and six private artifacts retained
-state_head: 35dd7d5
+last_activity_desc: Owner approved synchronous-first collection, measurement-only callback threshold and bounded preparation wait
+state_head: 644d9e4
 progress:
   total_phases: 14
   completed_phases: 7
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — PAUSED AT OWNER GAME CHECKPOINT
+Phase: 05.5 (Heavy Faction Ship Conformance) — LOCAL REPAIR IN PROGRESS
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 initial game collection refused; root cause and runtime acceptance pending
-Last activity: 2026-09-17 — Initial normal-time capture retained with verified locator; no ship_core revision 1 publication; no repeat run
+Status: Plans 01 and 09 complete locally; Plan 10 synchronous-first repair approved; local review/regression and separate game consent pending
+Last activity: 2026-09-17 — Owner approved simpler synchronous collection experiment; no repeat X4 run or installed-package replacement
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -252,5 +252,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-17
-Stopped at: Phase 05.5 Plan 10 disposable stand preparation after initial risk consent
+Stopped at: Phase 05.5 Plan 10 synchronous-first local repair after explicit owner decisions
 Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
