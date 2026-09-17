@@ -2,6 +2,10 @@ use super::{ProductionError, ProductionObservationSession};
 use observation_domain::SectionKey;
 use observation_persistence::ObservationRepository;
 
+#[cfg(test)]
+#[path = "production_ship_timing_tests.rs"]
+mod timing_tests;
+
 impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub(super) fn validate_detail_dependency(
         &self,
