@@ -324,6 +324,13 @@ parent identity and dependencies. This covers only the first six members,
 not all 129 ships' details. The remaining 0.638s of the unchanged 60s window
 is approximately 1.1%: there is essentially no admission-window headroom.
 
+The actual-chain oracle requires its capture/readback revision sequence to equal
+the committed sequence exactly. After replacement core it checks the surviving
+member's unfinished family (or the successor if absent/completed), then requires
+progress to a later member. Executable mutations reject reset-to-g0/family,
+missing capture rows and later-member starvation; ordinal binding alone is not
+treated as cursor continuity evidence.
+
 Its 3836 callback samples had p95/max 0.159/2.705ms; the maximum exceeds the
 prepared 2ms guard. Native push p95/max was 0.133/0.263ms over 275 records;
 progress p95/max was 0.058/1.117ms over 6977 calls. Seal-to-commit p95/max was
