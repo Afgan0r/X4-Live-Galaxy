@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 local repair verified and packaged; separate revised deployment/run consent pending
+stopped_at: Phase 05.5 Plan 10 revised package installed after owner consent; awaiting owner-loaded paused disposable campaign
 last_updated: "2026-09-17T06:21:42Z"
 last_activity: 2026-09-17
-last_activity_desc: Final local regression and package self-test/build/hash verification passed; installed game extension unchanged
+last_activity_desc: Owner approved revised deployment/run; X4 closed and installed extension verified 26/26
 state_head: b4d6b65
 progress:
   total_phases: 14
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — REVISED GAME CONSENT PENDING
+Phase: 05.5 (Heavy Faction Ship Conformance) — REVISED GAME RUN READY
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 synchronous-first repair reviewed, locally verified and packaged; separate game consent pending
-Last activity: 2026-09-17 — Owner approved simpler synchronous collection experiment; no repeat X4 run or installed-package replacement
+Status: Plans 01 and 09 complete locally; Plan 10 revised package installed after owner consent; owner-controlled normal-time run pending
+Last activity: 2026-09-17 — Revised source b4d6b65 installed while X4 closed, backup retained and installed files verified 26/26; bridge not started
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -218,7 +218,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: Owner approved the checked 01 -> 09 -> 10 -> 11 chain. Installed `e661f36` failed its initial game collection and is unchanged. Revised synchronous-first source `b4d6b65` captures one selection in one callback and retains owned data under backpressure; 2 ms is measurement-only. Every heavy demand has a finite 30-second first-data window then unchanged 10-second inactivity. Scoped review and final local regression passed. Revised package manifest SHA-256 `832e3de04eba392215abf9295b6b8254b57c85123385c812636608106b344f3d` passed independent 29/29 digest checks. Interleave proves 19 exact readbacks and same-peer unfinished-family/later-member progress; its deliberate aging waits are not throughput evidence. Separate revised deployment/run consent remains required. All 21 runtime outcomes, numerical acceptance, SETA, Gate A/B and Plan 10 completion remain pending. X4 responsiveness/headroom remain unproven; synchronous native calls cannot be preempted.
+- [Phase 05.5]: Owner approved the checked 01 -> 09 -> 10 -> 11 chain and revised deployment/run. Revised source `b4d6b65` is installed, verified 26/26 while X4 closed; old `e661f36` rollback copy retained. Manifest SHA-256 `832e3de04eba392215abf9295b6b8254b57c85123385c812636608106b344f3d` passed 29/29 package checks. Scoped review and final local regression passed, including 19 exact interleave readbacks and same-peer unfinished-family/later-member progress. Deliberate aging waits are not throughput evidence. Bridge not started; owner-loaded paused disposable campaign is next. All 21 runtime outcomes, numerical acceptance, SETA, Gate A/B and Plan 10 completion remain pending. X4 responsiveness/headroom remain unproven; synchronous native calls cannot be preempted.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -252,5 +252,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-17
-Stopped at: Phase 05.5 Plan 10 revised package ready; awaiting separate deployment/run consent
+Stopped at: Phase 05.5 Plan 10 revised package installed; awaiting owner-loaded paused disposable campaign
 Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md

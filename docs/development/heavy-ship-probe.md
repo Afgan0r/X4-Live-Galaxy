@@ -220,9 +220,12 @@ session/epoch without reconnect; callback maximum 1.7134 ms excludes waits.
 The corrected nonterminal diagnostic is `waiting/peer-inactive`, not a false
 disconnect. Deliberate aging/recovery elapsed time is not throughput headroom.
 
-Validate and review locally, regenerate the package and obtain separate consent
-before deployment or another X4 run. The installed `e661f36` package is unchanged;
-the earlier risk consent does not approve the revised synchronous run. Plan 10,
+Local validation/review and package regeneration passed. On 2026-09-17 the owner
+separately approved revised installation and one 60-second normal-time run.
+With X4 closed, revised source `b4d6b65` was installed and all 26 extension file
+digests verified; the previous package was retained for rollback. The agent has
+not started the bridge or game; the owner must load the disposable campaign
+before the admission window begins. Plan 10,
 Gate A/B, SETA and numerical acceptance remain pending. Retained initial evidence:
 logical ID `055-normal-e661f36-20260917-051641`, locator
 `%LOCALAPPDATA%/LiveGalaxy/runs/055-normal-e661f36-20260917-051641/locator.json`.
