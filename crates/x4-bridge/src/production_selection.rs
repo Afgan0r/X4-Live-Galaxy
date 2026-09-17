@@ -7,6 +7,24 @@ use observation_persistence::ObservationRepository;
 mod timing_tests;
 
 impl<R: ObservationRepository> ProductionObservationSession<R> {
+    pub(crate) fn ship_receipt_completed(
+        &mut self,
+        message: &observation_domain::CompleteMessage,
+        now: u64,
+    ) {
+        self.ship_timing.completed(message, now);
+    }
+    pub(crate) fn ship_intent_issued(
+        &mut self,
+        identity: &observation_ingest::CarrierIdentity,
+        key: &str,
+        revision: u64,
+        now: u64,
+    ) {
+        if let Some(scope) = &self.ship_scope {
+            self.ship_timing.issued(identity, key, revision, now, scope);
+        }
+    }
     pub(super) fn validate_detail_dependency(
         &self,
         message: &observation_domain::CompleteMessage,
@@ -121,8 +139,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .max_by_key(|value| value.receipt().revision.get());
         let cursor = last.and_then(|value| durable_cursor(value));
         let next = crate::production_ship_cursor::next_member(&members, previous, cursor)?;
-        let family = next.split_once(":g").map_or("", |value| value.0);
-        let observed = family_duration(&details, family);
+        let observed = self.ship_timing.observed(&next);
         let limits = self
             .heavy_limits
             .as_ref()
@@ -159,6 +176,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
 
     pub fn select_ship_core(&mut self, faction: &str) -> Result<(), ProductionError> {
         self.ship_scope = Some(crate::receiver_ship::scope(faction)?);
+        self.ship_timing.clear();
         self.last_received = None;
         Ok(())
     }
@@ -172,29 +190,8 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     }
 }
 
-fn capture_duration(content: &str) -> Option<u64> {
-    let field = |key: &str| {
-        content
-            .lines()
-            .find_map(|line| line.strip_prefix(key))?
-            .parse::<u64>()
-            .ok()
-    };
-    field("capture_end=")?.checked_sub(field("capture_start=")?)
-}
-
 fn durable_cursor(value: &observation_persistence::CurrentRevision) -> Option<(&str, &str)> {
     let record = value.revision().records.first()?;
     let (family, _) = value.revision().section_key.as_str().split_once(":g")?;
     Some((record.entity_id.as_str(), family))
-}
-
-fn family_duration(details: &[&observation_persistence::CurrentRevision], family: &str) -> u64 {
-    details
-        .iter()
-        .filter(|value| value.revision().section_key.as_str().starts_with(family))
-        .filter_map(|value| value.revision().records.first())
-        .filter_map(|record| capture_duration(&record.content))
-        .max()
-        .unwrap_or(0)
 }

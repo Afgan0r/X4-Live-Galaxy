@@ -4,6 +4,8 @@ use std::path::Path;
 mod retention;
 #[path = "production_selection.rs"]
 mod selection;
+#[path = "production_ship_timing.rs"]
+mod timing;
 
 use observation_application::{
     LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
@@ -34,6 +36,7 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     last_received: Option<(BatchId, Vec<u8>, LifecycleContext)>,
     ship_scope: Option<SourceScopeId>,
     heavy_limits: Option<crate::HeavyShipLimits>,
+    ship_timing: timing::ShipTiming,
 }
 
 impl ProductionObservationSession {
@@ -74,6 +77,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             last_received: None,
             ship_scope: None,
             heavy_limits: None,
+            ship_timing: timing::ShipTiming::default(),
         };
         session
             .restore_current_snapshot()
@@ -139,6 +143,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
 
     pub fn invalidate_source_scope(&mut self, scope: &SourceScopeId) {
         self.lifecycle.invalidate_source_scope(scope);
+        self.ship_timing.clear();
         self.last_received = None;
     }
 
@@ -148,6 +153,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         session: SourceSessionIdentity,
     ) {
         self.lifecycle.mark_source_scope_uncertain(scope, session);
+        self.ship_timing.clear();
         self.last_received = None;
     }
 
@@ -177,14 +183,12 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         crate::receiver_context::assemble(&self.lifecycle, &message)
     }
 }
-
 impl<R: ObservationRepository + PublicationReconciler> ProductionObservationSession<R> {
     pub fn reconcile_ambiguous(&mut self, now: u64) -> Result<LifecycleResult, ProductionError> {
         self.lifecycle
             .reconcile_ambiguous(now)
             .map_err(ProductionError::Lifecycle)
     }
-
     pub fn retry_proven_not_committed(&mut self) -> Result<LifecycleResult, ProductionError> {
         self.lifecycle
             .retry_proven_not_committed()

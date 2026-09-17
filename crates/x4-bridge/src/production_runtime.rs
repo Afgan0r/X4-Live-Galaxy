@@ -143,7 +143,7 @@ fn recover_idle(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
     limits: &ProductionLimits,
-    session: &ProductionObservationSession,
+    session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
     key: &mut String,
 ) -> bool {
@@ -160,7 +160,7 @@ fn next(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
     limits: &ProductionLimits,
-    session: &ProductionObservationSession,
+    session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
     key: &mut String,
 ) -> Option<()> {
@@ -176,14 +176,10 @@ fn next(
         if !schedule.admit(key) {
             return None;
         }
-        intent(
-            peer,
-            identity,
-            key,
-            session.heavy_revision_floor().ok()?,
-            limits,
-        )
-        .ok()?;
+        let revision = session.heavy_revision_floor().ok()?;
+        let issued_at = now();
+        intent(peer, identity, key, revision, limits).ok()?;
+        session.ship_intent_issued(identity, key, revision, issued_at);
     }
     send(
         peer,

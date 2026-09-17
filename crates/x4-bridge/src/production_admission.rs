@@ -79,6 +79,9 @@ pub fn admit(
     let LifecycleResult::Disposition(disposition) = result else {
         return Err(AdmitError::UnexpectedResult);
     };
+    if disposition == ReceiverDisposition::Committed {
+        session.ship_receipt_completed(&decoded, crate::production_runtime::now());
+    }
     let body = ControlBody::Disposition(DispositionBody {
         message_id: message_id.as_str().to_owned(),
         section_key,
