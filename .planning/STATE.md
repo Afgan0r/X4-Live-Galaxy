@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: paused
-stopped_at: Phase 05.5 Plan 09 locally complete; Plan 10 initial experiment approval pending
-last_updated: "2026-09-16T19:27:51Z"
+stopped_at: Phase 05.5 Plan 10 local throughput repair verified; initial game experiment approval pending
+last_updated: "2026-09-17T04:07:00Z"
 last_activity: 2026-09-17
-last_activity_desc: Phase 05.5 Plan 09 locally complete and pushed; no game run
-state_head: b718c67
+last_activity_desc: Phase 05.5 Plan 10 local repair reviewed, regression passed and experiment package rebuilt; no game run
+state_head: e661f36
 progress:
   total_phases: 14
   completed_phases: 7
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — PAUSED
+Phase: 05.5 (Heavy Faction Ship Conformance) — PAUSED AT OWNER GAME CHECKPOINT
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 initial experiment requires explicit owner consent
-Last activity: 2026-09-17 — Production details, shared limits, history and recovery locally verified and pushed; no game run
+Status: Plans 01 and 09 complete locally; Plan 10 precheckpoint repair is verified; initial game experiment requires explicit owner consent
+Last activity: 2026-09-17 — Local repair review converged, final regression passed and prepared-heavy-experiment rebuilt; no game run
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -218,7 +218,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: Owner approved the checked revised 01 -> 09 -> 10 -> 11 chain. Plan 09 is locally complete and pushed, including selective source integration, copied UpgradeGroup fields, actual Lua/DLL/pipe/production-runtime history, validated profile and interrupted-family recovery. Package source is `5e3f45a`; manifest SHA-256 is `0a72f75c9373842b88e3658b2ec7fb4f1f176e8e44fa0b218e496f295acf9d7e`. All 21 runtime outcomes remain pending; proposed 60-second experimental envelope and game actions require separate Plan 10 consent. Core count above 128 is refused, not truncated; a synchronous native call cannot be preempted.
+- [Phase 05.5]: Owner approved the checked revised 01 -> 09 -> 10 -> 11 chain. Plan 10 local repair replaces standalone population quotas with resource admission, incremental work and throughput-first backpressure. Scoped review closed cursor starvation, native aggregate-admission, readback-oracle and game-time/wall-time defects; final Rust/Lua/XML/actual-chain regression passed. Current candidate is `prepared-heavy-experiment`, source `e661f3640af3a05b0f2f5336face8b239d1c33b5`, manifest SHA-256 `293ca4462909052e05a4a84772c3eb34ee1856d6313f7343c5c909e1d1dbc6f4`; all 29 file digests independently verified. The earlier Plan 09 package is historical. Final synthetic interleave passed 19 revisions in 59.473/60 seconds, leaving 0.527 seconds, while the synthetic restart callback max reached 10.764 ms: whole-faction headroom and prepared 2 ms game safety remain unproven despite local prepared-profile success. All 21 runtime outcomes, numerical acceptance and Gate A/B remain pending. The 60-second first game experiment requires separate Plan 10 consent; candidate/inactivity/parent-freshness deadlines remain 30/10/30 seconds. Synchronous native calls cannot be preempted.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -252,5 +252,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-17
-Stopped at: Phase 05.5 Plan 10 initial experimental consent
-Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-09-SUMMARY.md
+Stopped at: Phase 05.5 Plan 10 initial game experiment consent after verified local repair
+Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md

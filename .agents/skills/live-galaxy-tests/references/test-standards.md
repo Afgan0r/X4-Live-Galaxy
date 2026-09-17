@@ -12,6 +12,13 @@ admission rule may need accepted, stale, malformed, over-budget, duplicate, and
 out-of-order scenarios, while a display-only change may not. Coverage
 percentages help find blind spots but do not replace those scenarios.
 
+For a resumable cursor across replacement parents, valid per-record parent
+bindings do not prove continuity. Assert the next unfinished identity/family
+after refresh and subsequent member progress; a caller that ignores a correct
+cursor helper and resets to the first member must fail the integration oracle.
+When a trace drives independent durable readback, compare its revision set with
+the expected committed set so missing trace entries cannot silently skip checks.
+
 ## TEST-02: Minimum Capable Level
 
 Test pure policy and state transitions directly. Do not mock the system under
