@@ -123,28 +123,29 @@ JSON into `live_galaxy_config.lua` and includes its SHA-256 identity. The bridge
 uses the same JSON; unknown, duplicate, zero, overflowing or inconsistent fields
 are refused before collection. The clock-only profile remains separate.
 
-The initial cohort is ordinary faction `argon`, with complete bounded core
-membership and one core-qualified ship per detail group. A whole faction array
-over 128 ships is refused, never represented as a complete prefix. This small
-cohort does not establish the later heavy-faction Gate A/B cohort.
+The initial subject remains ordinary faction `argon`, with byte-bounded core
+membership and one core-qualified ship per detail group. There is no independent
+128-ship or 64-inner-entry quota. Allocation, wire bytes, queue capacity and
+deadlines can still refuse a capture honestly; no refusal yields a complete
+prefix. This prepared profile does not establish Gate A/B acceptance.
 
 <!-- markdownlint-disable MD013 -->
 
 | Bound | Proposed value | Local arithmetic or purpose |
 | --- | --- | --- |
 | Admission window | 60,000 ms | One bridge-run window, not renewed on reconnect |
-| Core membership | 128 ships | 128 × 8-byte UniverseID = 1,024 bytes |
+| Core membership | Derived from admitted bytes | UniverseID count × 8 must fit the per-allocation envelope |
 | Detail group | 1 ship | Separate cargo, crew and installed-loadout captures |
-| Inner collection | 64 entries | Count checked before allocating or filling |
-| Per allocation | 8,192 bytes | Count × actual target `ffi.sizeof` must fit |
-| Aggregate allocation | 65,536 bytes | Cumulative across nested allocations in one capture |
-| Native calls / steps | 384 / 512 | Core's two reads per member need 256 calls; all stages remain bounded |
+| Inner collection | Derived from the message byte envelope | Compatibility count guards cannot be independently lowered into world quotas |
+| Per allocation | 4 MiB | Count × actual target `ffi.sizeof` must fit before allocation |
+| Aggregate allocation | 64 MiB | Cumulative across nested allocations in one capture |
+| Native calls / steps | 64 MiB work units each | Finite emergency work envelope; the 30-second age guard remains independent |
 | Heavy permits | 1 per callback | Getter or allocation, with control pumping first |
 | Callback target | 2 ms | Measured after synchronous return; an overrun stops capture |
 | Rate interval | 50 ms | Existing Rust scheduler; transport-byte work is charged independently |
-| Message / control | 8,192 / 512 bytes | Whole immutable records, no byte-chunk collection |
-| Candidate raw / work | 131,072 / 131,072 | Cumulative native and receiver capture ceilings |
-| Aggregate decoded / pending / total | 262,144 / 8,192 / 524,288 bytes | One pending slot and bounded staging |
+| Message / control | 1 MiB / 512 bytes | Complete semantic records; the local ABI delivered 9.6–12 KiB detail content |
+| Candidate raw / work | 64 MiB / 64 MiB work units | Finite emergency envelope, not a measured safe X4 operating threshold |
+| Aggregate decoded / pending / total | 128 MiB / 1 MiB / 256 MiB | One pending slot and bounded staging; not measured safe X4 thresholds |
 | Capture age / inactivity | 30,000 / 10,000 ms | Distinct total-age and feedback-stall bounds |
 | Parent freshness | 30,000 ms | Receiver receipt age and producer-owned monotonic age |
 | Attempts / reconnect attempts | 1 / 1 | Incomplete captures require fresh qualification |
@@ -153,11 +154,28 @@ cohort does not establish the later heavy-faction Gate A/B cohort.
 <!-- markdownlint-enable MD013 -->
 
 Local fixtures use PeopleInfo=40, RoleTierData=16, software=16, UIWareInfo=24
-and UnitData=24 bytes: 64 entries need respectively 2,560, 1,024, 1,024, 1,536
-and 1,536 bytes. These are fixture ABI sizes, not packed-layout promises for X4.
+and UnitData=24 bytes. These are fixture ABI sizes, not packed-layout promises
+for X4.
 Production uses target `ffi.sizeof`; every allocation must satisfy both per-call
 and cumulative ceilings. A nested role/tier population can exceed the cumulative
 ceiling even when individual counts fit, and is then refused before allocation.
+The existing flat profile retains generic compatibility count fields because
+the current carrier/receiver contracts require them. Candidate records/batches
+equal candidate raw bytes, aggregate records/batches equal aggregate bytes,
+publication records equal publication content bytes, and inner records equal
+message bytes. Each accepted row consumes at least one byte; these conservative
+derived guards therefore do not add an independent population restriction.
+The actual byte/work safeguards remain enforced by each consumer.
+
+Owned identities, cargo copies, storage validation, crew role/tier validation
+and merge ordering advance in at most 32 processing operations per callback.
+Membership transfers ownership without another full sort/copy. Native count/fill
+and immediate copying of borrowed strings are indivisible: neither this helper
+nor the timer can preempt them. The DLL's synchronous record copy/validation
+and encode/progress remain measured callback work, not preemptible operations.
+The existing scheduler pumps feedback first and makes no source admission when
+the one-slot downstream queue is unavailable. A busy record handoff retains the
+same pending fact and resumes without repeating its getter.
 
 Build and verify locally before any owner-operated installation:
 
@@ -193,9 +211,130 @@ Record normal-time and separately approved SETA samples: package/profile/run
 identity, real/game time and SETA factor, count/fill cardinalities, target ABI
 sizes, getter latency, callback duration, cumulative calls/allocations/work,
 record/message bytes, queue/pending occupancy, receipt ages, stop reason and
-independent earlier/current readback. Expand faction/cohort/count ceilings only
+independent earlier/current readback. Expand experimental resource envelopes only
 after reviewing those measurements and explicit owner selection. Missing
 cases, all 21 runtime rows and numerical acceptance remain pending.
+
+## Local preparation throughput evidence
+
+Owner-approved Plan 10 local repair is committed as `67b9b09`, preceded by
+intentional RED `25925ea`: a byte-safe 129-identity census previously returned
+`collection_overflow` rather than `sampled`. The regression also bounds per-pulse
+identity copying and verifies lossless busy handoff. A separate eighty-ware
+regression verifies incremental normalization and retry without loss.
+
+The existing actual-chain harness supports a local-only load switch:
+
+<!-- markdownlint-disable MD013 -->
+
+```powershell
+pwsh -NoProfile -File tests/carrier-b-local.ps1 -SelfTest -Scenario heavy-ship-recovery -LimitsFile config/heavy-ship-experiment.json -Throughput
+```
+
+<!-- markdownlint-enable MD013 -->
+
+It copies the profile into ignored harness storage and changes only that local
+copy to callback20ms/rate25ms. Prepared game settings remain callback2ms/rate50ms;
+candidate30s, inactivity10s, parent30s and bridge admission60s are unchanged.
+The first above-target attempts stopped on the original callback2ms guard,
+including revision6 after five commits and 453 getter calls. These are real
+calibration risks, not evidence that 2ms is production-safe. No deadline was
+extended to obtain success.
+
+The explicitly synthetic target is 128 core records plus one ship's three detail
+records with 64 inner entries, within a 30-second test window: 131/30 = 4.367
+semantic records/s. This is not an approved X4 refresh interval or measured game
+demand. Above-target input uses 129 core records and 80 inner entries. The actual
+Lua host, owned release DLL, native ABI, pipe, production bridge and SQLite ran;
+only X4 getters and their ABI-size fixtures are synthetic.
+
+These measurements precede the fair-cursor review repair; they establish the
+capacity slice, not verification of the later scheduling changes.
+
+<!-- markdownlint-disable MD013 -->
+
+| Measured local result | First producer | Distinct restarted producer |
+| --- | --- | --- |
+| Exact committed revisions | 1–8, same connection | 9–12, same durable database |
+| Semantic records / elapsed | 136 / 24.518s | 132 / 22.357s |
+| End-to-end service | 5.547 records/s | 5.904 records/s |
+| Margin over synthetic 4.367 records/s demand | 27.0% | 35.2% |
+| Callback samples / p95 / max | 1596 / 0.099 / 1.910ms | 1456 / 0.097 / 0.271ms |
+| Native push samples / p95 / max | 136 / 0.110 / 0.213ms | 132 / 0.025 / 0.168ms |
+| Native progress samples / p95 / max | 2860 / 0.043 / 0.145ms | 2295 / 0.047 / 0.171ms |
+| Seal-to-commit samples / p95 / max | 8 / 47.714 / 47.714ms | 4 / 48.071 / 48.071ms |
+| Backpressure-paused pulses / final backlog | 332 / 0 | 617 / 0 |
+| Core capture / calls / allocation / steps | 11.109s / 263 / 1032B / 464 | 11.093s / 263 / 1032B / 464 |
+
+<!-- markdownlint-enable MD013 -->
+
+These small seal/commit samples use nearest-rank empirical p95; they do not
+establish population tails. QPC measures actual callbacks, not an assumed 50ms
+pulse. Cargo80 capture took 0.812–0.814s, seven calls, 24 allocated bytes and
+50 steps; crew80 roles took 4.466–4.475s, 87 calls, 4480 bytes and 288 steps;
+loadout80 software took 0.613–0.620s, 32 calls, 1328 bytes and 37 steps. Native
+begin/finish maxima were 0.026/0.011ms. Pipe transfer, receiver validation and
+SQLite commit are exercised but not separately timed; seal-to-commit combines
+those stages. Stage-specific sustainable capacity remains unproven.
+
+Independent CLI reads reopened earlier/current core revisions1/9 (129 complete
+records each), cargo2/10 (80 wares; 9570/9650 content bytes), crew3/11 (80 roles;
+4416 bytes), and loadout4/12 (80 software entries; 11998/11999 bytes). No ABI or
+wire fragmentation change was needed: complete semantic records above 8KiB fit
+the finite 1MiB frame. First/current workload content totals were 75856/40383
+bytes, or approximately 3094/1806 content bytes/s. These are independently read
+content bytes, not transport-overhead-inclusive throughput.
+
+The bridge previously waited the 5s availability interval after every commit.
+The load exposed parent freshness expiry and a 60s watchdog. Heavy collection now
+uses its existing configured rate interval for new demand while preserving
+pump/reconcile order; legacy availability behavior is unchanged.
+
+This finite slice ends with zero backlog, but is not a long steady-state or
+full-faction proof. At the measured 80-role cost, all 129 ships' three groups
+cannot fit one 30-second parent window. The review repair resumes the last
+durable member identity and unfinished family after replacement cores, rebinding
+the ordinal and exact dependencies to current membership. Before new detail
+admission, remaining parent age is compared with the observed family duration
+plus one configured rate interval. This estimate is not a worst-case native
+duration guarantee; an unknown first family may start against a fresh parent.
+Stale wire captures receive the existing superseded disposition, discard only
+incomplete staging, refresh core and resume that position on the same peer.
+Permanent refusal and ambiguous commits remain terminal.
+
+Native detail admission now makes one allocation-free bounded walk across all
+nested arrays and strings before owned decoding. Its shared envelope is eight
+times the admitted frame bytes: each node reserves 128 bytes of typed/formatting
+overhead and strings reserve twice their actual length. Depth is finite. The
+1MiB profile therefore supplies an 8MiB admission-work envelope, not an
+independent population quota or a measured safe X4 memory threshold. The actual
+ABI fixture's individually valid 16 roles × 16 tiers exceed its 32KiB envelope
+and are refused before detail copying/serialization; later valid captures and
+independent earlier/current readback pass. This added native regression was
+executed after implementation and is GREEN-only evidence, not a native RED
+claim. The cursor family-loss regression was independently RED before repair.
+
+The post-repair local `-Throughput -Interleave` run committed revisions1–19 on
+one producer and peer in 59.362s: 275 semantic records, two complete 129-ship
+cores and 17 detail records with 80 inner entries. Core15 replaced core1 after
+cargo:g4 revision14; crew:g4 revision16 and loadout:g4 revision17 resumed that
+member against exact core/member revision15, then progressed to member g5.
+Independent CLI reads reopened every committed revision and checked current
+parent identity and dependencies. This covers only the first six members,
+not all 129 ships' details. The remaining 0.638s of the unchanged 60s window
+is approximately 1.1%: there is essentially no admission-window headroom.
+
+Its 3836 callback samples had p95/max 0.159/2.705ms; the maximum exceeds the
+prepared 2ms guard. Native push p95/max was 0.133/0.263ms over 275 records;
+progress p95/max was 0.058/1.117ms over 6977 calls. Seal-to-commit p95/max was
+48.598/48.598ms over 19 commits; 695 pulses paused under backpressure and
+the final backlog was zero. Those observations do not establish steady backlog,
+full-faction refresh capacity, separate receiver/SQLite capacity, or X4 safety.
+
+Actual required X4 flow/headroom, full-faction eventual coverage, non-preemptible
+fill/copy timing and game responsiveness remain unproven. Gate A and all owner
+pauses remain pending; neither capacity ceilings nor the relaxed local callback
+profile resolve those obligations.
 
 Retain private run evidence outside Git in the shared contract's durable
 machine-local artifact store, with owner-only permissions and a stable locator

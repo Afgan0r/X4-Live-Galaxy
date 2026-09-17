@@ -8,6 +8,8 @@ param(
     [string]$LuaJitPath,
     [string]$LuaLibraryPath,
     [string]$LimitsFile,
+    [switch]$Throughput,
+    [switch]$Interleave,
     [switch]$Calibration
 )
 
@@ -80,7 +82,9 @@ static int host_sleep(lua_State *state) {
 }
 
 static int host_monotonic_millis(lua_State *state) {
-    lua_pushnumber(state, (lua_Number)GetTickCount64());
+    LARGE_INTEGER counter, frequency;
+    if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&frequency)) return luaL_error(state, "host clock unavailable");
+    lua_pushnumber(state, (lua_Number)counter.QuadPart * 1000.0 / (lua_Number)frequency.QuadPart);
     return 1;
 }
 
@@ -177,6 +181,14 @@ if ($Calibration) {
 } else {
     $sourceLimits = if ($LimitsFile) { $LimitsFile } else { Join-Path $repo 'config/carrier-b-limits.json' }
     Copy-Item -LiteralPath (Resolve-Path $sourceLimits) -Destination $limits
+    if ($Throughput) {
+        if ($Scenario -ne 'heavy-ship-recovery') { throw 'THROUGHPUT_REQUIRES_CONFIGURED_CHAIN' }
+        $synthetic = Get-Content -LiteralPath $limits -Raw | ConvertFrom-Json
+        $synthetic.rate_interval_millis = 25
+        $synthetic.callback_budget_millis = 20
+        [IO.File]::WriteAllText($limits, ($synthetic | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+        Write-Output 'LOCAL_SYNTHETIC callback_budget_millis=20 rate_interval_millis=25 candidate_deadline_millis=30000 prepared_game_profile_unchanged=true runtime_acceptance=pending'
+    }
     $expectedLimitsHash = '440a55d8a0aed233f29fca14a6e06482c5880a0655f5beb98675f075303f4748'
     $actualLimitsHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($Scenario -ne 'heavy-ship-recovery' -and $actualLimitsHash -cne $expectedLimitsHash) { throw 'FROZEN_LIMITS_DIGEST_MISMATCH' }
@@ -191,7 +203,7 @@ if ($Scenario -eq 'heavy-ship-recovery') {
         throw 'HEAVY_PROFILE_REQUIRED'
     }
     . (Join-Path $repo 'tests/carrier-b-heavy-configured.ps1')
-    Invoke-HeavyConfiguredRestart $run $hostExecutable $data $limits $repo
+    Invoke-HeavyConfiguredRestart $run $hostExecutable $data $limits $repo -Throughput:$Throughput -Interleave:$Interleave
     return
 }
 if ($Scenario -in @('heavy-ship-core', 'heavy-ship-detail')) {

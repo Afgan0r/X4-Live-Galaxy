@@ -1,7 +1,23 @@
-local root, mode, result_path = ...
+local root, mode, result_path, marker = ...
+local interleave = marker == "throughput-interleave"
+local throughput = marker == "throughput" or interleave
+local population = throughput and 129 or 1
 package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 local options = assert(require("live_galaxy.lua.live_galaxy_config").options())
 local carrier = assert(require("live_galaxy.lua.live_galaxy_carrier").new(options.carrier))
+local timings, captures = {}, {}
+if throughput then
+    for _, name in ipairs({ "begin_section", "push_record", "finish_section", "progress" }) do
+        local method = carrier[name]
+        carrier[name] = function(self, ...)
+            local before = host_monotonic_millis()
+            local first, second = method(self, ...)
+            timings[name] = timings[name] or {}
+            timings[name][#timings[name] + 1] = host_monotonic_millis() - before
+            return first, second
+        end
+    end
+end
 local revision, calls = 1, 0
 local function called() calls = calls + 1 end
 local function stop(family)
@@ -9,23 +25,34 @@ local function stop(family)
 end
 local source = {
     list_factions = function() called(); return { "argon" } end,
-    count_ships = function() called(); return 1 end,
+    count_ships = function() called(); return population end,
     new_buffer = function() return {} end,
-    fill_ships = function(_, buffer) called(); buffer[0] = "9007199254740993"; return 1 end,
+    fill_ships = function(_, buffer)
+        called(); for i = 0, population - 1 do buffer[i] = "900719925474" .. string.format("%04d", i + 993) end
+        return population
+    end,
     read_core = function(_, identity) called(); stop("core"); return { identity = identity, owner = "argon",
         type = "destroyer_macro", class = "destroyer", location = "sector:1" } end,
-    cargo_wares = function() called(); return { ore = revision } end,
+    cargo_wares = function()
+        called(); if not throughput then return { ore = revision } end
+        local rows = {}; for i = 1, 80 do rows["ware_" .. string.rep("x", 100) .. string.format("%03d", i)] = revision end
+        return rows
+    end,
     cargo_storage_count = function() called(); return 1 end,
     cargo_storage_size = function() return 24 end,
     cargo_storage_allocate = function() return {} end,
     cargo_storage_fill = function() called(); stop("cargo"); return { { transport = "solid",
         capacity_cubic_metres = 1200, occupied_cubic_metres = 110 } } end,
     crew_capacity = function() called(); return 12 + revision end,
-    crew_count = function() called(); return 1 end,
+    crew_count = function() called(); return throughput and 80 or 1 end,
     crew_size = function() return 40 end,
     crew_allocate = function() return {} end,
-    crew_fill = function() called(); return { { id = "service", amount_people = 7,
-        reported_numtiers = 1, canhire = true, tiers = {} } } end,
+    crew_fill = function()
+        called(); local rows = {}; for i = 1, throughput and 80 or 1 do
+            rows[i] = { id = "service" .. (throughput and string.format("%03d", i) or ""), amount_people = 7,
+                reported_numtiers = 1, canhire = true, tiers = {} }
+        end; return rows
+    end,
     crew_tier_size = function() return 16 end,
     crew_tier_allocate = function() return {} end,
     crew_tier_fill = function() called(); stop("crew"); return { { name = "raw",
@@ -36,10 +63,14 @@ local source = {
     physical_group = function() called(); return { path = "..", group = "" } end,
     virtual_count = function(_, _, kind) called(); return kind == "thruster" and 1 or 0 end,
     virtual_macro = function() called(); return "thruster_current_macro" end,
-    software_count = function() called(); return 1 end,
+    software_count = function() called(); return throughput and 80 or 1 end,
     software_size = function() return 16 end,
     software_allocate = function() return {} end,
-    software_fill = function() called(); stop("loadout"); return { { maximum = "software_max", current = "software_current" } } end,
+    software_fill = function()
+        called(); stop("loadout"); local rows = {}; for i = 1, throughput and 80 or 1 do
+            rows[i] = { maximum = "software_max" .. (throughput and string.rep("x", 100) .. i or ""), current = "software_current" }
+        end; return rows
+    end,
     missiles_count = function() called(); return 1 end,
     missiles_size = function() return 24 end,
     missiles_allocate = function() return {} end,
@@ -54,23 +85,52 @@ options.observation.getter = function() error("clock sample must not run in ship
 options.observation.clock_getter = function() return host_monotonic_millis() / 1000 end
 local observation = assert(require("live_galaxy.lua.live_galaxy_observation").new(options.observation))
 local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
-local expected = mode == "first" and 8 or 4
+local expected = interleave and 19 or (mode == "first" and 8 or 4)
 local committed, last, revisions = 0, "none", {}
+local started, callback_durations, commit_durations, busy, produced, production_times = host_monotonic_millis(), {}, {}, 0, 0, {}
 local deadline = host_monotonic_millis() + options.observation.heavy_limits.admission_window_millis
 local feedback = observation.feedback
 function observation:feedback(context, active_carrier, status, control)
     feedback(self, context, active_carrier, status, control)
     revision = assert(tonumber(status.collection_revision))
-    if control == 5 then committed = committed + 1; revisions[#revisions + 1] = revision end
+    if control == 5 then
+        committed = committed + 1; revisions[#revisions + 1] = revision
+        commit_durations[#commit_durations + 1] = host_monotonic_millis() - (production_times[committed] or started)
+    end
 end
 while committed < expected do
+    local before = host_monotonic_millis()
     local result = scheduler.tick({ source_boundary = "runtime_start" }, carrier, observation)
+    callback_durations[#callback_durations + 1] = host_monotonic_millis() - before
+    if result.disposition == "producer_busy" then busy = busy + 1 end
+    if result.disposition == "sampled" then
+        produced = produced + 1; production_times[produced] = host_monotonic_millis()
+        local m = result.capture_metrics
+        if m then captures[#captures + 1] = "capture section=" .. m.section .. " revision=" .. m.revision
+            .. " duration_millis=" .. m.duration_millis .. " calls=" .. m.calls
+            .. " allocation_bytes=" .. m.allocation_bytes .. " steps=" .. m.steps end
+    end
     last = result.disposition
     assert(host_monotonic_millis() < deadline, "configured heavy watchdog: " .. last)
     assert(last ~= "source_failure" and last ~= "core_changed" and last ~= "native_call_limit"
-        and last ~= "allocation_limit" and last ~= "callback_budget_exceeded", last)
+        and last ~= "allocation_limit" and last ~= "callback_budget_exceeded",
+        last .. " revision=" .. revision .. " committed=" .. committed .. " calls=" .. calls)
     host_sleep(1)
 end
 local file = assert(io.open(result_path, "wb"))
 assert(file:write("committed=" .. committed .. "\ncalls=" .. calls .. "\nrevisions=" .. table.concat(revisions, ",") .. "\n"))
+if throughput then
+    local function percentile(rows, fraction) table.sort(rows); return rows[math.max(1, math.ceil(#rows * fraction))] end
+    assert(file:write("synthetic_core_records=" .. population .. "\nnested_records=80\nelapsed_millis=" .. (host_monotonic_millis() - started)
+        .. "\ncallback_samples=" .. #callback_durations .. "\ncallback_p95_millis=" .. percentile(callback_durations, .95)
+        .. "\ncallback_max_millis=" .. percentile(callback_durations, 1)
+        .. "\nseal_to_commit_samples=" .. #commit_durations .. "\nseal_to_commit_p95_millis=" .. percentile(commit_durations, .95)
+        .. "\nseal_to_commit_max_millis=" .. percentile(commit_durations, 1)
+        .. "\nproducer_busy_pulses=" .. busy .. "\nfinal_backlog=" .. (produced - committed) .. "\n"))
+    for name, rows in pairs(timings) do
+        assert(file:write("stage=" .. name .. " samples=" .. #rows .. " p95_millis=" .. percentile(rows, .95)
+            .. " max_millis=" .. percentile(rows, 1) .. "\n"))
+    end
+    for _, row in ipairs(captures) do assert(file:write(row .. "\n")) end
+end
 assert(file:close()); assert(carrier:close() == 0)
