@@ -348,6 +348,45 @@ fill/copy timing and game responsiveness remain unproven. Gate A and all owner
 pauses remain pending; neither capacity ceilings nor the relaxed local callback
 profile resolve those obligations.
 
+### Final post-review local verification
+
+The final synthetic restart uses callback20ms/rate25ms, not the prepared
+callback2ms/rate50ms profile. Its first 8 commits (136 semantic records)
+took 24.722s: 1599 callback samples, p95/max 0.163/0.654ms. Its distinct
+producer restart committed 4 more (132 records) in 22.526s: 1455 samples,
+p95/max 0.198/10.764ms. The **10.764ms callback** is the latest observed
+maximum and exceeds the prepared 2ms guard. A timer detects the violation
+after return; it cannot preempt an indivisible callback or native call.
+Prepared-profile fixture success does not certify that latency limit in X4.
+Seal-to-commit maxima were 47.171/50.292ms; backpressure paused 335/616
+pulses and both final backlogs were zero. All 12 complete revisions reopened;
+replacement core9 resumed crew:g2/loadout:g2 then progressed to cargo:g3.
+
+The final same-peer interleave committed all 19 revisions in 59.473s,
+275 semantic records (two 129-record cores and 17 details). It retained only
+0.527s, approximately 0.9%, of the unchanged 60s admission window: required
+headroom is not demonstrated. Callback n/p95/max was 3842/0.181/1.411ms;
+native push was 275/0.152/0.570ms, progress 6983/0.058/0.814ms, and
+seal-to-commit 19/48.493/48.493ms. There were 701 backpressure pauses and
+zero final backlog. Complete independent reads verified every revision,
+core15 exact dependencies, unfinished crew:g4/loadout:g4 and subsequent g5.
+This remains a capacity slice, not full-faction or separate-stage headroom.
+
+After the clock repair converged, formatting, workspace all-target Clippy,
+325 executed Rust tests, the 200-line source check, 80 Lua contracts,
+20 Lua syntax checks, XML/schema and serial native clock/recovery scenarios
+passed. Five existing Phase05.1 station-publication tests remain ignored for
+Phase05.3 reconciliation; they are not ABI harness cases. Separate heavy ABI
+core/detail checks and the exact prepared2ms/50ms first/restart plus all four
+interrupted-family recovery checks passed. Oracle mutations rejected cursor
+reset, missing capture and later-member starvation.
+
+An earlier pre-clock full pass was discarded as final evidence. One synthetic
+launch overlapped the still-running prepared interruption matrix and refused
+pipe opening; that orchestration error is excluded from product measurements.
+The measured synthetic rerun and interleave began only after predecessor exit
+and process cleanup. No game operation or runtime acceptance occurred.
+
 Retain private run evidence outside Git in the shared contract's durable
 machine-local artifact store, with owner-only permissions and a stable locator
 containing logical run ID, exact retained paths and verified digests. Public
