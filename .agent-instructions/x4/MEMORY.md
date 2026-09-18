@@ -81,13 +81,8 @@ conclusions remain in `wing_x4_modding`; general game conclusions use the game
 owner and its memory lifecycle. Use family recall when deduplicating: an
 equivalent historical or sibling record is not a reason to create a copy.
 
-After a verified new write outside the current repository's primary wing,
-leave a short local locator in its declared memory-link index or a `Memory
-links` section of the consumer-owned root `AGENTS.md`. Include only a safe topic,
-exact `wing/room`, and stable `drawer_id`; do not mirror the conclusion or invent
-a browser URL. Verify the local entry against the fetched drawer. Do not put
-locators in the generated companion bundle. If the pointer write fails, report
-it separately and retry the pointer using the existing drawer ID.
+Follow `game-repo-standard` for reporting verified writes, thematic retrieval,
+and task-specific citations. A memory write alone requires no repository edit.
 
 Corrections, invalidations, and deletions require an exact preview and the
 user's explicit approval. Do not create a local memory outbox when the server
