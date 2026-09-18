@@ -13,13 +13,25 @@ local function metrics(self)
         source_value_bytes = b.source_value_bytes,
         section = self.key, incarnation = self.incarnation } or nil
 end
-local function discard(self, carrier, reason)
+local function discard(self, carrier, reason, request)
+    local result
     if self.collector then
-        if self.collector.discard then self.collector:discard(carrier, reason)
-        else self.collector:fail(carrier, reason) end
+        if self.collector.discard then result = self.collector:discard(carrier, reason)
+        else result = self.collector:fail(carrier, reason) end
+    end
+    result = result or { disposition = reason, rejection = { stage = "selection", condition = reason } }
+    if request then
+        result.rejection = { stage = "selection", condition = reason, section = request.selection,
+            revision = request.collection_revision, run = request.producer_incarnation }
+    elseif self.budget then
+        result.rejection.operation = self.budget.operation
+        result.rejection.condition = self.budget.condition or result.rejection.condition
     end
     self.collector, self.pending, self.accepted = nil, nil, nil
-    return { disposition = reason, capture_metrics = metrics(self) }
+    -- A failed start performed no source capture. Never label previous capture
+    -- counters with a new request or retain the old collector's failure stage.
+    result.capture_metrics = not request and metrics(self) or nil
+    return result
 end
 function selection.attach(adapter, options)
     local limits, err = profile.validate(options.heavy_limits)
@@ -83,16 +95,16 @@ function selection.advance(self, context, carrier, status)
     context.source_boundary = context.source_boundary or "runtime_start"
     local now = tonumber(status.monotonic_millis)
     if self.run_started and (not now or now - self.run_started >= self.limits.admission_window_millis) then
-        return discard(self, carrier, "admission_window_exhausted")
+        return discard(self, carrier, "admission_window_exhausted", status)
     end
     if self.incarnation and (self.incarnation ~= status.producer_incarnation or self.boundary ~= context.source_boundary) then
-        return discard(self, carrier, "source_boundary_changed")
+        return discard(self, carrier, "source_boundary_changed", status)
     end
     if not self.collector or self.key ~= status.selection or self.collector.stage == "done" then
         local ok, err = start(self, context, carrier, status)
         if not ok then
             if err == "stale_parent" then carrier:fail_section("stale_parent") end
-            return discard(self, carrier, err)
+            return discard(self, carrier, err, status)
         end
     end
     local ok, err = self.budget:before(status)
@@ -107,7 +119,9 @@ function selection.advance(self, context, carrier, status)
         self.pending = { members = self.collector.identities, cores = self.collector.cores, revision = self.revision,
             boundary = self.boundary, incarnation = self.incarnation }
     end
-    if result.disposition == "sampled" then result.capture_metrics = metrics(self) end
+    if result.disposition ~= "collecting" and result.disposition ~= "producer_busy" then
+        result.capture_metrics = metrics(self)
+    end
     return result
 end
 return selection

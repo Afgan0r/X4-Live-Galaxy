@@ -30,7 +30,9 @@ function source.runtime()
             local owner, macro, class, sector = GetComponentData(
                 component, "owner", "macro", "classid", "sectorid")
             local sector_identity = source.identity(sector)
-            if sector_identity == nil then return nil end
+            if sector_identity == nil then
+                return nil, { condition = "identity_invalid", field = "sectorid", observed_type = type(sector) }
+            end
             return { identity = identity, owner = owner, type = macro,
                 class = class, location = "sector:" .. sector_identity }
         end,

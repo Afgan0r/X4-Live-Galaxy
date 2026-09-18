@@ -28,6 +28,14 @@ A rejection records its condition and safe diagnostic values, such as expected
 and observed dependency revisions. Generic `failed` without identity or reason
 is insufficient. Rendering can vary while event meaning stays stable.
 
+Capture rejection context before cleanup changes the stage or clears pending
+values. Propagate it through wrappers on rejection as well as success. When
+several checks share a disposition, retain the specific failed field/condition
+and safe value type, not the raw source value. For example, faction census and
+ship-core validation must not both become an uncorrelated `invalid_fact` after
+their collector state is cleared. Exercise the ordinary runtime renderer in a
+regression, not just the helper that constructs the outcome.
+
 ## LOG-03 — Error and level ownership
 
 Levels reflect consequences: a routine domain rejection is not automatically

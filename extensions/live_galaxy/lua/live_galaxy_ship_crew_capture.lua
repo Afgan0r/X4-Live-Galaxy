@@ -32,10 +32,14 @@ function capture.step(self)
         for i = self.row_index, #self.rows do
             if self.work_budget then self.work_budget:step() end
             local role = self.rows[i]
-            if type(role.id) ~= "string" or not role.id:match("^[%w_:%-]+$") or self.seen[role.id]
-                or not unsigned(role.amount_people, 4294967295)
-                or not unsigned(role.reported_numtiers, self.limit) or type(role.canhire) ~= "boolean" then
-                return nil, "invalid_fact"
+            local field, condition
+            if type(role.id) ~= "string" or not role.id:match("^[%w_:%-]+$") then field, condition = "id", "token_invalid"
+            elseif self.seen[role.id] then field, condition = "id", "duplicate"
+            elseif not unsigned(role.amount_people, 4294967295) then field, condition = "amount_people", "integer_invalid"
+            elseif not unsigned(role.reported_numtiers, self.limit) then field, condition = "reported_numtiers", "integer_invalid"
+            elseif type(role.canhire) ~= "boolean" then field, condition = "canhire", "result_shape" end
+            if field then
+                return nil, "invalid_fact", { condition = condition, field = field, observed_type = type(role[field]) }
             end
             self.seen[role.id], self.row_index = true, i + 1
         end
@@ -65,11 +69,15 @@ function capture.step(self)
         for i = self.row_index, #self.rows do
             if self.work_budget then self.work_budget:step() end
             local tier = self.rows[i]
-            if type(tier.name) ~= "string" or #tier.name == 0 or #tier.name > 128
-                or tier.name:find("[|\n\r]") or type(tier.skill_lower_threshold) ~= "number"
-                or tier.skill_lower_threshold < -2147483648 or tier.skill_lower_threshold > 2147483647
-                or tier.skill_lower_threshold % 1 ~= 0 or not unsigned(tier.amount_people, 4294967295) then
-                return nil, "invalid_fact"
+            local field, condition
+            if type(tier.name) ~= "string" or #tier.name == 0 or #tier.name > 128 or tier.name:find("[|\n\r]") then
+                field, condition = "name", "string_invalid"
+            elseif type(tier.skill_lower_threshold) ~= "number" or tier.skill_lower_threshold < -2147483648
+                or tier.skill_lower_threshold > 2147483647 or tier.skill_lower_threshold % 1 ~= 0 then
+                field, condition = "skill_lower_threshold", "integer_invalid"
+            elseif not unsigned(tier.amount_people, 4294967295) then field, condition = "amount_people", "integer_invalid" end
+            if field then
+                return nil, "invalid_fact", { condition = condition, field = field, observed_type = type(tier[field]) }
             end
             self.row_index = i + 1
         end

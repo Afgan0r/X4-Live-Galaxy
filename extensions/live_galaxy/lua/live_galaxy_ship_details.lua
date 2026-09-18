@@ -28,10 +28,12 @@ function details.new(options, clock)
         kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
 end
 
-function details:fail(carrier, reason)
+function details:fail(carrier, reason, condition, field, observed_type)
+    local rejection = { stage = self.stage, condition = condition or reason,
+        field = field, observed_type = observed_type, ordinal = self.index }
     carrier:fail_section(reason)
     self.stage, self.pending, self.buffer = "failed", nil, nil
-    return { disposition = reason }
+    return { disposition = reason, rejection = rejection }
 end
 
 function details:step(context, carrier, status)
@@ -48,14 +50,17 @@ function details:step(context, carrier, status)
         self.begin, self.records, self.index, self.capture_start = begin, {}, 1, begin.capture_start_millis
         self.stage = start_stage(self.kind)
     elseif self.stage:match("^crew_") then
-        local ok, err = crew_capture.step(self)
-        if not ok then return self:fail(carrier, err) end
+        local ok, err, rejection = crew_capture.step(self)
+        if not ok then return self:fail(carrier, err, rejection and rejection.condition,
+            rejection and rejection.field, rejection and rejection.observed_type) end
     elseif self.stage:match("^loadout_") then
-        local ok, err = loadout_capture.step(self)
-        if not ok then return self:fail(carrier, err) end
+        local ok, err, rejection = loadout_capture.step(self)
+        if not ok then return self:fail(carrier, err, rejection and rejection.condition,
+            rejection and rejection.field, rejection and rejection.observed_type) end
     elseif self.stage == "wares" then
         local raw = self.api:cargo_wares(group.members[self.index])
-        if type(raw) ~= "table" or getmetatable(raw) ~= nil then return self:fail(carrier, "cargo_unknown") end
+        if type(raw) ~= "table" then return self:fail(carrier, "cargo_unknown", "result_shape", "wares", type(raw)) end
+        if getmetatable(raw) ~= nil then return self:fail(carrier, "cargo_unknown", "unexpected_metatable", "wares", type(raw)) end
         -- Copy the returned owned values into the frozen selection record.
         self.raw, self.pending, self.stage = raw, { wares = {} }, "ware_copy"
     elseif self.stage == "ware_copy" then
@@ -67,9 +72,9 @@ function details:step(context, carrier, status)
                 self.sort, self.stage = order.new(self.pending.wares, function(a, b) return a.ware < b.ware end), "ware_order"
                 break
             end
-            if #self.pending.wares >= self.limit or not token(ware) or not integer(amount, MAX_INTEGER) then
-                return self:fail(carrier, "collection_overflow")
-            end
+            if #self.pending.wares >= self.limit then return self:fail(carrier, "collection_overflow", "record_limit", "wares") end
+            if not token(ware) then return self:fail(carrier, "collection_overflow", "token_invalid", "ware", type(ware)) end
+            if not integer(amount, MAX_INTEGER) then return self:fail(carrier, "collection_overflow", "integer_invalid", "amount", type(amount)) end
             self.pending.wares[#self.pending.wares + 1], self.ware_key = { ware = ware, amount_items = amount }, ware
         end
     elseif self.stage == "ware_order" then
@@ -96,10 +101,13 @@ function details:step(context, carrier, status)
         for i = self.row_index, #self.rows do
             if self.work_budget then self.work_budget:step() end
             local row = self.rows[i]
-            if not token(row.transport) or self.seen[row.transport]
-                or not integer(row.capacity_cubic_metres, 4294967295)
-                or not integer(row.occupied_cubic_metres, row.capacity_cubic_metres) then
-                return self:fail(carrier, "invalid_fact")
+            if not token(row.transport) then return self:fail(carrier, "invalid_fact", "token_invalid", "transport", type(row.transport)) end
+            if self.seen[row.transport] then return self:fail(carrier, "invalid_fact", "duplicate", "transport") end
+            if not integer(row.capacity_cubic_metres, 4294967295) then
+                return self:fail(carrier, "invalid_fact", "integer_invalid", "capacity_cubic_metres", type(row.capacity_cubic_metres))
+            end
+            if not integer(row.occupied_cubic_metres, row.capacity_cubic_metres) then
+                return self:fail(carrier, "invalid_fact", "integer_invalid", "occupied_cubic_metres", type(row.occupied_cubic_metres))
             end
             self.seen[row.transport], self.row_index = true, i + 1
         end
@@ -130,10 +138,14 @@ function details:step(context, carrier, status)
         self.index, self.pending = self.index + 1, nil
         self.stage = self.index > #group.members and "capture_finish" or start_stage(self.kind)
     elseif self.stage == "revalidate" then
-        local current = self.api:read_core(self.expected_core.identity)
-        if type(current) ~= "table" then return self:fail(carrier, "core_changed") end
+        local current, source_rejection = self.api:read_core(self.expected_core.identity)
+        if type(current) ~= "table" then
+            return self:fail(carrier, "core_changed", source_rejection and source_rejection.condition or "result_shape",
+                source_rejection and source_rejection.field or "core",
+                source_rejection and source_rejection.observed_type or type(current))
+        end
         for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
-            if current[key] ~= self.expected_core[key] then return self:fail(carrier, "core_changed") end
+            if current[key] ~= self.expected_core[key] then return self:fail(carrier, "core_changed", "value_mismatch", key, type(current[key])) end
         end
         self.validated, self.stage = true, "capture_finish"
     elseif self.stage == "capture_finish" then

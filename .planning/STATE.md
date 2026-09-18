@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 revised normal-time run refused invalid_fact; retained evidence and source diagnosis pending
+stopped_at: Phase 05.5 Plan 10 rejection diagnostics repaired; next bounded X4 run pending
 last_updated: "2026-09-17T06:21:42Z"
 last_activity: 2026-09-17
-last_activity_desc: Revised 60-second run ended; game invalid_fact/retry_exhausted and exact core readback MissingRevision
+last_activity_desc: Rejection context repair reviewed clean; original source refusal requires a new bounded run
 state_head: b4d6b65
 progress:
   total_phases: 14
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — REVISED SOURCE REFUSAL
+Phase: 05.5 (Heavy Faction Ship Conformance) — REJECTION DIAGNOSTICS REPAIRED
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 revised normal-time run refused invalid_fact before publication; specific source cause unknown
-Last activity: 2026-09-18 — Revised source b4d6b65 run stopped after bounded window; six private artifacts retained with verified locator; owner responsiveness report pending
+Status: Plans 01 and 09 complete locally; Plan 10 diagnostics repair reviewed clean; original specific source cause unknown
+Last activity: 2026-09-18 — Safe rejection context and correlation preserved; owner confirmed no noticeable freezes during revised run; next bounded game run pending
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 

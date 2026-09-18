@@ -277,6 +277,85 @@ describe("owned Carrier B adapter", function()
         assert.is_truthy(diagnostic:match("source_value_bytes=%d+"))
     end)
 
+    for _, case in ipairs({
+        { field = "owner", value = "PRIVATE_OWNER", condition = "value_mismatch", observed_type = "string" },
+        { field = "type", value = "PRIVATE/path\n", condition = "token_invalid", observed_type = "string" },
+        { field = "class", value = false, condition = "token_invalid", observed_type = "boolean" },
+        { field = "location", value = {}, condition = "token_invalid", observed_type = "table" },
+        { field = "sectorid", condition = "identity_invalid", observed_type = "number", absent = true },
+        { field = "core", condition = "source_value_cycle", cycle = true },
+    }) do
+        it("retains rejected " .. case.field .. " context through ordinary runtime logging", function()
+            local env, tick, diagnostic = native({ selection = "ship_core", remaining = "1", monotonic_step = 10 }), nil, nil
+            local messages = {}
+            local file = assert(io.open("config/heavy-ship-experiment.json", "rb"))
+            local text = assert(file:read("*a")); assert(file:close())
+            local values = {}; for key, value in text:gmatch('"([%w_]+)"%s*:%s*(%d+)') do values[key] = tonumber(value) end
+            local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
+            options.getter, options.clock_getter = function() return 0 end, function() return 1 end
+            options.ship_api = {
+                list_factions = function() return { "argon" } end, count_ships = function() return 1 end,
+                new_buffer = function() return { [0] = "9007199254740993" } end, fill_ships = function() return 1 end,
+                read_core = function(_, id)
+                    if case.absent then return nil, { field = "sectorid", condition = "identity_invalid", observed_type = "number" } end
+                    local core = { identity = id, owner = "argon", type = "macro", class = "ship", location = "sector:1" }
+                    if case.cycle then core.child = core else core[case.field] = case.value end
+                    return core
+                end,
+            }
+            _G.RegisterEvent = function(_, callback) tick = callback end
+            _G.DebugError = function(value) diagnostic = value; messages[#messages + 1] = value end
+            local runtime = fixture.runtime()
+            assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
+            assert.same({ false, "invalid_fact" }, { tick("live_galaxy_observation", "telemetry_tick") })
+            assert.is_truthy(diagnostic:match("stage=core"))
+            assert.is_truthy(diagnostic:match("condition=" .. case.condition))
+            if not case.cycle then
+                assert.is_truthy(diagnostic:match("field=" .. case.field))
+                assert.is_truthy(diagnostic:match("observed_type=" .. case.observed_type))
+            else assert.is_truthy(diagnostic:match("operation=read_core")) end
+            assert.is_truthy(diagnostic:match("section=ship_core"))
+            assert.is_truthy(diagnostic:match("revision=1"))
+            assert.is_truthy(diagnostic:match("attempt=1"))
+            assert.is_truthy(diagnostic:match("calls=%d+"))
+            assert.is_nil(diagnostic:match("PRIVATE"))
+            assert.is_nil(diagnostic:match("9007199254740993"))
+            assert.is_nil(diagnostic:match("[%c]"))
+            if case.field == "owner" then
+                local terminal
+                for _ = 1, 10 do
+                    local _, reason = tick("live_galaxy_observation", "telemetry_tick")
+                    if reason == "retry_exhausted" then terminal = true; break end
+                end
+                assert.is_true(terminal)
+                local count = #messages
+                for _ = 1, 3 do assert.same({ false, "retry_exhausted" }, { tick("live_galaxy_observation", "telemetry_tick") }) end
+                assert.equals(count, #messages, "unchanged terminal attempt is logged once")
+            end
+        end)
+    end
+
+    it("logs initial detail refusal against the request without fabricated capture metrics", function()
+        local env, tick, diagnostic = native({ selection = "ship_cargo:g1", revision = "4" }), nil, nil
+        local file = assert(io.open("config/heavy-ship-experiment.json", "rb"))
+        local text = assert(file:read("*a")); assert(file:close())
+        local values = {}; for key, value in text:gmatch('"([%w_]+)"%s*:%s*(%d+)') do values[key] = tonumber(value) end
+        local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
+        options.getter, options.clock_getter = function() return 0 end, function() return 1 end
+        options.ship_api = { read_core = function() error("unexpected source capture") end }
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        _G.DebugError = function(value) diagnostic = value end
+        local runtime = fixture.runtime()
+        assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
+        assert.same({ false, "stale_parent" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.is_truthy(diagnostic:match("stage=selection"))
+        assert.is_truthy(diagnostic:match("section=ship_cargo:g1"))
+        assert.is_truthy(diagnostic:match("revision=4"))
+        assert.is_truthy(diagnostic:match("run=producer:1"))
+        assert.is_nil(diagnostic:match("duration_millis"))
+        assert.is_nil(diagnostic:match("ordinal="))
+    end)
+
     for code, reason in pairs({
         [6] = "permanently_rejected", [7] = "ambiguous_commit",
         [8] = "retry_exhausted", [9] = "disconnected", [10] = "restart_required",

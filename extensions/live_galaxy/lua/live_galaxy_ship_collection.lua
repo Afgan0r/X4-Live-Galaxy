@@ -36,7 +36,10 @@ function collection.new(options, clock)
         stage = "census", work = 0, attempts = 1, work_budget = options.work_budget }, { __index = collection })
 end
 
-function collection:discard(carrier, reason)
+function collection:discard(carrier, reason, condition, field, observed_type)
+    local rejection = { stage = self.stage, condition = condition or reason,
+        field = field, observed_type = observed_type, attempt = self.attempts,
+        ordinal = self.index or self.copy_index }
     if self.reserved then carrier:fail_section(reason) end
     self.reserved, self.buffer, self.identities, self.pending = false, nil, nil, nil
     self.cores, self.records, self.begin, self.finish = nil, nil, nil, nil
@@ -44,7 +47,7 @@ function collection:discard(carrier, reason)
     self.faction_buffer, self.factions, self.boundary, self.incarnation = nil, nil, nil, nil
     self.attempts = self.attempts + 1
     self.stage = self.attempts <= self.limits.max_attempts and "census" or "halted"
-    return { disposition = reason }
+    return { disposition = reason, rejection = rejection }
 end
 
 function collection:step(context, carrier, status)
@@ -101,7 +104,10 @@ function collection:step(context, carrier, status)
         for i = self.copy_index, #self.factions do
             if self.work_budget then self.work_budget:step() end
             local faction = self.factions[i]
-            if not token(faction, 64) or self.seen[faction] then return self:discard(carrier, "invalid_fact") end
+            if not token(faction, 64) then
+                return self:discard(carrier, "invalid_fact", "token_invalid", "faction", type(faction))
+            end
+            if self.seen[faction] then return self:discard(carrier, "invalid_fact", "duplicate", "faction") end
             self.seen[faction], self.found, self.copy_index = true, self.found or faction == self.faction, i + 1
         end
         if self.copy_index > #self.factions then
@@ -129,7 +135,8 @@ function collection:step(context, carrier, status)
         for i = self.copy_index, self.count - 1 do
             if self.work_budget then self.work_budget:step() end
             local id = source.identity(self.buffer[i])
-            if id == nil or self.seen[id] then return self:discard(carrier, "identity_invalid") end
+            if id == nil then return self:discard(carrier, "identity_invalid", "identity_invalid", "identity", type(self.buffer[i])) end
+            if self.seen[id] then return self:discard(carrier, "identity_invalid", "duplicate", "identity") end
             self.seen[id], self.identities[i + 1] = true, id
             self.copy_index = i + 1
         end
@@ -156,19 +163,37 @@ function collection:step(context, carrier, status)
         self.reserved, self.index = true, 1
         self.stage = "record"
     elseif stage == "core" then
-        local core = api:read_core(self.identities[self.index])
-        if type(core) ~= "table" or core.identity ~= self.identities[self.index]
-            or core.owner ~= self.faction or not token(core.type, 128)
-            or not token(core.class, 64) or not token(core.location, 128) then
-            return self:discard(carrier, "invalid_fact")
+        local core, source_rejection = api:read_core(self.identities[self.index])
+        if type(core) ~= "table" then
+            return self:discard(carrier, "invalid_fact", source_rejection and source_rejection.condition or "result_shape",
+                source_rejection and source_rejection.field or "core",
+                source_rejection and source_rejection.observed_type or type(core))
+        end
+        for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
+            local valid = key == "identity" and core[key] == self.identities[self.index]
+                or key == "owner" and core[key] == self.faction
+                or key ~= "identity" and key ~= "owner" and token(core[key], key == "class" and 64 or 128)
+            if not valid then
+                return self:discard(carrier, "invalid_fact",
+                    (key == "identity" or key == "owner") and "value_mismatch" or "token_invalid", key, type(core[key]))
+            end
         end
         self.pending = { identity = core.identity, owner = core.owner, type = core.type,
             class = core.class, location = core.location }
         self.stage = "validate"
     elseif stage == "validate" then
-        local current = api:read_core(self.pending.identity)
-        if type(current) ~= "table" or not same_core(self.pending, current) then
-            return self:discard(carrier, "core_changed")
+        local current, source_rejection = api:read_core(self.pending.identity)
+        if type(current) ~= "table" then
+            return self:discard(carrier, "core_changed", source_rejection and source_rejection.condition or "result_shape",
+                source_rejection and source_rejection.field or "core",
+                source_rejection and source_rejection.observed_type or type(current))
+        end
+        if not same_core(self.pending, current) then
+            for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
+                if self.pending[key] ~= current[key] then
+                    return self:discard(carrier, "core_changed", "value_mismatch", key, type(current[key]))
+                end
+            end
         end
         self.cores[self.pending.identity] = self.pending
         self.records[self.index] = self.pending
@@ -205,7 +230,8 @@ end
 function collection:tick(context, carrier, status)
     local now = tonumber(status.monotonic_millis)
     if not integer(now) or self.last_callback and now <= self.last_callback then
-        return { disposition = "clock_unavailable" }
+        return { disposition = "clock_unavailable", rejection = { stage = self.stage,
+            condition = "monotonic_not_advancing", field = "monotonic_millis", attempt = self.attempts } }
     end
     self.last_callback = now
     while true do

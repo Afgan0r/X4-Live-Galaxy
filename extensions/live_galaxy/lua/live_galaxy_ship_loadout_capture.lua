@@ -51,7 +51,14 @@ function capture.step(self)
         self.slot_pending.macro_name, self.stage = macro, "loadout_group"
     elseif stage == "loadout_group" then
         local group = api:physical_group(id, physical_kinds[self.kind_index], self.slot)
-        if type(group) ~= "table" or not string(group.path) or not string(group.group) then return nil, "invalid_fact" end
+        if type(group) ~= "table" then
+            return nil, "invalid_fact", { condition = "result_shape", field = "upgrade_group", observed_type = type(group) }
+        end
+        for _, key in ipairs({ "path", "group" }) do
+            if not string(group[key]) then
+                return nil, "invalid_fact", { condition = "string_invalid", field = key, observed_type = type(group[key]) }
+            end
+        end
         self.slot_pending.path, self.slot_pending.group = group.path, group.group
         self.pending.physical[#self.pending.physical + 1] = self.slot_pending
         self.slot_pending, self.slot = nil, self.slot + 1

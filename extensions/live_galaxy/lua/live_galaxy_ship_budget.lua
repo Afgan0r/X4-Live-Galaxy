@@ -5,6 +5,7 @@ function budget.new(api, limits)
     local wrapped = {}
     for name, fn in pairs(api) do
         wrapped[name] = function(_, ...)
+            self.operation = name
             if name:match("_size$") then return fn(api, ...) end
             if name == "faction_string" then
                 local value = fn(api, ...); self:charge_source_value(value); return value
@@ -27,12 +28,12 @@ function budget.new(api, limits)
                 end
                 self.calls = self.calls + 1
             end
-            local value = fn(api, ...)
+            local value, rejection = fn(api, ...)
             -- Native buffers are charged by capacity, never traversed here.
             if not name:match("_allocate$") and name ~= "new_buffer" and name ~= "new_faction_buffer" then
                 self:charge_source_value(value)
             end
-            return value
+            return value, rejection
         end
     end
     self.api = wrapped
@@ -45,7 +46,10 @@ function budget:charge_source_value(value, ancestors)
     local kind = type(value)
     if kind == "table" then
         ancestors = ancestors or {}
-        if ancestors[value] then self.reason = "invalid_fact"; error(self.reason, 0) end
+        if ancestors[value] then
+            self.reason, self.condition = "invalid_fact", "source_value_cycle"
+            error(self.reason, 0)
+        end
         ancestors[value] = true
         for key, child in pairs(value) do
             self:step()
@@ -79,6 +83,7 @@ function budget:step()
     self.steps = self.steps + 1
 end
 function budget:clock(getter)
+    self.operation = "clock_getter"
     if self.calls >= self.v.max_native_calls then
         self.reason = "native_call_limit"; error(self.reason, 0)
     end

@@ -13,6 +13,22 @@ describe("shared heavy profile and bounded game work", function()
         budget = fixture.load("live_galaxy_ship_budget")
     end)
     after_each(function() fixture.restore() end)
+    it("propagates the actual source adapter sector refusal through the budget wrapper", function()
+        package.loaded.ffi = { C = {} }
+        _G.ConvertStringToLuaID = function(id) assert.equals("9007199254740993", id); return "external-component" end
+        _G.GetComponentData = function(component, ...)
+            assert.equals("external-component", component)
+            assert.same({ "owner", "macro", "classid", "sectorid" }, { ... })
+            return "argon", "macro", "ship", 123
+        end
+        local api = fixture.load("live_galaxy_ship_source").runtime()
+        local wrapped = budget.new(api, values())
+        assert(wrapped:before({ monotonic_millis = "10" }))
+        local value, rejection = wrapped.api:read_core("9007199254740993")
+        assert.is_nil(value)
+        assert.same({ condition = "identity_invalid", field = "sectorid", observed_type = "number" }, rejection)
+        assert.equals("read_core", wrapped.operation)
+    end)
     it("materializes the same strict profile for source and actual native consumers", function()
         local v = values()
         local options = assert(profile.options(v, "argon"))
@@ -95,7 +111,12 @@ describe("shared heavy profile and bounded game work", function()
         for _ = 1, 30 do if step().disposition == "sampled" then break end end
         assert.equals(2, finishes); assert.equals(3, reads); assert.equals(0, failures)
         status.selection = "ship_cargo:g1"
-        assert.equals("selection_unavailable", step().disposition)
+        status.collection_revision = "4"
+        local refusal = step()
+        assert.equals("selection_unavailable", refusal.disposition)
+        assert.same({ stage = "selection", condition = "selection_unavailable", section = "ship_cargo:g1",
+            revision = "4", run = "7" }, refusal.rejection)
+        assert.is_nil(refusal.capture_metrics, "the refused request did not capture source values")
         assert.equals(3, reads, "a missing group never starts a source read")
         now = v.admission_window_millis + 1000
         assert.equals("admission_window_exhausted", step().disposition)

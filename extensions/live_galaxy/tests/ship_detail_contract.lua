@@ -56,6 +56,13 @@ describe("source-faithful resumable cargo", function()
         assert.equals(17, records[1].wares[1].amount_items)
         assert.equals(170, records[1].storage[1].occupied_cubic_metres)
     end)
+    it("preserves the specific cargo field before failure cleanup", function()
+        local _, records, finished, failed, outcome = run({ wares = { ore = "PRIVATE_AMOUNT" } })
+        assert.equals("collection_overflow", outcome.disposition)
+        assert.same({ stage = "ware_copy", condition = "integer_invalid", field = "amount",
+            observed_type = "string", ordinal = 1 }, outcome.rejection)
+        assert.equals(0, #records); assert.equals(0, finished); assert.equals(1, failed)
+    end)
     it("captures eighty owned wares in one callback and resumes a busy handoff without getters", function()
         local raw, pushed, busy, pulses, reads, finishes = {}, nil, true, 0, 0, 0
         for i = 1, 80 do raw["ware" .. string.format("%03d", i)] = i end

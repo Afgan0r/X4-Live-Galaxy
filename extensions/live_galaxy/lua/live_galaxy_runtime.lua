@@ -35,16 +35,49 @@ local safe_details = {
     collecting = true, core_changed = true, stale_parent = true, collection_overflow = true,
     allocation_limit = true, native_call_limit = true, callback_budget_exceeded = true,
     source_boundary_changed = true, selection_unavailable = true, admission_window_exhausted = true,
+    identity_invalid = true, enumeration_incomplete = true, empty_unproven = true,
+    cargo_unknown = true, failed = true,
+    crew_unknown = true, invalid_capture_stage = true,
 }
 
-local function diagnostic(event, detail, metrics)
+-- Rejection metadata contains owned labels/types/ordinals, never source values.
+local function rejection_text(rejection)
+    if type(rejection) ~= "table" then return "" end
+    local text = ""
+    for _, key in ipairs({ "stage", "condition", "field", "observed_type", "operation" }) do
+        local value = rejection[key]
+        if type(value) == "string" and #value <= 64 and value:match("^[a-z_]+$") then
+            text = text .. " " .. key .. "=" .. value
+        end
+    end
+    for _, key in ipairs({ "attempt", "ordinal" }) do
+        local value = rejection[key]
+        if type(value) == "number" and value >= 0 and value <= 9007199254740991 and value % 1 == 0 then
+            text = text .. " " .. key .. "=" .. value
+        end
+    end
+    local section = rejection.section
+    if type(section) == "string" and #section <= 32 and (section == "ship_core"
+        or section:match("^ship_cargo:g%d+$") or section:match("^ship_crew:g%d+$")
+        or section:match("^ship_loadout:g%d+$")) then text = text .. " section=" .. section end
+    local revision, run = rejection.revision, rejection.run
+    if type(revision) == "string" and #revision <= 20 and revision:match("^[1-9]%d*$") then
+        text = text .. " revision=" .. revision
+    end
+    if type(run) == "string" and #run <= 64 and run:match("^[%w_:%-]+$") then text = text .. " run=" .. run end
+    return text
+end
+local function diagnostic(event, detail, metrics, rejection)
     local safe = safe_details[detail] and detail or "unknown"
-    local value = event .. ":" .. safe
-    if value == last_diagnostic and not metrics then return true end
+    local context_text = rejection_text(rejection)
+    local value = event .. ":" .. safe .. context_text
+    if metrics then value = value .. ":" .. metrics.section .. ":" .. metrics.revision .. ":" .. metrics.incarnation end
+    if value == last_diagnostic and (not metrics or safe ~= "sampled") then return true end
     if type(DebugError) == "function" then
         local text = "Live Galaxy Carrier B: event=" .. event .. " detail=" .. safe
         if profile_identity ~= "clock" then text = text .. " profile=" .. profile_identity end
         if diagnostic_gap_count > 0 then text = text .. " diagnostic_gap_count=" .. diagnostic_gap_count end
+        text = text .. context_text
         if metrics then
             text = text .. " section=" .. metrics.section .. " revision=" .. metrics.revision
                 .. " run=" .. metrics.incarnation .. " calls=" .. metrics.calls
@@ -84,7 +117,7 @@ function runtime.handle_tick(_, event_parameter)
         pending_boundary = nil
     end
     if result.disposition ~= "producer_busy" and result.disposition ~= "collecting" then
-        if not diagnostic("transition", result.disposition, result.capture_metrics) then return false, "diagnostic_failure" end
+        if not diagnostic("transition", result.disposition, result.capture_metrics, result.rejection) then return false, "diagnostic_failure" end
     end
     return result.disposition == "sampled", result.disposition
 end
