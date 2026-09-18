@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 rejection diagnostics repaired; next bounded X4 run pending
-last_updated: "2026-09-17T06:21:42Z"
-last_activity: 2026-09-17
-last_activity_desc: Rejection context repair reviewed clean; original source refusal requires a new bounded run
-state_head: b4d6b65
+stopped_at: Phase 05.5 Plan 10 diagnostic package installed; owner readiness for bounded X4 run pending
+last_updated: "2026-09-18T16:08:36Z"
+last_activity: 2026-09-18
+last_activity_desc: CI repair passed Actions; diagnostic extension installed and rollback verified while X4 was closed
+state_head: 5feb9f6
 progress:
   total_phases: 14
   completed_phases: 7
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 Phase: 05.5 (Heavy Faction Ship Conformance) — REJECTION DIAGNOSTICS REPAIRED
 Plan: 2 of 4 active plans complete; next is 10
 Status: Plans 01 and 09 complete locally; Plan 10 diagnostics repair reviewed clean; original specific source cause unknown
-Last activity: 2026-09-18 — Safe rejection context and correlation preserved; owner confirmed no noticeable freezes during revised run; next bounded game run pending
+Last activity: 2026-09-18 — Actions passed at 5feb9f6; verified b156a52 diagnostic package installed with exact rollback while X4 was closed; owner readiness and next bounded game run pending
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
