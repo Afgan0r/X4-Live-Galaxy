@@ -16,6 +16,13 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test -p mind-domain --test shadow_deliberation_evals --locked
       - run: cargo test -p mind-orchestration --test provider_contract --locked
+      - name: Prepare locked Lua ABI host
+        shell: pwsh
+        run: |
+          ./tools/provision-lua.ps1 -CompilerPath 'C:\Program Files\LLVM\bin\clang.exe'
+          ./tests/carrier-b-local.ps1 -SelfTest -PrepareOnly
+      - name: Build debug native ABI image
+        run: cargo build --locked -p x4-carrier-native
       - run: cargo test --workspace --locked
       - run: cargo test --manifest-path tools/shadow-harness/Cargo.toml --locked
       - run: cargo clippy --manifest-path tools/shadow-harness/Cargo.toml --all-targets --locked -- -D warnings

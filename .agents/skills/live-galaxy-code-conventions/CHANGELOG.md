@@ -2,6 +2,10 @@
 
 ## 2026-09-18
 
+- Clarified TOOL-04 ABI prerequisite preparation on clean runners. Source:
+  Actions run `35306856167` failed because the debug DLL was not built before
+  ship ABI fixtures; the workflow also lacked compatible host preparation.
+
 - Clarified LOG-02 context ownership before cleanup and rejection propagation.
 - Source: Phase 05.5 run `055-normal-b4d6b65-20260918-005155` retained only
   `invalid_fact`; merged field checks and success-only metrics lost its cause.

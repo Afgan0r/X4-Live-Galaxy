@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$SelfTest,
+    [switch]$PrepareOnly,
     [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload', 'heavy-ship-core', 'heavy-ship-detail', 'heavy-ship-recovery')]
     [string]$Scenario = 'actual-chain',
     [ValidateSet('bridge-first', 'native-first')]
@@ -20,23 +21,26 @@ if (-not $SelfTest) { throw 'SELF_TEST_REQUIRED' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $cache = Join-Path $repo 'tools/.cache/carrier-b-local'
 $dependencyRoot = $repo
-if (-not (Test-Path -LiteralPath (Join-Path $dependencyRoot 'tools/.cache/lua-busted/5.1.5'))) {
+$runtimeRoot = if ($PrepareOnly) { 'tools/.cache/lua/5.1.5' } else { 'tools/.cache/lua-busted/5.1.5' }
+if (-not (Test-Path -LiteralPath (Join-Path $dependencyRoot $runtimeRoot))) {
     $commonGitDirectory = (& git -C $repo rev-parse --path-format=absolute --git-common-dir).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'GIT_COMMON_DIRECTORY_UNAVAILABLE' }
     $dependencyRoot = Split-Path -Parent $commonGitDirectory
 }
-$luaRoot = Join-Path $dependencyRoot 'tools/.cache/lua-busted/5.1.5'
+$luaRoot = Join-Path $dependencyRoot $runtimeRoot
 $luaSource = Join-Path $luaRoot 'lua-5.1.5/src'
 $defaultLua = Join-Path $luaRoot 'bin/lua.exe'
 $defaultLibrary = Join-Path $luaRoot 'bin/lua51.dll'
 $LuaJitPath = if ($LuaJitPath) { (Resolve-Path $LuaJitPath).Path } else { $defaultLua }
 $LuaLibraryPath = if ($LuaLibraryPath) { (Resolve-Path $LuaLibraryPath).Path } else { $defaultLibrary }
-foreach ($path in @($LuaJitPath, $LuaLibraryPath, (Join-Path $luaSource 'lua.h'))) {
+$requiredLuaPaths = @($LuaJitPath, (Join-Path $luaSource 'lua.h'))
+if (-not $PrepareOnly) { $requiredLuaPaths += $LuaLibraryPath }
+foreach ($path in $requiredLuaPaths) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "COMPATIBLE_LUA_TOOL_MISSING:$path" }
 }
 $reported = (& $LuaJitPath -v 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $reported -notmatch '^Lua 5\.1\.5') { throw 'COMPATIBLE_LUA_ABI_MISMATCH' }
-if ($Scenario -eq 'actual-chain' -and $StartupOrder -eq 'bridge-first') {
+if (-not $PrepareOnly -and $Scenario -eq 'actual-chain' -and $StartupOrder -eq 'bridge-first') {
     cargo test --locked -p observation-ingest --test wire_v2_contract
     if ($LASTEXITCODE -ne 0) { throw 'WIRE_VERSION_MATRIX_FAILED' }
     cargo test --locked -p x4-bridge --test carrier_b_contract --test carrier_b_recovery --test carrier_b_publication
@@ -168,6 +172,12 @@ function Start-Owned([string]$Path, [string[]]$Arguments, [string]$WorkingDirect
 
 [IO.Directory]::CreateDirectory($cache) | Out-Null
 $run = Join-Path $cache ([guid]::NewGuid().ToString('N'))
+if ($PrepareOnly) {
+    [IO.Directory]::CreateDirectory($run) | Out-Null
+    $preparedHost = Build-Host $run
+    Write-Output "PREPARED_LUA_HOST:$preparedHost"
+    return
+}
 [IO.Directory]::CreateDirectory((Join-Path $run 'extensions/live_galaxy/lua')) | Out-Null
 Get-ChildItem -LiteralPath (Join-Path $repo 'extensions/live_galaxy/lua') -File |
     ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $run 'extensions/live_galaxy/lua') }

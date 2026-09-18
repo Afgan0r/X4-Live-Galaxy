@@ -39,6 +39,13 @@ must not silently upgrade them. Preserve pinned versions/lockfiles. Missing or
 incompatible mandatory tools cause an honest failure, not a successful skip
 or an improvised substitute.
 
+Prepare ABI fixture prerequisites explicitly before the test command on a fresh
+runner. For example, the ship ABI contracts require a compatible Lua host and
+the debug native DLL; `cargo test` alone does not guarantee that the top-level
+`cdylib` image exists. An earlier ignored local build can mask this dependency.
+Use the existing provisioning/build routes and keep preparation separate from
+ordinary test execution.
+
 ## TOOL-05 — Check integrity
 
 Success requires that mandatory steps ran against intended inputs. Accidental
