@@ -1,5 +1,5 @@
 use observation_application::{LifecycleError, LifecycleResult};
-use observation_domain::SourceScopeId;
+use observation_domain::{EnvelopeDecodeError, SourceScopeId};
 use observation_ingest::{
     CarrierIdentity, ControlBody, DispositionBody, ReceiverDisposition, complete_message_digest,
     decode_complete_message,
@@ -10,7 +10,7 @@ use crate::{OperationalHistory, ProductionObservationSession};
 
 #[derive(Debug)]
 pub enum AdmitError {
-    Decode,
+    Decode(EnvelopeDecodeError),
     Identity,
     Production(crate::ProductionError),
     UnexpectedResult,
@@ -20,7 +20,13 @@ pub enum AdmitError {
 impl AdmitError {
     pub const fn reason(&self) -> &'static str {
         match self {
-            Self::Decode => "message-decode",
+            Self::Decode(EnvelopeDecodeError::MessageTooLarge) => "message-decode-too-large",
+            Self::Decode(EnvelopeDecodeError::InvalidShape) => "message-decode-invalid-shape",
+            Self::Decode(EnvelopeDecodeError::UnsupportedVersion) => {
+                "message-decode-unsupported-version"
+            }
+            Self::Decode(EnvelopeDecodeError::InvalidIdentity) => "message-decode-invalid-identity",
+            Self::Decode(EnvelopeDecodeError::InvalidVersion) => "message-decode-invalid-version",
             Self::Identity => "message-identity",
             Self::Production(error) => production_reason(*error),
             Self::UnexpectedResult => "message-result",
@@ -58,7 +64,7 @@ pub fn admit(
     session: &mut ProductionObservationSession,
     send_response: impl FnOnce(ControlBody) -> Result<(), ()>,
 ) -> Result<(SourceScopeId, ReceiverDisposition), AdmitError> {
-    let decoded = decode_complete_message(bytes, message_limit).map_err(|_| AdmitError::Decode)?;
+    let decoded = decode_complete_message(bytes, message_limit).map_err(AdmitError::Decode)?;
     let (message_id, section_key, section_revision, scope) =
         identity(&decoded, carrier).map_err(|()| AdmitError::Identity)?;
     history.bind_message(message_id.as_str(), &section_key, section_revision);
@@ -126,50 +132,8 @@ pub const fn response_loss_state(disposition: ReceiverDisposition) -> &'static s
 }
 
 #[cfg(test)]
-mod reason_tests {
-    use observation_application::LifecycleError;
-
-    use super::AdmitError;
-
-    #[test]
-    fn lifecycle_failures_keep_actionable_static_reasons() {
-        let cases = [
-            (LifecycleError::DecodeRejected, "lifecycle-decode-rejected"),
-            (
-                LifecycleError::ContextMismatch,
-                "lifecycle-context-mismatch",
-            ),
-            (LifecycleError::SlotInvariant, "lifecycle-slot-invariant"),
-            (
-                LifecycleError::BlockedAmbiguous,
-                "lifecycle-blocked-ambiguous",
-            ),
-            (LifecycleError::RetainedLimit, "lifecycle-retained-limit"),
-            (
-                LifecycleError::CompletionRejected,
-                "lifecycle-completion-rejected",
-            ),
-            (
-                LifecycleError::AuthorityRejected,
-                "lifecycle-authority-rejected",
-            ),
-            (
-                LifecycleError::FinalizationBlocked,
-                "lifecycle-finalization-blocked",
-            ),
-            (
-                LifecycleError::RetryNotEligible,
-                "lifecycle-retry-not-eligible",
-            ),
-        ];
-        for (error, expected) in cases {
-            assert_eq!(
-                AdmitError::Production(crate::ProductionError::Lifecycle(error)).reason(),
-                expected
-            );
-        }
-    }
-}
+#[path = "production_admission_reason_tests.rs"]
+mod reason_tests;
 
 #[cfg(test)]
 #[path = "production_runtime_tests.rs"]

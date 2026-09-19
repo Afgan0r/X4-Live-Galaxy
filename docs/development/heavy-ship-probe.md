@@ -260,6 +260,10 @@ UI and other third-party extensions, starts a disposable Creative Custom campaig
 and performs the approved normal-time actions. Do not use player saves.
 The agent starts the bridge only after the disposable campaign is ready: its
 60-second experiment window begins with the bridge run, not after menu navigation.
+Keep X4 running at normal speed between bridge-only attempts. Do not pause merely
+to inspect bridge output or prepare the next connection. Pause only for an
+explicit pause-behavior scenario; close X4 before replacing the installed
+extension or native library.
 Stop on a source/identity change, frozen or
 backward clock, allocation/count/work/byte refusal, feedback stall or overrun.
 The agent stops its bridge and the owner disables the experimental extension

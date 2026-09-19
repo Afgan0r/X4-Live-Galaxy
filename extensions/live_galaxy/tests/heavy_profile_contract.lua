@@ -75,6 +75,17 @@ describe("shared heavy profile and bounded game work", function()
         assert.same({ condition = "identity_invalid", field = "sectorid", observed_type = "number" }, rejection)
         assert.equals("read_core", wrapped.operation)
     end)
+    it("retains a ship with no sector context as an explicit location state", function()
+        package.loaded.ffi = { C = { GetContextByClass = function() return "0ULL" end } }
+        _G.ConvertStringToLuaID = function() return "external-component" end
+        _G.ConvertIDTo64Bit = function() return "9007199254740993ULL" end
+        _G.GetComponentData = function() return "argon", "macro", "ship" end
+        local api = fixture.load("live_galaxy_ship_source").runtime()
+        local value, rejection = api:read_core("9007199254740993")
+        assert.is_nil(rejection)
+        assert.same({ identity = "9007199254740993", owner = "argon", type = "macro",
+            class = "ship", location = "context:none" }, value)
+    end)
     it("materializes the same strict profile for source and actual native consumers", function()
         local v = values()
         local options = assert(profile.options(v, "argon"))

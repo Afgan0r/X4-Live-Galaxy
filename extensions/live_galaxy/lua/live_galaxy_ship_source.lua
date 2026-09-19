@@ -22,6 +22,14 @@ local function class_token(value)
     return "classid:" .. string.format("%.0f", value)
 end
 
+local function location_token(value)
+    local raw = tostring(value)
+    if raw == "0ULL" or raw == "0" then return "context:none" end
+    local identity = source.identity(value)
+    if identity == nil then return nil end
+    return "sector:" .. identity
+end
+
 function source.runtime()
     local ffi = require("ffi")
     local C = ffi.C
@@ -44,12 +52,12 @@ function source.runtime()
             end
             local component64 = ConvertIDTo64Bit(component)
             local sector64 = C.GetContextByClass(component64, "sector", false)
-            local sector_identity = source.identity(sector64)
-            if sector_identity == nil then
+            local location = location_token(sector64)
+            if location == nil then
                 return nil, { condition = "identity_invalid", field = "sectorid", observed_type = type(sector64) }
             end
             return { identity = identity, owner = owner, type = macro,
-                class = class, location = "sector:" .. sector_identity }
+                class = class, location = location }
         end,
         cargo_wares = function(_, identity)
             return GetComponentData(ConvertStringToLuaID(identity), "cargo")
