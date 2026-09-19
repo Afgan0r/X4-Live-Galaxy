@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 sector identity fix reviewed; clean native regression and package pending X4 shutdown
+stopped_at: Phase 05.5 Plan 10 sector identity package installed; bounded X4 reattempt pending owner readiness
 last_updated: "2026-09-19T15:46:00Z"
 last_activity: 2026-09-19
-last_activity_desc: Bounded X4 run identified sectorid userdata rejection; stable native sector lookup fixed and reviewed
-state_head: 454934f
+last_activity_desc: Stable native sector lookup passed full regression, was packaged and installed with verified rollback
+state_head: 715365c
 progress:
   total_phases: 14
   completed_phases: 7
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — REJECTION DIAGNOSTICS REPAIRED
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 sector identity repair reviewed clean; clean native regression, package and X4 rerun pending
-Last activity: 2026-09-19 — Bounded run identified `sectorid` userdata rejection; stable native sector lookup implemented, 96 Lua plus 20 syntax contracts passed, and independent review found no issues
+Status: Plans 01 and 09 complete locally; Plan 10 sector identity package installed; bounded X4 runtime reattempt pending
+Last activity: 2026-09-19 — Stable native sector lookup passed the clean full regression, was independently reviewed, and exact package 715365c was installed with verified rollback
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
