@@ -44,10 +44,11 @@ pub fn assemble(
 pub(super) fn batch(
     source: &ProducerSource,
     scope: &SourceScopeId,
-    record: &PreparedRecord,
+    records: &[PreparedRecord],
     section_key: &str,
     revision: SectionRevisionId,
     ordinal: usize,
+    first_record_ordinal: usize,
 ) -> Result<ImmutableBatchEnvelope, ProducerError> {
     Ok(ImmutableBatchEnvelope {
         source_scope: scope.clone(),
@@ -64,19 +65,28 @@ pub(super) fn batch(
         ))
         .ok_or(ProducerError::InvalidInput)?,
         section_ordinal: ordinal,
-        records: vec![EnvelopeRecord {
-            record_id: RecordId::new(if section_key.starts_with("ship_") {
-                format!("carrier-b:{}:{ordinal:020}", revision.get())
-            } else {
-                format!("carrier-b:{}:{ordinal}", revision.get())
+        records: records
+            .iter()
+            .enumerate()
+            .map(|(offset, record)| {
+                let record_ordinal = first_record_ordinal
+                    .checked_add(offset)
+                    .ok_or(ProducerError::DataLimit)?;
+                Ok(EnvelopeRecord {
+                    record_id: RecordId::new(if section_key.starts_with("ship_") {
+                        format!("carrier-b:{}:{record_ordinal:020}", revision.get())
+                    } else {
+                        format!("carrier-b:{}:{record_ordinal}", revision.get())
+                    })
+                    .ok_or(ProducerError::InvalidInput)?,
+                    entity_id: EntityId::new(record.entity_id.clone())
+                        .ok_or(ProducerError::InvalidInput)?,
+                    observation_version: ObservationVersion::new(revision.get())
+                        .ok_or(ProducerError::InvalidInput)?,
+                    content: record.content.clone(),
+                })
             })
-            .ok_or(ProducerError::InvalidInput)?,
-            entity_id: EntityId::new(record.entity_id.clone())
-                .ok_or(ProducerError::InvalidInput)?,
-            observation_version: ObservationVersion::new(revision.get())
-                .ok_or(ProducerError::InvalidInput)?,
-            content: record.content.clone(),
-        }],
+            .collect::<Result<Vec<_>, ProducerError>>()?,
         optional_detail: None,
     })
 }

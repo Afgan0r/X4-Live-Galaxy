@@ -56,6 +56,8 @@ fn revision(section: &str, entity_version: u64, content: &str) -> ValidatedSecti
         }],
         coverage: CompletionCoverage::Complete,
         context: context(),
+        batch_count: 1,
+        raw_bytes: content.len(),
         manifest_digest: [0; 32],
         content_digest: [0; 32],
     }

@@ -128,18 +128,26 @@ fn ready(revision: u64) -> (Producer, ProducerSource) {
 
 fn take_messages(mut producer: Producer, source: &ProducerSource, revision: u64) -> Vec<Vec<u8>> {
     let mut messages = Vec::new();
-    for ordinal in 0..4 {
+    loop {
         let bytes = producer
             .pending_bytes()
             .expect("valid test fixture")
             .to_vec();
         let message = decode_complete_message(&bytes, 4096).expect("valid test fixture");
-        let id = match message {
-            CompleteMessage::SectionStart(_) => format!("message:start:ship_core:{revision}"),
-            CompleteMessage::ImmutableBatch(batch) => batch.batch_id.as_str().to_owned(),
-            CompleteMessage::SectionCompletion(_) => {
-                format!("message:complete:ship_core:{revision}")
+        let (id, disposition, complete) = match message {
+            CompleteMessage::SectionStart(_) => (
+                format!("message:start:ship_core:{revision}"),
+                "received",
+                false,
+            ),
+            CompleteMessage::ImmutableBatch(batch) => {
+                (batch.batch_id.as_str().to_owned(), "received", false)
             }
+            CompleteMessage::SectionCompletion(_) => (
+                format!("message:complete:ship_core:{revision}"),
+                "committed",
+                true,
+            ),
             CompleteMessage::Control(_) => panic!("unexpected control"),
         };
         let mut digest = String::new();
@@ -156,18 +164,16 @@ fn take_messages(mut producer: Producer, source: &ProducerSource, revision: u64)
                         section_key: "ship_core".into(),
                         section_revision: revision,
                         message_digest: digest,
-                        disposition: if ordinal == 3 {
-                            "committed"
-                        } else {
-                            "received"
-                        }
-                        .into(),
+                        disposition: disposition.into(),
                     }),
                 ),
                 0,
             )
             .expect("valid test fixture");
         messages.push(bytes);
+        if complete {
+            break;
+        }
     }
     messages
 }

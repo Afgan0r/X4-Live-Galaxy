@@ -2,29 +2,51 @@ use std::collections::BTreeMap;
 
 use observation_domain::{
     CanonicalizationVersion, CaptureWindow, DigestAlgorithmVersion, ObservationPolicyVersion,
-    ObservationSchemaVersion, SectionAvailability, SectionCoverage, SectionFreshness, SectionKey,
-    SectionQuality, SectionRevisionId, SectionState,
+    ObservationSchemaVersion, SectionKey, SectionRevisionId, SectionState,
 };
 use observation_ingest::{CandidateContext, ContractVersions};
 
-const FORMAT_VERSION: u64 = 1;
+use crate::context_codec::{
+    availability_code, coverage_code, freshness_code, next_u64, parse_availability,
+    parse_completion_counts, parse_coverage, parse_freshness, parse_quality, quality_code,
+};
+
+const FORMAT_VERSION: u64 = 2;
 
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PersistedContext {
+    format_version: u64,
     versions: ContractVersions,
     capture_window: CaptureWindow,
     state: SectionState,
     stable_identity: bool,
+    batch_count: Option<usize>,
+    raw_bytes: Option<usize>,
 }
 
 impl PersistedContext {
-    pub const fn from_candidate(context: &CandidateContext) -> Self {
+    pub const fn from_candidate(
+        context: &CandidateContext,
+        batch_count: usize,
+        raw_bytes: usize,
+    ) -> Self {
         Self {
+            format_version: FORMAT_VERSION,
             versions: context.versions(),
             capture_window: context.capture_window(),
             state: context.state(),
             stable_identity: context.stable_identity(),
+            batch_count: Some(batch_count),
+            raw_bytes: Some(raw_bytes),
+        }
+    }
+
+    #[must_use]
+    pub const fn completion_counts(&self) -> Option<(usize, usize)> {
+        match (self.batch_count, self.raw_bytes) {
+            (Some(batches), Some(bytes)) => Some((batches, bytes)),
+            _ => None,
         }
     }
 
@@ -45,8 +67,26 @@ impl PersistedContext {
 
     #[must_use]
     pub fn canonical_payload(&self) -> String {
+        if self.format_version == 1 {
+            return format!(
+                "1|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|0",
+                self.versions.schema().get(),
+                self.versions.policy().get(),
+                self.versions.canonicalization().get(),
+                self.versions.digest().get(),
+                self.capture_window.start_millis(),
+                self.capture_window.end_millis(),
+                self.state.capture_window().start_millis(),
+                self.state.capture_window().end_millis(),
+                freshness_code(self.state.freshness()),
+                quality_code(self.state.quality()),
+                availability_code(self.state.availability()),
+                coverage_code(self.state.coverage()),
+                u8::from(self.stable_identity),
+            );
+        }
         format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             FORMAT_VERSION,
             self.versions.schema().get(),
             self.versions.policy().get(),
@@ -61,7 +101,8 @@ impl PersistedContext {
             availability_code(self.state.availability()),
             coverage_code(self.state.coverage()),
             u8::from(self.stable_identity),
-            0
+            self.batch_count.unwrap_or(0),
+            self.raw_bytes.unwrap_or(0)
         )
     }
 
@@ -84,10 +125,9 @@ impl PersistedContext {
             1 => true,
             _ => return None,
         };
-        if format != FORMAT_VERSION || next_u64(&mut fields)? != 0 || fields.next().is_some() {
-            return None;
-        }
+        let (batch_count, raw_bytes) = parse_completion_counts(format, &mut fields)?;
         Some(Self {
+            format_version: format,
             versions: ContractVersions::new(schema, policy, canonicalization, digest),
             capture_window,
             state: SectionState::with_evidence(
@@ -98,79 +138,21 @@ impl PersistedContext {
                 coverage,
             ),
             stable_identity,
+            batch_count,
+            raw_bytes,
         })
     }
 }
 
-fn next_u64(fields: &mut std::str::Split<'_, char>) -> Option<u64> {
-    fields.next()?.parse().ok()
-}
+#[cfg(test)]
+mod tests {
+    use super::PersistedContext;
 
-const fn freshness_code(value: SectionFreshness) -> u8 {
-    match value {
-        SectionFreshness::Fresh => 1,
-        SectionFreshness::Stale => 2,
-    }
-}
-const fn parse_freshness(value: u64) -> Option<SectionFreshness> {
-    match value {
-        1 => Some(SectionFreshness::Fresh),
-        2 => Some(SectionFreshness::Stale),
-        _ => None,
-    }
-}
-const fn availability_code(value: SectionAvailability) -> u8 {
-    match value {
-        SectionAvailability::Available => 1,
-        SectionAvailability::Unavailable => 2,
-    }
-}
-const fn parse_availability(value: u64) -> Option<SectionAvailability> {
-    match value {
-        1 => Some(SectionAvailability::Available),
-        2 => Some(SectionAvailability::Unavailable),
-        _ => None,
-    }
-}
-const fn quality_code(value: SectionQuality) -> u8 {
-    match value {
-        SectionQuality::Fresh => 1,
-        SectionQuality::KnownEmpty => 2,
-        SectionQuality::Unknown => 3,
-        SectionQuality::Partial => 4,
-        SectionQuality::Stale => 5,
-        SectionQuality::Unsupported => 6,
-    }
-}
-const fn parse_quality(value: u64) -> Option<SectionQuality> {
-    match value {
-        1 => Some(SectionQuality::Fresh),
-        2 => Some(SectionQuality::KnownEmpty),
-        3 => Some(SectionQuality::Unknown),
-        4 => Some(SectionQuality::Partial),
-        5 => Some(SectionQuality::Stale),
-        6 => Some(SectionQuality::Unsupported),
-        _ => None,
-    }
-}
-const fn coverage_code(value: SectionCoverage) -> u8 {
-    match value {
-        SectionCoverage::Complete => 1,
-        SectionCoverage::KnownEmpty => 2,
-        SectionCoverage::Unknown => 3,
-        SectionCoverage::Partial => 4,
-        SectionCoverage::Unsupported => 5,
-        SectionCoverage::PointMeasurement => 6,
-    }
-}
-const fn parse_coverage(value: u64) -> Option<SectionCoverage> {
-    match value {
-        1 => Some(SectionCoverage::Complete),
-        2 => Some(SectionCoverage::KnownEmpty),
-        3 => Some(SectionCoverage::Unknown),
-        4 => Some(SectionCoverage::Partial),
-        5 => Some(SectionCoverage::Unsupported),
-        6 => Some(SectionCoverage::PointMeasurement),
-        _ => None,
+    #[test]
+    fn legacy_context_round_trips_without_changing_integrity_material() {
+        let payload = "1|1|2|3|1|10|20|10|20|1|1|1|1|1|0";
+        let context = PersistedContext::parse(payload).expect("legacy context parses");
+        assert_eq!(context.canonical_payload(), payload);
+        assert_eq!(context.completion_counts(), None);
     }
 }

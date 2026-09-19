@@ -3,7 +3,7 @@ use observation_application::ObservationLifecycle;
 use observation_domain::{
     BatchId, CompleteMessage, ImmutableBatchEnvelope, SectionCompletionEnvelope,
 };
-use observation_ingest::{ContractVersions, bind_completion_certificate};
+use observation_ingest::bind_completion_certificate;
 use observation_persistence::{CurrentRevision, ObservationRepository};
 
 pub fn is_committed<R: ObservationRepository>(
@@ -30,6 +30,7 @@ fn matches(done: &SectionCompletionEnvelope, current: &CurrentRevision) -> bool 
     let context = revision
         .context
         .candidate(revision.dependencies.clone(), revision.expected_current);
+    let versions = context.versions();
     if done.section_revision != revision_id
         || done.source_scope != revision.source_scope
         || done.producer_incarnation != *revision.source_session.producer_incarnation()
@@ -39,32 +40,55 @@ fn matches(done: &SectionCompletionEnvelope, current: &CurrentRevision) -> bool 
         || done.coverage != revision.coverage
         || done.sender_evidence.section_state != context.state()
         || done.sender_evidence.stable_identity != context.stable_identity()
+        || done.record_count != revision.records.len()
+        || done.schema_version != versions.schema()
+        || done.policy_version != versions.policy()
+        || done.canonicalization_version != versions.canonicalization()
+        || done.digest_version != versions.digest()
     {
         return false;
     }
-    let mut batches = Vec::new();
-    for (index, record) in revision.records.iter().enumerate() {
-        let ordinal = index + 1;
-        let Some(id) = BatchId::new(format!(
-            "carrier-b:{}:{}:{ordinal}",
-            revision.revision.get(),
-            done.transport_epoch.get()
-        )) else {
-            return false;
-        };
-        batches.push(ImmutableBatchEnvelope {
-            source_scope: revision.source_scope.clone(),
-            producer_incarnation: done.producer_incarnation.clone(),
-            transport_epoch: done.transport_epoch,
-            section_key: revision.section_key.clone(),
-            section_revision: revision.revision,
-            batch_id: id,
-            section_ordinal: ordinal,
-            records: vec![record.clone()],
-            optional_detail: None,
-        });
+    if let Some((batch_count, raw_bytes)) = revision.context.completion_counts() {
+        return done.batch_count == batch_count && done.raw_bytes == raw_bytes;
     }
-    let versions: ContractVersions = context.versions();
+    let Some(batches) = legacy_batches(done, current) else {
+        return false;
+    };
     bind_completion_certificate(done.clone(), &batches, versions)
         .is_some_and(|bound| bound == *done)
+}
+
+fn legacy_batches(
+    done: &SectionCompletionEnvelope,
+    current: &CurrentRevision,
+) -> Option<Vec<ImmutableBatchEnvelope>> {
+    let revision = current.revision();
+    let mut batches = Vec::new();
+    for (index, record) in revision.records.iter().enumerate() {
+        let ordinal = index.checked_add(1)?;
+        batches.push(envelope(done, vec![record.clone()], ordinal)?);
+    }
+    Some(batches)
+}
+
+fn envelope(
+    done: &SectionCompletionEnvelope,
+    records: Vec<observation_domain::EnvelopeRecord>,
+    ordinal: usize,
+) -> Option<ImmutableBatchEnvelope> {
+    Some(ImmutableBatchEnvelope {
+        source_scope: done.source_scope.clone(),
+        producer_incarnation: done.producer_incarnation.clone(),
+        transport_epoch: done.transport_epoch,
+        section_key: done.section_key.clone(),
+        section_revision: done.section_revision,
+        batch_id: BatchId::new(format!(
+            "carrier-b:{}:{}:{ordinal}",
+            done.section_revision.get(),
+            done.transport_epoch.get()
+        ))?,
+        section_ordinal: ordinal,
+        records,
+        optional_detail: None,
+    })
 }

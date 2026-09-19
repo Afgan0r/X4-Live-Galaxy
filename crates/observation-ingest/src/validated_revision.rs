@@ -16,6 +16,8 @@ pub struct ValidatedSectionRevision {
     pub(crate) records: Vec<EnvelopeRecord>,
     pub(crate) coverage: CompletionCoverage,
     pub(crate) context: CandidateContext,
+    pub(crate) batch_count: usize,
+    pub(crate) raw_bytes: usize,
     pub(crate) manifest_digest: [u8; 32],
     pub(crate) content_digest: [u8; 32],
 }
@@ -41,6 +43,8 @@ pub struct DurableRevisionParts {
     pub records: Vec<EnvelopeRecord>,
     pub coverage: CompletionCoverage,
     pub context: CandidateContext,
+    pub batch_count: usize,
+    pub raw_bytes: usize,
     pub manifest_digest: [u8; 32],
     pub content_digest: [u8; 32],
 }
@@ -70,6 +74,8 @@ impl HydratedSectionRevision {
             records: parts.records,
             coverage: parts.coverage,
             context: parts.context,
+            batch_count: parts.batch_count,
+            raw_bytes: parts.raw_bytes,
             manifest_digest: parts.manifest_digest,
             content_digest: parts.content_digest,
         }))
@@ -122,6 +128,14 @@ impl ValidatedSectionRevision {
     }
     pub const fn context(&self) -> &CandidateContext {
         &self.context
+    }
+    #[must_use]
+    pub const fn batch_count(&self) -> usize {
+        self.batch_count
+    }
+    #[must_use]
+    pub const fn raw_bytes(&self) -> usize {
+        self.raw_bytes
     }
     #[must_use]
     pub const fn manifest_digest(&self) -> &[u8; 32] {

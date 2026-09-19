@@ -6,7 +6,6 @@ use crate::{GenerationStager, ReceiverDisposition, RejectionReason, ValidatedSec
 use observation_domain::{
     CompletionCoverage, SectionCompletionEnvelope, SectionCoverage, SourceSessionIdentity,
 };
-
 impl GenerationStager {
     pub fn start_section_with_context(
         &mut self,
@@ -111,6 +110,8 @@ impl GenerationStager {
             records,
             coverage: certificate.envelope.coverage,
             context,
+            batch_count: certificate.batch_count,
+            raw_bytes: certificate.raw_bytes,
             manifest_digest: manifest,
             content_digest: certificate.canonical_content_digest,
         }))
@@ -143,6 +144,7 @@ fn completion_is_exact(
     context: &CandidateContext,
     records: &[observation_domain::EnvelopeRecord],
 ) -> bool {
+    let sender = &certificate.envelope.sender_evidence;
     candidate.start.source_scope == certificate.envelope.source_scope
         && candidate.start.producer_incarnation == certificate.envelope.producer_incarnation
         && candidate.start.transport_epoch == certificate.envelope.transport_epoch
@@ -154,7 +156,7 @@ fn completion_is_exact(
                     &certificate.envelope.sender_evidence,
                 )))
         && candidate.start.expected_records == records.len()
-        && crate::completion_evidence::ship_order_matches(&candidate.start.section_key, records)
+        && crate::completion_evidence::ship_order_matches(&candidate.start, records)
         && certificate.envelope.record_count == records.len()
         && certificate.batch_count == candidate.batches.len()
         && certificate.record_count == records.len()
@@ -169,14 +171,10 @@ fn completion_is_exact(
         && certificate.envelope.policy_version == certificate.versions.policy
         && certificate.envelope.canonicalization_version == certificate.versions.canonicalization
         && certificate.envelope.digest_version == certificate.versions.digest
-        && certificate.envelope.sender_evidence.schema_version == certificate.versions.schema
-        && certificate.envelope.sender_evidence.policy_version == certificate.versions.policy
-        && certificate
-            .envelope
-            .sender_evidence
-            .canonicalization_version
-            == certificate.versions.canonicalization
-        && certificate.envelope.sender_evidence.digest_version == certificate.versions.digest
+        && sender.schema_version == certificate.versions.schema
+        && sender.policy_version == certificate.versions.policy
+        && sender.canonicalization_version == certificate.versions.canonicalization
+        && sender.digest_version == certificate.versions.digest
         && coverage_is_consistent(context, certificate.envelope.coverage, records.len())
         && certificate.ordered_batch_manifest_digest == candidate_material(candidate).0
         && certificate.canonical_content_digest == content_digest(records)

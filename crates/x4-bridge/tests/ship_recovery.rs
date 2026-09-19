@@ -5,8 +5,8 @@
 mod carrier_b_support;
 mod ship_support;
 use observation_application::LifecycleResult;
-use observation_domain::{BatchId, SectionKey, SectionRevisionId, TransportEpoch};
-use observation_ingest::ReceiverDisposition;
+use observation_domain::{BatchId, CompleteMessage, SectionKey, SectionRevisionId, TransportEpoch};
+use observation_ingest::{ReceiverDisposition, decode_complete_message};
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 use x4_bridge::{HeavyShipLimits, ProductionObservationSession};
 
@@ -34,6 +34,14 @@ fn publish(receiver: &mut ProductionObservationSession, revision: u64, count: us
         .take(count)
         .enumerate()
     {
+        let expected = if matches!(
+            decode_complete_message(&bytes, 4096).expect("message"),
+            CompleteMessage::SectionCompletion(_)
+        ) {
+            ReceiverDisposition::Committed
+        } else {
+            ReceiverDisposition::Received
+        };
         let result = receiver
             .submit_received(
                 TransportEpoch::new(7).expect("epoch"),
@@ -43,25 +51,21 @@ fn publish(receiver: &mut ProductionObservationSession, revision: u64, count: us
                 revision * 10 + ordinal as u64,
             )
             .expect("submit");
-        let expected = if ordinal == 3 {
-            ReceiverDisposition::Committed
-        } else {
-            ReceiverDisposition::Received
-        };
         assert_eq!(result, LifecycleResult::Disposition(expected));
     }
 }
 #[test]
 fn incomplete_core_restart_never_replaces_accepted_history_or_consumes_a_durable_revision() {
-    for count in 0..4 {
+    let total = ship_support::messages(2, "argon").len();
+    for count in 0..total {
         let database = carrier_b_support::database(&format!("configured-incomplete-{count}"));
         let mut receiver = session(database.path());
-        publish(&mut receiver, 1, 4);
+        publish(&mut receiver, 1, usize::MAX);
         publish(&mut receiver, 2, count);
         drop(receiver);
         let mut reopened = session(database.path());
         assert_eq!(reopened.heavy_revision_floor().expect("floor"), 2);
-        publish(&mut reopened, 2, 4);
+        publish(&mut reopened, 2, usize::MAX);
         drop(reopened);
         let repository = SqliteObservationRepository::open(
             database.path(),
@@ -92,7 +96,7 @@ fn configured_retention_keeps_current_and_two_prior_receipts_and_exact_replay() 
     let database = carrier_b_support::database("configured-retention");
     let mut receiver = session(database.path());
     for revision in 1..=4 {
-        publish(&mut receiver, revision, 4);
+        publish(&mut receiver, revision, usize::MAX);
     }
     assert_eq!(
         receiver
@@ -118,6 +122,6 @@ fn configured_retention_keeps_current_and_two_prior_receipts_and_exact_replay() 
     drop(repository);
     let mut reopened = session(database.path());
     assert_eq!(reopened.heavy_revision_floor().expect("floor"), 5);
-    publish(&mut reopened, 4, 4);
+    publish(&mut reopened, 4, usize::MAX);
     assert_eq!(reopened.heavy_revision_floor().expect("replay floor"), 5);
 }

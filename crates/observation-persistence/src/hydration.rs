@@ -14,6 +14,8 @@ impl RevisionRecord {
             context: self
                 .context
                 .candidate(self.dependencies.clone(), self.expected_current),
+            batch_count: self.context.completion_counts().map_or(0, |value| value.0),
+            raw_bytes: self.context.completion_counts().map_or(0, |value| value.1),
             manifest_digest: self.manifest_digest,
             content_digest: self.content_digest,
         })

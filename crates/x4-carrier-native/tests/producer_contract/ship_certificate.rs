@@ -10,15 +10,12 @@ use observation_ingest::{
 use x4_carrier_native::{Producer, ProducerError, ProducerLimits, SectionEvidence};
 
 #[test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "ordered streaming trace keeps independent certificate assertions beside each handoff"
-)]
+#[expect(clippy::too_many_lines, reason = "ordered certificate trace")]
 fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
     let source = support::source(7);
     let limits = ProducerLimits {
         max_records: 129,
-        max_batches: 129,
+        max_batches: 128,
         max_work: 129,
         max_raw_bytes: 129 * 512,
         data_message_bytes: 4096,
@@ -54,27 +51,9 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
             129,
         )
         .unwrap();
-    producer.progress(1, 0).unwrap();
-    take_current(&mut producer, &source, "received", 0);
-    let mut batches = Vec::new();
     for ordinal in 1..=129 {
         let identity = (9_007_199_254_740_992_u64 + ordinal).to_string();
         producer.push_ship_core(&ship(&identity)).unwrap();
-        producer.progress(1, ordinal).unwrap();
-        let bytes = take_current(&mut producer, &source, "received", ordinal);
-        assert!(bytes.len() <= limits.data_message_bytes);
-        let CompleteMessage::ImmutableBatch(batch) = decode_complete_message(&bytes, 4096).unwrap()
-        else {
-            panic!("batch");
-        };
-        assert_eq!(batch.section_ordinal, usize::try_from(ordinal).unwrap());
-        assert_eq!(batch.records.len(), 1);
-        assert_eq!(
-            batch.records[0].entity_id.as_str(),
-            format!("x4:ship:{identity}")
-        );
-        batches.push(batch);
-        assert_eq!(producer.pending_bytes(), None);
     }
     assert_eq!(
         producer.push_ship_core(&ship("1")),
@@ -82,6 +61,38 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
     );
     producer.finish_section(support::finish(130)).unwrap();
     producer.progress(1, 130).unwrap();
+    take_current(&mut producer, &source, "received", 130);
+    let mut batches = Vec::new();
+    let mut identities = Vec::new();
+    loop {
+        let bytes = producer.pending_bytes().expect("message pending").to_vec();
+        assert!(bytes.len() <= limits.data_message_bytes);
+        match decode_complete_message(&bytes, 4096).unwrap() {
+            CompleteMessage::ImmutableBatch(batch) => {
+                assert_eq!(batch.section_ordinal, batches.len() + 1);
+                identities.extend(
+                    batch
+                        .records
+                        .iter()
+                        .map(|record| record.entity_id.as_str().to_owned()),
+                );
+                batches.push(batch);
+                take_current(&mut producer, &source, "received", 130);
+            }
+            CompleteMessage::SectionCompletion(_) => break,
+            _ => panic!("batch or completion expected"),
+        }
+    }
+    assert!(batches.len() < 129, "records must share bounded messages");
+    assert_eq!(identities.len(), 129);
+    assert_eq!(
+        identities.first().map(String::as_str),
+        Some("x4:ship:9007199254740993")
+    );
+    assert_eq!(
+        identities.last().map(String::as_str),
+        Some("x4:ship:9007199254741121")
+    );
     let bytes = take_current(&mut producer, &source, "committed", 130);
     let CompleteMessage::SectionCompletion(done) = decode_complete_message(&bytes, 4096).unwrap()
     else {
@@ -98,7 +109,7 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
         done, expected,
         "streaming hashes/counters equal canonical sorted batch evidence across ordinals 9/10/99/100"
     );
-    assert_eq!((done.batch_count, done.record_count), (129, 129));
+    assert_eq!((done.batch_count, done.record_count), (batches.len(), 129));
     assert!(
         done.raw_bytes <= limits.max_raw_bytes,
         "the complete certificate remains within the cumulative section budget"

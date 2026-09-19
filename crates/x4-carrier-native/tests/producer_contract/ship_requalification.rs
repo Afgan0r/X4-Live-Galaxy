@@ -16,7 +16,7 @@ fn discarded_completion_reconciles_without_replaying_capture_or_skipping_handsha
         SourceBoundary::TransportReconnect,
     ] {
         let (mut producer, mut source) = completed_ship_section(20);
-        for _ in 0..3 {
+        for _ in 0..2 {
             take_current(&mut producer, &source, "received", 20);
         }
         let bytes = producer.pending_bytes().expect("completion").to_vec();

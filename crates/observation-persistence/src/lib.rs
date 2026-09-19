@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod context;
+mod context_codec;
 mod fake;
 mod hydration;
 mod port;

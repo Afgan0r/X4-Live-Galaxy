@@ -39,6 +39,7 @@ pub struct Producer {
     pub(super) finished: bool,
     pub(super) messages: Option<SectionMessages>,
     pub(super) next_batch_index: usize,
+    pub(super) emitted_records: usize,
     pub(super) pending: Option<Pending>,
     pub(super) connection_generation: u64,
     pub(super) reconciliation: Option<crate::producer_recovery::CompletionOutcome>,
@@ -76,6 +77,7 @@ impl Producer {
             finished: false,
             messages: None,
             next_batch_index: 0,
+            emitted_records: 0,
             pending: Some(Pending::new(bytes, "bootstrap", now_millis)),
             connection_generation: 0,
             reconciliation: None,
@@ -113,7 +115,7 @@ impl Producer {
         let remaining = self
             .limits
             .max_records
-            .saturating_sub(self.next_batch_index + self.records.len());
+            .saturating_sub(self.emitted_records + self.records.len());
         if matches!(self.readiness, Readiness::Ready) {
             (&self.selected_key, remaining)
         } else {
@@ -166,6 +168,7 @@ impl Producer {
         self.finished = false;
         self.messages = None;
         self.next_batch_index = 0;
+        self.emitted_records = 0;
         self.pending = None;
     }
 }

@@ -2,6 +2,8 @@
 mod carrier_b_support;
 #[path = "ship_support/heavy_receiver.rs"]
 mod heavy_receiver;
+#[path = "ship_cargo_contract/valid.rs"]
+mod ship_cargo_valid;
 mod ship_support;
 use observation_application::LifecycleResult;
 use observation_domain::{BatchId, CompleteMessage, SectionKey, TransportEpoch};
@@ -87,7 +89,10 @@ fn run_family_case(index: usize, family: &str, content: &str, from: &str, to: &s
 }
 fn publish_core(receiver: &mut ProductionObservationSession, messages: &[Vec<u8>]) {
     for (ordinal, bytes) in messages.iter().enumerate() {
-        let expected = if ordinal == 3 {
+        let expected = if matches!(
+            decode_complete_message(bytes, 4096).expect("core message"),
+            CompleteMessage::SectionCompletion(_)
+        ) {
             ReceiverDisposition::Committed
         } else {
             ReceiverDisposition::Received
@@ -97,9 +102,10 @@ fn publish_core(receiver: &mut ProductionObservationSession, messages: &[Vec<u8>
                 receiver,
                 bytes.clone(),
                 &format!("core:{ordinal}"),
-                ordinal as u64
+                ordinal as u64 + 1
             ),
-            Ok(LifecycleResult::Disposition(expected))
+            Ok(LifecycleResult::Disposition(expected)),
+            "core message {ordinal}"
         );
     }
 }
@@ -131,6 +137,7 @@ fn detail_batch(bytes: &[u8], key: &SectionKey, content: &str, from: &str, to: &
     if let CompleteMessage::ImmutableBatch(value) = &mut message {
         value.section_key = key.clone();
         value.section_revision = observation_domain::SectionRevisionId::new(2).expect("revision");
+        value.records.truncate(1);
         value.records[0].content = content.replace(from, to);
         value.records[0].record_id =
             observation_domain::RecordId::new("carrier-b:2:00000000000000000001").expect("id");

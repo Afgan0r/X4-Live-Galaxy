@@ -15,7 +15,6 @@ impl Producer {
     ) -> Result<(), ProducerError> {
         if self.profile == ProducerProfile::Clock
             || expected_records > self.limits.max_records
-            || expected_records > self.limits.max_batches
             || (expected_records == 0 && !qualified_empty(&evidence))
         {
             return Err(ProducerError::InvalidInput);
@@ -90,7 +89,7 @@ impl Producer {
         if !matches!(
             self.state,
             ProducerState::SectionReserved | ProducerState::Collecting
-        ) || self.next_batch_index + self.records.len() >= self.expected_records
+        ) || self.emitted_records + self.records.len() >= self.expected_records
         {
             return Err(ProducerError::InvalidTransition);
         }
@@ -111,7 +110,7 @@ impl Producer {
         if !matches!(
             self.state,
             ProducerState::SectionReserved | ProducerState::Collecting
-        ) || self.next_batch_index + self.records.len() != self.expected_records
+        ) || self.emitted_records + self.records.len() != self.expected_records
         {
             return Err(ProducerError::InvalidTransition);
         }
@@ -189,6 +188,7 @@ impl Producer {
             certificate: observation_ingest::ProducerCertificateStream::default(),
         });
         self.next_batch_index = 0;
+        self.emitted_records = 0;
         self.state = ProducerState::PendingStart;
         Ok(ProducerOutcome::Progress)
     }

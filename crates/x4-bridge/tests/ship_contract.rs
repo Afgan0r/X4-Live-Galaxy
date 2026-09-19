@@ -1,19 +1,29 @@
 #![expect(clippy::expect_used, reason = "contract fixtures fail immediately")]
 mod carrier_b_support;
+#[path = "ship_contract/replay.rs"]
+mod ship_contract_replay;
 mod ship_support;
 
-use observation_application::LifecycleResult;
-use observation_domain::{BatchId, SectionKey, TransportEpoch};
-use observation_ingest::ReceiverDisposition;
+use observation_application::{LifecycleLimits, LifecycleResult};
+use observation_domain::{BatchId, CompleteMessage, SectionKey, TransportEpoch};
+use observation_ingest::{ReceiverDisposition, decode_complete_message, encode_complete_message};
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 use x4_bridge::ProductionObservationSession;
 
 fn session(path: &std::path::Path) -> ProductionObservationSession {
+    session_with_message_limit(path, 4_096)
+}
+
+fn session_with_message_limit(
+    path: &std::path::Path,
+    complete_message_bytes: usize,
+) -> ProductionObservationSession {
     let mut receiver = ProductionObservationSession::open(
         path,
         carrier_b_support::generation_limits(),
         carrier_b_support::publication_limits(),
-        carrier_b_support::lifecycle_limits(),
+        LifecycleLimits::new(complete_message_bytes, 16_384, 1_000, 4)
+            .expect("valid lifecycle limits"),
         4,
     )
     .expect("valid test fixture");
@@ -37,8 +47,11 @@ fn submit(
     )
 }
 
-const fn disposition(ordinal: usize) -> ReceiverDisposition {
-    if ordinal == 3 {
+fn disposition(bytes: &[u8]) -> ReceiverDisposition {
+    if matches!(
+        decode_complete_message(bytes, 4096).expect("message decodes"),
+        CompleteMessage::SectionCompletion(_)
+    ) {
         ReceiverDisposition::Committed
     } else {
         ReceiverDisposition::Received
@@ -53,11 +66,7 @@ fn malformed_ship_owner_cannot_replace_durable_core() {
     for (ordinal, bytes) in valid.iter().enumerate() {
         assert_eq!(
             submit(&mut receiver, bytes, ordinal + 1),
-            Ok(LifecycleResult::Disposition(if ordinal == 3 {
-                ReceiverDisposition::Committed
-            } else {
-                ReceiverDisposition::Received
-            }))
+            Ok(LifecycleResult::Disposition(disposition(bytes)))
         );
     }
     let malformed = ship_support::messages(2, "argon\nowner=teladi");
@@ -115,52 +124,27 @@ fn repeated_ship_identity_is_atomically_rejected() {
     for (ordinal, bytes) in valid.iter().enumerate() {
         assert_eq!(
             submit(&mut receiver, bytes, ordinal + 1),
-            Ok(LifecycleResult::Disposition(disposition(ordinal)))
+            Ok(LifecycleResult::Disposition(disposition(bytes)))
         );
     }
     let repeated = ship_support::with_identities(2, "argon", ["9007199254740993"; 2]);
-    for (ordinal, bytes) in repeated.iter().enumerate().take(3) {
+    for (ordinal, bytes) in repeated.iter().enumerate().take(repeated.len() - 1) {
         assert_eq!(
             submit(&mut receiver, bytes, ordinal + 5),
             Ok(LifecycleResult::Disposition(ReceiverDisposition::Received))
         );
     }
     assert_eq!(
-        submit(&mut receiver, &repeated[3], 8),
+        submit(
+            &mut receiver,
+            repeated.last().expect("completion"),
+            repeated.len() + 4
+        ),
         Ok(LifecycleResult::Disposition(
             ReceiverDisposition::PermanentlyRejected
         ))
     );
     drop(receiver);
-    let repository =
-        SqliteObservationRepository::open(database.path(), carrier_b_support::publication_limits())
-            .expect("valid test fixture");
-    let current = repository
-        .current(&SectionKey::new("ship_core").expect("valid test fixture"))
-        .expect("valid test fixture")
-        .expect("valid test fixture");
-    assert_eq!(current.receipt().ordinal, 1);
-}
-
-#[test]
-fn reopened_ship_replay_keeps_exact_receipt_and_revision_floor() {
-    let database = carrier_b_support::database("ship-replay");
-    let messages = ship_support::messages(1, "argon");
-    for replay in 0..2 {
-        let mut receiver = session(database.path());
-        for (ordinal, bytes) in messages.iter().enumerate() {
-            let result = submit(&mut receiver, bytes, ordinal + 1);
-            assert_eq!(
-                result,
-                Ok(LifecycleResult::Disposition(disposition(ordinal))),
-                "replay {replay} ordinal {ordinal}"
-            );
-        }
-        assert_eq!(
-            receiver.next_revision(&SectionKey::new("ship_core").expect("valid test fixture")),
-            Ok(2)
-        );
-    }
     let repository =
         SqliteObservationRepository::open(database.path(), carrier_b_support::publication_limits())
             .expect("valid test fixture");

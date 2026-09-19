@@ -40,7 +40,11 @@ pub fn normalize(request: &PublishRequest, limits: PublicationLimits) -> Option<
         manifest_digest: *revision.manifest_digest(),
         content_digest: calculated,
         integrity_digest: [0; 32],
-        context: PersistedContext::from_candidate(revision.context()),
+        context: PersistedContext::from_candidate(
+            revision.context(),
+            revision.batch_count(),
+            revision.raw_bytes(),
+        ),
     };
     record.integrity_digest = integrity_digest(&record);
     Some(record)

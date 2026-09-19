@@ -62,31 +62,32 @@ fn ship_section_accepts_multiple_complete_records() {
 fn ship_stream_emits_ordered_complete_record_batches_and_completion() {
     let (mut producer, source) = completed_ship_section(0);
     let start = take_current(&mut producer, &source, "received", 0);
-    let first = take_current(&mut producer, &source, "received", 0);
-    let second = take_current(&mut producer, &source, "received", 0);
+    let batch = take_current(&mut producer, &source, "received", 0);
     let completion = take_current(&mut producer, &source, "committed", 0);
 
     assert!(matches!(
         decode_complete_message(&start, 4_096).expect("start decodes"),
         CompleteMessage::SectionStart(value) if value.expected_records == 2
     ));
-    for (bytes, ordinal, identity) in [
-        (&first, 1, "x4:ship:9007199254740993"),
-        (&second, 2, "x4:ship:9007199254740995"),
-    ] {
-        let CompleteMessage::ImmutableBatch(batch) =
-            decode_complete_message(bytes, 4_096).expect("batch decodes")
-        else {
-            panic!("batch expected");
-        };
-        assert_eq!(batch.section_ordinal, ordinal);
-        assert_eq!(batch.records.len(), 1);
-        assert_eq!(batch.records[0].entity_id.as_str(), identity);
-    }
+    let CompleteMessage::ImmutableBatch(batch) =
+        decode_complete_message(&batch, 4_096).expect("batch decodes")
+    else {
+        panic!("batch expected");
+    };
+    assert_eq!(batch.section_ordinal, 1);
+    assert_eq!(batch.records.len(), 2);
+    assert_eq!(
+        batch.records[0].entity_id.as_str(),
+        "x4:ship:9007199254740993"
+    );
+    assert_eq!(
+        batch.records[1].entity_id.as_str(),
+        "x4:ship:9007199254740995"
+    );
     assert!(matches!(
         decode_complete_message(&completion, 4_096).expect("completion decodes"),
         CompleteMessage::SectionCompletion(value)
-            if value.batch_count == 2 && value.record_count == 2
+            if value.batch_count == 1 && value.record_count == 2
     ));
     assert_eq!(producer.state(), ProducerState::Ready);
 }
@@ -143,8 +144,7 @@ fn source_resets_discard_copied_records_for_load_reload_and_uncertainty() {
 fn exact_durable_reconciliation_never_republishes_completion() {
     let (mut producer, source) = completed_ship_section(20);
     let _start = take_current(&mut producer, &source, "received", 20);
-    let _first = take_current(&mut producer, &source, "received", 20);
-    let _second = take_current(&mut producer, &source, "received", 20);
+    let _batch = take_current(&mut producer, &source, "received", 20);
     let completion = producer
         .pending_bytes()
         .expect("completion pending")
