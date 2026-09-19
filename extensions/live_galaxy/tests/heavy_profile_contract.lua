@@ -13,14 +13,35 @@ describe("shared heavy profile and bounded game work", function()
         budget = fixture.load("live_galaxy_ship_budget")
     end)
     after_each(function() fixture.restore() end)
-    it("propagates the actual source adapter sector refusal through the budget wrapper", function()
-        package.loaded.ffi = { C = {} }
+    it("reads a stable sector identity from the native component context", function()
+        package.loaded.ffi = { C = { GetContextByClass = function(component, class, include_self)
+            assert.equals("9007199254740993ULL", component)
+            assert.equals("sector", class); assert.is_false(include_self)
+            return "18446744073709551615ULL"
+        end } }
         _G.ConvertStringToLuaID = function(id) assert.equals("9007199254740993", id); return "external-component" end
+        _G.ConvertIDTo64Bit = function(component)
+            assert.equals("external-component", component); return "9007199254740993ULL"
+        end
         _G.GetComponentData = function(component, ...)
             assert.equals("external-component", component)
-            assert.same({ "owner", "macro", "classid", "sectorid" }, { ... })
-            return "argon", "macro", "ship", 123
+            assert.same({ "owner", "macro", "classid" }, { ... })
+            return "argon", "macro", "ship"
         end
+        local api = fixture.load("live_galaxy_ship_source").runtime()
+        local wrapped = budget.new(api, values())
+        assert(wrapped:before({ monotonic_millis = "10" }))
+        local value, rejection = wrapped.api:read_core("9007199254740993")
+        assert.is_nil(rejection)
+        assert.same({ identity = "9007199254740993", owner = "argon", type = "macro",
+            class = "ship", location = "sector:18446744073709551615" }, value)
+        assert.equals("read_core", wrapped.operation)
+    end)
+    it("propagates an invalid native sector identity through the budget wrapper", function()
+        package.loaded.ffi = { C = { GetContextByClass = function() return 123 end } }
+        _G.ConvertStringToLuaID = function() return "external-component" end
+        _G.ConvertIDTo64Bit = function() return "9007199254740993ULL" end
+        _G.GetComponentData = function() return "argon", "macro", "ship" end
         local api = fixture.load("live_galaxy_ship_source").runtime()
         local wrapped = budget.new(api, values())
         assert(wrapped:before({ monotonic_millis = "10" }))

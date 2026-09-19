@@ -27,11 +27,12 @@ function source.runtime()
         end,
         read_core = function(_, identity)
             local component = ConvertStringToLuaID(identity)
-            local owner, macro, class, sector = GetComponentData(
-                component, "owner", "macro", "classid", "sectorid")
-            local sector_identity = source.identity(sector)
+            local owner, macro, class = GetComponentData(component, "owner", "macro", "classid")
+            local component64 = ConvertIDTo64Bit(component)
+            local sector64 = C.GetContextByClass(component64, "sector", false)
+            local sector_identity = source.identity(sector64)
             if sector_identity == nil then
-                return nil, { condition = "identity_invalid", field = "sectorid", observed_type = type(sector) }
+                return nil, { condition = "identity_invalid", field = "sectorid", observed_type = type(sector64) }
             end
             return { identity = identity, owner = owner, type = macro,
                 class = class, location = "sector:" .. sector_identity }
