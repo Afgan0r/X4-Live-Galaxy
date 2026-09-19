@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 sector identity package installed; bounded X4 reattempt pending owner readiness
+stopped_at: Phase 05.5 Plan 10 numeric class fix verified; package and runtime reattempt pending
 last_updated: "2026-09-19T15:46:00Z"
 last_activity: 2026-09-19
-last_activity_desc: Stable native sector lookup passed full regression, was packaged and installed with verified rollback
+last_activity_desc: Numeric classid canonicalization reviewed clean and passed the full actual-native regression
 state_head: 715365c
 progress:
   total_phases: 14
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — REJECTION DIAGNOSTICS REPAIRED
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 sector identity package installed; bounded X4 runtime reattempt pending
-Last activity: 2026-09-19 — Stable native sector lookup passed the clean full regression, was independently reviewed, and exact package 715365c was installed with verified rollback
+Status: Plans 01 and 09 complete locally; Plan 10 numeric class fix is verified; package, installation and runtime reattempt pending
+Last activity: 2026-09-19 — Numeric `classid` canonicalization passed independent review, seven actual-native scenarios, 97 Lua contracts, 20 syntax checks, XML and persistence validation
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 

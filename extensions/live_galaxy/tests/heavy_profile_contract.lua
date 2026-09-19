@@ -26,7 +26,7 @@ describe("shared heavy profile and bounded game work", function()
         _G.GetComponentData = function(component, ...)
             assert.equals("external-component", component)
             assert.same({ "owner", "macro", "classid" }, { ... })
-            return "argon", "macro", "ship"
+            return "argon", "macro", 123
         end
         local api = fixture.load("live_galaxy_ship_source").runtime()
         local wrapped = budget.new(api, values())
@@ -34,8 +34,33 @@ describe("shared heavy profile and bounded game work", function()
         local value, rejection = wrapped.api:read_core("9007199254740993")
         assert.is_nil(rejection)
         assert.same({ identity = "9007199254740993", owner = "argon", type = "macro",
-            class = "ship", location = "sector:18446744073709551615" }, value)
+            class = "classid:123", location = "sector:18446744073709551615" }, value)
         assert.equals("read_core", wrapped.operation)
+    end)
+    it("canonicalizes signed zero and rejects malformed component classes before sector lookup", function()
+        for _, case in ipairs({
+            { raw = 0, expected = "classid:0" }, { raw = -0.0, expected = "classid:0" },
+            { raw = 1.5 }, { raw = -1 }, { raw = 9007199254740992 }, { raw = {} },
+        }) do
+            local context_calls = 0
+            package.loaded.ffi = { C = { GetContextByClass = function()
+                context_calls = context_calls + 1; return "1ULL"
+            end } }
+            _G.ConvertStringToLuaID = function() return "external-component" end
+            _G.ConvertIDTo64Bit = function() return "9007199254740993ULL" end
+            _G.GetComponentData = function() return "argon", "macro", case.raw end
+            local api = fixture.load("live_galaxy_ship_source").runtime()
+            local value, rejection = api:read_core("9007199254740993")
+            if case.expected then
+                assert.equals(case.expected, value.class); assert.is_nil(rejection)
+                assert.equals(1, context_calls)
+            else
+                assert.is_nil(value)
+                assert.same({ condition = "token_invalid", field = "class",
+                    observed_type = type(case.raw) }, rejection)
+                assert.equals(0, context_calls)
+            end
+        end
     end)
     it("propagates an invalid native sector identity through the budget wrapper", function()
         package.loaded.ffi = { C = { GetContextByClass = function() return 123 end } }

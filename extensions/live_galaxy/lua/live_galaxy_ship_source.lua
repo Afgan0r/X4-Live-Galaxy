@@ -1,4 +1,5 @@
 local source = {}
+local MAX_SAFE_INTEGER = 9007199254740991
 
 -- UniverseID never crosses Lua's floating-point number representation.
 function source.identity(value)
@@ -10,6 +11,15 @@ function source.identity(value)
         return nil
     end
     return decimal
+end
+
+local function class_token(value)
+    if type(value) == "string" then return value end
+    if type(value) ~= "number" or value < 0 or value > MAX_SAFE_INTEGER or value % 1 ~= 0 then
+        return nil
+    end
+    if value == 0 then return "classid:0" end
+    return "classid:" .. string.format("%.0f", value)
 end
 
 function source.runtime()
@@ -27,7 +37,11 @@ function source.runtime()
         end,
         read_core = function(_, identity)
             local component = ConvertStringToLuaID(identity)
-            local owner, macro, class = GetComponentData(component, "owner", "macro", "classid")
+            local owner, macro, raw_class = GetComponentData(component, "owner", "macro", "classid")
+            local class = class_token(raw_class)
+            if class == nil then
+                return nil, { condition = "token_invalid", field = "class", observed_type = type(raw_class) }
+            end
             local component64 = ConvertIDTo64Bit(component)
             local sector64 = C.GetContextByClass(component64, "sector", false)
             local sector_identity = source.identity(sector64)
