@@ -219,7 +219,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: Owner approved the checked 01 -> 09 -> 10 -> 11 chain and revised deployment/run. Revised source `b4d6b65` is installed, verified 26/26 while X4 closed; old `e661f36` rollback copy retained. Manifest SHA-256 `832e3de04eba392215abf9295b6b8254b57c85123385c812636608106b344f3d` passed 29/29 package checks. Scoped review and final local regression passed, including 19 exact interleave readbacks and same-peer unfinished-family/later-member progress. Deliberate aging waits are not throughput evidence. Bridge not started; owner-loaded paused disposable campaign is next. All 21 runtime outcomes, numerical acceptance, SETA, Gate A/B and Plan 10 completion remain pending. X4 responsiveness/headroom remain unproven; synchronous native calls cannot be preempted.
+- [Phase 05.5]: Normal-time X4 captured a full 203,418-byte source-value core in 9 ms without a reported freeze, but the first DATA message was rejected before durable publication and a later ship had no sector context. Source `a96d357` preserves that absence as `context:none`, records exact decode classes, and includes bounded one-message capture tooling. Review and the full 59.081-second local regression passed; manifest `2d8d208ff742cb77883ebb4970f8fbcd36420302e0a8e468d3407ffd87b423fd` was installed and verified 26/26 while X4 was closed. The next unpaused run must capture the exact pending JSON and repair its decode failure. Gate A/B, numerical acceptance, SETA and Plan 10 completion remain pending; the observed 9 ms callback exceeds the 2 ms measurement target and is not accepted headroom.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -252,6 +252,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17
-Stopped at: Phase 05.5 Plan 10 revised run failed source admission; diagnose exact invalid_fact field/stage
+Last session: 2026-09-19
+Stopped at: Phase 05.5 Plan 10 package a96d357 installed; capture exact pending JSON on the next unpaused run
 Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
