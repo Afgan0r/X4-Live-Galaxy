@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-20
+
+- Applied the owner's explicit full-task re-review decision: every round
+  independently reviews the entire current task diff from its established
+  base, with prior-finding verification as an additional duty.
+- Kept optional specialist follow-ups bounded without narrowing the lead pass.
+- Added case F for a missed defect in a file unchanged since the prior review.
+
 ## 2026-09-05
 
 - Added owner-approved conditional fan-out with up to three Luna/high lenses

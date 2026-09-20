@@ -17,6 +17,12 @@ corpus, not a numerical benchmark or an automatic acceptance engine.
   order scenarios.
 - **E:** Nonzero validator result is discarded and success forced; child stdout
   can corrupt the machine-result contract. Nonzero/progress scenarios are absent.
+- **F:** The lead verifies `r1.1` as fixed and finds the invalid-state publication
+  in `refresh.rs`, even though that file did not change after round one. It
+  reports the missing validation-failure scenario, keeps the unrelated legacy
+  formatter out of mandatory findings, and does not approve merely because
+  the old finding is closed. Scope is the whole current task diff from
+  `fixture-base` to `fixture-r2`, not only the round-two delta.
 
 Evaluate the lens boundaries as well as detection. A bug specialist need not
 enumerate test improvements; a logging specialist must not demand per-function
@@ -25,6 +31,16 @@ product infrastructure, fix the fixture, or claim actual X4/storage execution.
 The lead independently verifies candidates, merges shared causes, assigns
 severity, and reports remaining limits. Do not equate this corpus with measured
 production defect recall or an optimal fan-out cost profile.
+
+## Observed evaluation: 2026-09-20
+
+One independent lead evaluator was requested as GPT-5.6 Terra / medium with
+`fork_turns=none`, the full applicable skill chain, and inputs A-F only.
+It did not read expectations or the policy diff. It found the intended defects
+and missing scenarios in A/D/E and left B/C clean. In F it verified `r1.1`,
+found the invalid-state publication in unchanged `refresh.rs`, requested a
+failure-preserves-state regression, and excluded the unrelated formatter.
+This was a synthetic instruction check; no product or game runtime was tested.
 
 ## Observed evaluation: 2026-09-05
 

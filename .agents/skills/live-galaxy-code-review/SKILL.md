@@ -31,6 +31,7 @@ unrelated work. Establish Git freshness before relying on a repository. Review
 new/changed logic and necessary related corrections, including existing defects
 activated by the change. Read relevant surrounding implementation, callers,
 tests, and accepted architecture; the diff alone may omit the actual owner.
+Read every file in the task diff in full, not just its changed hunks.
 
 Existing code is not an exemplar. Do not expand ordinary review into an
 unrequested whole-repository audit or import external stack conventions.
@@ -95,11 +96,25 @@ No findings means only no grounded findings in the examined scope.
 
 ## REV-05 — Re-review and completion
 
-Re-read the current changed code and affected contracts after fixes. Confirm
-each finding as fixed, still open, rejected with evidence, or explicitly
-deferred by the owner; do not accept a description of the fix as proof. Check
-for regressions and second-order effects. Reuse specialists only for a
-remaining or newly affected question; do not rerun all lenses mechanically.
+Every re-review is a fresh full-depth lead review of the entire current task
+diff against its established base. Repeat REV-01 through REV-04, including
+files unchanged since the previous round. Search for previously missed
+defects as well as fix regressions and second-order effects. Neither the old
+finding list nor the delta since the last review limits this pass. Preserve
+the original task boundary; this is not an unrelated whole-repository audit.
+
+Additionally verify every prior finding against the current code: fixed,
+still open, rejected with evidence, or explicitly deferred by the owner.
+Link resolutions to stable prior finding IDs and identify the reviewed base
+and current revision. A description of a fix is not proof. Report new defects
+even in code unchanged since the previous round. If the prior report is
+missing, disclose the resolution-tracking gap and perform the full review
+without inventing resolutions. Derive the verdict from all current mandatory
+findings, not merely closure of the old list.
+
+The complete lead pass does not require redispatching every specialist lens.
+Reuse specialists only for a remaining or newly affected question under the
+fan-out reference; their focused follow-up does not narrow the lead's scope.
 
 Wait for selected specialist results before the final verdict. If a specialist
 fails or is unavailable, the lead covers the lens directly and states that

@@ -24,7 +24,9 @@ dispatch agents only to occupy all slots.
   demand logging every helper or duplicating errors already recorded by the
   owner.
 
-The lead retains the complete convention and cross-component review.
+The lead retains the complete convention and cross-component review of the
+entire current task diff on every round, as required by REV-05. A specialist's
+bounded assignment never narrows that lead responsibility.
 
 ## Routing and scope
 
@@ -93,5 +95,6 @@ replaced by explicit lead coverage or left as a declared unresolved limit.
 
 Stop fan-out when the selected questions are answered. After fixes, dispatch
 only a focused follow-up justified by changed evidence; avoid automatic
-multi-round swarms or repeating unchanged full reviews. Keep findings and
+multi-round swarms or repeating unchanged specialist assignments. The lead
+still performs the full-task re-review required by REV-05. Keep findings and
 dispositions in the existing review output, not a new review platform.

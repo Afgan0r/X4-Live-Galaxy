@@ -118,3 +118,48 @@ are already validated elsewhere and are outside this change.
 Write-Output '{"ok":true}'
 exit 0
 ```
+
+## Case F
+
+Act as the review lead for round two. The task base is `fixture-base`, the
+previously reviewed revision is `fixture-r1`, and the current revision is
+`fixture-r2`. These are synthetic labels, not Git objects. The task adds both
+`limit.rs` and `refresh.rs` below; everything else is unchanged and outside
+scope. The round-one report contains only `r1.1`: `limit.rs` accepts zero.
+The developer says that finding is fixed. Since round one only `limit.rs`
+changed. The task requires a positive limit and replacement state to be
+published only after successful validation; a failure must preserve the last
+valid state. Error reporting is owned by the caller, which cannot undo a
+published replacement. Existing tests exercise successful refresh and zero
+limit rejection, but no refresh validation failure.
+
+`limit.rs` at `fixture-r1`:
+
+```rust
+fn valid_limit(limit: u32) -> bool {
+    limit <= 100
+}
+```
+
+`limit.rs` at `fixture-r2`:
+
+```rust
+fn valid_limit(limit: u32) -> bool {
+    (1..=100).contains(&limit)
+}
+```
+
+`refresh.rs` at both `fixture-r1` and `fixture-r2`:
+
+```rust
+fn refresh(current: &mut Snapshot, replacement: Snapshot) -> Result<(), Error> {
+    *current = replacement;
+    validate(current)?;
+    Ok(())
+}
+```
+
+A legacy formatter has an unrelated known defect, predates `fixture-base`,
+and is neither touched nor used by this task. It is outside the supplied diff.
+Return the round-two report and the scope actually examined. Do not modify
+the fixture or claim real storage/game execution.
