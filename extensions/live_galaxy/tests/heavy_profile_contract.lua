@@ -156,7 +156,8 @@ describe("shared heavy profile and bounded game work", function()
             fail_section = function() failures = failures + 1; return 0 end,
             progress = function() return 0, { monotonic_millis = tostring(now) } end }
         local context = { source_boundary = "runtime_start" }
-        local status = { selection = "ship_core", collection_revision = "1", producer_incarnation = "7" }
+        local status = { selection = "ship_core", collection_revision = "1", producer_incarnation = "7",
+            producer_state = "ready" }
         local function step()
             now = now + 50; status.monotonic_millis = tostring(now)
             return adapter:advance(context, carrier, status)
@@ -177,5 +178,13 @@ describe("shared heavy profile and bounded game work", function()
         assert.equals(3, reads, "a missing group never starts a source read")
         now = v.admission_window_millis + 1000
         assert.equals("admission_window_exhausted", step().disposition)
+        adapter:feedback(context, carrier, status, 0)
+        assert.equals("admission_window_exhausted", step().disposition,
+            "ordinary polls never renew an exhausted experiment")
+        status.producer_state = "awaiting_compatibility"
+        adapter:feedback(context, carrier, status, 0)
+        status.producer_state, status.selection, status.collection_revision = "ready", "ship_core", "5"
+        assert.equals("sampled", step().disposition,
+            "a fresh bridge qualification opens a new finite experiment without reloading X4")
     end)
 end)

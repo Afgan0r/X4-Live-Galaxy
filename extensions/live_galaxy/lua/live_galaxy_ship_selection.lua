@@ -33,12 +33,23 @@ local function discard(self, carrier, reason, request)
     result.capture_metrics = not request and metrics(self) or nil
     return result
 end
+local function observe_qualification(self, carrier, status)
+    local producer_state = type(status) == "table" and status.producer_state or nil
+    if producer_state == "awaiting_compatibility" and self.producer_state
+        and self.producer_state ~= producer_state then
+        discard(self, carrier, "source_boundary_changed")
+        self.run_started, self.budget = nil, nil
+        self.key, self.revision, self.boundary, self.incarnation = nil, nil, nil, nil
+    end
+    if type(producer_state) == "string" then self.producer_state = producer_state end
+end
 function selection.attach(adapter, options)
     local limits, err = profile.validate(options.heavy_limits)
     if not limits then return nil, err end
     local state = { options = options, limits = limits, clock = adapter,
         api = options.ship_api or source.runtime() }
     function adapter:feedback(context, carrier, status, control)
+        observe_qualification(state, carrier, status)
         if control == 5 and state.pending then
             if type(status) ~= "table" or not tonumber(status.monotonic_millis) then
                 return discard(state, carrier, "clock_unavailable")
@@ -93,6 +104,7 @@ local function start(self, context, carrier, status)
 end
 function selection.advance(self, context, carrier, status)
     context.source_boundary = context.source_boundary or "runtime_start"
+    observe_qualification(self, carrier, status)
     local now = tonumber(status.monotonic_millis)
     if self.run_started and (not now or now - self.run_started >= self.limits.admission_window_millis) then
         return discard(self, carrier, "admission_window_exhausted", status)

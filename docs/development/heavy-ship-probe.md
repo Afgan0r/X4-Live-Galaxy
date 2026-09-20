@@ -470,3 +470,38 @@ precedents. Copy returned strings synchronously and record observed/inferred/
 unknown facts separately. Exact ABI size and alignment come from target
 `ffi.sizeof`, never a packed struct guess. Plans 10/11 record the actual game
 outcomes against the retained source contract and finite package identity.
+
+## Repeatable runtime-window and frame-capture repair
+
+The first focused loaded frame run is valid normal-time evidence for package
+source `658def3`. Logical runtime ID
+`055-gate-a-fps-focused-658def3-20260920-200209` committed 35 revisions with
+no rejected or failed outcome. Logical capture ID
+`055-fps-loaded-focused-20260920-200209` measured average FPS -0.627%, 1% low
+-1.173%, 0.1% low -6.525% and p99 frame time +4.205% against the clean
+baseline; no frame was at least 33.333 ms. The owner observed no freeze or
+stutter. The separate unfocused control
+`055-fps-unfocused-control-20260920-200500` captured 4,878 frames in 14.989
+seconds, proving that PresentMon collection does not require X4 focus or owner
+interaction. These results do not establish SETA acceptance or numerical Gate A.
+
+Two attempted SETA runs are explicitly invalid: the first never had SETA
+enabled, and the second was stopped after 0.887 seconds and four commits. They
+must not be used as performance or stability evidence.
+
+The retry failure exposed a lifecycle mismatch. Rust correctly creates one
+finite admission window per bridge process, but the Lua module retained its
+expired `run_started` value for the lifetime of X4. A transition into a new
+bridge compatibility qualification now discards old selection state and lets
+the next ready selection start a fresh Lua window. Ordinary polls, transport
+retry and reconnect do not renew either window. The 60-second bridge-run limit
+is unchanged.
+
+`tools/run-heavy-ship-runtime.ps1` owns the timed measurement lifecycle. In
+SETA mode it waits for a measured 4x--8x game-time factor before starting the
+bridge and PresentMon, runs the full requested interval independently of chat,
+stops only its own child processes and rejects missing frames, missing commits,
+failed/rejected outcomes, lost PresentMon events or insufficient SETA evidence.
+It publishes machine-readable status and result files under the private
+evidence root. This removes chat timing and repeated X4 restarts from the
+measurement protocol; it does not operate X4 or enable SETA for the owner.
