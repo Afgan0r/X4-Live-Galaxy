@@ -516,3 +516,42 @@ rehashed with zero mismatches while X4 was closed. Rollback artifact ID:
 The next valid measurement may start from SETA in the already-loaded disposable
 campaign; restarting X4 between bridge-run windows is no longer part of the
 procedure.
+
+## SETA capture and core-change recovery repair
+
+Logical run `055-gate-a-seta-20260920-230703` completed a 65-second capture at
+an observed 5.991x game-time factor. It produced 7,362 frames at 113.290 average
+FPS, with 54.678 1% low, 41.755 0.1% low, 11.835 ms p95, 15.959 ms p99,
+20.403 ms p99.9 and 37.065 ms maximum frame time. Fifty-six frames were at
+least 16.667 ms, one was at least 33.333 ms, none was at least 50 ms, and
+PresentMon reported no lost events. SETA changes game workload, so these values
+must not be compared directly with the normal-time baseline as mod overhead.
+
+The bridge durably committed 25 revisions in 4.282 seconds: one 971-record
+`ship_core` revision and cargo, crew and loadout revisions for groups g0 through
+g7. Independent reopening verified all 25 revisions and 995 semantic records
+with no failed read. The complete event span was 64.633 seconds.
+
+This run is not a Gate-A pass. X4 subsequently reported `core_changed` while
+revalidating `ship_cargo:g8` at revision 26. The rejection was correct and no
+invalid detail was published, but the native producer stayed paused instead of
+accepting a fresh core intent. The original runner also inspected only bridge
+history and therefore incorrectly labelled the window successful despite the
+Lua diagnostic.
+
+The recovery repair treats `core_changed` like `stale_parent`: it discards the
+incomplete section, retains fail-closed publication behavior and permits only a
+fresh `ship_core` intent. The runner now captures privacy-safe runtime
+`event:detail` diagnostics for the measured interval and fails on every pair
+except `transition:sampled` and `initialized:initialized`. Its self-test proves
+that `transition:core_changed` fails the verdict. No deadline, retry count,
+protocol or collection limit changed.
+
+Runtime locator SHA-256:
+`d6faa60c5ce5098b9ec9cc5fbcb60d3192a08bc973eea00849c6069aefb6a468`.
+Frame-capture locator SHA-256:
+`48055139405a852e58b5608fb02309d4f76e0a7de22a56867aae5a7ee8c0a98b`.
+All seven retained runtime files and all three retained frame files were
+re-read with zero digest mismatches under owner-only ACLs. A revised installed
+package and a fresh SETA run remain required; numerical acceptance, Gate A/B
+and Plan 10 remain pending.

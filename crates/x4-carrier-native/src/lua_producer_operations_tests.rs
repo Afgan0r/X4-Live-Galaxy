@@ -152,3 +152,6 @@ fn abi_poll_control_retains_control_and_state_while_clock_is_unavailable() {
 
 #[path = "lua_teardown_tests.rs"]
 mod teardown;
+
+#[path = "lua_producer_core_change_tests.rs"]
+mod core_change;

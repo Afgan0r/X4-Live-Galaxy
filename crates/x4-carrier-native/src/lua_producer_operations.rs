@@ -71,7 +71,7 @@ pub unsafe extern "C" fn fail_section(state: *mut c_void) -> c_int {
     }
     let result = with_producer(handle, |producer| {
         producer.fail_section();
-        if reason == b"stale_parent" {
+        if matches!(reason.as_slice(), b"stale_parent" | b"core_changed") {
             producer.allow_core_refresh();
         }
         Ok(())

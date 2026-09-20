@@ -18,6 +18,12 @@ function Get-GameTimes([string]$Text) {
         ForEach-Object { [double]$_.Groups['time'].Value })
 }
 
+function Get-RuntimeDiagnostics([string]$Text) {
+    @([regex]::Matches($Text,
+        'Live Galaxy Carrier B: event=(?<event>[a-z_]+) detail=(?<detail>[a-z_]+)') |
+        ForEach-Object { "$($_.Groups['event'].Value):$($_.Groups['detail'].Value)" })
+}
+
 function Read-GameTimes([string]$Path, [long]$Offset) {
     $stream = [System.IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
     try {
@@ -25,7 +31,11 @@ function Read-GameTimes([string]$Path, [long]$Offset) {
         [void]$stream.Seek($Offset, 'Begin')
         $reader = [System.IO.StreamReader]::new($stream, [Text.Encoding]::UTF8, $true, 4096, $true)
         try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
-        [pscustomobject]@{ Offset = $stream.Length; Times = @(Get-GameTimes $text) }
+        [pscustomobject]@{
+            Offset = $stream.Length
+            Times = @(Get-GameTimes $text)
+            Diagnostics = @(Get-RuntimeDiagnostics $text)
+        }
     } finally { $stream.Dispose() }
 }
 
@@ -89,6 +99,16 @@ function Invoke-SelfTest {
     $times = @(Get-GameTimes "ignored`n[Economy_Verbose] 10.25 sample`n[Economy_Verbose] 72.25 sample")
     if ($times.Count -ne 2 -or $times[0] -ne 10.25 -or $times[1] -ne 72.25) {
         throw 'HEAVY_RUNTIME_GAME_CLOCK_PARSE'
+    }
+    $diagnosticText = "Live Galaxy Carrier B: event=transition detail=sampled`n" +
+        'Live Galaxy Carrier B: event=transition detail=core_changed stage=revalidate'
+    $diagnostics = @(Get-RuntimeDiagnostics $diagnosticText)
+    if ($diagnostics.Count -ne 2 -or $diagnostics[0] -ne 'transition:sampled' `
+        -or $diagnostics[1] -ne 'transition:core_changed') {
+        throw 'HEAVY_RUNTIME_DIAGNOSTIC_PARSE'
+    }
+    if (@($diagnostics | Where-Object { $_ -notin @('transition:sampled', 'initialized:initialized') }).Count -ne 1) {
+        throw 'HEAVY_RUNTIME_DIAGNOSTIC_VERDICT'
     }
     $samples = [Collections.ArrayList]::new()
     [void]$samples.Add([pscustomobject]@{ Wall = [DateTime]'2026-01-01T00:00:00Z'; Game = 10.0 })
@@ -184,14 +204,19 @@ try {
         -StandardOutputPath $bridgeOut -StandardErrorPath $bridgeErr
     $started = [DateTime]::UtcNow; $offset = (Get-Item -LiteralPath $DebugLog).Length
     $runSamples = [Collections.ArrayList]::new()
+    $runtimeDiagnostics = [Collections.ArrayList]::new()
     @{ state = 'capturing'; run_id = $runId; bridge_pid = $bridge.Process.Id; presentmon_pid = $pm.Process.Id } |
         ConvertTo-Json | Set-Content -LiteralPath $statusPath -Encoding utf8NoBOM
     while (-not $pm.Process.HasExited) {
         Start-Sleep -Seconds 1; $pm.Process.Refresh(); $bridge.Process.Refresh()
         $read = Read-GameTimes $DebugLog $offset; $offset = $read.Offset; Add-GameSample $runSamples $read
+        foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
         if ($bridge.Process.HasExited) { throw "HEAVY_RUNTIME_BRIDGE_EXITED:$($bridge.Process.ExitCode)" }
         if (([DateTime]::UtcNow - $started).TotalSeconds -gt $CaptureSeconds + 15) { throw 'HEAVY_RUNTIME_CAPTURE_TIMEOUT' }
     }
+    $read = Read-GameTimes $DebugLog $offset
+    Add-GameSample $runSamples $read
+    foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
     if ($pm.Process.ExitCode -ne 0) { throw "HEAVY_RUNTIME_PRESENTMON_EXITED:$($pm.Process.ExitCode)" }
 } catch { $failure = $_ } finally {
     Complete-OwnedProcess $pm -Stop
@@ -204,6 +229,8 @@ $history = Join-Path $dataRoot 'operational-history.jsonl'
 $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
 $bad = @($events | Where-Object { $_.state -in @('failed', 'rejected') }).Count
+$runtimeFailures = @($runtimeDiagnostics |
+    Where-Object { $_ -notin @('transition:sampled', 'initialized:initialized') })
 $gameFactor = Measure-GameFactor $runSamples
 $gameFactorSeconds = if ($runSamples.Count -gt 1) {
     ($runSamples[-1].Wall - $runSamples[0].Wall).TotalSeconds
@@ -211,7 +238,8 @@ $gameFactorSeconds = if ($runSamples.Count -gt 1) {
 $frameValues = @($rows | ForEach-Object { [double]$_.MsBetweenPresents })
 $averageFrame = ($frameValues | Measure-Object -Average).Average
 $lostEvents = (Get-Content -LiteralPath $pmErr -Raw) -match '(?i)lost\s+\d+\s+events'
-$valid = $rows.Count -gt 0 -and $commits -gt 0 -and $bad -eq 0 -and -not $lostEvents
+$valid = $rows.Count -gt 0 -and $commits -gt 0 -and $bad -eq 0 `
+    -and $runtimeFailures.Count -eq 0 -and -not $lostEvents
 if ($Mode -eq 'Seta') {
     $valid = $valid -and $gameFactorSeconds -ge 10 -and $null -ne $gameFactor `
         -and $gameFactor -ge 4.0 -and $gameFactor -le 8.0
@@ -220,6 +248,8 @@ $result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); mo
     run_id = $runId; capture_id = $captureId; x4_process_id = $X4ProcessId; frames = $rows.Count
     average_fps = $(if ($averageFrame -gt 0) { 1000 / $averageFrame } else { 0 }); commits = $commits
     rejected_or_failed = $bad; lost_presentmon_events = $lostEvents
+    runtime_diagnostic_failures = $runtimeFailures.Count
+    runtime_diagnostic_failure_details = @($runtimeFailures | Sort-Object -Unique)
     game_time_factor = $gameFactor; game_time_sample_seconds = $gameFactorSeconds
     capture_seconds = $CaptureSeconds }
 $result | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding utf8NoBOM
