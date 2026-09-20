@@ -24,13 +24,13 @@ pub fn ship_order_matches(
             .all(|pair| pair[0].entity_id.as_str() < pair[1].entity_id.as_str());
     }
     let prefix = format!("carrier-b:{}:", start.section_revision.get());
-    let mut previous = 0_u64;
+    let mut previous: Option<&str> = None;
     for (index, record) in records.iter().enumerate() {
         let Some(identity) = record
             .entity_id
             .as_str()
             .strip_prefix("x4:ship:")
-            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
         else {
             return false;
         };
@@ -43,10 +43,10 @@ pub fn ship_order_matches(
         else {
             return false;
         };
-        if identity <= previous || ordinal != index + 1 {
+        if previous.is_some_and(|value| identity <= value) || ordinal != index + 1 {
             return false;
         }
-        previous = identity;
+        previous = Some(identity);
     }
     true
 }
@@ -99,10 +99,10 @@ mod tests {
     }
 
     #[test]
-    fn ship_core_requires_global_record_ordinals_from_one() {
+    fn ship_core_matches_source_lexical_order_and_global_ordinals() {
         let key = SectionKey::new("ship_core").expect("section key");
         let revision = SectionRevisionId::new(7).expect("revision");
-        let record = |ordinal: usize, identity: u64| EnvelopeRecord {
+        let record = |ordinal: usize, identity: &str| EnvelopeRecord {
             record_id: RecordId::new(format!("carrier-b:7:{ordinal:020}"))
                 .expect("record identity"),
             entity_id: EntityId::new(format!("x4:ship:{identity}")).expect("entity identity"),
@@ -119,8 +119,21 @@ mod tests {
             expected_records: 2,
             sender_evidence: SenderEvidence::legacy_default(),
         };
-        assert!(ship_order_matches(&start, &[record(1, 10), record(2, 20)]));
-        assert!(!ship_order_matches(&start, &[record(2, 10), record(3, 20)]));
-        assert!(!ship_order_matches(&start, &[record(1, 10), record(3, 20)]));
+        assert!(ship_order_matches(
+            &start,
+            &[record(1, "10"), record(2, "2")]
+        ));
+        assert!(!ship_order_matches(
+            &start,
+            &[record(1, "2"), record(2, "10")]
+        ));
+        assert!(!ship_order_matches(
+            &start,
+            &[record(2, "10"), record(3, "2")]
+        ));
+        assert!(!ship_order_matches(
+            &start,
+            &[record(1, "10"), record(3, "2")]
+        ));
     }
 }
