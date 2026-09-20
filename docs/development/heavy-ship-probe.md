@@ -505,3 +505,14 @@ failed/rejected outcomes, lost PresentMon events or insufficient SETA evidence.
 It publishes machine-readable status and result files under the private
 evidence root. This removes chat timing and repeated X4 restarts from the
 measurement protocol; it does not operate X4 or enable SETA for the owner.
+
+The rebuilt installed package records source revision
+`0869e1aae3afd1cc97cdb8c0b4749b0af01fb01d`; manifest SHA-256:
+`bbd9d051a472d57991e7d2f1b33c6d7e2a6cc582d8bfb1d19803cc1fb5e30faa`.
+All 29 package entries and all 26 installed extension files were independently
+rehashed with zero mismatches while X4 was closed. Rollback artifact ID:
+`05.5-0869e1a-20260920-204804-35070262`; its owner-only locator SHA-256 is
+`ffe7eb9f8fa1771ea6d6a225cacc3af201265670bc58e85d21ec1d7291cc49d9`.
+The next valid measurement may start from SETA in the already-loaded disposable
+campaign; restarting X4 between bridge-run windows is no longer part of the
+procedure.
