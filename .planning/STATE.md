@@ -3,12 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 package d93e6f9 installed; owner-operated normal-time Gate A pending
-last_updated: "2026-09-20T05:29:33Z"
+stopped_at: Phase 05.5 Plan 10 FFI repair passed final regression; package and install pending
+last_updated: "2026-09-20T06:15:05Z"
 last_activity: 2026-09-20
-last_activity_desc: Exact lexical-order package d93e6f9 installed and rehashed with verified owner-only rollback
-state_head: 9845f37
-state_head: 715365c
+last_activity_desc: Core Gate A passed on d93e6f9; reviewed detail FFI repair passed the full 57.047-second regression
+state_head: d93e6f9
 progress:
   total_phases: 14
   completed_phases: 7
@@ -28,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — ORDER REPAIR INSTALLED
+Phase: 05.5 (Heavy Faction Ship Conformance) — DETAIL FFI REPAIR REVIEWED
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 lexical order package is installed; owner-operated normal-time Gate-A reattempt remains pending
-Last activity: 2026-09-20 — Exact package d93e6f9 was independently verified, installed while X4 was closed and rehashed 26/26
+Status: Plans 01 and 09 complete locally; Plan 10 core Gate A passed on d93e6f9; reviewed detail FFI repair passed final regression and awaits exact packaging
+Last activity: 2026-09-20 — Core revision 1 committed/read back in 239 ms; UniverseID/arity and diagnostic-capture repairs passed full review and regression
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -219,7 +218,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: The retained 674-byte first message decoded as a valid `section_start`. A fresh unpaused run then accepted 366 observed receive events without decode errors but expired at the unchanged 30-second candidate age: the producer emitted one record per IPC batch at roughly 100 ms callback cadence, so 893 collected ships required about 90 seconds to transfer. Package `e7a843a` repaired batching. Normal-time run `055-gate-a-e7a843a-20260920-121406` then transferred four successive core revisions as one batch each in 204–212 ms, proving the timeout/backlog defect closed, but every completion was permanently rejected and durable readback remained `MissingRevision`. The source sorts canonical decimal `UniverseID` strings lexicographically while completion compared parsed numbers; package `d93e6f9` repairs that contract and retains global `1..N` record ordinals. Full workspace and 70.175-second native/Lua/XML regression passed. Manifest SHA-256 `d5184f2f485751e989ce75aa77f739ad429f23dbba311f567b00d21703caa574` was independently verified and installed 26/26 with owner-only rollback artifact `05.5-d93e6f9-20260920-122933-7ff4447e`. Another owner-operated normal-time Gate-A run remains pending; no numerical acceptance, SETA, Gate A/B or Plan 10 completion is claimed.
+- [Phase 05.5]: Package `d93e6f9` closed the lexical `UniverseID` order mismatch. Owner-operated normal-time run `055-gate-a-d93e6f9-20260920-123239` then transferred, committed and read back 906 core records in one batch within 239 ms, so the core Gate-A path passed. The immediately requested `ship_cargo:g0` detail section failed closed at `cargo_storage_count` before allocation. Exact X4 9.00 evidence showed that native detail getters require `UniverseID`, while the adapter supplied LuaID; `GetPeopleCapacity` also had the wrong arity. The reviewed repair converts all affected native detail calls to `UniverseID`, preserves the LuaID-only `GetComponentData(..., "cargo")` boundary and corrects `GetPeopleCapacity(UniverseID, "", false)`. The full regression passed; package installation and a fresh owner-operated detail run remain pending. No numerical acceptance, SETA, full Gate A/B or Plan 10 completion is claimed.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.

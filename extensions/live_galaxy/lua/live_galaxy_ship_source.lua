@@ -33,6 +33,9 @@ end
 function source.runtime()
     local ffi = require("ffi")
     local C = ffi.C
+    local function component64(identity)
+        return ConvertIDTo64Bit(ConvertStringToLuaID(identity))
+    end
     local api = {
         count_factions = function() return C.GetNumAllFactions(false) end,
         new_faction_buffer = function(_, count) return ffi.new("const char*[?]", count) end,
@@ -63,13 +66,13 @@ function source.runtime()
             return GetComponentData(ConvertStringToLuaID(identity), "cargo")
         end,
         crew_capacity = function(_, identity)
-            return tonumber(C.GetPeopleCapacity(ConvertStringToLuaID(identity), true))
+            return tonumber(C.GetPeopleCapacity(component64(identity), "", false))
         end,
         crew_count = function() return tonumber(C.GetNumAllRoles()) end,
         crew_size = function() return ffi.sizeof("PeopleInfo") end,
         crew_allocate = function(_, count) return ffi.new("PeopleInfo[?]", count) end,
         crew_fill = function(_, identity, buffer, count)
-            local returned = tonumber(C.GetPeople2(buffer, count, ConvertStringToLuaID(identity), true))
+            local returned = tonumber(C.GetPeople2(buffer, count, component64(identity), true))
             if returned == nil or returned < 0 or returned > count then return nil end
             local rows = {}
             for i = 0, returned - 1 do
@@ -81,7 +84,7 @@ function source.runtime()
         crew_tier_size = function() return ffi.sizeof("RoleTierData") end,
         crew_tier_allocate = function(_, count) return ffi.new("RoleTierData[?]", count) end,
         crew_tier_fill = function(_, identity, role, buffer, count)
-            local returned = tonumber(C.GetRoleTiers(buffer, count, ConvertStringToLuaID(identity), role))
+            local returned = tonumber(C.GetRoleTiers(buffer, count, component64(identity), role))
             if returned == nil or returned < 0 or returned > count then return nil end
             local rows = {}
             for i = 0, returned - 1 do
@@ -91,13 +94,13 @@ function source.runtime()
             return rows
         end,
         cargo_storage_count = function(_, identity)
-            return tonumber(C.GetNumCargoTransportTypes(ConvertStringToLuaID(identity), true))
+            return tonumber(C.GetNumCargoTransportTypes(component64(identity), true))
         end,
         cargo_storage_size = function() return ffi.sizeof("StorageInfo") end,
         cargo_storage_allocate = function(_, count) return ffi.new("StorageInfo[?]", count) end,
         cargo_storage_fill = function(_, identity, buffer, count)
             local returned = tonumber(C.GetCargoTransportTypes(buffer, count,
-                ConvertStringToLuaID(identity), true, false))
+                component64(identity), true, false))
             if returned == nil or returned < 0 or returned > count then return nil end
             -- Copy every pointer-backed string before returning/yielding.
             local copied = {}

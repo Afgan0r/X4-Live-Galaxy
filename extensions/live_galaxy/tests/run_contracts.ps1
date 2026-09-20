@@ -54,14 +54,14 @@ try {
         if ($Filter) { $arguments += @('--filter', $Filter) }
         $files = switch ($Suite) {
             'component_discovery' { 'component_discovery_contract.lua' }
-            'ship_detail' { 'ship_detail_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua' }
+            'ship_detail' { 'ship_detail_contract.lua'; 'ship_source_ffi_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua' }
             'x4_discovery' { 'carrier_b_contract.lua' }
             'telemetry' { 'telemetry_spec.lua' }
             'scheduler' { 'carrier_b_contract.lua' }
             'loader' { 'x4_loader_contract.lua' }
             'syntax' { 'module_loading_spec.lua'; $arguments += '--tags=syntax' }
             'carrier_b_actual' { 'carrier_b_contract.lua' }
-            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua'; 'x4_loader_contract.lua'; 'ship_collection_contract.lua'; 'ship_detail_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua' }
+            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua'; 'x4_loader_contract.lua'; 'ship_collection_contract.lua'; 'ship_detail_contract.lua'; 'ship_source_ffi_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua' }
         }
         $arguments += @($files | ForEach-Object { Join-Path $PSScriptRoot $_ })
         Invoke-Stage 'Busted' $busted $arguments

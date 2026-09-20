@@ -1,6 +1,6 @@
 local source = {}
 function source.extend(api, ffi, C, identity_string)
-    local function object(id) return ConvertStringToLuaID(id) end
+    local function object(id) return ConvertIDTo64Bit(ConvertStringToLuaID(id)) end
     api.physical_count = function(_, id, kind) return tonumber(C.GetNumUpgradeSlots(object(id), "", kind)) end
     api.physical_component = function(_, id, kind, slot)
         local raw = C.GetUpgradeSlotCurrentComponent(object(id), kind, slot)

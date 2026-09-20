@@ -1,4 +1,3 @@
-use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -9,6 +8,11 @@ use observation_ingest::{
 };
 use x4_bridge::PIPE_ENDPOINT;
 use x4_carrier_native::{BridgePeer, TransportConfig};
+
+#[path = "capture_pending_message/output.rs"]
+mod capture_output;
+
+use capture_output::{after_persist, receive_and_persist};
 
 const CONTROL_BYTES: usize = 512;
 const DATA_BYTES: usize = 1_048_576;
@@ -61,27 +65,27 @@ fn capture(output: &PathBuf) -> Result<(), String> {
             max_work: RESOURCE_LIMIT,
         }),
     )?;
-    send(
+    let demand = send(
         &mut peer,
         &identity,
         ControlBody::Demand(DemandBody { credit: 1 }),
-    )?;
-    let received = peer
-        .receive_timeout(DATA_BYTES, Duration::from_secs(30))
-        .map_err(debug)?;
+    );
+    let received = receive_and_persist(output, demand, || {
+        peer.receive_timeout(DATA_BYTES, Duration::from_secs(30))
+            .map_err(debug)
+    })?;
     let Some(bytes) = received else {
         return Err(timeout_error(reset(&mut peer, &identity)));
     };
-    let decoded = decode_complete_message(&bytes, DATA_BYTES).map_err(debug);
-    cleanup_result(decoded, reset(&mut peer, &identity))?;
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(output)
-        .map_err(debug)?;
-    file.write_all(&bytes).map_err(debug)?;
-    file.sync_all().map_err(debug)?;
-    Ok(())
+    after_persist(
+        Ok(()),
+        || {
+            decode_complete_message(&bytes, DATA_BYTES)
+                .map(|_| ())
+                .map_err(debug)
+        },
+        || reset(&mut peer, &identity),
+    )
 }
 
 fn reset(
@@ -163,29 +167,4 @@ fn send(
 
 fn debug(error: impl std::fmt::Debug) -> String {
     format!("{error:?}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{DATA_BYTES, cleanup_result, read_bounded, timeout_error};
-
-    #[test]
-    fn diagnostic_input_and_cleanup_failures_remain_bounded_and_visible() {
-        let mut exact = std::io::Cursor::new(vec![0; DATA_BYTES]);
-        assert_eq!(
-            read_bounded(&mut exact).expect("exact input").len(),
-            DATA_BYTES
-        );
-        let mut over = std::io::Cursor::new(vec![0; DATA_BYTES + 1]);
-        assert!(read_bounded(&mut over).is_err());
-        assert_eq!(timeout_error(Ok(())), "pending message timed out");
-        assert_eq!(
-            timeout_error(Err("closed".to_owned())),
-            "pending message timed out; reset failed: closed"
-        );
-        assert_eq!(
-            cleanup_result::<()>(Err("decode failed".to_owned()), Err("closed".to_owned())),
-            Err("decode failed; reset failed: closed".to_owned())
-        );
-    }
 }
