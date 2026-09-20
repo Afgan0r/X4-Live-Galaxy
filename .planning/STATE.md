@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 lexical order repair regression clean; package rebuild pending
-last_updated: "2026-09-20T05:26:59Z"
+stopped_at: Phase 05.5 Plan 10 package d93e6f9 installed; owner-operated normal-time Gate A pending
+last_updated: "2026-09-20T05:29:33Z"
 last_activity: 2026-09-20
-last_activity_desc: Gate A exposed a source/receiver order mismatch; lexical order repair passed review and final regression
+last_activity_desc: Exact lexical-order package d93e6f9 installed and rehashed with verified owner-only rollback
 state_head: 9845f37
 state_head: 715365c
 progress:
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — ORDER REPAIR REGRESSION CLEAN
+Phase: 05.5 (Heavy Faction Ship Conformance) — ORDER REPAIR INSTALLED
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 lexical order repair is review-clean and passed final regression; package rebuild and Gate-A reattempt remain pending
-Last activity: 2026-09-20 — Normal-time Gate A proved batching transfers one 893-record batch in 204–212 ms, then exposed and repaired a lexical-versus-numeric completion order mismatch
+Status: Plans 01 and 09 complete locally; Plan 10 lexical order package is installed; owner-operated normal-time Gate-A reattempt remains pending
+Last activity: 2026-09-20 — Exact package d93e6f9 was independently verified, installed while X4 was closed and rehashed 26/26
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
@@ -219,7 +219,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: The retained 674-byte first message decoded as a valid `section_start`. A fresh unpaused run then accepted 366 observed receive events without decode errors but expired at the unchanged 30-second candidate age: the producer emitted one record per IPC batch at roughly 100 ms callback cadence, so 893 collected ships required about 90 seconds to transfer. Package `e7a843a` repaired batching. Normal-time run `055-gate-a-e7a843a-20260920-121406` then transferred four successive core revisions as one batch each in 204–212 ms, proving the timeout/backlog defect closed, but every completion was permanently rejected and durable readback remained `MissingRevision`. The source sorts canonical decimal `UniverseID` strings lexicographically while completion compared parsed numbers; the review-clean repair now uses the exact source order and retains global `1..N` record ordinals. Full workspace and 70.175-second native/Lua/XML regression passed. Package rebuild and another owner-operated normal-time Gate-A run remain pending; no numerical acceptance, SETA, Gate A/B or Plan 10 completion is claimed.
+- [Phase 05.5]: The retained 674-byte first message decoded as a valid `section_start`. A fresh unpaused run then accepted 366 observed receive events without decode errors but expired at the unchanged 30-second candidate age: the producer emitted one record per IPC batch at roughly 100 ms callback cadence, so 893 collected ships required about 90 seconds to transfer. Package `e7a843a` repaired batching. Normal-time run `055-gate-a-e7a843a-20260920-121406` then transferred four successive core revisions as one batch each in 204–212 ms, proving the timeout/backlog defect closed, but every completion was permanently rejected and durable readback remained `MissingRevision`. The source sorts canonical decimal `UniverseID` strings lexicographically while completion compared parsed numbers; package `d93e6f9` repairs that contract and retains global `1..N` record ordinals. Full workspace and 70.175-second native/Lua/XML regression passed. Manifest SHA-256 `d5184f2f485751e989ce75aa77f739ad429f23dbba311f567b00d21703caa574` was independently verified and installed 26/26 with owner-only rollback artifact `05.5-d93e6f9-20260920-122933-7ff4447e`. Another owner-operated normal-time Gate-A run remains pending; no numerical acceptance, SETA, Gate A/B or Plan 10 completion is claimed.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -253,5 +253,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-09-19
-Stopped at: Phase 05.5 Plan 10 lexical order repair review and final regression clean; rebuild/install package, then repeat normal-time Gate A
+Stopped at: Phase 05.5 Plan 10 package d93e6f9 installed; launch X4, load the disposable campaign at normal time and repeat Gate A
 Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
