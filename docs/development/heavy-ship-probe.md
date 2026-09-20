@@ -555,3 +555,23 @@ All seven retained runtime files and all three retained frame files were
 re-read with zero digest mismatches under owner-only ACLs. A revised installed
 package and a fresh SETA run remain required; numerical acceptance, Gate A/B
 and Plan 10 remain pending.
+
+The repair is commit `915f9f3`. Its package records source revision
+`915f9f35b1ae13c8ab3384c8f842eb28df3a6c0f`; manifest SHA-256:
+`19b9a8bc2b4a47c0f5b7a0e37393babcf407aa360ec18725a713bdb055bca439`.
+All 29 package entries passed independent digest verification. The final
+regression passed the full Rust workspace, strict all-target Clippy, source-size
+enforcement, all native ABI tests, all seven actual Carrier B lifecycle
+scenarios, 99 Lua contracts, 20 Lua syntax checks, XML validation and
+persistence schema validation. Fresh scoped review found no remaining P0--P2
+finding.
+
+With X4 closed, all 26 installed extension files were backed up, atomically
+replaced and rehashed against the manifest; all 26 backup digests were also
+re-read. Rollback artifact ID:
+`05.5-915f9f3-20260920-233925-5cc05048`. Locator SHA-256:
+`026f7419579dda3ef0684b89560640f8eec516094b256eadaa3023d429313a4a`.
+The rollback directory has protected owner-only ACLs. One earlier ACL setup
+attempt stopped before copying any file; its empty directory was verified and
+removed. The revised installed package is ready for a replacement SETA run;
+Gate A remains pending until that run succeeds.
