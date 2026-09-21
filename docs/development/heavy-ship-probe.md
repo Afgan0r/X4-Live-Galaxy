@@ -692,3 +692,11 @@ owner-only locator:
 `%LOCALAPPDATA%/LiveGalaxy/evidence-locators/055-gate-a-normal-sdk-20260921-214108/locator.json`.
 Locator SHA-256:
 `4b2d5e5c5fd832104906a055cb36149c469f31108f2bba63b8fac062b7fe5b6a`.
+
+The corrected package was built from source revision
+`65dbea08bd4f4fb8ff59cd69909c94803ae71cf8`; manifest SHA-256:
+`54facadb921806dff8bfc5b386163461935282a073ef71395b92f61a9db498f8`.
+All 29 package entries and all 26 installed extension files matched their
+expected digests. The prior installation is retained in owner-only rollback
+artifact `05.5-65dbea0-20260921-230425-23f2915e`; locator SHA-256:
+`616b1760f1ff22a71a3e66aadf0c4cbc1ff9fecff5038ab9e8c6cd8860e4d920`.

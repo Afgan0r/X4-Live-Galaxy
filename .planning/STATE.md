@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 package 658def3 installed; owner-operated normal-time detail Gate A pending
-last_updated: "2026-09-20T06:19:30Z"
-last_activity: 2026-09-20
-last_activity_desc: Exact detail FFI package 658def3 installed and rehashed with verified owner-only rollback
-state_head: 658def3
+stopped_at: Phase 05.5 Plan 10 package 65dbea0 installed; replacement normal-time and SETA Gate A pending
+last_updated: "2026-09-21T16:04:25Z"
+last_activity: 2026-09-21
+last_activity_desc: Core per-record churn repair 65dbea0 installed and rehashed with verified owner-only rollback
+state_head: 65dbea0
 progress:
   total_phases: 14
   completed_phases: 7
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — DETAIL FFI REPAIR INSTALLED
+Phase: 05.5 (Heavy Faction Ship Conformance) — CORE CHURN REPAIR INSTALLED
 Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; Plan 10 core Gate A passed; package 658def3 is installed for the owner-operated detail reattempt
-Last activity: 2026-09-20 — Exact package 658def3 was independently verified, installed while X4 was closed and rehashed 26/26
+Status: Plans 01 and 09 complete locally; package 65dbea0 is installed for replacement normal-time and SETA Gate A evidence
+Last activity: 2026-09-21 — Exact package 65dbea0 was independently verified, installed while X4 was closed and rehashed 26/26
 
 Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
 
