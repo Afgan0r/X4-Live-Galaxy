@@ -645,3 +645,20 @@ backlog; the first process took 1.910 seconds end to end and its largest source
 callback was 207.366 ms. Those figures are synthetic load evidence. The next
 installed X4 run must measure the real combined callback and frame impact;
 Gate A remains pending.
+
+### Full-snapshot replacement installation
+
+Commit `f6eb065` was pushed and packaged from source revision
+`f6eb0650b523a38500c14d4bcb773ac4bcdad09f`. Manifest SHA-256:
+`f8220688f6e8a9e0ff106fbf1374ceea48b6308534ebce93cdc67189bd538d8a`.
+The package self-test passed before installation.
+
+With X4 closed, all 26 extension files were staged, atomically installed and
+rehashed against the manifest with zero mismatches. All 26 files from the prior
+installation were retained and re-read in the protected rollback artifact
+`05.5-f6eb065-20260921-070127-b4b0f963`. Stable owner-only locator:
+`%LOCALAPPDATA%/LiveGalaxy/install-backups/05.5-f6eb065-20260921-070127-b4b0f963/locator.json`.
+Locator SHA-256:
+`e8c872c697d5cf75cf6a3bf78e8d04d1879319281b3be4e980576067a824fd31`.
+The next evidence run uses normal time and SETA in one X4 session; no reinstall
+or second restart is required between them.
