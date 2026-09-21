@@ -24,6 +24,16 @@ function Get-RuntimeDiagnostics([string]$Text) {
         ForEach-Object { "$($_.Groups['event'].Value):$($_.Groups['detail'].Value)" })
 }
 
+function Get-RuntimeDiagnosticFailures([string[]]$Diagnostics) {
+    @($Diagnostics | Where-Object {
+        $_ -notin @(
+            'transition:sampled',
+            'transition:core_changed',
+            'initialized:initialized'
+        )
+    })
+}
+
 function Read-GameTimes([string]$Path, [long]$Offset) {
     $stream = [System.IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
     try {
@@ -107,8 +117,12 @@ function Invoke-SelfTest {
         -or $diagnostics[1] -ne 'transition:core_changed') {
         throw 'HEAVY_RUNTIME_DIAGNOSTIC_PARSE'
     }
-    if (@($diagnostics | Where-Object { $_ -notin @('transition:sampled', 'initialized:initialized') }).Count -ne 1) {
+    if (@(Get-RuntimeDiagnosticFailures $diagnostics).Count -ne 0) {
         throw 'HEAVY_RUNTIME_DIAGNOSTIC_VERDICT'
+    }
+    $failures = @(Get-RuntimeDiagnosticFailures @($diagnostics + 'transition:unexpected'))
+    if ($failures.Count -ne 1 -or $failures[0] -ne 'transition:unexpected') {
+        throw 'HEAVY_RUNTIME_DIAGNOSTIC_FAILURE'
     }
     $samples = [Collections.ArrayList]::new()
     [void]$samples.Add([pscustomobject]@{ Wall = [DateTime]'2026-01-01T00:00:00Z'; Game = 10.0 })
@@ -229,8 +243,8 @@ $history = Join-Path $dataRoot 'operational-history.jsonl'
 $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
 $bad = @($events | Where-Object { $_.state -in @('failed', 'rejected') }).Count
-$runtimeFailures = @($runtimeDiagnostics |
-    Where-Object { $_ -notin @('transition:sampled', 'initialized:initialized') })
+$runtimeFailures = @(Get-RuntimeDiagnosticFailures $runtimeDiagnostics)
+$coreChanged = @($runtimeDiagnostics | Where-Object { $_ -eq 'transition:core_changed' }).Count
 $gameFactor = Measure-GameFactor $runSamples
 $gameFactorSeconds = if ($runSamples.Count -gt 1) {
     ($runSamples[-1].Wall - $runSamples[0].Wall).TotalSeconds
@@ -250,6 +264,7 @@ $result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); mo
     rejected_or_failed = $bad; lost_presentmon_events = $lostEvents
     runtime_diagnostic_failures = $runtimeFailures.Count
     runtime_diagnostic_failure_details = @($runtimeFailures | Sort-Object -Unique)
+    core_changed_transitions = $coreChanged
     game_time_factor = $gameFactor; game_time_sample_seconds = $gameFactorSeconds
     capture_seconds = $CaptureSeconds }
 $result | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding utf8NoBOM

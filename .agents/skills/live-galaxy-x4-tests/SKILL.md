@@ -66,6 +66,17 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   a runtime log failure must be independently visible, must not stop X4, and
   does not waive durability or idempotency evidence. Do not assert formatted
   lines or unbounded per-frame traces.
+- When source collection is fast but end-to-end coverage is slow, measure the
+  number of sections, wire batches, acknowledgments, and scheduler pulses before
+  changing timeouts or collection deadlines. A per-entity stop-and-wait loop can
+  dominate throughput even when every getter is fast. Cross-language load tests
+  must assert requested-selection coverage, transaction multiplicity, zero
+  final backlog, and independent readback of every member.
+- Do not compare an in-game source-capture duration with the wall-clock duration
+  of a synthetic end-to-end fixture. Report capture, serialization, transport,
+  durable commit, polling/waits, payload bytes, and cycle count separately. A
+  fixture wall clock is correctness evidence unless its component timings and
+  workload are comparable to the runtime path.
 
 ## Lua Mutation Testing
 

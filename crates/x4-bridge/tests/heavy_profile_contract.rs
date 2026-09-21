@@ -6,7 +6,7 @@ const PROFILE: &str = include_str!("../../../config/heavy-ship-experiment.json")
 #[test]
 fn heavy_profile_refuses_unknown_duplicate_zero_overflow_and_policy_disagreement() {
     let valid = HeavyShipLimits::parse(PROFILE).expect("valid heavy profile");
-    assert_eq!(valid.group_members, 1);
+    assert_eq!(valid.group_members, valid.bridge.max_candidate_records);
     assert_eq!(valid.bridge.max_delivery_attempts, 1);
     assert!(
         ProductionLimits::parse(PROFILE).is_none(),
@@ -15,7 +15,7 @@ fn heavy_profile_refuses_unknown_duplicate_zero_overflow_and_policy_disagreement
     for (from, to) in [
         ("\"experimental_profile\": 1", "\"experimental_profile\": 2"),
         ("\"heavy_permits\": 1", "\"heavy_permits\": 0"),
-        ("\"group_members\": 1", "\"group_members\": 2"),
+        ("\"group_members\": 67108864", "\"group_members\": 1"),
         (
             "\"max_aggregate_records\": 134217728",
             "\"max_aggregate_records\": 127",
@@ -50,7 +50,7 @@ fn heavy_profile_refuses_unknown_duplicate_zero_overflow_and_policy_disagreement
             "\"freshness_millis\": 18446744073709551616",
         ),
         ("\"freshness_millis\": 30000", "\"unknown\": 30000"),
-        ("\"freshness_millis\": 30000", "\"group_members\": 1"),
+        ("\"freshness_millis\": 30000", "\"group_members\": 67108864"),
     ] {
         assert!(
             HeavyShipLimits::parse(&PROFILE.replace(from, to)).is_none(),

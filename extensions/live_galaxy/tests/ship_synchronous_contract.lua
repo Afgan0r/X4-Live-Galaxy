@@ -11,7 +11,8 @@ describe("synchronous selection capture with resumable delivery", function()
         local values = {}; for key, value in text:gmatch('"([%w_]+)"%s*:%s*(%d+)') do values[key] = tonumber(value) end
         if mode == "bytes" then
             for _, key in ipairs({ "complete_message_bytes", "max_candidate_raw_bytes", "max_candidate_records",
-                "max_candidate_batches", "max_publication_records", "max_publication_content_bytes", "max_inner_records" }) do values[key] = 200 end
+                "max_candidate_batches", "max_publication_records", "max_publication_content_bytes", "max_inner_records",
+                "group_members" }) do values[key] = 200 end
         end
         local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
         local now, admitted, pushed, finished = 100, 0, 0, 0

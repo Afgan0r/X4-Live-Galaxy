@@ -87,7 +87,7 @@ impl HeavyShipLimits {
             ]
             .iter()
             .all(|value| *value > 0)
-            && self.group_members == 1
+            && self.group_members == self.bridge.max_candidate_records
             && self.heavy_permits == 1
             && self.bridge.max_delivery_attempts == 1
             && self.bridge.reconnect_attempts == 1

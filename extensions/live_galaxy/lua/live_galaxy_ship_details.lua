@@ -21,9 +21,13 @@ function details.new(options, clock)
     if not integer(limit, MAX_INTEGER) or limit == 0
         or not integer(options.max_allocation_bytes, MAX_INTEGER)
         or options.max_allocation_bytes == 0 then return nil, "invalid_limits" end
+    local expected_cores = options.expected_cores
+    if expected_cores == nil and type(options.expected_core) == "table" then
+        expected_cores = { [options.expected_core.identity] = options.expected_core }
+    end
     return setmetatable({ api = options.ship_api or source.runtime(), clock = clock,
         limit = limit, allocation = options.max_allocation_bytes, stage = "reserve",
-        group = options.group, scope = options.source_scope, expected_core = options.expected_core,
+        group = options.group, scope = options.source_scope, expected_cores = expected_cores,
         work_budget = options.work_budget,
         kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
 end
@@ -136,23 +140,29 @@ function details:step(context, carrier, status)
         end
         self.records[self.index] = record
         self.index, self.pending = self.index + 1, nil
-        self.stage = self.index > #group.members and "capture_finish" or start_stage(self.kind)
+        if self.index > #group.members and self.expected_cores then
+            self.index, self.stage = 1, "revalidate"
+        elseif self.index > #group.members then
+            self.stage = "capture_finish"
+        else
+            self.stage = start_stage(self.kind)
+        end
     elseif self.stage == "revalidate" then
-        local current, source_rejection = self.api:read_core(self.expected_core.identity)
+        local identity = group.members[self.index]
+        local expected = self.expected_cores and self.expected_cores[identity]
+        if type(expected) ~= "table" then return self:fail(carrier, "core_changed", "missing_parent", "core") end
+        local current, source_rejection = self.api:read_core(identity)
         if type(current) ~= "table" then
             return self:fail(carrier, "core_changed", source_rejection and source_rejection.condition or "result_shape",
                 source_rejection and source_rejection.field or "core",
                 source_rejection and source_rejection.observed_type or type(current))
         end
         for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
-            if current[key] ~= self.expected_core[key] then return self:fail(carrier, "core_changed", "value_mismatch", key, type(current[key])) end
+            if current[key] ~= expected[key] then return self:fail(carrier, "core_changed", "value_mismatch", key, type(current[key])) end
         end
-        self.validated, self.stage = true, "capture_finish"
+        self.index = self.index + 1
+        if self.index > #group.members then self.stage = "capture_finish" end
     elseif self.stage == "capture_finish" then
-        if self.expected_core and not self.validated then
-            self.stage = "revalidate"
-            return { disposition = "collecting" }
-        end
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end
         finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true

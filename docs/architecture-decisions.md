@@ -423,20 +423,25 @@ existing 10-second inactivity bound; no heartbeat or protocol extension.
 ## ADR-LG-021: Heavy detail grouping
 
 - **Status:** accepted
-- **Context:** one faction-wide cargo, crew, or loadout snapshot is too large and
-  too easy to invalidate, while one section per ship creates excessive metadata
-  and scheduling overhead.
-- **Accepted rule:** core identity data is separate from heavy details. Cargo,
-  crew, and loadout publish as deterministic versioned bounded groups tied to an
-  exact core revision and exact member identities.
-- **Rationale:** bounded groups provide source-agnostic incremental progress
-  while preserving atomic publication at a useful semantic level.
-- **Consequences:** groups have independent coverage, capture windows, and
-  freshness. The full proof tracks eventual coverage without claiming one
-  simultaneous faction-wide detail snapshot. Carry-forward across a core
-  revision remains deferred pending stable identity and compatibility evidence.
-- **Supersedes:** one all-or-nothing heavy faction revision and one section per
-  ship.
+- **Context:** runtime evidence showed that one section per ship multiplied one
+  faction census into three stop-and-wait transactions per ship. X4 collected
+  hundreds of core records in milliseconds while the artificial transaction
+  cadence advanced only 39 ships in 65 seconds.
+- **Accepted rule:** core identity data remains separate from heavy details.
+  Each requested cargo, crew, or loadout selection covers the exact full parent
+  membership in deterministic order. The wire may split that section into as
+  many byte-bounded immutable batches as needed; ship count is not an
+  independent batching limit.
+- **Rationale:** source collection and validation operate on the requested
+  selection, while existing transport backpressure already supplies the real
+  delivery boundary. Adding a per-ship scheduling boundary provided no safety
+  benefit and dominated throughput.
+- **Consequences:** each family retains its own coverage, capture window, and
+  freshness, but a core change invalidates the full dependent family. If X4
+  measurements show visible stalls or excessive invalidation, resumable
+  grouping may be introduced from measured evidence. Carry-forward across a
+  core revision remains deferred.
+- **Supersedes:** one section per ship and arbitrary fixed ship-count groups.
 
 ## ADR-LG-022: Heavy ship proof scope
 

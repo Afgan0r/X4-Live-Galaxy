@@ -575,3 +575,27 @@ The rollback directory has protected owner-only ACLs. One earlier ACL setup
 attempt stopped before copying any file; its empty directory was verified and
 removed. The revised installed package is ready for a replacement SETA run;
 Gate A remains pending until that run succeeds.
+
+### Full-selection throughput correction
+
+The subsequent clean runtime evidence showed that source collection was not the
+bottleneck: a roughly 750-record core completed in 9--13 ms, but the configured
+`group_members = 1` path created three stop-and-wait sections per ship and
+advanced only 39 ships in 65 seconds. Extending the run window would have hidden
+that orchestration defect.
+
+The repaired experimental profile derives detail membership from the full
+accepted core rather than imposing a one-ship group. Cargo, crew, and loadout
+remain separate dependent sections; the existing one-megabyte wire limit splits
+each section into immutable batches as needed. Local actual-DLL/pipe/SQLite
+evidence collected 129 ships with 80 nested rows per family. Two complete
+core/cargo/crew/loadout cycles committed in 2.015 seconds with zero final
+backlog; a restarted producer committed the next cycle in 6.003 seconds. Those
+wall-clock durations include synthetic capture, serialization, IPC
+acknowledgments, durable commits, and polling. They are correctness evidence,
+not a throughput comparison with the 9--13 ms X4 core-only capture. Independent
+readback returned 129 records for every detail revision, including 1,547,870
+bytes of loadout content in the largest observed section. The largest synthetic
+synchronous callback was 143.163 ms for crew. These local measurements do not
+establish X4 throughput or frame safety. A rebuilt installed package and one
+replacement in-game run remain required; Gate A is still pending.

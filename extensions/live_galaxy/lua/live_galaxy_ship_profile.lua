@@ -20,7 +20,8 @@ function profile.validate(values)
     end
     for key in pairs(values) do if not allowed[key] then return nil, "invalid_limits" end end
     local v = copy
-    if v.heavy_profile_version ~= 1 or v.experimental_profile ~= 1 or v.group_members ~= 1 or v.heavy_permits ~= 1
+    if v.heavy_profile_version ~= 1 or v.experimental_profile ~= 1
+        or v.group_members ~= v.max_candidate_records or v.heavy_permits ~= 1
         or v.max_delivery_attempts ~= 1 or v.reconnect_attempts ~= 1 or v.control_message_bytes ~= 512
         or v.availability_interval_millis ~= 5000 or v.complete_message_bytes > v.max_candidate_raw_bytes
         or v.retained_revisions < 2

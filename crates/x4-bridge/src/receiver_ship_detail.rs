@@ -130,19 +130,32 @@ pub fn validate_dependency<R: ObservationRepository>(
             )?;
         }
         validate_members(batch, parent)?;
-        let member = expected_group
+        validate_expected_members(batch, &expected_group)?;
+    }
+    validate_group_count(message, expected_group.members().len())?;
+    Ok(())
+}
+
+fn validate_expected_members(
+    batch: &ImmutableBatchEnvelope,
+    expected: &observation_domain::ShipDetailGroup,
+) -> Result<(), ProductionError> {
+    let first = batch
+        .records
+        .first()
+        .and_then(|record| record.record_id.as_str().rsplit(':').next())
+        .and_then(|ordinal| ordinal.parse::<usize>().ok())
+        .filter(|ordinal| *ordinal > 0)
+        .ok_or_else(rejected)?;
+    for (offset, record) in batch.records.iter().enumerate() {
+        let member = expected
             .members()
-            .get(batch.section_ordinal.saturating_sub(1))
+            .get(first.saturating_sub(1).saturating_add(offset))
             .ok_or_else(rejected)?;
-        if batch
-            .records
-            .first()
-            .is_none_or(|v| v.entity_id.as_str() != format!("x4:ship:{}", member.as_str()))
-        {
+        if record.entity_id.as_str() != format!("x4:ship:{}", member.as_str()) {
             return Err(rejected());
         }
     }
-    validate_group_count(message, expected_group.members().len())?;
     Ok(())
 }
 

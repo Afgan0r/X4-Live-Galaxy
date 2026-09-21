@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-21
+
+- Added the orchestration-multiplicity diagnostic after Phase 05.5 measured
+  millisecond source collection but only 39 per-ship detail cycles in 65
+  seconds. Cross-language load evidence now checks full requested-selection
+  coverage, transaction count, backlog, and independent member readback before
+  anyone proposes longer runtime windows. It also separates in-game capture
+  time from synthetic fixture wall clock and its transport, commit, polling,
+  payload, and cycle components.
+
 ## 2026-09-17
 
 - Clarified fixed-pipe test isolation after Phase 05.5 Plan 09's workspace

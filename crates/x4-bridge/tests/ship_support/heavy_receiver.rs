@@ -34,7 +34,7 @@ fn run_case(case: usize) {
     let mut start =
         decode_complete_message(&detail_start(&messages[0], &key), 4096).expect("decode");
     if let CompleteMessage::SectionStart(value) = &mut start {
-        value.expected_records = if case == 3 { 2 } else { 1 };
+        value.expected_records = if case == 3 { 1 } else { 2 };
     }
     let now = match case {
         0 => 30004,
@@ -48,7 +48,7 @@ fn run_case(case: usize) {
         now,
     );
     if case == 2 {
-        assert!(result.is_ok(), "fresh exact single-member group");
+        assert!(result.is_ok(), "fresh exact full-parent group: {result:?}");
         let bytes = detail_batch(
             &messages[1],
             &key,

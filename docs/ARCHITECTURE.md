@@ -467,28 +467,28 @@ ship core index
   type or class
   location
 
-bounded cargo group  -> records source core revision and exact member identities
-bounded crew group   -> records source core revision and exact member identities
-bounded loadout group -> records source core revision and exact member identities
+full cargo selection   -> byte-bounded batches, exact parent membership
+full crew selection    -> byte-bounded batches, exact parent membership
+full loadout selection -> byte-bounded batches, exact parent membership
 ```
 
 - Identity, ownership, location, and core indexes receive reserved
   service under load.
 - Cargo, crew, loadout, and other details may be deferred first
   according to decision dependencies and freshness.
-- Heavy detail data commits as deterministic bounded groups rather
-  than one faction-wide all-or-nothing revision or one section per ship. Every
-  group carries its exact member identities, source core revision, capture
-  window, coverage, and independent freshness.
-- The grouping policy is deterministic and versioned. A retry or
-  replay cannot move the same source identity between groups under the same
-  policy version.
+- Each heavy detail family commits one deterministic full-parent selection.
+  Existing message-size and aggregate-resource bounds split transport batches
+  without turning ship count into a scheduling limit. Every section carries
+  its exact member identities, source core revision, capture window, coverage,
+  and independent freshness.
+- Ordering is deterministic and versioned. A retry or replay cannot move the
+  same source identity within the same policy version.
 - The conformance proof demonstrates eventual coverage of every in-scope ship by
   the required cargo, crew, and loadout groups without claiming simultaneous
   capture of all groups.
-- A core revision change does not interrupt a running dependent
-  group. At completion, the generic dependency check discards the group if its
-  exact frozen source-core revision is no longer current.
+- A core revision change does not interrupt a running dependent selection. At
+  completion, the generic dependency check discards the section if its exact
+  frozen source-core revision is no longer current.
 - An optional-detail failure yields unknown or stale detail
   state. It does not delete the core entity.
 - Optional detail availability is represented independently from the core

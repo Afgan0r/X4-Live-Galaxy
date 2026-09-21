@@ -1,11 +1,9 @@
 use super::{ProductionError, ProductionObservationSession};
 use observation_domain::SectionKey;
 use observation_persistence::ObservationRepository;
-
 #[cfg(test)]
 #[path = "production_ship_timing_tests.rs"]
 mod timing_tests;
-
 impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub(crate) fn ship_receipt_completed(
         &mut self,
@@ -132,18 +130,24 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .filter(|value| {
                 crate::receiver_ship_detail::is_key(value.revision().section_key.as_str())
                     && value.revision().source_scope == parent.revision().source_scope
+                    && value.revision().dependencies.get(&key) == Some(&parent.receipt().revision)
             })
             .collect::<Vec<_>>();
         let last = details
             .iter()
             .max_by_key(|value| value.receipt().revision.get());
         let cursor = last.and_then(|value| durable_cursor(value));
-        let next = crate::production_ship_cursor::next_member(&members, previous, cursor)?;
-        let observed = self.ship_timing.observed(&next);
         let limits = self
             .heavy_limits
             .as_ref()
             .ok_or(ProductionError::InvalidLimits)?;
+        let next = crate::production_ship_cursor::next_member(
+            &members,
+            previous,
+            cursor,
+            limits.group_members,
+        )?;
+        let observed = self.ship_timing.observed(&next);
         let margin = limits.rate_interval_millis as u64;
         if crate::production_ship_cursor::refresh_required(
             now,
@@ -173,14 +177,12 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 .ok_or(ProductionError::RevisionExhausted)
         })
     }
-
     pub fn select_ship_core(&mut self, faction: &str) -> Result<(), ProductionError> {
         self.ship_scope = Some(crate::receiver_ship::scope(faction)?);
         self.ship_timing.clear();
         self.last_received = None;
         Ok(())
     }
-
     pub const fn collection_key(&self) -> &'static str {
         if self.ship_scope.is_some() {
             "ship_core"
@@ -189,7 +191,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         }
     }
 }
-
 fn durable_cursor(value: &observation_persistence::CurrentRevision) -> Option<(&str, &str)> {
     let record = value.revision().records.first()?;
     let (family, _) = value.revision().section_key.as_str().split_once(":g")?;

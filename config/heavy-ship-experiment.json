@@ -24,7 +24,7 @@
   "availability_interval_millis": 5000,
   "heavy_profile_version": 1,
   "experimental_profile": 1,
-  "group_members": 1,
+  "group_members": 67108864,
   "max_inner_records": 1048576,
   "max_allocation_bytes": 4194304,
   "max_total_allocation_bytes": 67108864,

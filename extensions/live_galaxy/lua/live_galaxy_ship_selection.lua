@@ -90,12 +90,19 @@ local function start(self, context, carrier, status)
         if not parent or not ordinal or ordinal % 1 ~= 0 or ordinal > 65535
             or parent.incarnation ~= status.producer_incarnation or parent.boundary ~= context.source_boundary
             or now - parent.accepted_at > self.limits.freshness_millis then return nil, "stale_parent" end
-        local member = parent.members[ordinal + 1]
-        if not member then return nil, "selection_unavailable" end
+        local first = ordinal * self.limits.group_members + 1
+        local last = math.min(first + self.limits.group_members - 1, #parent.members)
+        if first > last then return nil, "selection_unavailable" end
+        local members, expected_cores = {}, {}
+        for index = first, last do
+            local member = parent.members[index]
+            members[#members + 1] = member
+            expected_cores[member] = parent.cores[member]
+        end
         self.collector = assert(detail.new({ ship_api = self.budget.api,
             max_inner = self.limits.max_inner_records, max_allocation_bytes = self.limits.max_allocation_bytes,
-            source_scope = options.source_scope, expected_core = parent.cores[member],
-            work_budget = self.budget, group = { key = key, members = { member },
+            source_scope = options.source_scope, expected_cores = expected_cores,
+            work_budget = self.budget, group = { key = key, members = members,
                 owner = options.faction_id, core_revision = parent.revision } }, clock))
     end
     self.key, self.revision, self.boundary, self.incarnation = key, status.collection_revision,

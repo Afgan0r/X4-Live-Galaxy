@@ -50,7 +50,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
             $readback = & (Join-Path $Repo 'target/release/x4-bridge.exe') --readback --data-dir $Data --section-key $row[0] --section-revision $row[1]
             if ($LASTEXITCODE -ne 0) { throw 'HEAVY_CONFIGURED_INDEPENDENT_READBACK_FAILED' }
             $value = ($readback -join '') | ConvertFrom-Json
-            $count = if ($Throughput -and $row[0] -ceq 'ship_core') { 129 } else { 1 }
+            $count = if ($Throughput) { 129 } else { 1 }
             if ($value.section_revision -ne $row[1] -or @($value.records).Count -ne $count) { throw 'HEAVY_CONFIGURED_READBACK_MISMATCH' }
             $content = $value.records[0].content
             $trace += [pscustomobject]@{ key = $row[0]; value = $value }
