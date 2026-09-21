@@ -599,3 +599,20 @@ bytes of loadout content in the largest observed section. The largest synthetic
 synchronous callback was 143.163 ms for crew. These local measurements do not
 establish X4 throughput or frame safety. A rebuilt installed package and one
 replacement in-game run remain required; Gate A is still pending.
+
+### Full-selection package installation
+
+Commit `2303865` was pushed and packaged from source revision
+`2303865c37ac3a137997eee0f07fbd1b5518383b`. Manifest SHA-256:
+`3e71daacc4e5f4f4779af362a9afc80fe790c3848a7206e6d5377c134f2c6c2d`.
+With X4 closed, all 26 extension files were staged, verified, atomically
+installed, and independently rehashed with zero mismatches.
+
+Rollback artifact ID: `05.5-2303865-20260921-110425-ff6f9931`. Stable
+owner-only locator:
+`%LOCALAPPDATA%/LiveGalaxy/install-backups/05.5-2303865-20260921-110425-ff6f9931/locator.json`.
+Locator SHA-256:
+`2d3da4b7bbdfe39f2b9716b4de9d561469b09251c028972a8536ae76cd27bd5c`.
+The replacement runtime run must report per-family X4 capture time and separate
+end-to-end transport/commit time; synthetic fixture wall clock is not the
+throughput baseline.
