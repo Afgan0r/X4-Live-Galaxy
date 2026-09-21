@@ -95,7 +95,7 @@ fn group_order_is_canonical_and_duplicate_identity_is_rejected() {
 }
 
 fn cargo_content() -> String {
-    "profile=ship_cargo\nidentity=9007199254740993\nowner=argon\ncore_revision=7\nmember_revision=7\npolicy=2\ncapture_start=100\ncapture_end=110\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nwares_outcome=value\nstorage_outcome=value\nreservation_policy=excluded\nware=ore|17\nstorage=solid|1000|170".to_owned()
+    "profile=ship_cargo\nidentity=9007199254740993\nowner=argon\ncore_revision=7\nmember_revision=7\npolicy=2\ncapture_start=100\ncapture_end=110\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nconsistency=consistent\nconsistency_reason=none\nwares_outcome=value\nstorage_outcome=value\nreservation_policy=excluded\nware=ore|17\nstorage=solid|1000|170".to_owned()
 }
 
 #[test]

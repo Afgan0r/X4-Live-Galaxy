@@ -54,8 +54,9 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
             if ($value.section_revision -ne $row[1] -or @($value.records).Count -ne $count) { throw 'HEAVY_CONFIGURED_READBACK_MISMATCH' }
             $content = $value.records[0].content
             $trace += [pscustomobject]@{ key = $row[0]; value = $value }
-            if ($row[0] -like 'ship_crew:*' -and $content -notmatch "capacity_people=$([int]$row[1] + 12)(`n|$)") { throw 'HEAVY_CONFIGURED_CREW_VALUE_MISMATCH' }
-            if ($row[0] -like 'ship_loadout:*' -and ($content -notmatch "missile=missile_ware\|missile_macro\|-$($row[1])(`n|$)" -or $content -notmatch 'units_selector=false')) { throw 'HEAVY_CONFIGURED_LOADOUT_VALUE_MISMATCH' }
+            $snapshotRevision = if ($row[0] -like 'ship_cargo:*') { [int]$row[1] - 1 } elseif ($row[0] -like 'ship_crew:*') { [int]$row[1] - 2 } elseif ($row[0] -like 'ship_loadout:*') { [int]$row[1] - 3 } else { [int]$row[1] }
+            if ($row[0] -like 'ship_crew:*' -and $content -notmatch "capacity_people=$($snapshotRevision + 12)(`n|$)") { throw 'HEAVY_CONFIGURED_CREW_VALUE_MISMATCH' }
+            if ($row[0] -like 'ship_loadout:*' -and ($content -notmatch "missile=missile_ware\|missile_macro\|-$snapshotRevision(`n|$)" -or $content -notmatch 'units_selector=false')) { throw 'HEAVY_CONFIGURED_LOADOUT_VALUE_MISMATCH' }
             if ($Throughput -and $row[0] -like 'ship_cargo:*' -and @($content -split "`n" | Where-Object { $_ -like 'ware=*' }).Count -ne 80) { throw 'THROUGHPUT_NESTED_CARGO_LOSS' }
             if ($Throughput -and $row[0] -like 'ship_crew:*' -and @($content -split "`n" | Where-Object { $_ -like 'role=*' }).Count -ne 80) { throw 'THROUGHPUT_NESTED_CREW_LOSS' }
             if ($Throughput -and $row[0] -like 'ship_loadout:*' -and @($content -split "`n" | Where-Object { $_ -like 'software=*' }).Count -ne 80) { throw 'THROUGHPUT_NESTED_LOADOUT_LOSS' }

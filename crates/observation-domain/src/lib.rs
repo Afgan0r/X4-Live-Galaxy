@@ -52,7 +52,8 @@ pub use ship_core::{
 };
 pub use ship_crew::{CrewObservation, CrewRole, CrewTier};
 pub use ship_detail::{
-    ShipDetailDependency, ShipDetailError, detail_number, detail_outcome, detail_token,
+    ShipDetailDependency, ShipDetailError, ShipRecordConsistency, ShipStaleReason, detail_number,
+    detail_outcome, detail_token,
 };
 pub use ship_field::{FieldApplicability, FieldOutcome, SourceEvidenceRef};
 pub use ship_group::{ShipDetailGroup, ShipGroupDescriptor, ShipGroupError};

@@ -2,6 +2,9 @@
 
 ## 2026-09-21
 
+- Added dependent-snapshot ACK-decoupling and per-record churn oracles after a
+  Phase 05.5 runtime run exposed both artificial inter-section callback waits
+  and whole-batch rejection when one ship changed location.
 - Added the orchestration-multiplicity diagnostic after Phase 05.5 measured
   millisecond source collection but only 39 per-ship detail cycles in 65
   seconds. Cross-language load evidence now checks full requested-selection

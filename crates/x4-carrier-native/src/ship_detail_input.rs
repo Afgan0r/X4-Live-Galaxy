@@ -7,7 +7,7 @@ use observation_domain::{
     detail_number, detail_outcome,
 };
 
-const KEYS: [&str; 14] = [
+const KEYS: [&str; 16] = [
     "profile",
     "source_scope",
     "identity",
@@ -18,6 +18,8 @@ const KEYS: [&str; 14] = [
     "capture_start_millis",
     "capture_end_millis",
     "source_evidence",
+    "consistency",
+    "consistency_reason",
     "wares_outcome",
     "storage_outcome",
     "wares",
@@ -106,5 +108,10 @@ pub(crate) unsafe fn dependency(api: LuaApi, state: *mut c_void) -> Option<ShipD
             detail_number(&string("capture_end_millis", 20)?).ok()?,
         )?,
         source: SourceEvidenceRef::new(string("source_evidence", 128)?)?,
+        consistency: observation_domain::ShipRecordConsistency::from_fields(
+            &string("consistency", 32)?,
+            &string("consistency_reason", 32)?,
+        )
+        .ok()?,
     })
 }

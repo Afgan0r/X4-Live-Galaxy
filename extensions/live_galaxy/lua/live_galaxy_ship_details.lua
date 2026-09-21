@@ -29,13 +29,21 @@ function details.new(options, clock)
         limit = limit, allocation = options.max_allocation_bytes, stage = "reserve",
         group = options.group, scope = options.source_scope, expected_cores = expected_cores,
         work_budget = options.work_budget,
+        capture_only = options.capture_only,
         kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
+end
+
+function details:deliver()
+    if self.stage ~= "captured" then return false end
+    self.capture_only = false
+    self.finish, self.index, self.pending, self.stage = self.captured_finish, 1, self.records[1], "reserve_delivery"
+    return true
 end
 
 function details:fail(carrier, reason, condition, field, observed_type)
     local rejection = { stage = self.stage, condition = condition or reason,
         field = field, observed_type = observed_type, ordinal = self.index }
-    carrier:fail_section(reason)
+    if not self.capture_only then carrier:fail_section(reason) end
     self.stage, self.pending, self.buffer = "failed", nil, nil
     return { disposition = reason, rejection = rejection }
 end
@@ -44,7 +52,9 @@ function details:step(context, carrier, status)
     local group = self.group
     if self.stage == "done" then return { disposition = "producer_busy" } end
     if self.stage == "failed" then return { disposition = "failed" } end
-    if status.selection ~= group.key then return self:fail(carrier, "restart_required") end
+    if status.selection ~= group.key and not (self.capture_only and status.selection == "ship_core") then
+        return self:fail(carrier, "restart_required")
+    end
     if self.stage == "reserve" then
         local begin, err = self.clock:begin_evidence()
         if not begin then return self:fail(carrier, err) end
@@ -134,6 +144,7 @@ function details:step(context, carrier, status)
         record.policy_version = 2
         record.capture_start_millis, record.capture_end_millis = self.capture_start, finish.capture_end_millis
         record.source_evidence = "x4-9.00-steam-23660954-ship-detail-source-v1"
+        record.consistency, record.consistency_reason = "consistent", "none"
         if self.kind == "ship_cargo" then
             record.wares_outcome = #record.wares == 0 and "empty" or "value"
             record.storage_outcome = #record.storage == 0 and "empty" or "value"
@@ -153,12 +164,18 @@ function details:step(context, carrier, status)
         if type(expected) ~= "table" then return self:fail(carrier, "core_changed", "missing_parent", "core") end
         local current, source_rejection = self.api:read_core(identity)
         if type(current) ~= "table" then
-            return self:fail(carrier, "core_changed", source_rejection and source_rejection.condition or "result_shape",
-                source_rejection and source_rejection.field or "core",
-                source_rejection and source_rejection.observed_type or type(current))
-        end
-        for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
-            if current[key] ~= expected[key] then return self:fail(carrier, "core_changed", "value_mismatch", key, type(current[key])) end
+            self.records[self.index].consistency = "possibly_stale"
+            self.records[self.index].consistency_reason = "missing"
+        else
+            local reason
+            if current.identity ~= expected.identity then reason = "missing"
+            elseif current.owner ~= expected.owner then reason = "owner_changed"
+            elseif current.location ~= expected.location then reason = "location_changed"
+            elseif current.type ~= expected.type or current.class ~= expected.class then reason = "core_changed" end
+            if reason then
+                self.records[self.index].consistency = "possibly_stale"
+                self.records[self.index].consistency_reason = reason
+            end
         end
         self.index = self.index + 1
         if self.index > #group.members then self.stage = "capture_finish" end
@@ -166,6 +183,10 @@ function details:step(context, carrier, status)
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:fail(carrier, err) end
         finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true
+        if self.capture_only then
+            self.captured_finish, self.stage = finish, "captured"
+            return { disposition = "captured" }
+        end
         self.finish, self.index, self.pending, self.stage = finish, 1, self.records[1], "reserve_delivery"
         if self.work_budget then
             local ok, reason = self.work_budget:after(carrier)
@@ -188,6 +209,7 @@ function details:step(context, carrier, status)
         self.stage, self.reserved = "done", false
         return { disposition = "sampled" }
     end
+    if self.stage == "captured" then return { disposition = "captured" } end
     return { disposition = "collecting" }
 end
 

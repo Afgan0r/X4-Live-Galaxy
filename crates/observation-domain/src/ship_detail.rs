@@ -12,6 +12,55 @@ pub struct ShipDetailDependency {
     pub policy: ObservationPolicyVersion,
     pub capture: CaptureWindow,
     pub source: SourceEvidenceRef,
+    pub consistency: ShipRecordConsistency,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ShipRecordConsistency {
+    Consistent,
+    PossiblyStale(ShipStaleReason),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ShipStaleReason {
+    LocationChanged,
+    OwnerChanged,
+    Missing,
+    CoreChanged,
+}
+
+impl ShipRecordConsistency {
+    pub fn from_fields(value: &str, reason: &str) -> Result<Self, ShipDetailError> {
+        match (value, reason) {
+            ("consistent", "none") => Ok(Self::Consistent),
+            ("possibly_stale", "location_changed") => {
+                Ok(Self::PossiblyStale(ShipStaleReason::LocationChanged))
+            }
+            ("possibly_stale", "owner_changed") => {
+                Ok(Self::PossiblyStale(ShipStaleReason::OwnerChanged))
+            }
+            ("possibly_stale", "missing") => Ok(Self::PossiblyStale(ShipStaleReason::Missing)),
+            ("possibly_stale", "core_changed") => {
+                Ok(Self::PossiblyStale(ShipStaleReason::CoreChanged))
+            }
+            _ => Err(ShipDetailError::InvalidField),
+        }
+    }
+
+    #[must_use]
+    pub const fn fields(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Consistent => ("consistent", "none"),
+            Self::PossiblyStale(ShipStaleReason::LocationChanged) => {
+                ("possibly_stale", "location_changed")
+            }
+            Self::PossiblyStale(ShipStaleReason::OwnerChanged) => {
+                ("possibly_stale", "owner_changed")
+            }
+            Self::PossiblyStale(ShipStaleReason::Missing) => ("possibly_stale", "missing"),
+            Self::PossiblyStale(ShipStaleReason::CoreChanged) => ("possibly_stale", "core_changed"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -72,6 +72,15 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   dominate throughput even when every getter is fast. Cross-language load tests
   must assert requested-selection coverage, transaction multiplicity, zero
   final backlog, and independent readback of every member.
+- For a logical snapshot with several dependent sections, inject delayed
+  acknowledgments and prove that they do not gate later X4 getters. Capture all
+  selected source families into owned memory first, then assert that delivery
+  retries publish the retained values without repeating source calls.
+- Inject one moved, transferred, and disappeared member during final
+  revalidation. When the contract permits partial per-record freshness, assert
+  that the batch completes, only that record carries the exact stale reason,
+  and unchanged members remain authoritative; a whole-batch rejection is not
+  an acceptable substitute for record-level churn evidence.
 - Do not compare an in-game source-capture duration with the wall-clock duration
   of a synthetic end-to-end fixture. Report capture, serialization, transport,
   durable commit, polling/waits, payload bytes, and cycle count separately. A

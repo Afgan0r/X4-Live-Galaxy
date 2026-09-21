@@ -149,6 +149,28 @@ describe("shared heavy profile and bounded game work", function()
             cargo_storage_size = function() return 24 end,
             cargo_storage_allocate = function() return {} end,
             cargo_storage_fill = function() return {} end,
+            crew_capacity = function() return 0 end,
+            crew_count = function() return 0 end,
+            crew_size = function() return 40 end,
+            crew_allocate = function() return {} end,
+            crew_fill = function() return {} end,
+            crew_tier_size = function() return 16 end,
+            crew_tier_allocate = function() return {} end,
+            crew_tier_fill = function() return {} end,
+            physical_count = function() return 0 end,
+            virtual_count = function() return 0 end,
+            software_count = function() return 0 end,
+            software_size = function() return 24 end,
+            software_allocate = function() return {} end,
+            software_fill = function() return {} end,
+            missiles_count = function() return 0 end,
+            missiles_size = function() return 24 end,
+            missiles_allocate = function() return {} end,
+            missiles_fill = function() return {} end,
+            units_count = function() return 0 end,
+            units_size = function() return 24 end,
+            units_allocate = function() return {} end,
+            units_fill = function() return {} end,
         }
         local adapter = { clock_getter = function() return now end,
             begin_evidence = function() return { capture_start_millis = tostring(now) } end,
@@ -166,11 +188,11 @@ describe("shared heavy profile and bounded game work", function()
             return adapter:advance(context, carrier, status)
         end
         for _ = 1, 30 do if step().disposition == "sampled" then break end end
-        assert.equals(1, finishes); assert.equals(4, reads)
+        assert.equals(1, finishes); assert.equals(10, reads)
         adapter:feedback(context, carrier, status, 5)
         status.selection, status.collection_revision = "ship_cargo:g0", "2"
         for _ = 1, 30 do if step().disposition == "sampled" then break end end
-        assert.equals(2, finishes); assert.equals(6, reads); assert.equals(0, failures)
+        assert.equals(2, finishes); assert.equals(10, reads); assert.equals(0, failures)
         status.selection = "ship_cargo:g1"
         status.collection_revision = "4"
         local refusal = step()
@@ -178,7 +200,7 @@ describe("shared heavy profile and bounded game work", function()
         assert.same({ stage = "selection", condition = "selection_unavailable", section = "ship_cargo:g1",
             revision = "4", run = "7" }, refusal.rejection)
         assert.is_nil(refusal.capture_metrics, "the refused request did not capture source values")
-        assert.equals(6, reads, "a missing group never starts a source read")
+        assert.equals(10, reads, "a missing group never starts a source read")
         now = v.admission_window_millis + 1000
         assert.equals("admission_window_exhausted", step().disposition)
         adapter:feedback(context, carrier, status, 0)

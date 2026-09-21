@@ -33,7 +33,14 @@ function collection.new(options, clock)
     local api = options.ship_api or source.runtime()
     return setmetatable({ api = api, limits = copied, clock = clock, faction = options.faction_id,
         source_scope = options.source_scope or "x4:faction:" .. options.faction_id .. ":ships",
-        stage = "census", work = 0, attempts = 1, work_budget = options.work_budget }, { __index = collection })
+        stage = "census", work = 0, attempts = 1, work_budget = options.work_budget,
+        capture_only = options.capture_only }, { __index = collection })
+end
+
+function collection:deliver()
+    if self.stage ~= "captured" then return false end
+    self.stage = "reserve"
+    return true
 end
 
 function collection:discard(carrier, reason, condition, field, observed_type)
@@ -203,7 +210,8 @@ function collection:step(context, carrier, status)
         local finish, err = self.clock:finish_evidence()
         if not finish then return self:discard(carrier, err) end
         finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true
-        self.finish, self.index, self.stage = finish, 1, "reserve"
+        self.finish, self.index, self.stage = finish, 1, self.capture_only and "captured" or "reserve"
+        if self.capture_only then return { disposition = "captured" } end
         if self.work_budget then
             local ok, reason = self.work_budget:after(carrier)
             if not ok then return self:discard(carrier, reason) end
@@ -224,6 +232,7 @@ function collection:step(context, carrier, status)
         self.cores = nil
         self.stage, self.started, self.last_step, self.work, self.attempts = "census", nil, nil, 0, 1
     end
+    if stage == "captured" then return { disposition = "captured" } end
     return { disposition = "collecting" }
 end
 

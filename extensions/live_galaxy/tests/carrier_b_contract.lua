@@ -266,14 +266,28 @@ describe("owned Carrier B adapter", function()
             list_factions = function() return { "argon" } end, count_ships = function() return 1 end,
             new_buffer = function() return { [0] = "9007199254740993" } end, fill_ships = function() return 1 end,
             read_core = function(_, id) return { identity = id, owner = "argon", type = "macro", class = "ship", location = "sector:1" } end,
+            cargo_wares = function() return {} end, cargo_storage_count = function() return 0 end,
+            cargo_storage_size = function() return 24 end, cargo_storage_allocate = function() return {} end,
+            cargo_storage_fill = function() return {} end, crew_capacity = function() return 0 end,
+            crew_count = function() return 0 end, crew_size = function() return 40 end,
+            crew_allocate = function() return {} end, crew_fill = function() return {} end,
+            crew_tier_size = function() return 16 end, crew_tier_allocate = function() return {} end,
+            crew_tier_fill = function() return {} end, physical_count = function() return 0 end,
+            virtual_count = function() return 0 end,
+            software_count = function() return 0 end, software_size = function() return 24 end,
+            software_allocate = function() return {} end, software_fill = function() return {} end,
+            missiles_count = function() return 0 end, missiles_size = function() return 24 end,
+            missiles_allocate = function() return {} end, missiles_fill = function() return {} end,
+            units_count = function() return 0 end, units_size = function() return 24 end,
+            units_allocate = function() return {} end, units_fill = function() return {} end,
         }
         _G.RegisterEvent = function(_, callback) tick = callback end
         _G.DebugError = function(value) diagnostic = value end
         local runtime = fixture.runtime()
         assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
         assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
-        assert.is_truthy(diagnostic:match("max_callback_duration_millis=20"))
-        assert.is_truthy(diagnostic:match("max_callback_overrun_millis=18"))
+        assert.is_truthy(diagnostic:match("max_callback_duration_millis=10"))
+        assert.is_truthy(diagnostic:match("max_callback_overrun_millis=8"))
         assert.is_truthy(diagnostic:match("source_value_bytes=%d+"))
     end)
 

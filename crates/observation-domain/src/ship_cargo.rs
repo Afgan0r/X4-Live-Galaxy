@@ -1,5 +1,6 @@
 use crate::ship_detail::{detail_number, detail_token, outcome_name};
 use crate::{FieldOutcome, ShipDetailDependency, ShipDetailError};
+use core::fmt::Write as _;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CargoWare {
@@ -34,17 +35,10 @@ impl CargoObservation {
 
     #[must_use]
     pub fn canonical_content(&self) -> String {
-        let d = &self.dependency;
-        let mut text = format!(
-            "profile=ship_cargo\nidentity={}\nowner={}\ncore_revision={}\nmember_revision={}\npolicy={}\ncapture_start={}\ncapture_end={}\nsource={}\nwares_outcome={}\nstorage_outcome={}\nreservation_policy=excluded",
-            d.identity.as_str(),
-            d.owner.as_str(),
-            d.core_revision.get(),
-            d.member_revision.get(),
-            d.policy.get(),
-            d.capture.start_millis(),
-            d.capture.end_millis(),
-            d.source.as_str(),
+        let mut text = crate::ship_detail_codec::header("ship_cargo", &self.dependency);
+        let _ = write!(
+            text,
+            "\nwares_outcome={}\nstorage_outcome={}\nreservation_policy=excluded",
             outcome_name(&self.wares),
             outcome_name(&self.storage)
         );

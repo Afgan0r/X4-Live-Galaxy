@@ -6,22 +6,9 @@ use observation_ingest::{
     CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody, DemandBody, HandshakeBody,
     encode_carrier_control,
 };
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use x4_carrier_native::BridgePeer;
 
-pub fn wait_interval(
-    peer: &mut BridgePeer,
-    limits: &ProductionLimits,
-    interval: usize,
-) -> Result<(), ()> {
-    match peer.receive_timeout(
-        limits.complete_message_bytes,
-        Duration::from_millis(interval as u64),
-    ) {
-        Ok(None) => Ok(()),
-        _ => Err(()),
-    }
-}
 pub fn initial(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -121,12 +108,6 @@ pub fn next(
     key: &mut String,
 ) -> Option<Instant> {
     // Reconcile completion before issuing fresh collection demand.
-    let interval = session
-        .heavy_limits()
-        .map_or(limits.availability_interval_millis, |profile| {
-            profile.rate_interval_millis
-        });
-    wait_interval(peer, limits, interval).ok()?;
     if let Some(schedule) = schedule {
         *key = session.next_ship_key(key, now()).ok()?;
         if !schedule.admit(key) {

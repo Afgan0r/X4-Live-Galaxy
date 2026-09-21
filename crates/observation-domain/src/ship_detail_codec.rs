@@ -33,11 +33,15 @@ pub fn dependency(
         .ok_or(ShipDetailError::InvalidNumber)?,
         source: SourceEvidenceRef::new(field(lines, "source=")?)
             .ok_or(ShipDetailError::InvalidField)?,
+        consistency: crate::ShipRecordConsistency::from_fields(
+            field(lines, "consistency=")?,
+            field(lines, "consistency_reason=")?,
+        )?,
     })
 }
 pub fn header(profile: &str, d: &ShipDetailDependency) -> String {
     format!(
-        "profile={profile}\nidentity={}\nowner={}\ncore_revision={}\nmember_revision={}\npolicy={}\ncapture_start={}\ncapture_end={}\nsource={}",
+        "profile={profile}\nidentity={}\nowner={}\ncore_revision={}\nmember_revision={}\npolicy={}\ncapture_start={}\ncapture_end={}\nsource={}\nconsistency={}\nconsistency_reason={}",
         d.identity.as_str(),
         d.owner.as_str(),
         d.core_revision.get(),
@@ -45,6 +49,8 @@ pub fn header(profile: &str, d: &ShipDetailDependency) -> String {
         d.policy.get(),
         d.capture.start_millis(),
         d.capture.end_millis(),
-        d.source.as_str()
+        d.source.as_str(),
+        d.consistency.fields().0,
+        d.consistency.fields().1
     )
 }

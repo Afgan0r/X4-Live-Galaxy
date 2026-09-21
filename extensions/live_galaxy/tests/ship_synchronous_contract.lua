@@ -5,6 +5,31 @@ describe("synchronous selection capture with resumable delivery", function()
     before_each(function() fixture = helper.new() end)
     after_each(function() fixture.restore() end)
 
+    local function add_empty_details(api, observed)
+        local function hit() observed.count = observed.count + 1 end
+        api.cargo_wares = function() hit(); return {} end
+        api.cargo_storage_count = function() hit(); return 0 end
+        api.cargo_storage_size = function() return 24 end
+        api.cargo_storage_allocate = function() return {} end
+        api.cargo_storage_fill = function() hit(); return {} end
+        api.crew_capacity = function() hit(); return 0 end
+        api.crew_count = function() hit(); return 0 end
+        api.crew_size = function() return 40 end
+        api.crew_allocate = function() return {} end
+        api.crew_fill = function() hit(); return {} end
+        api.crew_tier_size = function() return 16 end
+        api.crew_tier_allocate = function() return {} end
+        api.crew_tier_fill = function() hit(); return {} end
+        api.physical_count = function() hit(); return 0 end
+        api.virtual_count = function() hit(); return 0 end
+        for _, family in ipairs({ "software", "missiles", "units" }) do
+            api[family .. "_count"] = function() hit(); return 0 end
+            api[family .. "_size"] = function() return 24 end
+            api[family .. "_allocate"] = function() return {} end
+            api[family .. "_fill"] = function() hit(); return {} end
+        end
+    end
+
     local function configured_case(mode)
         local file = assert(io.open("config/heavy-ship-experiment.json", "rb"))
         local text = assert(file:read("*a")); assert(file:close())
@@ -27,6 +52,7 @@ describe("synchronous selection capture with resumable delivery", function()
                 return { identity = id, owner = "argon", type = "macro", class = "ship", location = "sector:1" }
             end,
         }
+        add_empty_details(options.ship_api, { count = 0 })
         local adapter = { begin_evidence = function() return { capture_start_millis = "1" } end,
             finish_evidence = function() return { capture_end_millis = "2" } end }
         assert(fixture.load("live_galaxy_ship_selection").attach(adapter, options))
@@ -60,6 +86,7 @@ describe("synchronous selection capture with resumable delivery", function()
         local now, reads, fills, finished, busy = 100, 0, 0, 0, true
         local reused, delivered, expected = {}, {}, {}
         for i = 1, 950 do expected[i] = "900719925474" .. string.format("%04d", i) end
+        local detail_reads = { count = 0 }
         options.ship_api = {
             list_factions = function() return { "argon" } end,
             count_ships = function() return 950 end,
@@ -73,6 +100,7 @@ describe("synchronous selection capture with resumable delivery", function()
                 return reused
             end,
         }
+        add_empty_details(options.ship_api, detail_reads)
         local adapter = {
             begin_evidence = function() return { capture_start_millis = tostring(now) } end,
             finish_evidence = function() return { capture_end_millis = tostring(now) } end,
@@ -92,24 +120,38 @@ describe("synchronous selection capture with resumable delivery", function()
         local status = { selection = "ship_core", collection_revision = "1", producer_incarnation = "7", monotonic_millis = "100" }
         local result = adapter:advance({}, carrier, status)
         assert.equals("producer_busy", result.disposition)
-        assert.equals(1900, reads, "all source and revalidation reads must finish before returning")
+        assert.equals(4750, reads, "core and all detail revalidation reads must finish before returning")
+        assert.is_true(detail_reads.count > 0, "all detail families must be captured in the same callback")
         assert.equals(1, fills); assert.equals(0, #delivered); assert.equals(0, finished)
         reused.location = "changed_after_capture"
         for _ = 1, 3 do
             now = now + 50; status.monotonic_millis = tostring(now)
             assert.equals("producer_busy", adapter:advance({}, carrier, status).disposition)
-            assert.equals(1900, reads); assert.equals(1, fills)
+            assert.equals(4750, reads); assert.equals(1, fills)
         end
         busy = false; now = now + 50; status.monotonic_millis = tostring(now)
         result = adapter:advance({}, carrier, status)
         assert.equals("sampled", result.disposition); assert.equals(1, finished)
-        assert.equals(950, #delivered); assert.equals(1900, reads)
-        for i, row in ipairs(delivered) do
-            assert.equals(expected[i], row.identity)
-            assert.equals("macro:" .. expected[i], row.type)
-            assert.equals("sector:" .. expected[i], row.location)
+        assert.equals(950, #delivered); assert.equals(4750, reads)
+        local captured_detail_reads = detail_reads.count
+        assert.is_nil(adapter:feedback({ source_boundary = "runtime_start" }, carrier, status, 5))
+        for revision, key in ipairs({ "ship_cargo:g0", "ship_crew:g0", "ship_loadout:g0" }) do
+            now = now + 1
+            status.selection, status.collection_revision, status.monotonic_millis = key, tostring(revision + 1), tostring(now)
+            assert.equals("sampled", adapter:advance({}, carrier, status).disposition)
+            assert.equals(4750, reads, "cached detail delivery must not reread X4 core state")
+            assert.equals(captured_detail_reads, detail_reads.count, "cached detail delivery must not repeat getters")
         end
-        assert.equals(1900, result.capture_metrics.max_callback_duration_millis)
-        assert.equals(1898, result.capture_metrics.max_callback_overrun_millis)
+        assert.equals(3800, #delivered)
+        for i, row in ipairs(delivered) do
+            local member = expected[(i - 1) % 950 + 1]
+            assert.equals(member, row.identity)
+            if i <= 950 then
+                assert.equals("macro:" .. member, row.type)
+                assert.equals("sector:" .. member, row.location)
+            end
+        end
+        assert.equals(4750, result.capture_metrics.max_callback_duration_millis)
+        assert.equals(4748, result.capture_metrics.max_callback_overrun_millis)
     end)
 end)

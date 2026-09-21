@@ -3,7 +3,7 @@ use crate::lua_table::{exact_keys, field_bool, field_integer, field_signed, fiel
 use core::ffi::c_void;
 use observation_domain::{CrewObservation, CrewRole, CrewTier, FieldOutcome, detail_outcome};
 
-const KEYS: [&str; 15] = [
+const KEYS: [&str; 17] = [
     "profile",
     "source_scope",
     "identity",
@@ -14,6 +14,8 @@ const KEYS: [&str; 15] = [
     "capture_start_millis",
     "capture_end_millis",
     "source_evidence",
+    "consistency",
+    "consistency_reason",
     "capacity_outcome",
     "capacity_people",
     "roles_outcome",

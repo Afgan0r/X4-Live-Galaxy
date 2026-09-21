@@ -96,6 +96,26 @@ describe("source-faithful resumable cargo", function()
         assert.equals("producer_busy", collector:tick({}, carrier, { selection = "ship_cargo:g0" }).disposition)
         assert.equals(1, reads, "a finished collector waits for the next selection without looping")
     end)
+    it("aborts a reserved native section when cached delivery fails", function()
+        local failures = 0
+        local collector = assert(module.new({ capture_only = true, max_inner = 2,
+            max_allocation_bytes = 48, source_scope = "x4:faction:argon:ships",
+            group = { key = "ship_cargo:g0", owner = "argon", core_revision = "7",
+                members = { "9007199254740993" } }, ship_api = {
+                cargo_wares = function() return {} end, cargo_storage_count = function() return 0 end,
+                cargo_storage_size = function() return 24 end, cargo_storage_allocate = function() return {} end,
+                cargo_storage_fill = function() return {} end } }, {
+                begin_evidence = function() return { capture_start_millis = "100" } end,
+                finish_evidence = function() return { capture_end_millis = "110" } end,
+            }))
+        local carrier = { begin_section = function() return 0 end, push_record = function() return -20 end,
+            finish_section = function() return 0 end,
+            fail_section = function() failures = failures + 1; return 0 end }
+        assert.equals("captured", collector:tick({}, carrier, { selection = "ship_core" }).disposition)
+        assert.is_true(collector:deliver())
+        assert.equals("fact_rejected", collector:tick({}, carrier, { selection = "ship_cargo:g0" }).disposition)
+        assert.equals(1, failures)
+    end)
     it("rejects overflow before allocation or fill", function()
         for _, options in ipairs({ { count = 3 }, { size = 49 },
             { wares = { ore = 9007199254740992 } }, { wares = { a = 1, b = 2, c = 3 } } }) do
@@ -111,18 +131,26 @@ describe("source-faithful resumable cargo", function()
             { transport = "solid", capacity_cubic_metres = 1000, occupied_cubic_metres = 1001 } } })
         assert.equals(0, #rejected); assert.equals(0, completed); assert.equals(1, failed)
     end)
-    it("revalidates owner and location after detail collection before completing", function()
+    it("marks only the changed ship stale without discarding the detail batch", function()
         local expected = { identity = "9007199254740993", owner = "argon", type = "ship_macro",
             class = "destroyer", location = "sector:argon_prime" }
         local _, _, completed, failed = run({ expected_core = expected, current_core = expected })
         assert.equals(1, completed); assert.equals(0, failed)
+        local reasons = { identity = "missing", owner = "owner_changed", type = "core_changed",
+            class = "core_changed", location = "location_changed" }
         for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
             local changed = {}; for name, value in pairs(expected) do changed[name] = value end
             changed[key] = "changed"
             local _, records, finish, failures, last = run({ expected_core = expected, current_core = changed })
-            assert.equals(0, #records, "revalidate before any delivery")
-            assert.equals(0, finish); assert.equals(1, failures); assert.equals("core_changed", last.disposition)
+            assert.equals(1, #records)
+            assert.equals("possibly_stale", records[1].consistency)
+            assert.equals(reasons[key], records[1].consistency_reason)
+            assert.equals(1, finish); assert.equals(0, failures); assert.equals("sampled", last.disposition)
         end
+        local _, missing, finish, failures, last = run({ expected_core = expected, current_core = nil })
+        assert.equals("possibly_stale", missing[1].consistency)
+        assert.equals("missing", missing[1].consistency_reason)
+        assert.equals(1, finish); assert.equals(0, failures); assert.equals("sampled", last.disposition)
     end)
 end)
 

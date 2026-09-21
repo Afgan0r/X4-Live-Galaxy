@@ -5,7 +5,7 @@ use observation_domain::{
     InstalledSlot, InstalledSoftware, LoadoutObservation, MissileCargo, ShipUnit, VirtualSlot,
     detail_outcome,
 };
-const KEYS: [&str; 21] = [
+const KEYS: [&str; 23] = [
     "profile",
     "source_scope",
     "identity",
@@ -16,6 +16,8 @@ const KEYS: [&str; 21] = [
     "capture_start_millis",
     "capture_end_millis",
     "source_evidence",
+    "consistency",
+    "consistency_reason",
     "physical_outcome",
     "virtual_outcome",
     "software_outcome",

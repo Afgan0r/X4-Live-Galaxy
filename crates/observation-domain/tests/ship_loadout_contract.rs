@@ -1,6 +1,6 @@
 use observation_domain::{FieldOutcome, LoadoutObservation};
 
-const HEADER: &str = "profile=ship_loadout\nidentity=9007199254740993\nowner=argon\ncore_revision=7\nmember_revision=7\npolicy=2\ncapture_start=100\ncapture_end=110\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nphysical_outcome=value\nvirtual_outcome=value\nsoftware_outcome=value\nmissiles_outcome=value\nunits_outcome=value\nmissile_semantics=raw_signed_inferred_items\nunits_selector=false\nvirtual_semantics=observed_macro_thruster_inferred";
+const HEADER: &str = "profile=ship_loadout\nidentity=9007199254740993\nowner=argon\ncore_revision=7\nmember_revision=7\npolicy=2\ncapture_start=100\ncapture_end=110\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nconsistency=consistent\nconsistency_reason=none\nphysical_outcome=value\nvirtual_outcome=value\nsoftware_outcome=value\nmissiles_outcome=value\nunits_outcome=value\nmissile_semantics=raw_signed_inferred_items\nunits_selector=false\nvirtual_semantics=observed_macro_thruster_inferred";
 fn content() -> String {
     format!(
         "{HEADER}\nphysical=engine|1|0|engine_macro|..|\nphysical=weapon|1|9007199254740993|weapon_macro|path|group\nvirtual=thruster|1|thruster_macro\nsoftware=software_max|software_current\nmissile=missile_ware|missile_macro|-3\nunit=unit_macro|unfiltered_raw|2"

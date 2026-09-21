@@ -616,3 +616,32 @@ Locator SHA-256:
 The replacement runtime run must report per-family X4 capture time and separate
 end-to-end transport/commit time; synthetic fixture wall clock is not the
 throughput baseline.
+
+### Full-snapshot ACK decoupling and churn correction
+
+The replacement normal-time run measured approximately 9 ms for core, 18 ms
+for cargo, 76 ms for crew and 196 ms for loadout. Their successful source span
+was nevertheless approximately 1.46 seconds because each family waited for a
+durable ACK and another telemetry callback. A later loadout attempt discarded
+the complete roughly 750-ship batch when one ship at ordinal 643 changed
+location, then waited for parent expiry before refreshing core.
+
+The corrected path captures core, cargo, crew and loadout into one owned Lua
+snapshot during the core callback. Existing section envelopes are then drained
+from that snapshot without another X4 getter and without the bridge's former
+rate-interval sleep. Wire byte limits, backpressure, durable acknowledgment,
+reconciliation and the finite admission window remain active.
+
+Final revalidation now marks only the affected record as `possibly_stale` with
+`location_changed`, `owner_changed`, `missing` or `core_changed`. The batch and
+unchanged records remain admissible, while the receiver rejects malformed
+consistency/reason pairs.
+
+Local RED/GREEN evidence covers 950 ships in one four-family callback, cached
+delivery without repeated getters, per-record churn, actual DLL/pipe/SQLite
+publication, restart recovery and independent historical/current readback. A
+129-ship, 80-nested-row synthetic run completed two snapshots with zero final
+backlog; the first process took 1.910 seconds end to end and its largest source
+callback was 207.366 ms. Those figures are synthetic load evidence. The next
+installed X4 run must measure the real combined callback and frame impact;
+Gate A remains pending.

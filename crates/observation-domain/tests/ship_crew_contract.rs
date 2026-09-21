@@ -1,5 +1,5 @@
 use observation_domain::{CrewObservation, FieldOutcome};
-const HEADER: &str = "profile=ship_crew\nidentity=9007199254740993\nowner=argon\ncore_revision=7\nmember_revision=7\npolicy=2\ncapture_start=100\ncapture_end=110\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\ncapacity_outcome=value\nincludepilot=true\nincludearriving=true\nrole_coverage=observed_count_fill_only\nroles_outcome=value\ncapacity_people=60";
+const HEADER: &str = "profile=ship_crew\nidentity=9007199254740993\nowner=argon\ncore_revision=7\nmember_revision=7\npolicy=2\ncapture_start=100\ncapture_end=110\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nconsistency=consistent\nconsistency_reason=none\ncapacity_outcome=value\nincludepilot=true\nincludearriving=true\nrole_coverage=observed_count_fill_only\nroles_outcome=value\ncapacity_people=60";
 
 #[test]
 fn aggregate_crew_roundtrip_preserves_signed_raw_tiers_and_every_role() {

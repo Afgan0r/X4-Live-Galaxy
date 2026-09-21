@@ -11,7 +11,7 @@ use observation_ingest::{ReceiverDisposition, decode_complete_message, encode_co
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 use x4_bridge::ProductionObservationSession;
 
-const CONTENT: &str = "profile=ship_cargo\nidentity=9007199254740993\nowner=argon\ncore_revision=1\nmember_revision=1\npolicy=2\ncapture_start=10\ncapture_end=11\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nwares_outcome=value\nstorage_outcome=value\nreservation_policy=excluded\nware=ore|17\nstorage=solid|1000|170";
+const CONTENT: &str = "profile=ship_cargo\nidentity=9007199254740993\nowner=argon\ncore_revision=1\nmember_revision=1\npolicy=2\ncapture_start=10\ncapture_end=11\nsource=x4-9.00-steam-23660954-ship-detail-source-v1\nconsistency=consistent\nconsistency_reason=none\nwares_outcome=value\nstorage_outcome=value\nreservation_policy=excluded\nware=ore|17\nstorage=solid|1000|170";
 
 #[test]
 fn cargo_dependency_and_nested_failures_preserve_accepted_core() {
