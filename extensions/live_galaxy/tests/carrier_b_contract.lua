@@ -292,7 +292,6 @@ describe("owned Carrier B adapter", function()
     end)
 
     for _, case in ipairs({
-        { field = "owner", value = "PRIVATE_OWNER", condition = "value_mismatch", observed_type = "string" },
         { field = "type", value = "PRIVATE/path\n", condition = "token_invalid", observed_type = "string" },
         { field = "class", value = false, condition = "token_invalid", observed_type = "boolean" },
         { field = "location", value = {}, condition = "token_invalid", observed_type = "table" },
@@ -335,19 +334,42 @@ describe("owned Carrier B adapter", function()
             assert.is_nil(diagnostic:match("PRIVATE"))
             assert.is_nil(diagnostic:match("9007199254740993"))
             assert.is_nil(diagnostic:match("[%c]"))
-            if case.field == "owner" then
-                local terminal
-                for _ = 1, 10 do
-                    local _, reason = tick("live_galaxy_observation", "telemetry_tick")
-                    if reason == "retry_exhausted" then terminal = true; break end
-                end
-                assert.is_true(terminal)
-                local count = #messages
-                for _ = 1, 3 do assert.same({ false, "retry_exhausted" }, { tick("live_galaxy_observation", "telemetry_tick") }) end
-                assert.equals(count, #messages, "unchanged terminal attempt is logged once")
-            end
         end)
     end
+
+    it("publishes an owner-changed core as record-scoped stale evidence", function()
+        local env, tick, diagnostic = native({ selection = "ship_core", remaining = "1", monotonic_step = 10 }), nil, nil
+        local file = assert(io.open("config/heavy-ship-experiment.json", "rb"))
+        local text = assert(file:read("*a")); assert(file:close())
+        local values = {}; for key, value in text:gmatch('"([%w_]+)"%s*:%s*(%d+)') do values[key] = tonumber(value) end
+        local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
+        options.getter, options.clock_getter = function() return 0 end, function() return 1 end
+        options.ship_api = {
+            list_factions = function() return { "argon" } end, count_ships = function() return 1 end,
+            new_buffer = function() return { [0] = "9007199254740993" } end, fill_ships = function() return 1 end,
+            read_core = function(_, id) return { identity = id, owner = "teladi", type = "macro",
+                class = "ship", location = "sector:1" } end,
+            cargo_wares = function() return {} end, cargo_storage_count = function() return 0 end,
+            cargo_storage_size = function() return 24 end, cargo_storage_allocate = function() return {} end,
+            cargo_storage_fill = function() return {} end, crew_capacity = function() return 0 end,
+            crew_count = function() return 0 end, crew_size = function() return 40 end,
+            crew_allocate = function() return {} end, crew_fill = function() return {} end,
+            crew_tier_size = function() return 16 end, crew_tier_allocate = function() return {} end,
+            crew_tier_fill = function() return {} end, physical_count = function() return 0 end,
+            virtual_count = function() return 0 end, software_count = function() return 0 end,
+            software_size = function() return 24 end, software_allocate = function() return {} end,
+            software_fill = function() return {} end, missiles_count = function() return 0 end,
+            missiles_size = function() return 24 end, missiles_allocate = function() return {} end,
+            missiles_fill = function() return {} end, units_count = function() return 0 end,
+            units_size = function() return 24 end, units_allocate = function() return {} end,
+            units_fill = function() return {} end,
+        }
+        _G.RegisterEvent = function(_, callback) tick = callback end
+        _G.DebugError = function(value) diagnostic = value end
+        assert(fixture.runtime().initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
+        assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.is_truthy(diagnostic:match("detail=sampled"))
+    end)
 
     it("logs initial detail refusal against the request without fabricated capture metrics", function()
         local env, tick, diagnostic = native({ selection = "ship_cargo:g1", revision = "4" }), nil, nil

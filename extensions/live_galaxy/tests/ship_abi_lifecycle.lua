@@ -5,7 +5,8 @@ return function(module, api, carrier, loadlib, limits, source, boundary)
         source_epoch_status = "boundary_uncertain", source_boundary = boundary }
     local record = { profile = "ship_core", source_scope = source.source_scope,
         identity = "9007199254740995", owner = "argon", type = "destroyer_macro",
-        class = "destroyer", location = "sector:2" }
+        class = "destroyer", location = "sector:2", consistency = "consistent",
+        consistency_reason = "none" }
     local finish = { capture_end_millis = "21", success = true, quality = "unknown",
         availability = "available", coverage = "partial", consistency = "observed_count_fill_only",
         stable_identity = true }

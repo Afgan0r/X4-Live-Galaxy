@@ -41,7 +41,7 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
         };
         assert_eq!(
             batch.records[0].content,
-            "profile=ship_core\nidentity=9007199254740993\nowner=argon\ntype=destroyer_macro\nclass=destroyer\nlocation=sector:1"
+            "profile=ship_core\nidentity=9007199254740993\nowner=argon\ntype=destroyer_macro\nclass=destroyer\nlocation=sector:1\nconsistency=consistent\nconsistency_reason=none"
         );
         let CompleteMessage::SectionCompletion(done) = receive(&mut peer, &identity, "committed")
         else {

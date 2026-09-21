@@ -63,7 +63,8 @@ else
     begin.capture_start_millis, begin.source_boundary = "999", "mutated"
     local record = { profile = "ship_core", source_scope = "x4:faction:argon:ships",
         identity = "9007199254740993", owner = "argon", type = "destroyer_macro",
-        class = "destroyer", location = "sector:1" }
+        class = "destroyer", location = "sector:1", consistency = "consistent",
+        consistency_reason = "none" }
     for key in pairs(record) do
         local bad = copy(record); bad[key] = nil
         assert(carrier:push_record(bad) == -20, "missing ship key " .. key)
@@ -78,6 +79,10 @@ else
         type = "", class = "", location = "" }) do
         local bad = copy(record); bad[key] = value
         assert(carrier:push_record(bad) == -20, "invalid ship field " .. key)
+    end
+    for consistency, reason in pairs({ consistent = "owner_changed", possibly_stale = "none" }) do
+        local bad = copy(record); bad.consistency, bad.consistency_reason = consistency, reason
+        assert(carrier:push_record(bad) == -20, "invalid core consistency pair")
     end
     extra = copy(record); extra.extra = true
     assert(carrier:push_record(extra) == -20)

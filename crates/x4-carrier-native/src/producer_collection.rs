@@ -29,12 +29,14 @@ impl Producer {
             return Err(ProducerError::InvalidTransition);
         }
         let content = format!(
-            "profile=ship_core\nidentity={}\nowner={}\ntype={}\nclass={}\nlocation={}",
+            "profile=ship_core\nidentity={}\nowner={}\ntype={}\nclass={}\nlocation={}\nconsistency={}\nconsistency_reason={}",
             record.identity().as_str(),
             record.owner().as_str(),
             record.ship_type().as_str(),
             record.class().as_str(),
-            record.location().as_str()
+            record.location().as_str(),
+            record.consistency().fields().0,
+            record.consistency().fields().1
         );
         let expected_scope = self
             .evidence

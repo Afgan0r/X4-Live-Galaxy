@@ -72,7 +72,7 @@ fn verify_records(revision: &observation_persistence::RevisionRecord, number: u6
         let id = format!("900719925474099{}", index + 2);
         let location = if number == 2 { 2 } else { 1 };
         let expected = format!(
-            "profile=ship_core\nidentity={id}\nowner=argon\ntype=destroyer_macro\nclass=destroyer\nlocation=sector:{location}"
+            "profile=ship_core\nidentity={id}\nowner=argon\ntype=destroyer_macro\nclass=destroyer\nlocation=sector:{location}\nconsistency=consistent\nconsistency_reason=none"
         );
         if record.content != expected
             || record.entity_id.as_str() != format!("x4:ship:{id}")

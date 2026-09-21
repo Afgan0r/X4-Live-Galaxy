@@ -118,7 +118,7 @@ fn large_incremental_ship_certificate_equals_the_receiver_batch_certificate() {
 
 #[test]
 fn section_raw_budget_survives_receipts_and_rejects_a_later_record() {
-    let (mut producer, source) = super::ship_support::ready_ship(0);
+    let (mut producer, source) = super::ship_support::ready_ship_with_raw_budget(0, 640);
     producer
         .begin_ship_section(
             SectionEvidence::point_measurement("x4:faction:argon:ships"),
@@ -143,7 +143,7 @@ fn section_raw_budget_survives_receipts_and_rejects_a_later_record() {
 
 #[test]
 fn builder_and_encoded_message_bounds_reject_without_splitting_records() {
-    let (mut producer, source) = super::ship_support::ready_ship(0);
+    let (mut producer, source) = super::ship_support::ready_ship_with_raw_budget(0, 640);
     producer
         .begin_ship_section(
             SectionEvidence::point_measurement("x4:faction:argon:ships"),

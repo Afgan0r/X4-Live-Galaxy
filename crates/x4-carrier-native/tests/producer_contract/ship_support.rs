@@ -12,12 +12,19 @@ use x4_carrier_native::{
 use super::support;
 
 pub(super) fn ready_ship(now: u64) -> (Producer, ProducerSource) {
+    ready_ship_with_raw_budget(now, 512)
+}
+
+pub(super) fn ready_ship_with_raw_budget(
+    now: u64,
+    max_raw_bytes: usize,
+) -> (Producer, ProducerSource) {
     let source = support::source(7);
     let limits = ProducerLimits {
         data_message_bytes: 4_096,
         control_message_bytes: 512,
         max_records: 4,
-        max_raw_bytes: 512,
+        max_raw_bytes,
         max_batches: 4,
         max_work: 4,
         max_retry_age_millis: 5_000,
@@ -32,7 +39,7 @@ pub(super) fn ready_ship(now: u64) -> (Producer, ProducerSource) {
             section_key: "ship_core".to_owned(),
             next_revision: 1,
             max_records: 4,
-            max_raw_bytes: 512,
+            max_raw_bytes,
             max_work: 4,
         }),
         ControlBody::Demand(DemandBody { credit: 1 }),

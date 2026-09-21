@@ -2,6 +2,9 @@
 
 ## 2026-09-21
 
+- Extended the per-record churn oracle to the core census after an in-game
+  Phase 05.5 run discarded roughly 750 otherwise valid ships because one ship
+  changed owner during core revalidation.
 - Added dependent-snapshot ACK-decoupling and per-record churn oracles after a
   Phase 05.5 runtime run exposed both artificial inter-section callback waits
   and whole-batch rejection when one ship changed location.

@@ -1,4 +1,4 @@
-use crate::{SenderEvidence, SourceScopeId};
+use crate::{SenderEvidence, ShipRecordConsistency, SourceScopeId};
 
 #[must_use]
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -70,6 +70,7 @@ pub struct ShipCoreRecord {
     ship_type: ShipType,
     class: ShipClass,
     location: ShipLocation,
+    consistency: ShipRecordConsistency,
     evidence: SenderEvidence,
 }
 
@@ -90,8 +91,14 @@ impl ShipCoreRecord {
             ship_type,
             class,
             location,
+            consistency: ShipRecordConsistency::Consistent,
             evidence,
         }
+    }
+
+    pub const fn with_consistency(mut self, consistency: ShipRecordConsistency) -> Self {
+        self.consistency = consistency;
+        self
     }
 
     pub const fn source_scope(&self) -> &SourceScopeId {
@@ -111,6 +118,10 @@ impl ShipCoreRecord {
     }
     pub const fn location(&self) -> &ShipLocation {
         &self.location
+    }
+    #[must_use]
+    pub const fn consistency(&self) -> ShipRecordConsistency {
+        self.consistency
     }
     pub const fn evidence(&self) -> &SenderEvidence {
         &self.evidence

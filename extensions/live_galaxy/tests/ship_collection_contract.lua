@@ -10,7 +10,7 @@ describe("bounded faction core continuation", function()
 
     local function environment(options)
         options = options or {}
-        local calls, records, finished, failed, now = {}, {}, 0, 0, 0
+        local calls, records, finished, failed, now, core_reads = {}, {}, 0, 0, 0, {}
         local api = {
             list_factions = function() calls[#calls + 1] = "census"; return { "argon" } end,
             count_ships = function() calls[#calls + 1] = "count"; return options.count or 2 end,
@@ -22,9 +22,16 @@ describe("bounded faction core continuation", function()
             end,
             read_core = function(_, id)
                 calls[#calls + 1] = "core"
+                core_reads[id] = (core_reads[id] or 0) + 1
                 local core = { identity = id, owner = "argon", type = "destroyer_macro",
                     class = "destroyer", location = "sector:1" }
-                if options.change and calls[#calls - 1] == "core" then core[options.change] = "changed" end
+                if options.initial_owner and id == "9007199254740993" and core_reads[id] == 1 then
+                    core.owner = options.initial_owner
+                elseif options.change and id == "9007199254740993" and core_reads[id] == 2 then
+                    core[options.change] = "changed"
+                elseif options.missing and id == "9007199254740993" and core_reads[id] == 2 then
+                    return nil
+                end
                 return core
             end,
         }
@@ -102,8 +109,6 @@ describe("bounded faction core continuation", function()
         { options = { filled = 1 }, reason = "enumeration_incomplete" },
         { options = { second = "9007199254740995" }, reason = "identity_invalid" },
         { options = { second = 9007199254740992 }, reason = "identity_invalid" },
-        { options = { change = "owner" }, reason = "core_changed" },
-        { options = { change = "location" }, reason = "core_changed" },
         { options = { work = 8 }, reason = "collection_overflow" },
         { options = { age = 3, busy = true }, reason = "collection_overflow" },
     }) do
@@ -117,6 +122,29 @@ describe("bounded faction core continuation", function()
             local records, finished = env.result()
             assert.equals(0, #records)
             assert.equals(0, finished)
+        end)
+    end
+
+    for _, case in ipairs({
+        { options = { initial_owner = "teladi" }, reason = "owner_changed" },
+        { options = { change = "owner" }, reason = "owner_changed" },
+        { options = { change = "location" }, reason = "location_changed" },
+        { options = { change = "type" }, reason = "core_changed" },
+        { options = { missing = true }, reason = "missing" },
+    }) do
+        it("marks only the changed core stale for " .. case.reason, function()
+            local env, result = environment(case.options), nil
+            for _ = 1, 20 do
+                result = env.step()
+                if result.disposition == "sampled" then break end
+            end
+            assert.equals("sampled", result.disposition)
+            local records, finished, failed = env.result()
+            assert.same({ 2, 1, 0 }, { #records, finished, failed })
+            assert.same({ "possibly_stale", case.reason },
+                { records[1].consistency, records[1].consistency_reason })
+            assert.same({ "consistent", "none" },
+                { records[2].consistency, records[2].consistency_reason })
         end)
     end
 

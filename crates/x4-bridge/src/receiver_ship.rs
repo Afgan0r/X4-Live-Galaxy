@@ -1,8 +1,8 @@
 use crate::ProductionError;
 use observation_application::LifecycleError;
 use observation_domain::{
-    CompleteMessage, SenderEvidence, ShipClass, ShipIdentity, ShipLocation, ShipOwner, ShipType,
-    SourceScopeId,
+    CompleteMessage, SenderEvidence, ShipClass, ShipIdentity, ShipLocation, ShipOwner,
+    ShipRecordConsistency, ShipStaleReason, ShipType, SourceScopeId,
 };
 
 const fn rejected() -> ProductionError {
@@ -140,8 +140,12 @@ fn validate_record(
     let kind = field(&mut fields, "type=")?;
     let class = field(&mut fields, "class=")?;
     let location = field(&mut fields, "location=")?;
+    let consistency = ShipRecordConsistency::from_fields(
+        field(&mut fields, "consistency=")?,
+        field(&mut fields, "consistency_reason=")?,
+    )
+    .map_err(|_| rejected())?;
     if fields.next().is_some()
-        || owner != faction
         || id.parse::<u64>().is_err()
         || ShipIdentity::new(id).is_err()
         || ShipOwner::new(owner).is_err()
@@ -150,6 +154,8 @@ fn validate_record(
         || ShipLocation::new(location).is_err()
         || record.entity_id.as_str() != format!("x4:ship:{id}")
         || record.observation_version.get() != revision
+        || (owner != faction
+            && consistency != ShipRecordConsistency::PossiblyStale(ShipStaleReason::OwnerChanged))
     {
         return Err(rejected());
     }

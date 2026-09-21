@@ -662,3 +662,33 @@ Locator SHA-256:
 `e8c872c697d5cf75cf6a3bf78e8d04d1879319281b3be4e980576067a824fd31`.
 The next evidence run uses normal time and SETA in one X4 session; no reinstall
 or second restart is required between them.
+
+## Core churn and FrameView SDK CLI correction
+
+Normal-time run `055-gate-a-normal-sdk-20260921-214108` captured 115,423 X4
+frames in seven FrameView SDK segments over 70.953 seconds. It measured
+278.645 average FPS, 126.081 1% low, 78.323 0.1% low, 6.447 ms p99 and
+29.713 ms maximum frame time, with no frame at least 33.333 ms. This trace is
+not Gate-A evidence because the bridge committed no revision.
+
+The exact runtime failure was a ship owner change at core ordinal 16, revision
+95. Whole-core revalidation discarded the approximately 750-record capture and
+retried stale data until exhaustion. Core collection now retains valid fields,
+marks only that record `possibly_stale` with an exact reason, and continues the
+batch. Initial identity mismatch and malformed facts still fail closed. The
+strict consistency pair is preserved through Lua, native ABI, wire content and
+receiver validation.
+
+For this machine, use
+`C:/Program Files/NVIDIA Corporation/FrameViewSDK/SDK/FvSDKTestClient_Public.exe`
+as `-PresentMonPath`. The runner recognizes that executable, launches repeated
+`--test_case 6` ten-second segments in the capture directory, merges the
+per-frame CSV files, and filters them to `-X4ProcessId`. The legacy PresentMon
+arguments remain available for a compatible standalone binary. The SDK CLI
+does not require X4 focus or manual overlay interaction.
+
+The 28 private files for this failed acceptance attempt are retained under an
+owner-only locator:
+`%LOCALAPPDATA%/LiveGalaxy/evidence-locators/055-gate-a-normal-sdk-20260921-214108/locator.json`.
+Locator SHA-256:
+`4b2d5e5c5fd832104906a055cb36149c469f31108f2bba63b8fac062b7fe5b6a`.

@@ -34,6 +34,15 @@ pub fn messages(revision: u64, owner: &str) -> Vec<Vec<u8>> {
 }
 
 pub fn with_identities(revision: u64, owner: &str, identities: [&str; 2]) -> Vec<Vec<u8>> {
+    with_core_consistency(revision, owner, identities, None)
+}
+
+pub fn with_core_consistency(
+    revision: u64,
+    owner: &str,
+    identities: [&str; 2],
+    first_consistency: Option<ShipRecordConsistency>,
+) -> Vec<Vec<u8>> {
     let (mut producer, source) = ready(revision);
     let mut evidence = SectionEvidence::point_measurement(source.source_scope.clone());
     evidence.sender.section_state = SectionState::with_evidence(
@@ -48,8 +57,8 @@ pub fn with_identities(revision: u64, owner: &str, identities: [&str; 2]) -> Vec
     producer
         .begin_ship_section(evidence.clone(), 2)
         .expect("valid test fixture");
-    for id in identities {
-        let record = ShipCoreRecord::new(
+    for (index, id) in identities.into_iter().enumerate() {
+        let mut record = ShipCoreRecord::new(
             SourceScopeId::new(source.source_scope.clone()).expect("valid test fixture"),
             ShipIdentity::new(id).expect("valid test fixture"),
             ShipOwner::new(owner).expect("valid test fixture"),
@@ -58,6 +67,11 @@ pub fn with_identities(revision: u64, owner: &str, identities: [&str; 2]) -> Vec
             ShipLocation::new("sector:2").expect("valid test fixture"),
             evidence.sender.clone(),
         );
+        if index == 0
+            && let Some(consistency) = first_consistency
+        {
+            record = record.with_consistency(consistency);
+        }
         producer
             .push_ship_core(&record)
             .expect("valid test fixture");

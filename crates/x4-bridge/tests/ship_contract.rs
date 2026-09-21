@@ -1,5 +1,7 @@
 #![expect(clippy::expect_used, reason = "contract fixtures fail immediately")]
 mod carrier_b_support;
+#[path = "ship_contract/core_consistency.rs"]
+mod core_consistency;
 #[path = "ship_contract/replay.rs"]
 mod ship_contract_replay;
 mod ship_support;

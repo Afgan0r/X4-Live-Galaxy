@@ -79,8 +79,10 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
 - Inject one moved, transferred, and disappeared member during final
   revalidation. When the contract permits partial per-record freshness, assert
   that the batch completes, only that record carries the exact stale reason,
-  and unchanged members remain authoritative; a whole-batch rejection is not
-  an acceptable substitute for record-level churn evidence.
+  and unchanged members remain authoritative. Apply this oracle to the core
+  census as well as dependent detail sections: a whole-batch rejection is not
+  an acceptable substitute when the retained record still has a valid identity
+  and fields that can be marked stale.
 - Do not compare an in-game source-capture duration with the wall-clock duration
   of a synthetic end-to-end fixture. Report capture, serialization, transport,
   durable commit, polling/waits, payload bytes, and cycle count separately. A

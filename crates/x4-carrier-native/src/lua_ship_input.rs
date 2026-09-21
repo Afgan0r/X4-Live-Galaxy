@@ -3,7 +3,8 @@ use core::ffi::c_void;
 use observation_domain::{
     CaptureWindow, SectionAvailability, SectionCoverage, SectionFreshness, SectionQuality,
     SectionState, SenderEvidence, ShipClass, ShipCoreRecord, ShipIdentity, ShipLocation, ShipOwner,
-    ShipType, SourceBoundary, SourceConsistency, SourceEpochStatus, SourceScopeId,
+    ShipRecordConsistency, ShipType, SourceBoundary, SourceConsistency, SourceEpochStatus,
+    SourceScopeId,
 };
 
 use crate::abi_windows::LuaApi;
@@ -11,7 +12,7 @@ use crate::lua_input::BeginInput;
 use crate::lua_table::{exact_keys, field_bool, field_integer, field_string};
 use crate::{ProducerSource, SectionEvidence};
 
-const RECORD_KEYS: [&str; 7] = [
+const RECORD_KEYS: [&str; 9] = [
     "profile",
     "source_scope",
     "identity",
@@ -19,6 +20,8 @@ const RECORD_KEYS: [&str; 7] = [
     "type",
     "class",
     "location",
+    "consistency",
+    "consistency_reason",
 ];
 
 pub unsafe fn begin(
@@ -87,6 +90,11 @@ pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<ShipCoreRecord> 
         ship_type: unsafe { field_string(api, state, 2, "type", 128) }?,
         class: unsafe { field_string(api, state, 2, "class", 64) }?,
         location: unsafe { field_string(api, state, 2, "location", 128) }?,
+        consistency: ShipRecordConsistency::from_fields(
+            &unsafe { field_string(api, state, 2, "consistency", 32) }?,
+            &unsafe { field_string(api, state, 2, "consistency_reason", 32) }?,
+        )
+        .ok()?,
     })
 }
 
@@ -97,18 +105,22 @@ struct ShipCoreFields {
     ship_type: String,
     class: String,
     location: String,
+    consistency: ShipRecordConsistency,
 }
 
 fn build_record(fields: ShipCoreFields) -> Option<ShipCoreRecord> {
-    Some(ShipCoreRecord::new(
-        SourceScopeId::new(fields.source_scope)?,
-        ShipIdentity::new(fields.identity).ok()?,
-        ShipOwner::new(fields.owner).ok()?,
-        ShipType::new(fields.ship_type).ok()?,
-        ShipClass::new(fields.class).ok()?,
-        ShipLocation::new(fields.location).ok()?,
-        SenderEvidence::legacy_default(),
-    ))
+    Some(
+        ShipCoreRecord::new(
+            SourceScopeId::new(fields.source_scope)?,
+            ShipIdentity::new(fields.identity).ok()?,
+            ShipOwner::new(fields.owner).ok()?,
+            ShipType::new(fields.ship_type).ok()?,
+            ShipClass::new(fields.class).ok()?,
+            ShipLocation::new(fields.location).ok()?,
+            SenderEvidence::legacy_default(),
+        )
+        .with_consistency(fields.consistency),
+    )
 }
 
 fn decimal(value: &str) -> Option<u64> {
@@ -130,6 +142,7 @@ mod tests {
             ship_type: "ship_arg_l_destroyer_01_a_macro".to_owned(),
             class: "destroyer".to_owned(),
             location: "sector:argon_prime".to_owned(),
+            consistency: observation_domain::ShipRecordConsistency::Consistent,
         })
         .expect("copied ship input is valid");
         identity.replace_range(.., "1");
@@ -147,6 +160,7 @@ mod tests {
                 ship_type: "ship_arg_l_destroyer_01_a_macro".to_owned(),
                 class: "destroyer".to_owned(),
                 location: "sector:argon_prime".to_owned(),
+                consistency: observation_domain::ShipRecordConsistency::Consistent,
             })
             .is_none()
         );

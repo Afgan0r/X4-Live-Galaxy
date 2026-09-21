@@ -10,13 +10,6 @@ local function token(value, limit)
     return type(value) == "string" and #value > 0 and #value <= limit
         and value:match("^[%w_:%-]+$") ~= nil
 end
-local function same_core(left, right)
-    for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
-        if left[key] ~= right[key] then return false end
-    end
-    return true
-end
-
 function collection.new(options, clock)
     if not token(options.faction_id, 64) or options.faction_id == "player"
         or options.faction_id == "xenon" or options.faction_id == "khaak" then
@@ -178,28 +171,32 @@ function collection:step(context, carrier, status)
         end
         for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
             local valid = key == "identity" and core[key] == self.identities[self.index]
-                or key == "owner" and core[key] == self.faction
+                or key == "owner" and token(core[key], 64)
                 or key ~= "identity" and key ~= "owner" and token(core[key], key == "class" and 64 or 128)
             if not valid then
                 return self:discard(carrier, "invalid_fact",
-                    (key == "identity" or key == "owner") and "value_mismatch" or "token_invalid", key, type(core[key]))
+                    key == "identity" and "value_mismatch" or "token_invalid", key, type(core[key]))
             end
         end
-        self.pending = { identity = core.identity, owner = core.owner, type = core.type,
-            class = core.class, location = core.location }
+        self.pending = { identity = core.identity, owner = self.faction, type = core.type,
+            class = core.class, location = core.location, consistency = "consistent",
+            consistency_reason = "none" }
+        if core.owner ~= self.faction then
+            self.pending.consistency, self.pending.consistency_reason = "possibly_stale", "owner_changed"
+        end
         self.stage = "validate"
     elseif stage == "validate" then
-        local current, source_rejection = api:read_core(self.pending.identity)
+        local current = api:read_core(self.pending.identity)
         if type(current) ~= "table" then
-            return self:discard(carrier, "core_changed", source_rejection and source_rejection.condition or "result_shape",
-                source_rejection and source_rejection.field or "core",
-                source_rejection and source_rejection.observed_type or type(current))
-        end
-        if not same_core(self.pending, current) then
-            for _, key in ipairs({ "identity", "owner", "type", "class", "location" }) do
-                if self.pending[key] ~= current[key] then
-                    return self:discard(carrier, "core_changed", "value_mismatch", key, type(current[key]))
-                end
+            self.pending.consistency, self.pending.consistency_reason = "possibly_stale", "missing"
+        else
+            local reason
+            if current.identity ~= self.pending.identity then reason = "missing"
+            elseif current.owner ~= self.pending.owner then reason = "owner_changed"
+            elseif current.location ~= self.pending.location then reason = "location_changed"
+            elseif current.type ~= self.pending.type or current.class ~= self.pending.class then reason = "core_changed" end
+            if reason then
+                self.pending.consistency, self.pending.consistency_reason = "possibly_stale", reason
             end
         end
         self.cores[self.pending.identity] = self.pending

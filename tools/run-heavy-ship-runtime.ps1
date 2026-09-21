@@ -74,7 +74,8 @@ function Start-OwnedProcess(
     [string]$FilePath,
     [string[]]$Arguments,
     [string]$StandardOutputPath,
-    [string]$StandardErrorPath
+    [string]$StandardErrorPath,
+    [string]$WorkingDirectory
 ) {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $FilePath
@@ -82,6 +83,9 @@ function Start-OwnedProcess(
     $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true
     $info.RedirectStandardError = $true
+    if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
+        $info.WorkingDirectory = $WorkingDirectory
+    }
     foreach ($argument in $Arguments) { [void]$info.ArgumentList.Add($argument) }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $info
@@ -141,14 +145,17 @@ function Invoke-SelfTest {
     $script = [IO.Path]::Combine([IO.Path]::GetTempPath(), "$([Guid]::NewGuid()).ps1")
     try {
         $pwsh = (Get-Process -Id $PID).Path
-        [IO.File]::WriteAllText($script, '[Console]::Out.Write($args[0])', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($script,
+            '[Console]::Out.Write($args[0] + "|" + [Environment]::CurrentDirectory)',
+            [Text.UTF8Encoding]::new($false))
         $owned = Start-OwnedProcess -FilePath $pwsh -Arguments @('-NoProfile', '-File',
             $script, 'value with spaces') `
-            -StandardOutputPath $out -StandardErrorPath $err
+            -StandardOutputPath $out -StandardErrorPath $err -WorkingDirectory ([IO.Path]::GetTempPath())
         Complete-OwnedProcess $owned
         $actualOut = Get-Content -LiteralPath $out -Raw
         $actualErr = Get-Content -LiteralPath $err -Raw
-        if ($actualOut -ne 'value with spaces' -or -not [string]::IsNullOrEmpty($actualErr)) {
+        $expectedOut = "value with spaces|$([IO.Path]::GetTempPath().TrimEnd('\'))"
+        if ($actualOut.TrimEnd('\') -ne $expectedOut -or -not [string]::IsNullOrEmpty($actualErr)) {
             throw "HEAVY_RUNTIME_ARGUMENT_PRESERVATION:out=<$actualOut>:err=<$actualErr>"
         }
     } finally {
@@ -206,39 +213,69 @@ if ($Mode -eq 'Seta') {
 $csv = Join-Path $captureRoot "x4-loaded-$($Mode.ToLowerInvariant()).csv"
 $pmOut = Join-Path $captureRoot 'presentmon.stdout.log'; $pmErr = Join-Path $captureRoot 'presentmon.stderr.log'
 $bridgeOut = Join-Path $runRoot 'bridge.stdout.log'; $bridgeErr = Join-Path $runRoot 'bridge.stderr.log'
-$pmArgs = @('--process_id', [string]$X4ProcessId, '--timed', [string]$CaptureSeconds,
-    '--terminate_after_timed', '--output_file', $csv,
-    '--session_name', "LiveGalaxy-$Mode-$stamp", '--no_console_stats')
+$useFrameViewSdk = [IO.Path]::GetFileName($PresentMonPath) -ieq 'FvSDKTestClient_Public.exe'
+$pmArgs = if ($useFrameViewSdk) { @('--test_case', '6') } else {
+    @('--process_id', [string]$X4ProcessId, '--timed', [string]$CaptureSeconds,
+        '--terminate_after_timed', '--output_file', $csv,
+        '--session_name', "LiveGalaxy-$Mode-$stamp", '--no_console_stats')
+}
 $pm = $null; $bridge = $null; $failure = $null
 try {
-    $pm = Start-OwnedProcess -FilePath $PresentMonPath -Arguments $pmArgs `
-        -StandardOutputPath $pmOut -StandardErrorPath $pmErr
     $bridgeArgs = @('--data-dir', $dataRoot, '--limits-file', $LimitsFile, '--ship-faction', 'argon')
     $bridge = Start-OwnedProcess -FilePath $BridgePath -Arguments $bridgeArgs `
         -StandardOutputPath $bridgeOut -StandardErrorPath $bridgeErr
     $started = [DateTime]::UtcNow; $offset = (Get-Item -LiteralPath $DebugLog).Length
     $runSamples = [Collections.ArrayList]::new()
     $runtimeDiagnostics = [Collections.ArrayList]::new()
-    @{ state = 'capturing'; run_id = $runId; bridge_pid = $bridge.Process.Id; presentmon_pid = $pm.Process.Id } |
-        ConvertTo-Json | Set-Content -LiteralPath $statusPath -Encoding utf8NoBOM
-    while (-not $pm.Process.HasExited) {
-        Start-Sleep -Seconds 1; $pm.Process.Refresh(); $bridge.Process.Refresh()
-        $read = Read-GameTimes $DebugLog $offset; $offset = $read.Offset; Add-GameSample $runSamples $read
-        foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
-        if ($bridge.Process.HasExited) { throw "HEAVY_RUNTIME_BRIDGE_EXITED:$($bridge.Process.ExitCode)" }
-        if (([DateTime]::UtcNow - $started).TotalSeconds -gt $CaptureSeconds + 15) { throw 'HEAVY_RUNTIME_CAPTURE_TIMEOUT' }
+    $segment = 0
+    do {
+        $segment += 1
+        $segmentOut = if ($useFrameViewSdk) {
+            Join-Path $captureRoot "frameview-$segment.stdout.log"
+        } else { $pmOut }
+        $segmentErr = if ($useFrameViewSdk) {
+            Join-Path $captureRoot "frameview-$segment.stderr.log"
+        } else { $pmErr }
+        $pm = Start-OwnedProcess -FilePath $PresentMonPath -Arguments $pmArgs `
+            -StandardOutputPath $segmentOut -StandardErrorPath $segmentErr `
+            -WorkingDirectory $(if ($useFrameViewSdk) { $captureRoot } else { $null })
+        @{ state = 'capturing'; run_id = $runId; bridge_pid = $bridge.Process.Id
+            frame_capture_pid = $pm.Process.Id; frame_capture_segment = $segment } |
+            ConvertTo-Json | Set-Content -LiteralPath $statusPath -Encoding utf8NoBOM
+        while (-not $pm.Process.HasExited) {
+            Start-Sleep -Seconds 1; $pm.Process.Refresh(); $bridge.Process.Refresh()
+            $read = Read-GameTimes $DebugLog $offset; $offset = $read.Offset; Add-GameSample $runSamples $read
+            foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
+            if ($bridge.Process.HasExited) { throw "HEAVY_RUNTIME_BRIDGE_EXITED:$($bridge.Process.ExitCode)" }
+            if (([DateTime]::UtcNow - $started).TotalSeconds -gt $CaptureSeconds + 15) {
+                throw 'HEAVY_RUNTIME_CAPTURE_TIMEOUT'
+            }
+        }
+        Complete-OwnedProcess $pm
+        if ($pm.Process.ExitCode -ne 0) { throw "HEAVY_RUNTIME_FRAME_CAPTURE_EXITED:$($pm.Process.ExitCode)" }
+        $pm = $null
+        if (-not $useFrameViewSdk) { break }
+    } while (([DateTime]::UtcNow - $started).TotalSeconds -lt $CaptureSeconds)
+    if ($useFrameViewSdk) {
+        $sdkCsv = @(Get-ChildItem -LiteralPath $captureRoot -Filter 'FvSDKPerFrameStreamDataT*.csv' -File)
+        if ($sdkCsv.Count -lt $segment) { throw 'HEAVY_RUNTIME_FRAME_CAPTURE_MISSING' }
     }
     $read = Read-GameTimes $DebugLog $offset
     Add-GameSample $runSamples $read
     foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
-    if ($pm.Process.ExitCode -ne 0) { throw "HEAVY_RUNTIME_PRESENTMON_EXITED:$($pm.Process.ExitCode)" }
 } catch { $failure = $_ } finally {
     Complete-OwnedProcess $pm -Stop
     Complete-OwnedProcess $bridge -Stop
 }
 if ($failure) { throw $failure }
 
-$rows = @(Import-Csv -LiteralPath $csv | Where-Object { $_.MsBetweenPresents -ne 'NA' })
+$csvFiles = if ($useFrameViewSdk) {
+    @(Get-ChildItem -LiteralPath $captureRoot -Filter 'FvSDKPerFrameStreamDataT*.csv' -File |
+        Sort-Object Name | ForEach-Object { $_.FullName })
+} else { @($csv) }
+$rows = @($csvFiles | ForEach-Object { Import-Csv -LiteralPath $_ } |
+    Where-Object { $_.MsBetweenPresents -ne 'NA' -and
+        (-not $useFrameViewSdk -or $_.ProcessId -eq [string]$X4ProcessId) })
 $history = Join-Path $dataRoot 'operational-history.jsonl'
 $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
@@ -251,7 +288,11 @@ $gameFactorSeconds = if ($runSamples.Count -gt 1) {
 } else { 0 }
 $frameValues = @($rows | ForEach-Object { [double]$_.MsBetweenPresents })
 $averageFrame = ($frameValues | Measure-Object -Average).Average
-$lostEvents = (Get-Content -LiteralPath $pmErr -Raw) -match '(?i)lost\s+\d+\s+events'
+$captureErrors = if ($useFrameViewSdk) {
+    @(Get-ChildItem -LiteralPath $captureRoot -Filter 'frameview-*.stderr.log' -File |
+        ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
+} else { Get-Content -LiteralPath $pmErr -Raw }
+$lostEvents = $captureErrors -match '(?i)lost\s+\d+\s+events'
 $valid = $rows.Count -gt 0 -and $commits -gt 0 -and $bad -eq 0 `
     -and $runtimeFailures.Count -eq 0 -and -not $lostEvents
 if ($Mode -eq 'Seta') {
@@ -266,7 +307,9 @@ $result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); mo
     runtime_diagnostic_failure_details = @($runtimeFailures | Sort-Object -Unique)
     core_changed_transitions = $coreChanged
     game_time_factor = $gameFactor; game_time_sample_seconds = $gameFactorSeconds
-    capture_seconds = $CaptureSeconds }
+    capture_seconds = ([DateTime]::UtcNow - $started).TotalSeconds
+    frame_capture_backend = $(if ($useFrameViewSdk) { 'frameview-sdk' } else { 'presentmon' })
+    frame_capture_segments = $csvFiles.Count }
 $result | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding utf8NoBOM
 $result | ConvertTo-Json | Set-Content -LiteralPath $statusPath -Encoding utf8NoBOM
 $result | ConvertTo-Json -Compress
