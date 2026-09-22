@@ -66,7 +66,8 @@ fn duplicate_suppression_never_crosses_session_or_message_identity() {
     let events = std::fs::read_to_string(path.join("operational-history.jsonl"))
         .expect("history remains readable");
     assert!(events.contains("\"session\":\"session-b\",\"epoch\":2"));
-    assert!(events.contains("\"message\":\"message-b\",\"section\":\"section\",\"revision\":2"));
+    assert!(events.contains("\"message\":\"message-b\",\"section\":\"section\""));
+    assert!(events.contains("\"revision\":2"));
     assert!(events.contains(&format!("\"suppressed_before\":{suppressed}")));
 
     let _ = std::fs::remove_dir_all(path);

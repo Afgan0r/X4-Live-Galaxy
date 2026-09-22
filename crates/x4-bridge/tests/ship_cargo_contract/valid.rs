@@ -11,6 +11,7 @@ fn valid_single_record_detail_batch_reaches_staging() {
         4,
     )
     .expect("session");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver.select_ship_core("argon").expect("selection");
     let messages = ship_support::messages(1, "argon");
     publish_core(&mut receiver, &messages);
@@ -46,6 +47,7 @@ fn per_ship_stale_marker_reaches_staging_without_rejecting_the_batch() {
         4,
     )
     .expect("session");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver.select_ship_core("argon").expect("selection");
     let messages = ship_support::messages(1, "argon");
     publish_core(&mut receiver, &messages);
@@ -87,6 +89,7 @@ fn configured_full_parent_detail_batch_accepts_every_ordered_member() {
         4,
     )
     .expect("session");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver.select_ship_core("argon").expect("selection");
     receiver
         .configure_heavy(

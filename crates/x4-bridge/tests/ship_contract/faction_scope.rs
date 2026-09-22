@@ -11,6 +11,7 @@ fn faction_scoped_core_rejects_cross_faction_source_before_staging() {
         4,
     )
     .expect("valid test fixture");
+    ship_support::admit_factions(&mut receiver, &["argon", "xenon"]);
     receiver
         .select_ship_factions(["argon", "xenon"])
         .expect("validated observation roster");
@@ -35,6 +36,7 @@ fn zero_ship_faction_commits_partial_observation_without_known_empty_claim() {
         4,
     )
     .expect("valid test fixture");
+    ship_support::admit_factions(&mut receiver, &["argon", "khaak"]);
     receiver
         .select_ship_factions(["argon", "khaak"])
         .expect("validated observation roster");

@@ -33,6 +33,7 @@ fn session_with_message_limit(
         4,
     )
     .expect("valid test fixture");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver
         .select_ship_core("argon")
         .expect("valid test fixture");
@@ -115,6 +116,7 @@ fn ship_source_requires_receiver_selection() {
     let messages = ship_support::messages(1, "argon");
     assert!(submit(&mut receiver, &messages[0], 1).is_err());
     assert!(receiver.select_ship_core("player").is_err());
+    ship_support::admit_factions(&mut receiver, &["xenon", "teladi"]);
     receiver
         .select_ship_core("xenon")
         .expect("mandatory hostile observation subject");

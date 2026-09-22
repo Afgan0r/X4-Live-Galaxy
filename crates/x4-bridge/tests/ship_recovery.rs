@@ -19,6 +19,7 @@ fn session(path: &std::path::Path) -> ProductionObservationSession {
         4,
     )
     .expect("session");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver.select_ship_core("argon").expect("selection");
     receiver
         .configure_heavy(

@@ -48,6 +48,7 @@ fn run_family_case(index: usize, family: &str, content: &str, from: &str, to: &s
         4,
     )
     .expect("session");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver.select_ship_core("argon").expect("selection");
     let messages = ship_support::messages(1, "argon");
     publish_core(&mut receiver, &messages);

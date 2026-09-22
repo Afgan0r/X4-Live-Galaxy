@@ -22,6 +22,7 @@ fn run_case(case: usize) {
         4,
     )
     .expect("session");
+    crate::ship_support::admit_factions(&mut receiver, &["argon"]);
     receiver.select_ship_core("argon").expect("selection");
     let limits = HeavyShipLimits::parse(include_str!(
         "../../../../config/heavy-ship-experiment.json"

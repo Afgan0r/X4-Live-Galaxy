@@ -8,6 +8,25 @@ use x4_carrier_native::{SectionEvidence, SectionFinishEvidence};
 mod transport;
 pub use transport::{ready, take_messages};
 
+pub fn admit_factions(receiver: &mut x4_bridge::ProductionObservationSession, factions: &[&str]) {
+    let inventory = factions
+        .iter()
+        .map(|faction| {
+            FactionOriginEvidence::new(
+                *faction,
+                FactionOrigin::Vanilla,
+                Some(true),
+                false,
+                "test-inventory",
+            )
+            .expect("valid faction evidence")
+        })
+        .collect::<Vec<_>>();
+    receiver
+        .accept_faction_census(1, factions.iter().copied(), &inventory)
+        .expect("accepted faction census");
+}
+
 pub fn messages(revision: u64, owner: &str) -> Vec<Vec<u8>> {
     with_identities(revision, owner, ["9007199254740993", "9007199254740995"])
 }
