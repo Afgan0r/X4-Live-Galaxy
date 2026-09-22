@@ -124,7 +124,18 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             now,
             context.clone(),
         );
-        let result = if let Some((scope, source_session)) =
+        let census_completion = matches!(&message, observation_domain::CompleteMessage::SectionCompletion(value) if value.section_key.as_str() == "faction_census");
+        let result = if census_completion {
+            let inventory = self.faction_inventory.clone();
+            self.lifecycle.submit_validated(input, &|revision| {
+                receiver_faction::validate_census(
+                    revision.section_revision().get(),
+                    revision.records(),
+                    &inventory,
+                )
+                .is_ok()
+            })
+        } else if let Some((scope, source_session)) =
             crate::receiver_context::source_boundary(&self.lifecycle, &message)
         {
             self.lifecycle
@@ -137,7 +148,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         if matches!(
             result,
             LifecycleResult::Disposition(observation_ingest::ReceiverDisposition::Committed)
-        ) && matches!(&message, observation_domain::CompleteMessage::SectionCompletion(value) if value.section_key.as_str() == "faction_census")
+        ) && census_completion
         {
             self.accept_committed_faction_census()?;
         }
@@ -146,8 +157,12 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
 
     pub fn invalidate_source_scope(&mut self, scope: &SourceScopeId) {
         self.lifecycle.invalidate_source_scope(scope);
-        self.ship_timing.clear();
-        self.last_received = None;
+        if self.faction_census_mode {
+            self.refresh_faction_census();
+        } else {
+            self.ship_timing.clear();
+            self.last_received = None;
+        }
     }
 
     pub fn mark_source_scope_uncertain(
@@ -156,8 +171,12 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         session: SourceSessionIdentity,
     ) {
         self.lifecycle.mark_source_scope_uncertain(scope, session);
-        self.ship_timing.clear();
-        self.last_received = None;
+        if self.faction_census_mode {
+            self.refresh_faction_census();
+        } else {
+            self.ship_timing.clear();
+            self.last_received = None;
+        }
     }
 
     pub fn expire_candidates(&mut self, now: u64) -> usize {

@@ -122,3 +122,23 @@ fn one_faction_census_keeps_scoped_identity_and_starts_with_core() {
         Ok(String::from("ship_core:argon"))
     );
 }
+
+#[test]
+fn reconnect_invalidates_roster_and_requires_a_fresh_census() {
+    let database = carrier_b_support::database("ship-roster-reconnect");
+    let mut receiver = ProductionObservationSession::open(
+        database.path(),
+        carrier_b_support::generation_limits(),
+        carrier_b_support::publication_limits(),
+        carrier_b_support::lifecycle_limits(),
+        4,
+    )
+    .expect("valid test fixture");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
+    assert_eq!(receiver.collection_key(), "ship_core:argon");
+    receiver.invalidate_source_scope(
+        &observation_domain::SourceScopeId::new("x4:faction:argon:ships").expect("scope"),
+    );
+    assert_eq!(receiver.collection_key(), "faction_census");
+    assert!(receiver.select_ship_factions(["argon"]).is_err());
+}

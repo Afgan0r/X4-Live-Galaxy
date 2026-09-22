@@ -31,6 +31,7 @@ local function metrics(self)
 end
 local function discard(self, carrier, reason, request)
     local result
+    if self.census_txn and carrier.reset then carrier:reset(reason) end
     if self.collector then
         if self.collector.discard then result = self.collector:discard(carrier, reason)
         else result = self.collector:fail(carrier, reason) end
@@ -44,6 +45,7 @@ local function discard(self, carrier, reason, request)
         result.rejection.condition = self.budget.condition or result.rejection.condition
     end
     self.collector, self.pending, self.accepted, self.snapshot, self.snapshot_capture = nil, nil, nil, nil, nil
+    self.census_txn = nil
     -- A failed start performed no source capture. Never label previous capture
     -- counters with a new request or retain the old collector's failure stage.
     result.capture_metrics = not request and metrics(self) or nil
@@ -55,6 +57,7 @@ local function refresh_boundary(self)
     self.discovery_revision = (self.discovery_revision or 1) + 1
     self.key, self.revision, self.boundary, self.incarnation = nil, nil, nil, nil
     self.run_started, self.budget = nil, nil
+    self.census_txn = nil
 end
 local function census_record(entry, revision)
     return { profile = "faction_census", faction_id = entry.id,

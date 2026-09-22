@@ -37,7 +37,15 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
     }
 
     pub fn submit(&mut self, input: LifecycleInput) -> Result<LifecycleResult, LifecycleError> {
-        self.submit_admitted(input, None)
+        self.submit_admitted(input, None, None)
+    }
+
+    pub fn submit_validated(
+        &mut self,
+        input: LifecycleInput,
+        validator: &dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool,
+    ) -> Result<LifecycleResult, LifecycleError> {
+        self.submit_admitted(input, None, Some(validator))
     }
 
     pub fn submit_source_boundary(
@@ -46,7 +54,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         scope: observation_domain::SourceScopeId,
         session: observation_domain::SourceSessionIdentity,
     ) -> Result<LifecycleResult, LifecycleError> {
-        self.submit_admitted(input, Some((scope, session)))
+        self.submit_admitted(input, Some((scope, session)), None)
     }
 
     fn submit_admitted(
@@ -56,6 +64,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             observation_domain::SourceScopeId,
             observation_domain::SourceSessionIdentity,
         )>,
+        validator: Option<&dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>,
     ) -> Result<LifecycleResult, LifecycleError> {
         if self.retained.is_some() {
             return Err(LifecycleError::BlockedAmbiguous);
@@ -96,7 +105,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             .slot
             .mark_local_handoff()
             .map_err(|_| LifecycleError::SlotInvariant)?;
-        self.dispatch(message, input.context, input.work, input.now)
+        self.dispatch(message, input.context, input.work, input.now, validator)
     }
 
     pub fn invalidate_source_scope(&mut self, scope: &observation_domain::SourceScopeId) {
@@ -123,6 +132,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         context: LifecycleContext,
         work: usize,
         now: u64,
+        validator: Option<&dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>,
     ) -> Result<LifecycleResult, LifecycleError> {
         let disposition = match (message, context) {
             (CompleteMessage::SectionStart(start), LifecycleContext::Start(context)) => {
@@ -134,7 +144,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             (
                 CompleteMessage::SectionCompletion(completion),
                 LifecycleContext::Completion(current),
-            ) => return self.complete(completion, &current, now),
+            ) => return self.complete(completion, &current, now, validator),
             _ => return Err(LifecycleError::ContextMismatch),
         };
         self.finish_disposition(disposition)

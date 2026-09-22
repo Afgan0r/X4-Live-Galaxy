@@ -71,6 +71,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         completion: SectionCompletionEnvelope,
         current: &CompletionCurrent,
         now: u64,
+        validator: Option<&dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>,
     ) -> Result<LifecycleResult, LifecycleError> {
         let Some(certificate) = self.stager.completion_certificate(completion) else {
             return self.finish_disposition(ReceiverDisposition::PermanentlyRejected);
@@ -81,6 +82,9 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
                 return self.finish_disposition(rejection_disposition(reason));
             }
         };
+        if validator.is_some_and(|validate| !validate(&revision)) {
+            return self.finish_disposition(ReceiverDisposition::PermanentlyRejected);
+        }
         let Some(authority) = self.index.prepare_publication(revision) else {
             return self.finish_disposition(ReceiverDisposition::PermanentlyRejected);
         };

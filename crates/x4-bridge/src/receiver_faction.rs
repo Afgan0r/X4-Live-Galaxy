@@ -1,6 +1,7 @@
 use super::{ProductionError, ProductionObservationSession};
 use observation_domain::{
-    FactionObservationDisposition, FactionOrigin, FactionOriginEvidence, SectionKey,
+    EnvelopeRecord, FactionObservationDisposition, FactionObservationRoster, FactionOrigin,
+    FactionOriginEvidence, SectionKey,
 };
 use observation_persistence::ObservationRepository;
 
@@ -25,37 +26,40 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .current_revision(&key)
             .map_err(|_| ProductionError::Storage)?
             .ok_or(ProductionError::InvalidFactionCensus)?;
-        let claims = accepted
-            .revision()
-            .records
-            .iter()
-            .map(|record| parse_claim(record.entity_id.as_str(), &record.content))
-            .collect::<Result<Vec<_>, _>>()?;
-        let revision = claims
-            .first()
-            .map(|claim| claim.revision)
-            .ok_or(ProductionError::InvalidFactionCensus)?;
-        if claims.iter().any(|claim| claim.revision != revision) {
-            return Err(ProductionError::InvalidFactionCensus);
-        }
-        let roster = observation_domain::classify_observation_factions(
-            revision,
-            claims.iter().map(|claim| claim.id.clone()),
-            &self.faction_inventory,
-        )
-        .map_err(|_| ProductionError::InvalidFactionCensus)?;
-        if claims
-            .iter()
-            .any(|claim| !claim.matches(roster.entry(&claim.id)))
-        {
-            return Err(ProductionError::InvalidFactionCensus);
-        }
+        let claims = &accepted.revision().records;
+        let revision = accepted.receipt().revision.get();
+        let roster = validate_census(revision, claims, &self.faction_inventory)?;
         self.accept_faction_census(
             revision,
-            claims.into_iter().map(|claim| claim.id),
+            roster.entries().iter().map(|entry| entry.id().to_owned()),
             &self.faction_inventory.clone(),
         )
     }
+}
+
+pub(super) fn validate_census(
+    revision: u64,
+    records: &[EnvelopeRecord],
+    inventory: &[FactionOriginEvidence],
+) -> Result<FactionObservationRoster, ProductionError> {
+    let claims = records
+        .iter()
+        .map(|record| parse_claim(record.entity_id.as_str(), &record.content))
+        .collect::<Result<Vec<_>, _>>()?;
+    if claims.is_empty() || claims.iter().any(|claim| claim.revision != revision) {
+        return Err(ProductionError::InvalidFactionCensus);
+    }
+    let roster = observation_domain::classify_observation_factions(
+        revision,
+        claims.iter().map(|claim| claim.id.clone()),
+        inventory,
+    )
+    .map_err(|_| ProductionError::InvalidFactionCensus)?;
+    claims
+        .iter()
+        .all(|claim| claim.matches(roster.entry(&claim.id)))
+        .then_some(roster)
+        .ok_or(ProductionError::InvalidFactionCensus)
 }
 
 struct Claim {
@@ -131,5 +135,35 @@ const fn origin(value: FactionOrigin) -> &'static str {
         FactionOrigin::Player => "player",
         FactionOrigin::Service => "service",
         FactionOrigin::Modded => "modded",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use observation_domain::{EntityId, ObservationVersion, RecordId};
+
+    fn record(revision: u64) -> EnvelopeRecord {
+        EnvelopeRecord {
+            record_id: RecordId::new("record:argon").expect("record"),
+            entity_id: EntityId::new("x4:faction:argon").expect("entity"),
+            observation_version: ObservationVersion::new(1).expect("version"),
+            content: format!(
+                "discovery_revision={revision}\ndisposition=included\nreason=independent-first-party\norigin=vanilla\nsource_evidence=base\nmind_candidate=true"
+            ),
+        }
+    }
+
+    fn inventory() -> Vec<FactionOriginEvidence> {
+        vec![
+            FactionOriginEvidence::new("argon", FactionOrigin::Vanilla, Some(true), true, "base")
+                .expect("inventory"),
+        ]
+    }
+
+    #[test]
+    fn census_claim_revision_must_equal_section_revision() {
+        assert!(validate_census(2, &[record(1)], &inventory()).is_err());
+        assert!(validate_census(2, &[record(2)], &inventory()).is_ok());
     }
 }
