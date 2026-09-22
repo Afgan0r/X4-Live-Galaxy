@@ -15,8 +15,8 @@ pub fn run_full_set(
         .configure_heavy(profile.clone())
         .map_err(|e| format!("heavy profile:{e:?}"))?;
     receiver
-        .select_ship_factions(["argon", "scaleplate", "xenon", "khaak"])
-        .map_err(|e| format!("full-set selection:{e:?}"))?;
+        .configure_faction_inventory(full_set_inventory()?)
+        .map_err(|e| format!("faction inventory:{e:?}"))?;
     let mut first = Host::start(root, host, script, data, "heavy-ship-full-set")?;
     let first_run = full_set_peer::serve(&mut receiver, &profile, 1, true)?;
     first.finish()?;
@@ -34,9 +34,25 @@ pub fn run_full_set(
     full_set_readback::verify(database, &completions)?;
     writeln!(
         std::io::stdout(),
-        "PASS heavy-ship-full-set actual_native=true factions=4 zero_ship=xenon blocked_skip=1 rotations=3 restart=true earlier_current=true unknown_blocker=true"
+        "PASS heavy-ship-full-set actual_native=true factions=4 zero_ship=xenon blocked_recovery=1 rotations=3 restart=true earlier_current=true unknown_blocker=false"
     )?;
     Ok(())
+}
+
+fn full_set_inventory() -> Result<Vec<observation_domain::FactionOriginEvidence>> {
+    ["argon", "scaleplate", "xenon", "khaak"]
+        .into_iter()
+        .map(|id| {
+            observation_domain::FactionOriginEvidence::new(
+                id,
+                observation_domain::FactionOrigin::Vanilla,
+                Some(true),
+                matches!(id, "argon" | "scaleplate"),
+                "heavy-full-set-fixture",
+            )
+            .map_err(|error| format!("faction inventory:{error:?}").into())
+        })
+        .collect()
 }
 
 pub fn run_detail(

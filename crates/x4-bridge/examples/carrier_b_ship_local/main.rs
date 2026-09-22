@@ -4,6 +4,7 @@ mod crew_readback;
 mod detail_peer;
 mod full_set_peer;
 mod full_set_readback;
+mod full_set_recovery;
 mod peer;
 mod readback;
 mod scenarios;

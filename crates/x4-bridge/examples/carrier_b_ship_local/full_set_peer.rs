@@ -36,13 +36,18 @@ pub fn serve(
         if let Some(faction) = key.strip_prefix("ship_core:") {
             *cores.entry(faction.to_owned()).or_default() += 1;
         }
-        let mut next = receiver
-            .next_ship_key(&key, wire::now())
-            .map_err(|e| format!("next:{key}:{e:?}"))?;
+        let mut next = if key == "faction_census" {
+            receiver.collection_key()
+        } else {
+            receiver
+                .next_ship_key(&key, wire::now())
+                .map_err(|e| format!("next:{key}:{e:?}"))?
+        };
+        let mut recovered = false;
         if block_scaleplate_once && blocked_skips == 0 && next == "ship_cargo:scaleplate:g0" {
-            next = receiver
-                .skip_stale_ship_scope()
-                .map_err(|e| format!("skip:{e:?}"))?;
+            recovered = super::full_set_recovery::recover(
+                &mut peer, &identity, profile, receiver, &mut next,
+            )?;
             blocked_skips = 1;
         }
         if next == "ship_core:argon"
@@ -52,7 +57,9 @@ pub fn serve(
         {
             break;
         }
-        issue(&mut peer, &identity, &next, receiver, profile)?;
+        if !recovered {
+            issue(&mut peer, &identity, &next, receiver, profile)?;
+        }
         key = next;
     }
     Ok(RunSummary {

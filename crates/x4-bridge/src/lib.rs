@@ -35,7 +35,10 @@ pub use listener::run_windows_listener;
 pub use operational_history::OperationalHistory;
 pub use production::{ProductionError, ProductionObservationSession};
 pub use production_limits::ProductionLimits;
+pub use production_runtime_control::{RecoveryState, recover_idle};
+pub use production_runtime_idle::ReceiveProgress;
 pub use production_ship_limits::HeavyShipLimits;
+pub use production_ship_schedule::ShipSchedule;
 pub use production_startup::{StartupError, run_production};
 pub use protocol::{CapabilityDecision, RestartRequirement, SessionHello};
 pub use server::{

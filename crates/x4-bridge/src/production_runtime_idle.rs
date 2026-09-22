@@ -11,6 +11,7 @@ pub struct ReceiveProgress {
     inactivity_limit: Duration,
 }
 impl ReceiveProgress {
+    #[must_use]
     pub const fn issued(origin: Instant, limits: &ProductionLimits, heavy: bool) -> Self {
         let inactivity_limit = Duration::from_millis(limits.max_message_inactivity_millis as u64);
         Self {

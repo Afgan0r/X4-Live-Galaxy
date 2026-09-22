@@ -8,6 +8,7 @@ pub struct ShipSchedule {
     received_work: usize,
 }
 impl ShipSchedule {
+    #[must_use]
     pub fn new(profile: &HeavyShipLimits) -> Option<Self> {
         let started = Instant::now();
         Some(Self {

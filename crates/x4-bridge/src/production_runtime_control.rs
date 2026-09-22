@@ -9,6 +9,13 @@ use observation_ingest::{
 use std::time::Instant;
 use x4_carrier_native::BridgePeer;
 
+pub struct RecoveryState<'a> {
+    pub key: &'a mut String,
+    pub progress: &'a mut ReceiveProgress,
+    pub monotonic_millis: u64,
+    pub issued_at: Instant,
+}
+
 pub fn initial(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -82,12 +89,17 @@ pub fn recover_idle(
     limits: &ProductionLimits,
     session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
-    key: &mut String,
-    progress: &mut ReceiveProgress,
+    recovery: RecoveryState<'_>,
 ) -> bool {
+    let RecoveryState {
+        key,
+        progress,
+        monotonic_millis,
+        issued_at,
+    } = recovery;
     if observation_domain::ShipSectionIdentity::parse(key)
         .is_some_and(|section| section.kind() == observation_domain::ShipSectionKind::Core)
-        || !session.stale_ship_parent(now())
+        || !session.stale_ship_parent(monotonic_millis)
     {
         return false;
     }
@@ -102,7 +114,7 @@ pub fn recover_idle(
     let Some(issued) = issue(peer, identity, limits, session, schedule, key) else {
         return false;
     };
-    *progress = ReceiveProgress::issued(issued, limits, true);
+    *progress = ReceiveProgress::issued(issued_at.max(issued), limits, true);
     true
 }
 

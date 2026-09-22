@@ -54,12 +54,16 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             inventory,
         )
         .map_err(|_| ProductionError::InvalidFactionCensus)?;
+        let included = roster.included_ids().map(str::to_owned).collect::<Vec<_>>();
         self.faction_roster = Some(roster);
         self.ship_scope = None;
         self.ship_scopes.clear();
         self.ship_scope_index = 0;
         self.ship_timing.clear();
         self.last_received = None;
+        if !included.is_empty() {
+            self.select_ship_factions(included.iter().map(String::as_str))?;
+        }
         Ok(())
     }
 

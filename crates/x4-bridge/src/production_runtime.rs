@@ -1,4 +1,6 @@
-use crate::production_runtime_control::{complete_selection, initial, recover_idle, send};
+use crate::production_runtime_control::{
+    RecoveryState, complete_selection, initial, recover_idle, send,
+};
 use crate::production_runtime_idle::{ReceiveProgress, await_progress};
 use crate::production_runtime_message::{record_disposition, selection_finished};
 use crate::production_ship_schedule::ShipSchedule;
@@ -86,7 +88,7 @@ fn receive_loop(
         let bytes = match await_progress(peer, limits, history, session, &progress) {
             Ok(bytes) => bytes,
             Err(())
-                if recover_idle(
+                if try_recover(
                     peer,
                     identity,
                     limits,
@@ -138,6 +140,30 @@ fn receive_loop(
     }
     let _ = history.record("waiting", "peer-disconnected");
     active_scope
+}
+
+fn try_recover(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    session: &mut ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    key: &mut String,
+    progress: &mut ReceiveProgress,
+) -> bool {
+    recover_idle(
+        peer,
+        identity,
+        limits,
+        session,
+        schedule,
+        RecoveryState {
+            key,
+            progress,
+            monotonic_millis: now(),
+            issued_at: Instant::now(),
+        },
+    )
 }
 pub fn now() -> u64 {
     SystemTime::now()
