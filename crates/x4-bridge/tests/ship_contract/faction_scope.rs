@@ -92,6 +92,33 @@ fn receiver_requests_runtime_census_before_ship_selection() {
         4,
     )
     .expect("valid test fixture");
-    assert_eq!(receiver.collection_key(), "faction_census");
+    assert_eq!(receiver.collection_key(), "carrier_b_realtime_sample");
     assert!(receiver.faction_census_blocks_closure());
+}
+
+#[test]
+fn one_faction_census_keeps_scoped_identity_and_starts_with_core() {
+    let database = carrier_b_support::database("ship-single-faction-scope");
+    let mut receiver = ProductionObservationSession::open(
+        database.path(),
+        carrier_b_support::generation_limits(),
+        carrier_b_support::publication_limits(),
+        carrier_b_support::lifecycle_limits(),
+        4,
+    )
+    .expect("valid test fixture");
+    ship_support::admit_factions(&mut receiver, &["argon"]);
+    receiver
+        .configure_heavy(
+            x4_bridge::HeavyShipLimits::parse(include_str!(
+                "../../../../config/heavy-ship-experiment.json"
+            ))
+            .expect("heavy profile"),
+        )
+        .expect("configured");
+    assert_eq!(receiver.collection_key(), "ship_core:argon");
+    assert_eq!(
+        receiver.next_ship_key("faction_census", 1),
+        Ok(String::from("ship_core:argon"))
+    );
 }
