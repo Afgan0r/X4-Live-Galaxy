@@ -297,6 +297,8 @@ describe("owned Carrier B adapter", function()
         assert.is_truthy(diagnostic:match("max_callback_duration_millis=10"))
         assert.is_truthy(diagnostic:match("max_callback_overrun_millis=8"))
         assert.is_truthy(diagnostic:match("source_value_bytes=%d+"))
+        assert.is_nil(diagnostic:match("backlog="),
+            "runtime must omit backlog until an owned measured queue value exists")
     end)
 
     for _, case in ipairs({
