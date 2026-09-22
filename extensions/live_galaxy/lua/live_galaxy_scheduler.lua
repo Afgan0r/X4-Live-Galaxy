@@ -46,7 +46,7 @@ function scheduler.tick(context, carrier, observation)
     end
     if type(observation.feedback) == "function" then
         local ok, result = pcall(observation.feedback, observation, context, carrier, progress_status, control)
-        if not ok then discard(observation, carrier, "source_failure"); return finish("source_failure", nil) end
+        if not ok then discard(observation, carrier, "source_failure"); return finish("source_failure", nil, progress_status) end
         if result then context.reentry_guard = false; return result end
     end
     if terminal[control] then
@@ -56,7 +56,7 @@ function scheduler.tick(context, carrier, observation)
     if type(progress_status) ~= "table"
         or type(progress_status.capacity) ~= "string"
         or not progress_status.capacity:match("^available:%d+$") then
-        return finish("producer_busy", progress)
+        return finish("producer_busy", progress, progress_status)
     end
 
     if type(observation.advance) == "function" then
@@ -64,38 +64,38 @@ function scheduler.tick(context, carrier, observation)
         if not ok or type(result) ~= "table" then
             if observation.discard then observation:discard(carrier, "source_failure")
             elseif observation.collector then observation.collector:discard(carrier, "source_failure") end
-            return finish("source_failure", nil)
+            return finish("source_failure", nil, progress_status)
         end
         context.reentry_guard = false
         return result
     end
 
     local begin, begin_error = call(observation, "begin_evidence")
-    if begin == nil then return finish(begin_error, nil) end
+    if begin == nil then return finish(begin_error, nil, progress_status) end
     begin.source_epoch_status = context.source_epoch_status or "unknown"
     begin.source_boundary = context.source_boundary or "runtime_start"
     local reserved = call(carrier, "begin_section", begin)
-    if reserved == -21 then return finish("producer_busy", reserved) end
-    if reserved ~= 0 then return finish("reservation_failed", reserved) end
+    if reserved == -21 then return finish("producer_busy", reserved, progress_status) end
+    if reserved ~= 0 then return finish("reservation_failed", reserved, progress_status) end
 
     local fact, source_error = call(observation, "capture")
     if fact == nil then
         call(carrier, "fail_section", source_error or "source_failure")
-        return finish(source_error or "source_failure", nil)
+        return finish(source_error or "source_failure", nil, progress_status)
     end
     local pushed = call(carrier, "push_record", fact)
     if pushed ~= 0 then
         call(carrier, "fail_section", "fact_rejected")
-        return finish("fact_rejected", pushed)
+        return finish("fact_rejected", pushed, progress_status)
     end
     local completion, completion_error = call(observation, "finish_evidence")
     if completion == nil then
         call(carrier, "fail_section", completion_error or "clock_unavailable")
-        return finish(completion_error or "clock_unavailable", nil)
+        return finish(completion_error or "clock_unavailable", nil, progress_status)
     end
     local closed = call(carrier, "finish_section", completion)
-    if closed ~= 0 then return finish("finish_rejected", closed) end
-    return finish("sampled", 0)
+    if closed ~= 0 then return finish("finish_rejected", closed, progress_status) end
+    return finish("sampled", 0, progress_status)
 end
 
 return scheduler

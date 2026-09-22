@@ -32,7 +32,9 @@ static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
 fn long_lived_and_stalled_sessions_keep_distinct_deadlines() {
-    let _guard = TEST_LOCK.lock().expect("test lock");
+    let _guard = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     long_lived_session_accepts_late_transport_progress();
     stalled_candidate_expires_before_peer_disconnect();
 }
@@ -84,7 +86,8 @@ fn stalled_candidate_expires_before_peer_disconnect() {
     .expect("start disposition");
     assert!(matches!(disposition.body, ControlBody::Disposition(_)));
     wait_for_history(harness.directory.path(), "candidate-expired");
-    wait_for_history(harness.directory.path(), "peer-inactive");
+    wait_for_history(harness.directory.path(), "receive-timeout");
+    wait_for_history(harness.directory.path(), "peer-disconnected");
     harness.stop();
 }
 

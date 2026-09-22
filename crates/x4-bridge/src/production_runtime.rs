@@ -1,7 +1,7 @@
 use crate::production_runtime_control::{
     RecoveryState, complete_selection, initial, recover_idle, send,
 };
-use crate::production_runtime_idle::{ReceiveProgress, await_progress};
+use crate::production_runtime_idle::{ProgressError, ReceiveProgress, await_progress};
 use crate::production_runtime_message::{record_disposition, selection_finished};
 use crate::production_ship_schedule::ShipSchedule;
 use crate::{OperationalHistory, PIPE_ENDPOINT, ProductionLimits, ProductionObservationSession};
@@ -107,7 +107,7 @@ fn receive_loop(
     loop {
         let bytes = match await_progress(peer, limits, history, session, &progress) {
             Ok(bytes) => bytes,
-            Err(())
+            Err(ProgressError::Timeout)
                 if try_recover(
                     peer,
                     identity,
@@ -118,9 +118,14 @@ fn receive_loop(
                     &mut progress,
                 ) =>
             {
+                let _ = history.record("recovered", "stale-scope-rotated");
                 continue;
             }
-            Err(()) => break,
+            Err(ProgressError::Timeout) => {
+                let _ = history.record("rejected", "receive-timeout");
+                break;
+            }
+            Err(ProgressError::Receive) => break,
         };
         progress.received(Instant::now());
         if let Some(schedule) = schedule {

@@ -16,6 +16,27 @@ pub struct RecoveryState<'a> {
     pub issued_at: Instant,
 }
 
+#[derive(Clone, Copy)]
+enum SelectionFailure {
+    Cursor,
+    Admission,
+    Revision,
+    Intent,
+    Demand,
+}
+
+impl SelectionFailure {
+    const fn reason(self) -> &'static str {
+        match self {
+            Self::Cursor => "next-selection-cursor",
+            Self::Admission => "next-selection-admission",
+            Self::Revision => "next-selection-revision",
+            Self::Intent => "next-selection-intent-send",
+            Self::Demand => "next-selection-demand-send",
+        }
+    }
+}
+
 pub fn initial(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -111,24 +132,26 @@ pub fn recover_idle(
         return false;
     };
     *key = next_key;
-    let Some(issued) = issue(peer, identity, limits, session, schedule, key) else {
+    let Ok(issued) = issue(peer, identity, limits, session, schedule, key) else {
         return false;
     };
     *progress = ReceiveProgress::issued(issued_at.max(issued), limits, true);
     true
 }
 
-pub fn next(
+fn next(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
     limits: &ProductionLimits,
     session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
     key: &mut String,
-) -> Option<Instant> {
+) -> Result<Instant, SelectionFailure> {
     // Reconcile completion before issuing fresh collection demand.
     if schedule.is_some() {
-        *key = session.next_ship_key(key, now()).ok()?;
+        *key = session
+            .next_ship_key(key, now())
+            .map_err(|_| SelectionFailure::Cursor)?;
     }
     issue(peer, identity, limits, session, schedule, key)
 }
@@ -140,14 +163,16 @@ fn issue(
     session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
     key: &str,
-) -> Option<Instant> {
+) -> Result<Instant, SelectionFailure> {
     if let Some(schedule) = schedule {
         if !schedule.admit(key) {
-            return None;
+            return Err(SelectionFailure::Admission);
         }
-        let revision = session.heavy_revision_floor().ok()?;
+        let revision = session
+            .heavy_revision_floor()
+            .map_err(|_| SelectionFailure::Revision)?;
         let issued_at = now();
-        intent(peer, identity, key, revision, limits).ok()?;
+        intent(peer, identity, key, revision, limits).map_err(|()| SelectionFailure::Intent)?;
         session.ship_intent_issued(identity, key, revision, issued_at);
     }
     let issued = Instant::now();
@@ -157,8 +182,8 @@ fn issue(
         ControlBody::Demand(DemandBody { credit: 1 }),
         limits,
     )
-    .ok()?;
-    Some(issued)
+    .map_err(|()| SelectionFailure::Demand)?;
+    Ok(issued)
 }
 
 pub fn complete_selection(
@@ -177,9 +202,17 @@ pub fn complete_selection(
     if let Some(schedule) = schedule {
         schedule.complete();
     }
-    let issued = next(peer, identity, limits, session, schedule, key);
-    if issued.is_none() {
-        let _ = history.record("waiting", "heavy-admission-or-peer-stop");
+    match next(peer, identity, limits, session, schedule, key) {
+        Ok(issued) => {
+            let revision = session.heavy_revision_floor().unwrap_or(0);
+            history.bind_message("attempt-1", key, revision);
+            Some(issued)
+        }
+        Err(error) => {
+            let revision = session.heavy_revision_floor().unwrap_or(0);
+            history.bind_message("attempt-1", key, revision);
+            let _ = history.record("rejected", error.reason());
+            None
+        }
     }
-    issued
 }

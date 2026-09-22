@@ -10,6 +10,10 @@ pub struct ReceiveProgress {
     preparation_limit: Duration,
     inactivity_limit: Duration,
 }
+pub enum ProgressError {
+    Timeout,
+    Receive,
+}
 impl ReceiveProgress {
     #[must_use]
     pub const fn issued(origin: Instant, limits: &ProductionLimits, heavy: bool) -> Self {
@@ -41,21 +45,23 @@ pub fn await_progress(
     history: &mut OperationalHistory,
     session: &mut ProductionObservationSession,
     progress: &ReceiveProgress,
-) -> Result<Vec<u8>, ()> {
+) -> Result<Vec<u8>, ProgressError> {
     let idle_limit = Duration::from_millis(limits.max_message_inactivity_millis as u64);
     let poll_interval = idle_limit.min(Duration::from_millis(10));
     loop {
         match peer.receive_timeout(limits.complete_message_bytes, poll_interval) {
             Ok(Some(_)) if progress.expired(Instant::now()) => {
-                let _ = history.record("rejected", "receive-timeout");
-                return Err(());
+                let _ = history.record("degraded", "receive-timeout");
+                return Err(ProgressError::Timeout);
             }
             Ok(Some(bytes)) => return Ok(bytes),
-            Ok(None) if on_idle(history, session, progress) => return Err(()),
+            Ok(None) if on_idle(history, session, progress) => {
+                return Err(ProgressError::Timeout);
+            }
             Ok(None) => {}
             Err(_) => {
                 let _ = history.record("rejected", "receive-failed");
-                return Err(());
+                return Err(ProgressError::Receive);
             }
         }
     }
@@ -72,7 +78,7 @@ fn on_idle(
     if !progress.expired(Instant::now()) {
         return false;
     }
-    let _ = history.record("rejected", "receive-timeout");
+    let _ = history.record("degraded", "receive-timeout");
     true
 }
 
