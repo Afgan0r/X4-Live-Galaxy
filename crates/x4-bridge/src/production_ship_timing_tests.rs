@@ -33,8 +33,8 @@ fn scoped_completion(kind: &str) -> observation_domain::CompleteMessage {
     let observation_domain::CompleteMessage::SectionCompletion(value) = &mut message else {
         panic!("completion")
     };
-    value.section_key = observation_domain::SectionKey::new(format!("{kind}:argon:g0"))
-        .expect("scoped detail key");
+    value.section_key =
+        observation_domain::SectionKey::new(format!("{kind}:argon:g0")).expect("scoped detail key");
     message
 }
 
