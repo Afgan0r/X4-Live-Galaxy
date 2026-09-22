@@ -75,6 +75,14 @@ describe("owned Carrier B adapter", function()
         }
     end
 
+    local function tick_until_terminal(tick)
+        for _ = 1, 1000 do
+            local ok, detail = tick("live_galaxy_observation", "telemetry_tick")
+            if detail ~= "collecting" then return ok, detail end
+        end
+        error("ship collection did not reach a terminal disposition")
+    end
+
     it("loads ABI 2 and samples one reserved realtime fact", function()
         local env, getter_calls, clock_calls = native(), 0, 0
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
@@ -285,7 +293,7 @@ describe("owned Carrier B adapter", function()
         _G.DebugError = function(value) diagnostic = value end
         local runtime = fixture.runtime()
         assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
-        assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.same({ true, "sampled" }, { tick_until_terminal(tick) })
         assert.is_truthy(diagnostic:match("max_callback_duration_millis=10"))
         assert.is_truthy(diagnostic:match("max_callback_overrun_millis=8"))
         assert.is_truthy(diagnostic:match("source_value_bytes=%d+"))
@@ -320,7 +328,7 @@ describe("owned Carrier B adapter", function()
             _G.DebugError = function(value) diagnostic = value; messages[#messages + 1] = value end
             local runtime = fixture.runtime()
             assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
-            assert.same({ false, "invalid_fact" }, { tick("live_galaxy_observation", "telemetry_tick") })
+            assert.same({ false, "invalid_fact" }, { tick_until_terminal(tick) })
             assert.is_truthy(diagnostic:match("stage=core"))
             assert.is_truthy(diagnostic:match("condition=" .. case.condition))
             if not case.cycle then
@@ -367,7 +375,7 @@ describe("owned Carrier B adapter", function()
         _G.RegisterEvent = function(_, callback) tick = callback end
         _G.DebugError = function(value) diagnostic = value end
         assert(fixture.runtime().initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
-        assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
+        assert.same({ true, "sampled" }, { tick_until_terminal(tick) })
         assert.is_truthy(diagnostic:match("detail=sampled"))
     end)
 

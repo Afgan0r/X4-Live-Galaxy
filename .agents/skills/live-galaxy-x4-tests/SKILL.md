@@ -92,6 +92,20 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   Preserve raw row counts, but deduplicate metric input by process, swap chain,
   and QPC timestamp. Verify duplicate groups have identical metric fields before
   treating this as transport duplication rather than distinct presents.
+- A configured callback-time budget is not evidence of bounded game work by
+  itself. Drive a workload that advances the monotonic clock during both source
+  capture and retained delivery, assert that `collecting` resumes on later
+  callbacks, and bound the measured callback maximum. Also prove that yielding
+  does not repeat getters or expose a partially published section. One already
+  entered native call remains indivisible and may report a measured overrun.
+- For the local heavy-ship performance gate, derive the complete frame budget
+  from `target_fps`; never encode its millisecond result as an unexplained
+  constant. Time every synchronous source/carrier stage and the complete
+  callback. The production callback budget remains the cooperative-yield
+  target, while no measured indivisible stage or callback may exceed the full
+  target-frame budget. Gate callback-normalized throughput against the recorded
+  multi-process baseline and require zero final backlog. This local gate catches
+  obvious frame killers but does not replace X4 plus FrameView acceptance.
 
 ## Lua Mutation Testing
 

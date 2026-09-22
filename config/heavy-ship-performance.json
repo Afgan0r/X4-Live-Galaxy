@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "target_fps": 144,
+  "callback_budget_millis": 2,
+  "baseline_records_per_callback": 0.8,
+  "baseline_process_samples": 6,
+  "maximum_callback_work_regression_percent": 20,
+  "required_final_backlog": 0,
+  "required_stages": [
+    "source_read_core",
+    "source_cargo_wares",
+    "source_crew_fill",
+    "source_software_fill",
+    "begin_section",
+    "push_record",
+    "finish_section",
+    "progress"
+  ]
+}

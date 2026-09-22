@@ -243,6 +243,7 @@ function collection:tick(context, carrier, status)
     while true do
         local result = self:step(context, carrier, status)
         if result.disposition ~= "collecting" then return result end
+        if self.work_budget and self.work_budget:should_yield(carrier) then return result end
     end
 end
 

@@ -11,6 +11,7 @@ param(
     [string]$LimitsFile,
     [switch]$Throughput,
     [switch]$Interleave,
+    [switch]$PerformanceGate,
     [switch]$Calibration
 )
 
@@ -191,7 +192,7 @@ if ($Calibration) {
 } else {
     $sourceLimits = if ($LimitsFile) { $LimitsFile } else { Join-Path $repo 'config/carrier-b-limits.json' }
     Copy-Item -LiteralPath (Resolve-Path $sourceLimits) -Destination $limits
-    if ($Throughput) {
+    if ($Throughput -and -not $PerformanceGate) {
         if ($Scenario -ne 'heavy-ship-recovery') { throw 'THROUGHPUT_REQUIRES_CONFIGURED_CHAIN' }
         $synthetic = Get-Content -LiteralPath $limits -Raw | ConvertFrom-Json
         $synthetic.rate_interval_millis = 25
@@ -213,7 +214,8 @@ if ($Scenario -eq 'heavy-ship-recovery') {
         throw 'HEAVY_PROFILE_REQUIRED'
     }
     . (Join-Path $repo 'tests/carrier-b-heavy-configured.ps1')
-    Invoke-HeavyConfiguredRestart $run $hostExecutable $data $limits $repo -Throughput:$Throughput -Interleave:$Interleave
+    if ($PerformanceGate -and -not $Throughput) { throw 'PERFORMANCE_GATE_REQUIRES_THROUGHPUT' }
+    Invoke-HeavyConfiguredRestart $run $hostExecutable $data $limits $repo -Throughput:$Throughput -Interleave:$Interleave -PerformanceGate:$PerformanceGate
     return
 }
 if ($Scenario -in @('heavy-ship-core', 'heavy-ship-detail')) {

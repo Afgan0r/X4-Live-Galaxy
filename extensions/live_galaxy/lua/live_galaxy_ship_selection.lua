@@ -1,8 +1,6 @@
 local selection = {}
-local source = require("live_galaxy.lua.live_galaxy_ship_source")
-local core = require("live_galaxy.lua.live_galaxy_ship_collection")
-local detail = require("live_galaxy.lua.live_galaxy_ship_details")
-local budget_module = require("live_galaxy.lua.live_galaxy_ship_budget")
+local source, core = require("live_galaxy.lua.live_galaxy_ship_source"), require("live_galaxy.lua.live_galaxy_ship_collection")
+local detail, budget_module = require("live_galaxy.lua.live_galaxy_ship_details"), require("live_galaxy.lua.live_galaxy_ship_budget")
 local profile = require("live_galaxy.lua.live_galaxy_ship_profile")
 local DETAIL_KEYS = { "ship_cargo:g0", "ship_crew:g0", "ship_loadout:g0" }
 local function metrics(self)
@@ -28,7 +26,7 @@ local function discard(self, carrier, reason, request)
         result.rejection.operation = self.budget.operation
         result.rejection.condition = self.budget.condition or result.rejection.condition
     end
-    self.collector, self.pending, self.accepted, self.snapshot, self.preflight_checked = nil, nil, nil, nil, nil
+    self.collector, self.pending, self.accepted, self.snapshot, self.snapshot_capture = nil, nil, nil, nil, nil
     -- A failed start performed no source capture. Never label previous capture
     -- counters with a new request or retain the old collector's failure stage.
     result.capture_metrics = not request and metrics(self) or nil
@@ -120,30 +118,37 @@ local function start(self, context, carrier, status)
     return true
 end
 local function capture_snapshot(self, context, carrier, status)
-    local parent = { members = self.collector.identities, cores = self.collector.cores,
-        revision = self.revision, boundary = self.boundary, incarnation = self.incarnation,
-        budget = self.budget }
+    if not self.snapshot_capture then
+        self.snapshot_capture = { parent = { members = self.collector.identities, cores = self.collector.cores,
+            revision = self.revision, boundary = self.boundary, incarnation = self.incarnation,
+            budget = self.budget }, detail_index = 1 }
+    end
+    local capture = self.snapshot_capture
+    local parent = capture.parent
     local clock = { begin_evidence = self.clock.begin_evidence, finish_evidence = self.clock.finish_evidence,
         clock_getter = function() return self.budget:clock(self.clock.clock_getter) end }
-    for _, key in ipairs(DETAIL_KEYS) do
-        local collector = assert(detail.new({ ship_api = self.budget.api, capture_only = true,
-            max_inner = self.limits.max_inner_records, max_allocation_bytes = self.limits.max_allocation_bytes,
-            source_scope = self.options.source_scope, expected_cores = parent.cores,
-            work_budget = self.budget, group = { key = key, members = parent.members,
-                owner = self.options.faction_id, core_revision = parent.revision } }, clock))
-        local result = collector:tick(context, carrier, status)
+    while capture.detail_index <= #DETAIL_KEYS do
+        local key = DETAIL_KEYS[capture.detail_index]
+        if not capture.collector then
+            capture.collector = assert(detail.new({ ship_api = self.budget.api, capture_only = true,
+                max_inner = self.limits.max_inner_records, max_allocation_bytes = self.limits.max_allocation_bytes,
+                source_scope = self.options.source_scope, expected_cores = parent.cores,
+                work_budget = self.budget, group = { key = key, members = parent.members,
+                    owner = self.options.faction_id, core_revision = parent.revision } }, clock))
+        end
+        local result = capture.collector:tick(context, carrier, status)
+        if result.disposition == "collecting" then return result end
         if result.disposition ~= "captured" then return nil, result end
-        parent[key] = collector
+        parent[key], capture.collector = capture.collector, nil
+        capture.detail_index = capture.detail_index + 1
+        if self.budget:should_yield(carrier) then return { disposition = "collecting" } end
     end
-    local admitted, reason = self.budget:after(carrier)
-    if not admitted then return nil, discard(self, carrier, reason) end
-    self.budget.capture_duration_millis = self.budget.last - self.budget.callback_start
-    self.preflight_checked = true
-    self.snapshot = parent
+    self.snapshot, self.snapshot_capture = parent, nil
     assert(self.collector:deliver())
     while true do
         local result = self.collector:step(context, carrier, status)
         if result.disposition ~= "collecting" then return result end
+        if self.budget:should_yield(carrier) then return result end
     end
 end
 function selection.advance(self, context, carrier, status)
@@ -167,7 +172,7 @@ function selection.advance(self, context, carrier, status)
     if not ok then return discard(self, carrier, err) end
     local success, result = pcall(self.collector.tick, self.collector, context, carrier, status)
     if not success then return discard(self, carrier, self.budget.reason or "source_failure") end
-    if result.disposition == "captured" and self.key == "ship_core" then
+    if self.key == "ship_core" and (result.disposition == "captured" or self.snapshot_capture) then
         local capture_success, captured, capture_result = pcall(capture_snapshot, self, context, carrier, status)
         if not capture_success then return discard(self, carrier, self.budget.reason or "source_failure") end
         if captured == nil then
@@ -177,11 +182,8 @@ function selection.advance(self, context, carrier, status)
         end
         result = captured
     end
-    if self.preflight_checked then self.preflight_checked = nil
-    else
-        ok, err = self.budget:after(carrier)
-        if not ok then return discard(self, carrier, err) end
-    end
+    ok, err = self.budget:after(carrier)
+    if not ok then return discard(self, carrier, err) end
     if result.disposition == "sampled" and self.key == "ship_core" then
         -- Transfer owned, already bytewise-ordered membership; do not repeat an
         -- copy/sort after the source collector has completed.

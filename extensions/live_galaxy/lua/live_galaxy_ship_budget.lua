@@ -73,7 +73,7 @@ function budget:before(status)
     if now - self.started > self.v.max_message_age_millis or self.steps >= self.v.max_collection_steps then
         return nil, "collection_overflow"
     end
-    self.last, self.callback_start, self.callback_operations = now, now, 0
+    self.last, self.callback_start, self.callback_operations, self.callback_yielded = now, now, 0, false
     return true
 end
 function budget:step()
@@ -90,9 +90,10 @@ function budget:clock(getter)
     self.callback_operations, self.calls = self.callback_operations + 1, self.calls + 1
     return getter()
 end
-function budget:after(carrier)
-    -- Status-only progress(0) reads the owned monotonic clock after return.
-    -- It cannot interrupt a synchronous getter which has already entered X4.
+function budget:sample_callback(carrier)
+    -- Status-only progress(0) reads the owned monotonic clock between
+    -- indivisible source or carrier operations. It cannot interrupt an
+    -- operation which has already entered X4.
     local _, status = carrier:progress(0)
     local now = status and tonumber(status.monotonic_millis)
     if not integer(now) or now < self.callback_start then return nil, "clock_unavailable" end
@@ -100,6 +101,21 @@ function budget:after(carrier)
     self.max_callback_duration = math.max(self.max_callback_duration or 0, now - self.callback_start)
     self.max_callback_overrun = math.max(0, self.max_callback_duration - self.v.callback_budget_millis)
     if now - self.started > self.v.max_message_age_millis then return nil, "collection_overflow" end
+    return now
+end
+function budget:should_yield(carrier)
+    local now, reason = self:sample_callback(carrier)
+    if not now then
+        self.reason = reason
+        error(reason, 0)
+    end
+    self.callback_yielded = now - self.callback_start >= self.v.callback_budget_millis
+    return self.callback_yielded
+end
+function budget:after(carrier)
+    if self.callback_yielded then return true end
+    local now, reason = self:sample_callback(carrier)
+    if not now then return nil, reason end
     return true
 end
 return budget

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'loader', 'syntax', 'xml', 'carrier_b_actual', 'ship_detail')]
+    [ValidateSet('all', 'lua', 'component_discovery', 'x4_discovery', 'telemetry', 'scheduler', 'loader', 'syntax', 'xml', 'carrier_b_actual', 'ship_detail', 'performance')]
     [string]$Suite = 'all',
     [string]$Filter,
     [string]$ExtensionRoot = (Split-Path -Parent $PSScriptRoot)
@@ -39,7 +39,16 @@ try {
         Invoke-Stage 'Carrier-B-bridge-restart' 'pwsh' ($actual + @('-Scenario', 'bridge-restart', '-StartupOrder', 'native-first'))
         Invoke-Stage 'Carrier-B-unload' 'pwsh' ($actual + @('-Scenario', 'pending-io-unload'))
     }
-    if ($Suite -ne 'xml') {
+    if ($Suite -in @('all', 'performance')) {
+        Invoke-Stage 'Heavy-performance-contract' 'pwsh' @('-NoProfile', '-File',
+            (Join-Path $root 'tests/carrier-b-performance-gate.Tests.ps1'))
+        $performance = @('-NoProfile', '-File', (Join-Path $root 'tests/carrier-b-local.ps1'),
+            '-SelfTest', '-Scenario', 'heavy-ship-recovery', '-StartupOrder', 'native-first',
+            '-LimitsFile', (Join-Path $root 'config/heavy-ship-experiment.json'),
+            '-Throughput', '-PerformanceGate')
+        Invoke-Stage 'Heavy-performance' 'pwsh' $performance
+    }
+    if ($Suite -notin @('xml', 'performance')) {
         $lock = Get-Content -LiteralPath (Join-Path $root 'tools/lua-runner.lock.json') -Raw | ConvertFrom-Json
         $lua = Join-Path $root "$($lock.bustedDevelopment.rootRelativePath)/bin/lua.exe"
         $busted = Join-Path $root "$($lock.bustedDevelopment.treeRelativePath)/bin/busted.bat"

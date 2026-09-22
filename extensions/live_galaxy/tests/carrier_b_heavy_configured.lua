@@ -1,6 +1,7 @@
 local root, mode, result_path, marker = ...
 local interleave = marker == "throughput-interleave"
-local throughput = marker == "throughput" or interleave
+local performance = marker == "performance"
+local throughput = marker == "throughput" or interleave or performance
 local population = throughput and 129 or 1
 package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 local options = assert(require("live_galaxy.lua.live_galaxy_config").options())
@@ -80,6 +81,18 @@ local source = {
     units_allocate = function() return {} end,
     units_fill = function() called(); return { { macro_name = "unit_macro", category = "unfiltered_raw", amount_items = 2 } } end,
 }
+if throughput then
+    for name, method in pairs(source) do
+        source[name] = function(...)
+            local before = host_monotonic_millis()
+            local first, second, third = method(...)
+            local key = "source_" .. name
+            timings[key] = timings[key] or {}
+            timings[key][#timings[key] + 1] = host_monotonic_millis() - before
+            return first, second, third
+        end
+    end
+end
 options.observation.ship_api = source
 options.observation.getter = function() error("clock sample must not run in ship mode") end
 options.observation.clock_getter = function() return host_monotonic_millis() / 1000 end

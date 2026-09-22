@@ -15,8 +15,9 @@ function Assert-HeavySamePeerInterleave([string]$Data) {
     Write-Output 'SAME_PEER_INTERLEAVE revisions=1..19 inactivity_recovery=waiting sessions=1 epochs=1 reconnect=false'
 }
 
-function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [string]$Data, [string]$Limits, [string]$Repo, [switch]$Throughput, [switch]$Interleave) {
+function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [string]$Data, [string]$Limits, [string]$Repo, [switch]$Throughput, [switch]$Interleave, [switch]$PerformanceGate) {
     . (Join-Path $Repo 'tests/carrier-b-heavy-oracles.ps1')
+    . (Join-Path $Repo 'tests/carrier-b-performance-gate.ps1')
     if ($Interleave -and -not $Throughput) { throw 'INTERLEAVE_REQUIRES_LOCAL_THROUGHPUT' }
     $bridge = $null; $producer = $null
     $result = Join-Path $Run 'heavy-result.txt'
@@ -26,7 +27,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
         $bridge = Start-Owned (Join-Path $Repo 'target/release/x4-bridge.exe') @('--data-dir', $Data, '--limits-file', $Limits, '--ship-faction', 'argon') $Run
         $modes = if ($Interleave) { @('first') } else { @('first', 'restart') }
         foreach ($mode in $modes) {
-            $marker = if ($Interleave) { 'throughput-interleave' } elseif ($Throughput) { 'throughput' } else { '' }
+            $marker = if ($Interleave) { 'throughput-interleave' } elseif ($PerformanceGate) { 'performance' } elseif ($Throughput) { 'throughput' } else { '' }
             $producer = Start-Owned $HostExecutable @($Run, $script, $result, $marker, $mode) $Run $true
             $deadline = [DateTime]::UtcNow.AddMilliseconds((Get-Content -LiteralPath $Limits -Raw | ConvertFrom-Json).admission_window_millis)
             while (-not $producer.HasExited -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 10; $producer.Refresh() }
@@ -40,6 +41,17 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
                 foreach ($line in Get-Content -LiteralPath $result) {
                     if ($line -match '^capture section=(\S+) revision=(\d+) ') { $readbackRows += ,@($Matches[1], [int]$Matches[2]) }
                 }
+            }
+            if ($PerformanceGate) {
+                $policy = Get-Content -LiteralPath (Join-Path $Repo 'config/heavy-ship-performance.json') -Raw |
+                    ConvertFrom-Json -AsHashtable
+                $activeLimits = Get-Content -LiteralPath $Limits -Raw | ConvertFrom-Json
+                if ([double]$policy.callback_budget_millis -ne [double]$activeLimits.callback_budget_millis) {
+                    throw 'PERFORMANCE_CALLBACK_PROFILE_MISMATCH'
+                }
+                $measurement = Read-HeavyPerformanceMeasurement $result
+                Assert-HeavyPerformanceMeasurement $policy $measurement
+                Write-Output (Format-HeavyPerformanceGate $policy $measurement)
             }
         }
         if (-not $Throughput) { $readbackRows = @(@('ship_core', 1), @('ship_core', 9), @('ship_cargo:g0', 2), @('ship_cargo:g0', 10), @('ship_crew:g0', 3), @('ship_crew:g0', 11), @('ship_loadout:g0', 4), @('ship_loadout:g0', 12)) }

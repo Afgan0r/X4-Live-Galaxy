@@ -716,3 +716,50 @@ frame time. A same-session 30-second control after bridge shutdown measured
 50 ms. X4 separately reported a 277 ms source callback. This is a normal-time
 Gate-A failure and activates the accepted chunked-work fallback; do not proceed
 to SETA until replacement normal-time evidence passes.
+
+## Time-bounded callback continuation
+
+The 2 ms callback setting had been diagnostic only: core capture, all three
+detail families, and retained delivery each looped until completion before the
+clock was sampled. The fallback now samples the owned producer monotonic clock
+between indivisible source or carrier operations. When elapsed callback time
+reaches 2 ms, the collector returns `collecting` and resumes the same owned
+state on the next ordinary telemetry callback. It adds no sleep, rate delay, or
+operation-count cap.
+
+Core, cargo, crew, and loadout still form one owned logical snapshot before any
+core publication. Backpressure and later detail requests drain retained values
+without repeating X4 getters. Atomic section reservation, validation, durable
+acknowledgment, total resource budgets, admission age, and stale-record
+semantics are unchanged. An individual native or carrier call cannot be
+preempted and can therefore still produce a measured overrun.
+
+The executable 950-ship contract advances time during capture and delivery,
+requires continuation across multiple callbacks, retains exactly 4,750 core
+reads, publishes 3,800 records, and reports no callback overrun in the fake
+clock. Full local regression passed: 104 Lua behavior tests, 20 Lua syntax
+checks, XML/schema checks, workspace formatting, strict Clippy, all Rust tests,
+and source-size enforcement. Replacement normal-time X4 and FrameView evidence
+remains the acceptance gate before SETA.
+
+### Local 144 FPS performance regression gate
+
+The no-X4 gate does not claim an FPS measurement. It prevents an obvious local
+frame killer before packaging. Policy stores `target_fps=144`; the test derives
+the complete frame budget as `1000 / target_fps` and never hard-codes the
+resulting millisecond value. The production cooperative callback budget remains
+2 ms.
+
+The release-mode Lua/DLL/pipe/bridge/SQLite workload contains 129 ships and 80
+nested cargo, crew, and loadout rows. It times every synchronous source and
+carrier call plus the complete scheduler callback. No individual stage or
+callback may exceed the derived complete-frame budget, callback-normalized
+throughput may not regress more than 20% from its measured baseline, and final
+backlog must be zero.
+
+Three calibration runs produced six process samples. Callback p95 was
+3.04--3.14 ms, callback maximum was 3.39--4.08 ms, the slowest individual stage
+was 1.86 ms, and every run ended with zero backlog. The conservative baseline
+is the rounded-down worst observation, 0.80 records per callback. Run the gate
+with `run_contracts.ps1 -Suite performance`; it remains synthetic evidence and
+does not replace the normal-time X4/FrameView gate.

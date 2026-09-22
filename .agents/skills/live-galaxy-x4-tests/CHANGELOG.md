@@ -4,6 +4,12 @@
 
 - Required FrameView SDK metric deduplication by process, swap chain, and QPC
   after a Phase 05.5 capture repeated identical per-frame events 8--10 times.
+- Required an executable continuation oracle for configured callback budgets
+  after Phase 05.5 proved that the former 2 ms setting only measured a 277 ms
+  callback after completion and allowed a large normal-time frame regression.
+- Added a no-X4 heavy performance gate derived from the 144 FPS target after the
+  same regression showed that correctness and coarse watchdogs could not reject
+  an obvious frame-budget violation before installation.
 
 ## 2026-09-21
 

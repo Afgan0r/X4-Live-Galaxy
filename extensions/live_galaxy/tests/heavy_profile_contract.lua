@@ -130,6 +130,20 @@ describe("shared heavy profile and bounded game work", function()
         assert.is_nil(ok); assert.equals("clock_unavailable", reason)
         assert.is_nil(b:before({ monotonic_millis = "9" })); assert.equals(1, entered)
     end)
+    it("yields after elapsed callback time without counting operations", function()
+        local v, now = values(), 10
+        local b = budget.new({}, v)
+        local carrier = { progress = function()
+            return 0, { monotonic_millis = tostring(now) }
+        end }
+        assert(b:before({ monotonic_millis = tostring(now) }))
+        now = now + v.callback_budget_millis - 1
+        assert.is_false(b:should_yield(carrier))
+        now = now + 1
+        assert.is_true(b:should_yield(carrier))
+        assert.equals(v.callback_budget_millis, b.max_callback_duration)
+        assert.equals(0, b.max_callback_overrun)
+    end)
     it("requires committed core feedback and revalidates one full-faction detail group", function()
         local v, now, finishes, failures, reads = values(), 0, 0, 0, 0
         local identities = { "9007199254740993", "9007199254740995" }
