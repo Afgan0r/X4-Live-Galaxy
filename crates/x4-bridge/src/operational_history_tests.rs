@@ -113,3 +113,40 @@ fn transient_history_sink_failure_recovers_with_an_honest_marker() {
 
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn identical_suppressed_event_reopens_recovered_history_sink() {
+    let path = std::env::temp_dir().join(format!("history-identical-recovery-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    for _ in 1..MAX_IDENTICAL_EVENTS {
+        assert!(history.record("waiting", "same-event"));
+    }
+    history.sink = Some(
+        std::fs::File::open(path.join("operational-history.jsonl"))
+            .expect("read-only failing sink"),
+    );
+    assert!(!history.record("waiting", "same-event"));
+    assert!(history.record("waiting", "same-event"));
+    let events = std::fs::read_to_string(path.join("operational-history.jsonl")).expect("history");
+    assert!(events.contains("\"state\":\"journal-recovered\""));
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
+fn status_emergency_latch_resets_after_successful_write() {
+    let path = std::env::temp_dir().join(format!("status-latch-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    let status = path.join("operational-status.json");
+    std::fs::remove_file(&status).expect("remove status");
+    std::fs::create_dir(&status).expect("block status");
+    assert!(!history.record("collection", "first-failure"));
+    assert!(history.status_emergency_reported);
+    std::fs::remove_dir(&status).expect("unblock status");
+    assert!(history.record("collection", "recovered"));
+    assert!(!history.status_emergency_reported);
+    std::fs::remove_file(&status).expect("remove status again");
+    std::fs::create_dir(&status).expect("block status again");
+    assert!(!history.record("collection", "second-failure"));
+    assert!(history.status_emergency_reported);
+    let _ = std::fs::remove_dir_all(path);
+}
