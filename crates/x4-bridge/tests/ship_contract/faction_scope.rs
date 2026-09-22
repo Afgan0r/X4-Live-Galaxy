@@ -78,3 +78,18 @@ fn receiver_rejects_unvalidated_faction_authority() {
         );
     }
 }
+
+#[test]
+fn receiver_requests_runtime_census_before_ship_selection() {
+    let database = carrier_b_support::database("ship-faction-census-first");
+    let receiver = ProductionObservationSession::open(
+        database.path(),
+        carrier_b_support::generation_limits(),
+        carrier_b_support::publication_limits(),
+        carrier_b_support::lifecycle_limits(),
+        4,
+    )
+    .expect("valid test fixture");
+    assert_eq!(receiver.collection_key(), "faction_census");
+    assert!(receiver.faction_census_blocks_closure());
+}
