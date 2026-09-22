@@ -10,19 +10,39 @@ local limits = { data_message_bytes = 4096, control_message_bytes = 512, max_rec
     max_content_bytes = 512, max_canonical_bytes = 4096, max_batches = 129, max_work = 129,
     max_age_millis = 5000, pending_slots = 1, max_attempts = 2, max_retry_age_millis = 5000,
     availability_interval_millis = 5000 }
+local heavy = mode == "heavy_profile"
+if heavy then
+    limits.heavy_profile_version, limits.max_inner_records = 1, 17
+    limits.max_attempts, limits.max_age_millis = 1, 30000
+end
+local boundary = (mode == "incompatible" or heavy) and "runtime_start" or mode
 local source = { source_scope = "x4:faction:argon:ships", source_epoch_status = "boundary_uncertain",
-    source_boundary = mode == "incompatible" and "runtime_start" or mode }
+    source_boundary = boundary }
 local function copy(value)
     local result = {}; for key, field in pairs(value) do result[key] = field end; return result
 end
 local original_limits, original_source = copy(limits), copy(source)
 -- Open goes through registered operations. Invalid configuration cannot start a worker.
 assert(api.open(1, limits, source) == -10)
-for key, value in pairs({ pending_slots = 2, max_attempts = 3, max_age_millis = 4999,
+for key, value in pairs({ pending_slots = 2, max_attempts = 3,
     availability_interval_millis = 4999, max_canonical_bytes = 4095, max_records = 0,
     max_batches = 128, max_work = 0, max_retry_age_millis = 0 }) do
     local bad = copy(limits); bad[key] = value
     assert(api.open(2, bad, source) == -20, "invalid configured limit " .. key)
+end
+if heavy then
+    for key in pairs(limits) do
+        local bad = copy(limits); bad[key] = nil
+        assert(api.open(2, bad, source) == -20, "missing heavy limit " .. key)
+    end
+    for key, value in pairs({ heavy_profile_version = 2, max_inner_records = 0 }) do
+        local bad = copy(limits); bad[key] = value
+        assert(api.open(2, bad, source) == -20, "invalid heavy limit " .. key)
+    end
+    local too_large = copy(limits); too_large.max_inner_records = limits.max_records + 1
+    assert(api.open(2, too_large, source) == -20, "heavy inner bound exceeds records")
+    local unknown = copy(limits); unknown.extra = 1
+    assert(api.open(2, unknown, source) == -20, "heavy limit table remains exact-key")
 end
 local bad_source = copy(source); bad_source.source_scope = ""
 assert(api.open(2, limits, bad_source) == -20)
@@ -43,7 +63,7 @@ end
 local begin = { section_key = "ship_core", expected_records = 1, capture_start_millis = "12",
     capture_clock = "game_time_millis", quality = "unknown", availability = "available",
     coverage = "partial", consistency = "observed_count_fill_only", stable_identity = true,
-    source_epoch_status = "boundary_uncertain", source_boundary = mode }
+    source_epoch_status = "boundary_uncertain", source_boundary = boundary }
 if mode == "incompatible" then
     await(function(control) return control == 10 end)
     assert(carrier:begin_section(begin) ~= 0)
@@ -103,6 +123,6 @@ else
     finish.capture_end_millis = "999"
     await(function(control) return control == 5 end)
     require("extensions.live_galaxy.tests.ship_abi_lifecycle")(
-        module, api, carrier, loadlib, original_limits, original_source, mode)
+        module, api, carrier, loadlib, original_limits, original_source, boundary)
 end
 local file = assert(io.open(result_path, "wb")); assert(file:write("SHIP_ABI_PASS")); assert(file:close())
