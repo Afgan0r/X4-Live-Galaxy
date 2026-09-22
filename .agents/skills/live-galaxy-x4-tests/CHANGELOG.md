@@ -13,6 +13,9 @@
 - Required runtime oracles to conditionally classify terminal safety events
   after a valid 60-second capture was rejected solely because its configured
   admission window closed after eight successful commits.
+- Required aggregation of rotated operational history after the SETA runner
+  reported only 2 current-file commits while 24 durable commits existed across
+  two retained journal segments.
 
 ## 2026-09-21
 

@@ -83,6 +83,16 @@ function Read-GameTimes([string]$Path, [long]$Offset) {
     } finally { $stream.Dispose() }
 }
 
+function Read-OperationalHistory([string]$DataRoot) {
+    $files = @(Get-ChildItem -LiteralPath $DataRoot -File | Where-Object {
+        $_.Name -like 'operational-history.jsonl*'
+    } | Sort-Object Name)
+    if ($files.Count -eq 0) { throw 'HEAVY_RUNTIME_HISTORY_MISSING' }
+    @($files | ForEach-Object {
+        Get-Content -LiteralPath $_.FullName | ForEach-Object { $_ | ConvertFrom-Json }
+    })
+}
+
 function Measure-GameFactor([System.Collections.IList]$Samples) {
     if ($Samples.Count -lt 2) { return $null }
     $wall = ($Samples[-1].Wall - $Samples[0].Wall).TotalSeconds
@@ -183,6 +193,21 @@ function Invoke-SelfTest {
         (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 0 0) -or
         (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 8 1)) {
         throw 'HEAVY_RUNTIME_TERMINAL_ADMISSION_WINDOW_GUARD'
+    }
+    $historyRoot = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N'))
+    try {
+        [IO.Directory]::CreateDirectory($historyRoot) | Out-Null
+        [IO.File]::WriteAllText((Join-Path $historyRoot 'operational-history.jsonl.1'),
+            '{"state":"committed","revision":1}', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $historyRoot 'operational-history.jsonl'),
+            '{"state":"committed","revision":2}', [Text.UTF8Encoding]::new($false))
+        $historyEvents = @(Read-OperationalHistory $historyRoot)
+        if ($historyEvents.Count -ne 2 -or
+            @($historyEvents.revision | Sort-Object) -join ',' -cne '1,2') {
+            throw 'HEAVY_RUNTIME_ROTATED_HISTORY'
+        }
+    } finally {
+        Remove-Item -LiteralPath $historyRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
     $frameRows = @(
         [pscustomobject]@{ ProcessId = '7'; SwapChainAddress = 'a'; QpcTime = '10'; MsBetweenPresents = '4'; MsBetweenDisplayChange = '4'; MsPCLatency = '0' }
@@ -357,8 +382,7 @@ $rawRows = @($csvFiles | ForEach-Object { Import-Csv -LiteralPath $_ } |
     Where-Object { $_.MsBetweenPresents -ne 'NA' -and
         (-not $useFrameViewSdk -or $_.ProcessId -eq [string]$X4ProcessId) })
 $rows = if ($useFrameViewSdk) { @(Select-UniqueFrameRows $rawRows) } else { $rawRows }
-$history = Join-Path $dataRoot 'operational-history.jsonl'
-$events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
+$events = @(Read-OperationalHistory $dataRoot)
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
 $bad = @($events | Where-Object { $_.state -in @('failed', 'rejected') }).Count
 $captureElapsed = ([DateTime]::UtcNow - $started).TotalSeconds

@@ -112,6 +112,10 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   elapsed time reaches that configured window, at least one revision committed,
   and the bridge recorded no rejected or failed outcome. Keep the same event a
   failure before those conditions are proven.
+- Runtime commit and failure counts must aggregate every retained operational
+  history segment, including rotated `operational-history.jsonl.*` files. A
+  high-throughput SETA run can rotate the journal while remaining healthy; the
+  current segment alone is not a complete oracle.
 
 ## Lua Mutation Testing
 

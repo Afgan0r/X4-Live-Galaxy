@@ -763,3 +763,46 @@ was 1.86 ms, and every run ended with zero backlog. The conservative baseline
 is the rounded-down worst observation, 0.80 records per callback. Run the gate
 with `run_contracts.ps1 -Suite performance`; it remains synthetic evidence and
 does not replace the normal-time X4/FrameView gate.
+
+## Accepted replacement Gate A evidence
+
+The replacement package is source revision
+`f4465ef48f71b74e79f93dd9bafb7954ad13935a`, with package manifest SHA-256
+`229afa89d85ab85b22a272df38f7e1680534b89f55cd8595c0e5322e556f9cdb`.
+The owner-approved average-FPS thresholds are 144 at normal speed and 60 under
+approximately 6.2x SETA. The complete-frame callback ceiling remains derived as
+`1000 / 144`; the production cooperative-yield target remains 2 ms.
+
+Normal-time active run `055-gate-a-normal-20260922-145417` measured 184.671
+average FPS, 62.823 1% low, 23.466 0.1% low, 9.853 ms p99 and 44.498 ms
+maximum. Its same-session control without the bridge measured 177.788 average
+FPS, 51.544 1% low, 23.789 0.1% low, 12.090 ms p99 and 44.302 ms maximum.
+Both traces contain one X4 swap chain, 13 frames at least 33.333 ms and no frame
+at least 50 ms. The active run committed two complete core/cargo/crew/loadout
+cycles with zero rejected or failed outcome, zero runtime diagnostic failure,
+a 1.001 game-time factor and 4 ms maximum callback duration.
+
+SETA active run `055-gate-a-seta-20260922-150230` measured a 5.992 game-time
+factor, 129.260 average FPS, 47.712 1% low, 24.227 0.1% low, 14.009 ms p99 and
+42.570 ms maximum. Its same-session control without the bridge measured 154.996
+average FPS, 52.087 1% low, 24.620 0.1% low, 13.392 ms p99 and 42.850 ms
+maximum. Both traces contain one X4 swap chain, 12 frames at least 33.333 ms and
+no frame at least 50 ms. The active path remains more than twice the approved
+60 FPS SETA floor.
+
+The SETA journal rotated once. Aggregating both retained segments proves 24
+commits, six complete core/cargo/crew/loadout cycles, and zero rejected or
+failed outcome. The runner's original current-file-only count of two was an
+oracle defect, not a production failure. Independent offline readback opened
+previous and current revisions for every section in both modes: 979 records per
+normal section and 1,031--1,032 records per SETA section. The maximum reported
+callback duration was 4 ms, below the derived 144 FPS complete-frame budget.
+
+The 44 normal-time files are retained under owner-only logical artifact
+`055-gate-a-normal-f4465ef-20260922-145417`; locator SHA-256 is
+`ce3d51a1410d4728da28fb298396a9816c9ae65b391377936d362761231144d4`.
+The 45 SETA files are retained under owner-only logical artifact
+`055-gate-a-seta-f4465ef-20260922-150230`; locator SHA-256 is
+`b4d5de96566dcf017d68d88ce0ff198f0aebb2df13355448038d21978ef87980`.
+Gate A is accepted for this exact package/profile identity. Full dynamic-faction
+implementation and Gate B remain pending.
