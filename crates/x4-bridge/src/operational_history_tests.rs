@@ -68,3 +68,23 @@ fn duplicate_suppression_never_crosses_session_or_message_identity() {
 
     let _ = std::fs::remove_dir_all(path);
 }
+
+#[test]
+fn transient_history_sink_failure_recovers_with_an_honest_marker() {
+    let path = std::env::temp_dir().join(format!("history-recovery-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    history.sink = None;
+
+    assert!(!history.record("collection", "lost-during-gap"));
+    assert!(history.record("collection", "persisted-after-reopen"));
+
+    let events = std::fs::read_to_string(path.join("operational-history.jsonl"))
+        .expect("history remains readable");
+    assert!(events.contains("\"state\":\"journal-recovered\""));
+    assert!(events.contains("\"reason\":\"append-reopened\""));
+    assert!(events.contains("\"reason\":\"persisted-after-reopen\""));
+    assert_eq!(history.history_gap_count(), 1);
+    assert!(!history.emergency_reported, "recovery resets the emergency latch");
+
+    let _ = std::fs::remove_dir_all(path);
+}
