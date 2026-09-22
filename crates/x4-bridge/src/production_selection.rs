@@ -54,6 +54,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             return Err(ProductionError::InvalidLimits);
         }
         self.heavy_limits = Some(limits);
+        self.faction_census_mode = true;
         Ok(())
     }
     pub(crate) const fn heavy_limits(&self) -> Option<&crate::HeavyShipLimits> {
@@ -106,6 +107,9 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     }
     pub fn next_ship_key(&mut self, previous: &str, now: u64) -> Result<String, ProductionError> {
         if self.heavy_limits.is_none() {
+            return Ok(self.collection_key());
+        }
+        if previous == "faction_census" {
             return Ok(self.collection_key());
         }
         let key = SectionKey::new(self.collection_key()).ok_or(ProductionError::InvalidLimits)?;

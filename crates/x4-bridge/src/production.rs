@@ -46,6 +46,7 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     ship_timing: timing::ShipTiming,
     faction_roster: Option<observation_domain::FactionObservationRoster>,
     faction_inventory: Vec<observation_domain::FactionOriginEvidence>,
+    faction_census_mode: bool,
 }
 
 impl<R: ObservationRepository> ProductionObservationSession<R> {
@@ -72,6 +73,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             ship_timing: timing::ShipTiming::default(),
             faction_roster: None,
             faction_inventory: Vec::new(),
+            faction_census_mode: false,
         };
         session
             .restore_current_snapshot()

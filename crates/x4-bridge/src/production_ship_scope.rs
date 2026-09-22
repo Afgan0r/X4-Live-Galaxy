@@ -55,6 +55,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )
         .map_err(|_| ProductionError::InvalidFactionCensus)?;
         let included = roster.included_ids().map(str::to_owned).collect::<Vec<_>>();
+        self.faction_census_mode = true;
         self.faction_roster = Some(roster);
         self.ship_scope = None;
         self.ship_scopes.clear();
@@ -93,6 +94,9 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     }
 
     pub fn collection_key(&self) -> String {
+        if !self.faction_census_mode {
+            return "carrier_b_realtime_sample".to_owned();
+        }
         if self.faction_roster.is_none() {
             return "faction_census".to_owned();
         }
@@ -107,7 +111,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
 
     pub(super) fn scoped_key(&self, legacy: &str) -> Result<String, ProductionError> {
         let section = ShipSectionIdentity::parse(legacy).ok_or(ProductionError::InvalidLimits)?;
-        if self.ship_scopes.len() <= 1 {
+        if !self.faction_census_mode {
             return Ok(section.key());
         }
         let faction = self.ship_faction().ok_or(ProductionError::InvalidLimits)?;

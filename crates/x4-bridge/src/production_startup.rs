@@ -68,14 +68,19 @@ pub fn run_production(
     )
     .map_err(StartupError::Production)?;
     if let Some(heavy) = heavy {
-        if parsed.ship_factions.is_empty() {
-            return Err(StartupError::MissingArgument);
-        }
+        let inventory_path = limits_file
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new(""))
+            .join("faction-source-inventory.json");
+        let inventory = crate::production_faction_inventory::read(&inventory_path)
+            .ok_or(StartupError::InvalidLimits)?;
         session
             .configure_heavy(heavy)
             .map_err(StartupError::Production)?;
-    }
-    if !parsed.ship_factions.is_empty() {
+        session
+            .configure_faction_inventory(inventory)
+            .map_err(StartupError::Production)?;
+    } else if !parsed.ship_factions.is_empty() {
         session
             .select_ship_factions(parsed.ship_factions.iter().map(String::as_str))
             .map_err(StartupError::Production)?;

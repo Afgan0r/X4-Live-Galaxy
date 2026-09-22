@@ -14,6 +14,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 .map_err(|_| ProductionError::InvalidFactionCensus)?;
         self.faction_inventory = inventory;
         self.faction_roster = None;
+        self.faction_census_mode = true;
         Ok(())
     }
 
