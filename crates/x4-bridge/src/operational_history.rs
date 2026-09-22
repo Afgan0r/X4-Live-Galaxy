@@ -1,11 +1,10 @@
-use std::{
-    fs::{File, OpenOptions},
-    io::Write as _,
-    path::{Path, PathBuf},
-};
+use std::fs::File;
+use std::io::Write as _;
+use std::path::{Path, PathBuf};
 
 use crate::{DiagnosticError, diagnostics::escape, operational_status};
-
+#[path = "operational_history_sink.rs"]
+mod sink_io;
 const MAX_HISTORY_BYTES: usize = 64 * 1_024;
 const MAX_IDENTICAL_EVENTS: usize = 16;
 
@@ -34,7 +33,7 @@ impl OperationalHistory {
         let written = std::fs::metadata(&path).map_or(0, |value| {
             usize::try_from(value.len()).unwrap_or(usize::MAX)
         });
-        let sink = open_append(&path)?;
+        let sink = sink_io::open_append(&path)?;
         let mut history = Self {
             sink: Some(sink),
             path,
@@ -64,25 +63,22 @@ impl OperationalHistory {
             self.suppressed = self.suppressed.saturating_add(1);
             return self.record_status(state, reason);
         }
+        let recovered = self.reopen_sink();
+        if self.sink.is_none() {
+            return self.note_gap(state, reason);
+        }
+        if recovered && !self.write_recovery() {
+            return self.note_gap(state, reason);
+        }
         let line = self.event_line(state, reason);
         self.suppressed = 0;
         if self.written.saturating_add(line.len()) > MAX_HISTORY_BYTES && !self.rotate() {
             return self.note_gap(state, reason);
         }
-        let accepted = self
-            .sink
-            .as_mut()
-            .is_some_and(|sink| sink.write_all(line.as_bytes()).is_ok() && sink.flush().is_ok());
-        if !accepted {
+        if !self.write_line(&line) {
             return self.note_gap(state, reason);
         }
-        self.written = self.written.saturating_add(line.len());
         self.record_status(state, reason)
-    }
-
-    #[must_use]
-    pub const fn has_history_gap(&self) -> bool {
-        self.gaps > 0
     }
 
     #[must_use]
@@ -123,6 +119,28 @@ impl OperationalHistory {
     fn reset_duplicate_window(&mut self) {
         (self.last, self.repeated) = (None, 0);
     }
+    fn reopen_sink(&mut self) -> bool {
+        if self.sink.is_some() {
+            return false;
+        }
+        if let Ok(sink) = sink_io::open_append(&self.path) {
+            self.sink = Some(sink);
+        }
+        self.sink.is_some()
+    }
+    fn write_line(&mut self, line: &str) -> bool {
+        let accepted = sink_io::write_line(self.sink.as_mut(), line);
+        if accepted {
+            self.written = self.written.saturating_add(line.len());
+        }
+        accepted
+    }
+    fn write_recovery(&mut self) -> bool {
+        let marker = self.event_line("journal-recovered", "append-reopened");
+        let accepted = self.write_line(&marker);
+        self.emergency_reported = !accepted;
+        accepted
+    }
     fn event_line(&self, state: &str, reason: &str) -> String {
         format!(
             "{{\"clock\":\"unix-ms\",\"at\":{},\"component\":\"x4-bridge\",\"session\":\"{}\",\"epoch\":{},\"message\":\"{}\",\"section\":\"{}\",\"revision\":{},\"state\":\"{}\",\"reason\":\"{}\",\"suppressed_before\":{},\"status_gap_count\":{}}}\n",
@@ -140,20 +158,7 @@ impl OperationalHistory {
     }
 
     fn rotate(&mut self) -> bool {
-        self.sink = None;
-        let retained = self.path.with_extension("jsonl.1");
-        if retained.exists() && std::fs::remove_file(&retained).is_err() {
-            return false;
-        }
-        if self.path.exists() && std::fs::rename(&self.path, retained).is_err() {
-            return false;
-        }
-        let Ok(sink) = open_append(&self.path) else {
-            return false;
-        };
-        self.sink = Some(sink);
-        self.written = 0;
-        true
+        sink_io::rotate(&self.path, &mut self.sink, &mut self.written)
     }
 
     fn note_gap(&mut self, state: &str, reason: &str) -> bool {
@@ -185,14 +190,6 @@ impl OperationalHistory {
         }
         false
     }
-}
-
-fn open_append(path: &Path) -> Result<File, DiagnosticError> {
-    OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .map_err(|_| DiagnosticError::Storage)
 }
 
 #[cfg(test)]

@@ -16,7 +16,10 @@ fn repeated_events_rotate_with_bounded_gap_status() {
         let _ = history.record("waiting", "same");
     }
     assert!(history.suppressed > 0);
-    history.sink = None;
+    history.sink = Some(
+        std::fs::File::open(path.join("operational-history.jsonl"))
+            .expect("read-only failing sink"),
+    );
     assert!(!history.record("degraded", "forced-test-gap"));
     assert_eq!(history.history_gap_count(), 1);
     assert!(
@@ -73,7 +76,10 @@ fn duplicate_suppression_never_crosses_session_or_message_identity() {
 fn transient_history_sink_failure_recovers_with_an_honest_marker() {
     let path = std::env::temp_dir().join(format!("history-recovery-{}", std::process::id()));
     let mut history = OperationalHistory::open(&path).expect("history");
-    history.sink = None;
+    history.sink = Some(
+        std::fs::File::open(path.join("operational-history.jsonl"))
+            .expect("read-only failing sink"),
+    );
 
     assert!(!history.record("collection", "lost-during-gap"));
     assert!(history.record("collection", "persisted-after-reopen"));
@@ -84,7 +90,10 @@ fn transient_history_sink_failure_recovers_with_an_honest_marker() {
     assert!(events.contains("\"reason\":\"append-reopened\""));
     assert!(events.contains("\"reason\":\"persisted-after-reopen\""));
     assert_eq!(history.history_gap_count(), 1);
-    assert!(!history.emergency_reported, "recovery resets the emergency latch");
+    assert!(
+        !history.emergency_reported,
+        "recovery resets the emergency latch"
+    );
 
     let _ = std::fs::remove_dir_all(path);
 }
