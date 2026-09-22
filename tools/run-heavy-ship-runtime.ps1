@@ -313,7 +313,7 @@ $pmArgs = if ($useFrameViewSdk) { @('--test_case', '6') } else {
 }
 $pm = $null; $bridge = $null; $failure = $null
 try {
-    $bridgeArgs = @('--data-dir', $dataRoot, '--limits-file', $LimitsFile, '--ship-faction', 'argon')
+    $bridgeArgs = @('--data-dir', $dataRoot, '--limits-file', $LimitsFile)
     $bridge = Start-OwnedProcess -FilePath $BridgePath -Arguments $bridgeArgs `
         -StandardOutputPath $bridgeOut -StandardErrorPath $bridgeErr
     $started = [DateTime]::UtcNow; $offset = (Get-Item -LiteralPath $DebugLog).Length

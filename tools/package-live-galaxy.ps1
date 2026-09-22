@@ -169,13 +169,7 @@ function Write-Bundle([string]$Destination, [string]$LimitsPath, [bool]$Calibrat
             'Do not hot-replace the native image. Restart X4 after DLL, Lua, ABI, or contract changes.'
         ) -join [Environment]::NewLine
         if ($heavyProfile) {
-            $inventory = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
             Copy-Item -LiteralPath $inventoryPath -Destination (Join-Path $stage 'faction-source-inventory.json')
-            $factionArguments = @($inventory.entries | Where-Object {
-                $_.independent -eq $true -and $_.origin -in @('vanilla', 'dlc')
-            } | ForEach-Object { "--ship-faction $($_.id)" }) -join ' '
-            $startup = $startup.Replace('--limits-file carrier-b-limits.json.',
-                "--limits-file carrier-b-limits.json $factionArguments.")
             $startup += [Environment]::NewLine + 'PREPARED EXPERIMENT ONLY. All X4 runtime acceptance remains pending; obtain owner risk approval before game actions.'
         }
         [IO.File]::WriteAllText((Join-Path $stage 'STARTUP.txt'), $startup, [Text.UTF8Encoding]::new($false))

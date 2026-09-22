@@ -25,7 +25,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
     $script = Join-Path $Repo 'extensions/live_galaxy/tests/carrier_b_heavy_configured.lua'
     $readbackRows = @()
     try {
-        $bridge = Start-Owned (Join-Path $Repo 'target/release/x4-bridge.exe') @('--data-dir', $Data, '--limits-file', $Limits, '--ship-faction', 'argon') $Run
+        $bridge = Start-Owned (Join-Path $Repo 'target/release/x4-bridge.exe') @('--data-dir', $Data, '--limits-file', $Limits) $Run
         $modes = if ($Interleave) { @('first') } else { @('first', 'restart') }
         foreach ($mode in $modes) {
             $marker = if ($Interleave) { 'throughput-interleave' } elseif ($PerformanceGate) { 'performance' } elseif ($Throughput) { 'throughput' } else { '' }
@@ -91,7 +91,7 @@ function Invoke-HeavyInterruptedRestart([string]$Run, [string]$HostExecutable, [
     $script = Join-Path $Repo 'extensions/live_galaxy/tests/carrier_b_heavy_configured.lua'
     $bridge = $null; $producer = $null
     try {
-        $bridge = Start-Owned (Join-Path $Repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $Limits, '--ship-faction', 'argon') $Run
+        $bridge = Start-Owned (Join-Path $Repo 'target/release/x4-bridge.exe') @('--data-dir', $data, '--limits-file', $Limits) $Run
         foreach ($mode in @('baseline', "fail_$Family", 'restart')) {
             $producer = Start-Owned $HostExecutable @($Run, $script, $result, '', $mode) $Run $true
             $deadline = [DateTime]::UtcNow.AddMilliseconds((Get-Content -LiteralPath $Limits -Raw | ConvertFrom-Json).admission_window_millis)
