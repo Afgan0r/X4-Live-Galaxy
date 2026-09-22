@@ -106,6 +106,12 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   target-frame budget. Gate callback-normalized throughput against the recorded
   multi-process baseline and require zero final backlog. This local gate catches
   obvious frame killers but does not replace X4 plus FrameView acceptance.
+- Runtime evidence oracles must distinguish a configured terminal safety event
+  from an early or unexplained copy of the same diagnostic. For a finite
+  admission window, allow `admission_window_exhausted` only after measured
+  elapsed time reaches that configured window, at least one revision committed,
+  and the bridge recorded no rejected or failed outcome. Keep the same event a
+  failure before those conditions are proven.
 
 ## Lua Mutation Testing
 

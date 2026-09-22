@@ -24,14 +24,32 @@ function Get-RuntimeDiagnostics([string]$Text) {
         ForEach-Object { "$($_.Groups['event'].Value):$($_.Groups['detail'].Value)" })
 }
 
-function Get-RuntimeDiagnosticFailures([string[]]$Diagnostics) {
+function Get-RuntimeDiagnosticFailures(
+    [string[]]$Diagnostics,
+    [switch]$AllowAdmissionWindowExhausted
+) {
+    $allowed = @(
+        'transition:sampled',
+        'transition:core_changed',
+        'initialized:initialized'
+    )
+    if ($AllowAdmissionWindowExhausted) {
+        $allowed += 'transition:admission_window_exhausted'
+    }
     @($Diagnostics | Where-Object {
-        $_ -notin @(
-            'transition:sampled',
-            'transition:core_changed',
-            'initialized:initialized'
-        )
+        $_ -notin $allowed
     })
+}
+
+function Test-TerminalAdmissionWindow(
+    $ObservedAt,
+    [datetime]$Started,
+    [double]$WindowSeconds,
+    [int]$Commits,
+    [int]$RejectedOrFailed
+) {
+    $null -ne $ObservedAt -and ($ObservedAt - $Started).TotalSeconds -ge $WindowSeconds `
+        -and $Commits -gt 0 -and $RejectedOrFailed -eq 0
 }
 
 function Select-UniqueFrameRows([object[]]$Rows) {
@@ -144,6 +162,28 @@ function Invoke-SelfTest {
     if ($failures.Count -ne 1 -or $failures[0] -ne 'transition:unexpected') {
         throw 'HEAVY_RUNTIME_DIAGNOSTIC_FAILURE'
     }
+    $windowFailures = @(Get-RuntimeDiagnosticFailures @(
+        $diagnostics + 'transition:admission_window_exhausted'
+    ))
+    if ($windowFailures.Count -ne 1 -or
+        $windowFailures[0] -ne 'transition:admission_window_exhausted') {
+        throw 'HEAVY_RUNTIME_EARLY_ADMISSION_WINDOW_ACCEPTED'
+    }
+    $windowFailures = @(Get-RuntimeDiagnosticFailures @(
+        $diagnostics + 'transition:admission_window_exhausted'
+    ) -AllowAdmissionWindowExhausted)
+    if ($windowFailures.Count -ne 0) {
+        throw 'HEAVY_RUNTIME_TERMINAL_ADMISSION_WINDOW_REJECTED'
+    }
+    $started = [DateTime]'2026-01-01T00:00:00Z'
+    if (Test-TerminalAdmissionWindow $started.AddSeconds(59) $started 60 8 0) {
+        throw 'HEAVY_RUNTIME_EARLY_ADMISSION_WINDOW_ACCEPTED'
+    }
+    if (-not (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 8 0) -or
+        (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 0 0) -or
+        (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 8 1)) {
+        throw 'HEAVY_RUNTIME_TERMINAL_ADMISSION_WINDOW_GUARD'
+    }
     $frameRows = @(
         [pscustomobject]@{ ProcessId = '7'; SwapChainAddress = 'a'; QpcTime = '10'; MsBetweenPresents = '4'; MsBetweenDisplayChange = '4'; MsPCLatency = '0' }
         [pscustomobject]@{ ProcessId = '7'; SwapChainAddress = 'a'; QpcTime = '10'; MsBetweenPresents = '4'; MsBetweenDisplayChange = '4'; MsPCLatency = '0' }
@@ -254,6 +294,7 @@ try {
     $started = [DateTime]::UtcNow; $offset = (Get-Item -LiteralPath $DebugLog).Length
     $runSamples = [Collections.ArrayList]::new()
     $runtimeDiagnostics = [Collections.ArrayList]::new()
+    [Nullable[datetime]]$windowExhaustionObservedAt = $null
     $segment = 0
     do {
         $segment += 1
@@ -272,7 +313,13 @@ try {
         while (-not $pm.Process.HasExited) {
             Start-Sleep -Seconds 1; $pm.Process.Refresh(); $bridge.Process.Refresh()
             $read = Read-GameTimes $DebugLog $offset; $offset = $read.Offset; Add-GameSample $runSamples $read
-            foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
+            foreach ($diagnostic in $read.Diagnostics) {
+                [void]$runtimeDiagnostics.Add($diagnostic)
+                if ($diagnostic -eq 'transition:admission_window_exhausted' -and
+                    $null -eq $windowExhaustionObservedAt) {
+                    $windowExhaustionObservedAt = [DateTime]::UtcNow
+                }
+            }
             if ($bridge.Process.HasExited) { throw "HEAVY_RUNTIME_BRIDGE_EXITED:$($bridge.Process.ExitCode)" }
             if (([DateTime]::UtcNow - $started).TotalSeconds -gt $CaptureSeconds + 15) {
                 throw 'HEAVY_RUNTIME_CAPTURE_TIMEOUT'
@@ -289,7 +336,13 @@ try {
     }
     $read = Read-GameTimes $DebugLog $offset
     Add-GameSample $runSamples $read
-    foreach ($diagnostic in $read.Diagnostics) { [void]$runtimeDiagnostics.Add($diagnostic) }
+    foreach ($diagnostic in $read.Diagnostics) {
+        [void]$runtimeDiagnostics.Add($diagnostic)
+        if ($diagnostic -eq 'transition:admission_window_exhausted' -and
+            $null -eq $windowExhaustionObservedAt) {
+            $windowExhaustionObservedAt = [DateTime]::UtcNow
+        }
+    }
 } catch { $failure = $_ } finally {
     Complete-OwnedProcess $pm -Stop
     Complete-OwnedProcess $bridge -Stop
@@ -308,7 +361,13 @@ $history = Join-Path $dataRoot 'operational-history.jsonl'
 $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
 $bad = @($events | Where-Object { $_.state -in @('failed', 'rejected') }).Count
-$runtimeFailures = @(Get-RuntimeDiagnosticFailures $runtimeDiagnostics)
+$captureElapsed = ([DateTime]::UtcNow - $started).TotalSeconds
+$limits = Get-Content -LiteralPath $LimitsFile -Raw | ConvertFrom-Json
+$admissionWindowSeconds = [double]$limits.admission_window_millis / 1000
+$allowWindowExhaustion = Test-TerminalAdmissionWindow $windowExhaustionObservedAt $started `
+    $admissionWindowSeconds $commits $bad
+$runtimeFailures = @(Get-RuntimeDiagnosticFailures $runtimeDiagnostics `
+    -AllowAdmissionWindowExhausted:$allowWindowExhaustion)
 $coreChanged = @($runtimeDiagnostics | Where-Object { $_ -eq 'transition:core_changed' }).Count
 $gameFactor = Measure-GameFactor $runSamples
 $gameFactorSeconds = if ($runSamples.Count -gt 1) {
@@ -336,7 +395,7 @@ $result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); mo
     runtime_diagnostic_failure_details = @($runtimeFailures | Sort-Object -Unique)
     core_changed_transitions = $coreChanged
     game_time_factor = $gameFactor; game_time_sample_seconds = $gameFactorSeconds
-    capture_seconds = ([DateTime]::UtcNow - $started).TotalSeconds
+    capture_seconds = $captureElapsed
     frame_capture_backend = $(if ($useFrameViewSdk) { 'frameview-sdk' } else { 'presentmon' })
     frame_capture_segments = $csvFiles.Count }
 $result | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding utf8NoBOM

@@ -10,6 +10,9 @@
 - Added a no-X4 heavy performance gate derived from the 144 FPS target after the
   same regression showed that correctness and coarse watchdogs could not reject
   an obvious frame-budget violation before installation.
+- Required runtime oracles to conditionally classify terminal safety events
+  after a valid 60-second capture was rejected solely because its configured
+  admission window closed after eight successful commits.
 
 ## 2026-09-21
 
