@@ -59,3 +59,22 @@ fn zero_ship_faction_commits_partial_observation_without_known_empty_claim() {
         observation_domain::CompletionCoverage::Partial
     );
 }
+
+#[test]
+fn receiver_rejects_unvalidated_faction_authority() {
+    let database = carrier_b_support::database("ship-unvalidated-faction");
+    let mut receiver = ProductionObservationSession::open(
+        database.path(),
+        carrier_b_support::generation_limits(),
+        carrier_b_support::publication_limits(),
+        carrier_b_support::lifecycle_limits(),
+        4,
+    )
+    .expect("valid test fixture");
+    for faction in ["custom_mod", "visitor", "unresolved"] {
+        assert!(
+            receiver.select_ship_factions([faction]).is_err(),
+            "receiver must not derive authority from a syntactically valid token: {faction}"
+        );
+    }
+}
