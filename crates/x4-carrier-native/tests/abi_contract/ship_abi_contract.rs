@@ -21,6 +21,7 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
         ("game_loaded", SourceBoundary::GameLoaded),
         ("lua_reload", SourceBoundary::LuaReload),
         ("transport_reconnect", SourceBoundary::TransportReconnect),
+        ("heavy_profile", SourceBoundary::RuntimeStart),
     ] {
         let mut host = Host::start(mode);
         let mut peer = connect();
