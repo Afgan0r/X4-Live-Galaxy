@@ -55,10 +55,10 @@ pub(super) fn intent(key: &str) -> ControlBody {
         max_work: 129,
     })
 }
-pub(super) fn qualify(peer: &mut BridgePeer) -> observation_ingest::CarrierIdentity {
+pub(super) fn qualify(peer: &mut BridgePeer, key: &str) -> observation_ingest::CarrierIdentity {
     let identity = decode_carrier_bootstrap(&peer.receive(512).unwrap(), 512).unwrap();
     send(peer, &identity, super_handshake());
-    send(peer, &identity, intent("ship_core"));
+    send(peer, &identity, intent(key));
     send(
         peer,
         &identity,

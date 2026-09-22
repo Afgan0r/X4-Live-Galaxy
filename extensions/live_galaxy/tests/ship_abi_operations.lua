@@ -64,6 +64,7 @@ local begin = { section_key = "ship_core", expected_records = 1, capture_start_m
     capture_clock = "game_time_millis", quality = "unknown", availability = "available",
     coverage = "partial", consistency = "observed_count_fill_only", stable_identity = true,
     source_epoch_status = "boundary_uncertain", source_boundary = boundary }
+if heavy then begin.section_key = "ship_cargo:g0" end
 if mode == "incompatible" then
     await(function(control) return control == 10 end)
     assert(carrier:begin_section(begin) ~= 0)
@@ -72,7 +73,7 @@ if mode == "incompatible" then
     assert(carrier:close() == 0)
 else
     local status = await(function(_, _, status) return status and status.capacity:match("^available:") end)
-    assert(status.selection == "ship_core" and status.remaining_capacity == "129")
+    assert(status.selection == begin.section_key and status.remaining_capacity == "129")
     for key in pairs(begin) do
         local bad = copy(begin); bad[key] = nil
         assert(carrier:begin_section(bad) == -20, "missing begin key " .. key)
@@ -85,6 +86,15 @@ else
         identity = "9007199254740993", owner = "argon", type = "destroyer_macro",
         class = "destroyer", location = "sector:1", consistency = "consistent",
         consistency_reason = "none" }
+    if heavy then
+        record = { profile = "ship_cargo", source_scope = "x4:faction:argon:ships",
+            identity = "9007199254740993", owner = "argon", core_revision = "1",
+            member_revision = "1", policy_version = 2, capture_start_millis = "12",
+            capture_end_millis = "13",
+            source_evidence = "x4-9.00-steam-23660954-ship-detail-source-v1",
+            consistency = "consistent", consistency_reason = "none",
+            wares_outcome = "empty", storage_outcome = "empty", wares = {}, storage = {} }
+    end
     for key in pairs(record) do
         local bad = copy(record); bad[key] = nil
         assert(carrier:push_record(bad) == -20, "missing ship key " .. key)
@@ -107,6 +117,14 @@ else
     extra = copy(record); extra.extra = true
     assert(carrier:push_record(extra) == -20)
     assert(carrier:push_record(setmetatable(copy(record), {})) == -20)
+    if heavy then
+        local over_bound = copy(record); over_bound.wares, over_bound.wares_outcome = {}, "value"
+        for index = 1, 18 do
+            over_bound.wares[index] = { ware = "energycells", amount_items = index }
+        end
+        assert(carrier:push_record(over_bound) == -20,
+            "configured max_inner_records must reject the eighteenth item")
+    end
     assert(carrier:push_record(record) == 0)
     for key in pairs(record) do record[key] = "mutated-after-success" end
     local finish = { capture_end_millis = "13", success = true, quality = "unknown",
@@ -122,7 +140,11 @@ else
     assert(carrier:finish_section(finish) == 0)
     finish.capture_end_millis = "999"
     await(function(control) return control == 5 end)
-    require("extensions.live_galaxy.tests.ship_abi_lifecycle")(
-        module, api, carrier, loadlib, original_limits, original_source, boundary)
+    if heavy then
+        assert(carrier:close() == 0)
+    else
+        require("extensions.live_galaxy.tests.ship_abi_lifecycle")(
+            module, api, carrier, loadlib, original_limits, original_source, boundary)
+    end
 end
 local file = assert(io.open(result_path, "wb")); assert(file:write("SHIP_ABI_PASS")); assert(file:close())

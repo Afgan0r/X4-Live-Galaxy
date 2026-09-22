@@ -25,7 +25,12 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
     ] {
         let mut host = Host::start(mode);
         let mut peer = connect();
-        let identity = qualify(&mut peer);
+        let key = if mode == "heavy_profile" {
+            "ship_cargo:g0"
+        } else {
+            "ship_core"
+        };
+        let identity = qualify(&mut peer, key);
         let CompleteMessage::SectionStart(start) = receive(&mut peer, &identity, "received") else {
             panic!("start");
         };
@@ -41,7 +46,7 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
             panic!("batch");
         };
         if mode == "heavy_profile" {
-            assert!(batch.records[0].content.contains("wares_outcome=observed"));
+            assert!(batch.records[0].content.contains("wares_outcome=empty"));
         } else {
             assert_eq!(
                 batch.records[0].content,
@@ -58,6 +63,10 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
             SourceEpochStatus::BoundaryUncertain
         );
         assert_eq!(done.record_count, 1);
+        if mode == "heavy_profile" {
+            host.finish();
+            continue;
+        }
         send(
             &mut peer,
             &identity,
@@ -67,7 +76,7 @@ fn registered_dll_ship_operations_copy_strict_tables_and_preserve_boundary_evide
         drop(peer);
         host.release_peer();
         let mut replacement = connect();
-        let fresh_identity = qualify(&mut replacement);
+        let fresh_identity = qualify(&mut replacement, "ship_core");
         assert_ne!(fresh_identity, identity);
         let CompleteMessage::SectionStart(fresh_start) =
             receive(&mut replacement, &fresh_identity, "received")
