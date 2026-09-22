@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-22
+
+- Required FrameView SDK metric deduplication by process, swap chain, and QPC
+  after a Phase 05.5 capture repeated identical per-frame events 8--10 times.
+
 ## 2026-09-21
 
 - Extended the per-record churn oracle to the core census after an in-game

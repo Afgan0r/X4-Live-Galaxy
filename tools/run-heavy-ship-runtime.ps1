@@ -34,6 +34,22 @@ function Get-RuntimeDiagnosticFailures([string[]]$Diagnostics) {
     })
 }
 
+function Select-UniqueFrameRows([object[]]$Rows) {
+    $seen = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    $unique = [Collections.Generic.List[object]]::new()
+    foreach ($row in $Rows) {
+        $key = "$($row.ProcessId)|$($row.SwapChainAddress)|$($row.QpcTime)"
+        $metrics = "$($row.MsBetweenPresents)|$($row.MsBetweenDisplayChange)|$($row.MsPCLatency)"
+        if ($seen.ContainsKey($key)) {
+            if ($seen[$key] -cne $metrics) { throw 'HEAVY_RUNTIME_FRAME_IDENTITY_CONFLICT' }
+        } else {
+            $seen.Add($key, $metrics)
+            $unique.Add($row)
+        }
+    }
+    @($unique)
+}
+
 function Read-GameTimes([string]$Path, [long]$Offset) {
     $stream = [System.IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
     try {
@@ -128,6 +144,17 @@ function Invoke-SelfTest {
     if ($failures.Count -ne 1 -or $failures[0] -ne 'transition:unexpected') {
         throw 'HEAVY_RUNTIME_DIAGNOSTIC_FAILURE'
     }
+    $frameRows = @(
+        [pscustomobject]@{ ProcessId = '7'; SwapChainAddress = 'a'; QpcTime = '10'; MsBetweenPresents = '4'; MsBetweenDisplayChange = '4'; MsPCLatency = '0' }
+        [pscustomobject]@{ ProcessId = '7'; SwapChainAddress = 'a'; QpcTime = '10'; MsBetweenPresents = '4'; MsBetweenDisplayChange = '4'; MsPCLatency = '0' }
+        [pscustomobject]@{ ProcessId = '7'; SwapChainAddress = 'a'; QpcTime = '11'; MsBetweenPresents = '5'; MsBetweenDisplayChange = '5'; MsPCLatency = '0' }
+    )
+    if (@(Select-UniqueFrameRows $frameRows).Count -ne 2) {
+        throw 'HEAVY_RUNTIME_FRAME_DEDUPLICATION'
+    }
+    $frameRows[1].MsBetweenPresents = '6'
+    try { Select-UniqueFrameRows $frameRows; throw 'HEAVY_RUNTIME_FRAME_CONFLICT_MISSED' }
+    catch { if ($_.Exception.Message -ne 'HEAVY_RUNTIME_FRAME_IDENTITY_CONFLICT') { throw } }
     $samples = [Collections.ArrayList]::new()
     [void]$samples.Add([pscustomobject]@{ Wall = [DateTime]'2026-01-01T00:00:00Z'; Game = 10.0 })
     [void]$samples.Add([pscustomobject]@{ Wall = [DateTime]'2026-01-01T00:00:10Z'; Game = 72.0 })
@@ -273,9 +300,10 @@ $csvFiles = if ($useFrameViewSdk) {
     @(Get-ChildItem -LiteralPath $captureRoot -Filter 'FvSDKPerFrameStreamDataT*.csv' -File |
         Sort-Object Name | ForEach-Object { $_.FullName })
 } else { @($csv) }
-$rows = @($csvFiles | ForEach-Object { Import-Csv -LiteralPath $_ } |
+$rawRows = @($csvFiles | ForEach-Object { Import-Csv -LiteralPath $_ } |
     Where-Object { $_.MsBetweenPresents -ne 'NA' -and
         (-not $useFrameViewSdk -or $_.ProcessId -eq [string]$X4ProcessId) })
+$rows = if ($useFrameViewSdk) { @(Select-UniqueFrameRows $rawRows) } else { $rawRows }
 $history = Join-Path $dataRoot 'operational-history.jsonl'
 $events = @(Get-Content -LiteralPath $history | ForEach-Object { $_ | ConvertFrom-Json })
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
@@ -301,6 +329,7 @@ if ($Mode -eq 'Seta') {
 }
 $result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); mode = $Mode.ToLowerInvariant()
     run_id = $runId; capture_id = $captureId; x4_process_id = $X4ProcessId; frames = $rows.Count
+    raw_frame_rows = $rawRows.Count; duplicate_frame_rows = $rawRows.Count - $rows.Count
     average_fps = $(if ($averageFrame -gt 0) { 1000 / $averageFrame } else { 0 }); commits = $commits
     rejected_or_failed = $bad; lost_presentmon_events = $lostEvents
     runtime_diagnostic_failures = $runtimeFailures.Count

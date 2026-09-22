@@ -88,6 +88,10 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   durable commit, polling/waits, payload bytes, and cycle count separately. A
   fixture wall clock is correctness evidence unless its component timings and
   workload are comparable to the runtime path.
+- FrameView SDK per-frame streams can repeat an identical event several times.
+  Preserve raw row counts, but deduplicate metric input by process, swap chain,
+  and QPC timestamp. Verify duplicate groups have identical metric fields before
+  treating this as transport duplication rather than distinct presents.
 
 ## Lua Mutation Testing
 

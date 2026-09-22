@@ -700,3 +700,19 @@ All 29 package entries and all 26 installed extension files matched their
 expected digests. The prior installation is retained in owner-only rollback
 artifact `05.5-65dbea0-20260921-230425-23f2915e`; locator SHA-256:
 `616b1760f1ff22a71a3e66aadf0c4cbc1ff9fecff5038ab9e8c6cd8860e4d920`.
+
+## FrameView SDK deduplication and failed normal-time gate
+
+FrameView SDK repeated exact events in its per-frame stream. Metric input must
+be deduplicated by process ID, swap-chain address, and QPC timestamp while raw
+row and duplicate counts remain visible. Run
+`055-gate-a-normal-20260922-122441` contained 59,755 raw X4 rows but 7,050 unique
+frames.
+
+The bridge path committed 34 sections with no rejection or runtime diagnostic
+failure, but measured 121.984 average FPS, 25.400 ms p99 and 552.879 ms maximum
+frame time. A same-session 30-second control after bridge shutdown measured
+264.387 average FPS, 6.084 ms p99 and 43.845 ms maximum, with no frame at least
+50 ms. X4 separately reported a 277 ms source callback. This is a normal-time
+Gate-A failure and activates the accepted chunked-work fallback; do not proceed
+to SETA until replacement normal-time evidence passes.
