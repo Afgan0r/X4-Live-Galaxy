@@ -116,7 +116,8 @@ fn transient_history_sink_failure_recovers_with_an_honest_marker() {
 
 #[test]
 fn identical_suppressed_event_reopens_recovered_history_sink() {
-    let path = std::env::temp_dir().join(format!("history-identical-recovery-{}", std::process::id()));
+    let path =
+        std::env::temp_dir().join(format!("history-identical-recovery-{}", std::process::id()));
     let mut history = OperationalHistory::open(&path).expect("history");
     for _ in 1..MAX_IDENTICAL_EVENTS {
         assert!(history.record("waiting", "same-event"));

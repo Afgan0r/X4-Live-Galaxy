@@ -63,16 +63,16 @@ impl OperationalHistory {
 
     #[must_use]
     pub fn record(&mut self, state: &str, reason: &str) -> bool {
-        if self.is_suppressed(state, reason) {
-            self.suppressed = self.suppressed.saturating_add(1);
-            return self.record_status(state, reason);
-        }
         let recovered = self.reopen_sink();
         if self.sink.is_none() {
             return self.note_gap(state, reason);
         }
         if recovered && !self.write_recovery() {
             return self.note_gap(state, reason);
+        }
+        if self.is_suppressed(state, reason) {
+            self.suppressed = self.suppressed.saturating_add(1);
+            return self.record_status(state, reason);
         }
         let line = self.event_line(state, reason);
         self.suppressed = 0;
@@ -167,6 +167,7 @@ impl OperationalHistory {
             self.suppressed,
             self.status_gaps,
         ) {
+            self.status_emergency_reported = false;
             return true;
         }
         self.status_gaps = self.status_gaps.saturating_add(1);
