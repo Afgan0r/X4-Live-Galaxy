@@ -14,6 +14,7 @@ pub struct RunSummary {
     pub incarnation: String,
     pub completions: BTreeMap<String, Vec<u64>>,
     pub blocked_skips: usize,
+    pub closure_blocked: bool,
 }
 
 pub fn serve(
@@ -22,6 +23,7 @@ pub fn serve(
     rotations: usize,
     block_scaleplate_once: bool,
 ) -> Result<RunSummary> {
+    receiver.refresh_faction_census();
     let (mut peer, identity) = qualify(receiver, profile)?;
     let mut key = receiver.collection_key();
     let mut completions = BTreeMap::<String, Vec<u64>>::new();
@@ -50,7 +52,7 @@ pub fn serve(
             )?;
             blocked_skips = 1;
         }
-        if next == "ship_core:argon"
+        if next.starts_with("ship_core:")
             && ["argon", "scaleplate", "xenon", "khaak"]
                 .iter()
                 .all(|faction| cores.get(*faction).copied().unwrap_or(0) >= rotations)
@@ -66,6 +68,7 @@ pub fn serve(
         incarnation: identity.producer_incarnation,
         completions,
         blocked_skips,
+        closure_blocked: receiver.faction_census_blocks_closure(),
     })
 }
 

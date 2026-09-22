@@ -74,6 +74,15 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .is_none_or(observation_domain::FactionObservationRoster::has_unknown_blocker)
     }
 
+    pub fn refresh_faction_census(&mut self) {
+        self.faction_roster = None;
+        self.ship_scope = None;
+        self.ship_scopes.clear();
+        self.ship_scope_index = 0;
+        self.ship_timing.clear();
+        self.last_received = None;
+    }
+
     fn validate_included_faction(&self, faction: &str) -> Result<(), ProductionError> {
         self.faction_roster
             .as_ref()

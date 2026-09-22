@@ -82,6 +82,9 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         }
         // Scan actual durable section identities, not the resource envelope.
         // This also preserves old groups after a smaller replacement census.
+        let census_floor = self.next_revision(
+            &SectionKey::new("faction_census").ok_or(ProductionError::InvalidLimits)?,
+        )?;
         self.lifecycle
             .current_snapshot()
             .map_err(|_| ProductionError::Storage)?
@@ -90,7 +93,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 observation_domain::ShipSectionIdentity::parse(v.revision().section_key.as_str())
                     .is_some()
             })
-            .try_fold(1, |floor, v| {
+            .try_fold(census_floor, |floor, v| {
                 let next = v
                     .receipt()
                     .revision

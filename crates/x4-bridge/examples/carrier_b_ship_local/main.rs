@@ -27,7 +27,11 @@ fn main() -> Result<()> {
         return Err("expected root host script data scenario [limits]".into());
     };
     let database = data.join("observations.sqlite3");
-    let receiver = session(&database)?;
+    let receiver = if scenario == Path::new("heavy-ship-full-set") {
+        session(&database)?
+    } else {
+        selected_session(&database)?
+    };
     if scenario == Path::new("heavy-ship-full-set") {
         return scenarios::run_full_set(root, host, script, data, rest, &database, receiver);
     }
@@ -51,7 +55,7 @@ fn run_core(
     first.finish()?;
     drop(receiver);
     readback::verify(database, &[1, 2], &completion1.1)?;
-    let mut receiver = session(database)?;
+    let mut receiver = selected_session(database)?;
     if receiver
         .next_revision(&key)
         .map_err(|e| format!("floor:{e:?}"))?
@@ -62,7 +66,7 @@ fn run_core(
     peer::replay(&mut receiver, &completion1)?;
     drop(receiver);
     readback::verify(database, &[1, 2], &completion1.1)?;
-    let mut receiver = session(database)?;
+    let mut receiver = selected_session(database)?;
     let mut second = Host::start(root, host, script, data, "heavy-ship-restart")?;
     let (identity2, completion2) = peer::serve(&mut receiver, 1, true)?;
     second.finish()?;
@@ -83,14 +87,29 @@ fn session(database: &Path) -> Result<ProductionObservationSession> {
     let candidate =
         CandidateLimits::new(65536, 16, 16, 65536, 5000, 5000).ok_or("candidate limits")?;
     let aggregate = AggregateLimits::new(2, 131_072, 32, 32, 131_072).ok_or("aggregate limits")?;
-    let mut session = ProductionObservationSession::open(
+    ProductionObservationSession::open(
         database,
         GenerationLimits::bounded(candidate, aggregate),
         publication_limits()?,
         LifecycleLimits::new(4096, 262_144, 262_144, 2).ok_or("lifecycle limits")?,
         4,
     )
-    .map_err(|e| format!("session:{e:?}"))?;
+    .map_err(|e| format!("session:{e:?}").into())
+}
+
+fn selected_session(database: &Path) -> Result<ProductionObservationSession> {
+    let mut session = session(database)?;
+    let inventory = [observation_domain::FactionOriginEvidence::new(
+        "argon",
+        observation_domain::FactionOrigin::Vanilla,
+        Some(true),
+        true,
+        "local-fixture",
+    )
+    .map_err(|error| format!("inventory:{error:?}"))?];
+    session
+        .accept_faction_census(1, ["argon"], &inventory)
+        .map_err(|error| format!("census:{error:?}"))?;
     session
         .select_ship_core("argon")
         .map_err(|e| format!("selection:{e:?}"))?;

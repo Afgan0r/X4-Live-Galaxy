@@ -65,8 +65,9 @@ end
 local function drive_census(self, context, carrier, status)
     local txn = self.census_txn
     if not txn then
+        local revision = tonumber(status.collection_revision)
         local roster, err = factions.capture(self.api, self.options.faction_inventory or {},
-            self.discovery_revision or 1, { max_factions = math.floor(self.limits.max_allocation_bytes / 8),
+            revision, { max_factions = math.floor(self.limits.max_allocation_bytes / 8),
                 max_allocation_bytes = self.limits.max_allocation_bytes, pointer_bytes = 8 })
         if not roster then return discard(self, carrier, err, status) end
         local begin, begin_error = self.clock:begin_evidence()

@@ -23,7 +23,10 @@ pub fn run_full_set(
     let mut second = Host::start(root, host, script, data, "heavy-ship-full-set-restart")?;
     let second_run = full_set_peer::serve(&mut receiver, &profile, 2, false)?;
     second.finish()?;
-    if first_run.incarnation == second_run.incarnation || first_run.blocked_skips != 1 {
+    if first_run.incarnation == second_run.incarnation
+        || first_run.blocked_skips != 1
+        || !first_run.closure_blocked
+    {
         return Err("full-set restart or blocked-scope recovery missing".into());
     }
     let mut completions = first_run.completions;
@@ -34,25 +37,51 @@ pub fn run_full_set(
     full_set_readback::verify(database, &completions)?;
     writeln!(
         std::io::stdout(),
-        "PASS heavy-ship-full-set actual_native=true factions=4 zero_ship=xenon blocked_recovery=1 rotations=3 restart=true earlier_current=true unknown_blocker=false"
+        "PASS heavy-ship-full-set actual_native=true factions=4 zero_ship=xenon blocked_recovery=1 rotations=3 restart=true earlier_current=true unknown_blocker={} ",
+        first_run.closure_blocked
     )?;
     Ok(())
 }
 
 fn full_set_inventory() -> Result<Vec<observation_domain::FactionOriginEvidence>> {
-    ["argon", "scaleplate", "xenon", "khaak"]
-        .into_iter()
-        .map(|id| {
-            observation_domain::FactionOriginEvidence::new(
-                id,
-                observation_domain::FactionOrigin::Vanilla,
-                Some(true),
-                matches!(id, "argon" | "scaleplate"),
-                "heavy-full-set-fixture",
-            )
+    [
+        (
+            "argon",
+            observation_domain::FactionOrigin::Vanilla,
+            true,
+            true,
+        ),
+        (
+            "scaleplate",
+            observation_domain::FactionOrigin::Vanilla,
+            true,
+            false,
+        ),
+        (
+            "xenon",
+            observation_domain::FactionOrigin::Vanilla,
+            true,
+            false,
+        ),
+        (
+            "khaak",
+            observation_domain::FactionOrigin::Vanilla,
+            true,
+            false,
+        ),
+        (
+            "player",
+            observation_domain::FactionOrigin::Player,
+            false,
+            false,
+        ),
+    ]
+    .into_iter()
+    .map(|(id, origin, independent, mind)| {
+        observation_domain::FactionOriginEvidence::new(id, origin, Some(independent), mind, "base")
             .map_err(|error| format!("faction inventory:{error:?}").into())
-        })
-        .collect()
+    })
+    .collect()
 }
 
 pub fn run_detail(

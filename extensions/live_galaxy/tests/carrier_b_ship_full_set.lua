@@ -113,8 +113,9 @@ local adapter = {
 }
 assert(require("live_galaxy.lua.live_galaxy_ship_selection").attach(adapter, config.observation))
 local context = { source_boundary = "runtime_start", source_epoch_status = "unknown" }
-local target = mode == "heavy-ship-full-set-restart" and 26 or 10
+local target = mode == "heavy-ship-full-set-restart" and 27 or 11
 local committed, deadline = 0, host_monotonic_millis() + 30000
+local closure_blocked
 while committed < target do
     local _, status = carrier:progress(1)
     local control = carrier:poll_control()
@@ -122,6 +123,7 @@ while committed < target do
     if control == 5 then committed = committed + 1 end
     if status and status.capacity:match("^available:") then
         local result = adapter:advance(context, carrier, status)
+        if result.unknown_blocker ~= nil then closure_blocked = result.unknown_blocker end
         assert(result.disposition == "collecting" or result.disposition == "sampled"
             or result.disposition == "producer_busy" or result.disposition == "clock_unavailable",
             result.disposition .. ":" .. tostring(result.rejection and result.rejection.native_code))
@@ -130,6 +132,7 @@ while committed < target do
     host_sleep(1)
 end
 local file = assert(io.open(result_path, "wb"))
-assert(file:write(string.format("return {committed=%d,unknown_blocker=true}", committed)))
+assert(file:write(string.format("return {committed=%d,unknown_blocker=%s}",
+    committed, tostring(closure_blocked == true))))
 assert(file:close())
 assert(carrier:close() == 0)
