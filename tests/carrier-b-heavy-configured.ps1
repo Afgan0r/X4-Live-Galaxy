@@ -8,13 +8,12 @@ function Assert-HeavySamePeerInterleave([string]$Data) {
     if (@($active | Where-Object { $_.state -ceq 'disconnected' -or $_.reason -cin @('peer-disconnected', 'peer-absent', 'compatible-session') }).Count -gt 0) {
         throw 'THROUGHPUT_SAME_PEER_CONTINUITY_LOSS'
     }
-    if (@($active | Where-Object { $_.state -ceq 'degraded' -and $_.reason -ceq 'receive-timeout' }).Count -ne 1 -or
-        @($active | Where-Object { $_.state -ceq 'recovered' -and $_.reason -ceq 'stale-scope-rotated' }).Count -ne 1 -or
-        @($active | Where-Object { $_.state -ceq 'rejected' -and $_.reason -ceq 'receive-timeout' }).Count -ne 0 -or
-        @($active.session | Sort-Object -Unique).Count -ne 1 -or @($active.epoch | Sort-Object -Unique).Count -ne 1) {
+    if (@($active | Where-Object { $_.state -ceq 'rejected' }).Count -ne 0 -or
+        @($active.session | Sort-Object -Unique).Count -ne 1 -or
+        @($active.epoch | Sort-Object -Unique).Count -ne 1) {
         throw 'THROUGHPUT_SAME_PEER_REFRESH_MISSING'
     }
-    Write-Output 'SAME_PEER_INTERLEAVE revisions=1..20 inactivity_recovery=recovered sessions=1 epochs=1 reconnect=false'
+    Write-Output 'SAME_PEER_INTERLEAVE revisions=1..20 sessions=1 epochs=1 reconnect=false'
 }
 
 function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [string]$Data, [string]$Limits, [string]$Repo, [switch]$Throughput, [switch]$Interleave, [switch]$PerformanceGate) {

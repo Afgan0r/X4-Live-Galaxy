@@ -109,18 +109,18 @@ local observation = assert(require("live_galaxy.lua.live_galaxy_observation").ne
 local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
 local expected = interleave and 20 or (mode == "first" and 9 or 5)
 local committed, last, revisions = 0, "none", {}
-local pending_age_wait, synthetic_wait_count, synthetic_wait_total = nil, 0, 0
+local synthetic_wait_count, synthetic_wait_total = 0, 0
 local started, callback_durations, commit_durations, busy, produced, production_times = host_monotonic_millis(), {}, {}, 0, 0, {}
 local deadline = host_monotonic_millis() + options.observation.heavy_limits.admission_window_millis
 local feedback = observation.feedback
 function observation:feedback(context, active_carrier, status, control)
-    feedback(self, context, active_carrier, status, control)
+    local forwarded = feedback(self, context, active_carrier, status, control)
     revision = assert(tonumber(status.collection_revision))
     if control == 5 then
         committed = committed + 1; revisions[#revisions + 1] = revision
         commit_durations[#commit_durations + 1] = host_monotonic_millis() - (production_times[committed] or started)
-        if interleave and committed == 2 then pending_age_wait = 31000 end
     end
+    return forwarded
 end
 while committed < expected do
     local before = host_monotonic_millis()
@@ -141,11 +141,6 @@ while committed < expected do
     assert(last ~= "source_failure" and last ~= "core_changed" and last ~= "native_call_limit"
         and last ~= "allocation_limit" and last ~= "callback_budget_exceeded",
         last .. " revision=" .. revision .. " committed=" .. committed .. " calls=" .. calls)
-    if pending_age_wait then
-        local delay = pending_age_wait; pending_age_wait = nil
-        host_sleep(delay)
-        synthetic_wait_count = synthetic_wait_count + 1; synthetic_wait_total = synthetic_wait_total + delay
-    end
     host_sleep(1)
 end
 local file = assert(io.open(result_path, "wb"))

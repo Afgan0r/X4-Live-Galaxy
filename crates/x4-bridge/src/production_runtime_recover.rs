@@ -25,13 +25,15 @@ pub fn receive(
     history: &mut OperationalHistory,
     session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
-    recovery: RecoveryState<'_>,
+    mut recovery: RecoveryState<'_>,
 ) -> Result<Option<Vec<u8>>, ProgressError> {
     match await_progress(peer, limits, history, session, recovery.progress) {
         Ok(bytes) => Ok(Some(bytes)),
-        Err(ProgressError::Timeout)
-            if recover_idle(peer, identity, limits, session, schedule, recovery) =>
-        {
+        Err(ProgressError::Timeout) => {
+            recovery.monotonic_millis = crate::production_runtime::now();
+            if !recover_idle(peer, identity, limits, session, schedule, recovery) {
+                return Err(ProgressError::Timeout);
+            }
             let _ = history.record("recovered", "stale-scope-rotated");
             Ok(None)
         }
