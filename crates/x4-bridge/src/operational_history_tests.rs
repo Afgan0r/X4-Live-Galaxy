@@ -73,6 +73,21 @@ fn duplicate_suppression_never_crosses_session_or_message_identity() {
 }
 
 #[test]
+fn scoped_failures_keep_distinct_bounded_correlation() {
+    let path = std::env::temp_dir().join(format!("history-scopes-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    history.bind_message("attempt-1", "ship_core:argon", 7);
+    assert!(history.record("rejected", "receive-timeout"));
+    history.bind_message("attempt-2", "ship_core:teladi", 7);
+    assert!(history.record("rejected", "receive-timeout"));
+    let events = std::fs::read_to_string(path.join("operational-history.jsonl")).expect("history");
+    assert!(events.contains("\"scope\":\"x4:faction:argon:ships\""));
+    assert!(events.contains("\"scope\":\"x4:faction:teladi:ships\""));
+    assert!(events.contains("\"attempt\":1,\"outcome\":\"rejected\""));
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn transient_history_sink_failure_recovers_with_an_honest_marker() {
     let path = std::env::temp_dir().join(format!("history-recovery-{}", std::process::id()));
     let mut history = OperationalHistory::open(&path).expect("history");
