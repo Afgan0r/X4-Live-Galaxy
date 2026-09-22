@@ -20,19 +20,28 @@ if throughput then
     end
 end
 local revision, calls = 1, 0
+local discovered_factions = interleave and { "argon", "teladi" } or { "argon" }
+local active_faction = "argon"
 local function called() calls = calls + 1 end
 local function stop(family)
     if mode == "fail_" .. family then error("fixture_source_stop", 0) end
 end
 local source = {
-    list_factions = function() called(); return { "argon" } end,
-    count_ships = function() called(); return population end,
+    list_factions = function() called(); return discovered_factions end,
+    count_factions = function() called(); return #discovered_factions end,
+    new_faction_buffer = function() return {} end,
+    fill_factions = function(_, buffer)
+        called(); for index, faction in ipairs(discovered_factions) do buffer[index - 1] = faction end
+        return #discovered_factions
+    end,
+    faction_string = function(_, value) return value end,
+    count_ships = function(_, faction) called(); active_faction = faction; return population end,
     new_buffer = function() return {} end,
     fill_ships = function(_, buffer)
         called(); for i = 0, population - 1 do buffer[i] = "900719925474" .. string.format("%04d", i + 993) end
         return population
     end,
-    read_core = function(_, identity) called(); stop("core"); return { identity = identity, owner = "argon",
+    read_core = function(_, identity) called(); stop("core"); return { identity = identity, owner = active_faction,
         type = "destroyer_macro", class = "destroyer", location = "sector:1" } end,
     cargo_wares = function()
         called(); if not throughput then return { ore = revision } end
@@ -98,7 +107,7 @@ options.observation.getter = function() error("clock sample must not run in ship
 options.observation.clock_getter = function() return host_monotonic_millis() / 1000 end
 local observation = assert(require("live_galaxy.lua.live_galaxy_observation").new(options.observation))
 local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
-local expected = interleave and 19 or (mode == "first" and 8 or 4)
+local expected = interleave and 20 or (mode == "first" and 9 or 5)
 local committed, last, revisions = 0, "none", {}
 local pending_age_wait, synthetic_wait_count, synthetic_wait_total = nil, 0, 0
 local started, callback_durations, commit_durations, busy, produced, production_times = host_monotonic_millis(), {}, {}, 0, 0, {}
@@ -110,7 +119,7 @@ function observation:feedback(context, active_carrier, status, control)
     if control == 5 then
         committed = committed + 1; revisions[#revisions + 1] = revision
         commit_durations[#commit_durations + 1] = host_monotonic_millis() - (production_times[committed] or started)
-        if interleave and (committed == 2 or committed == 3) then pending_age_wait = 16000 end
+        if interleave and committed == 2 then pending_age_wait = 31000 end
     end
 end
 while committed < expected do

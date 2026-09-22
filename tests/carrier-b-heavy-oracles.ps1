@@ -6,13 +6,13 @@ function Assert-HeavyCapturedTrace([object[]]$Trace, [int[]]$Expected) {
     $expectedFamily = 'ship_cargo'
     $completedAfterReplacement = $false
     foreach ($row in $Trace) {
-        if ($row.key -ceq 'ship_core') {
+        if ($row.key -like 'ship_core:*') {
             if ($null -ne $core) { $replacement = $true }
             $core = $row.value
             $expectedFamily = 'ship_cargo'
             continue
         }
-        $family = ($row.key -split ':g')[0]
+        $family = ($row.key -split ':')[0]
         if ($family -cne $expectedFamily) { throw 'THROUGHPUT_CURSOR_RESUME_LOSS' }
         if ($null -eq $core -or $row.value.records.Count -ne $core.records.Count) {
             throw 'THROUGHPUT_FULL_GROUP_COUNT_MISMATCH'

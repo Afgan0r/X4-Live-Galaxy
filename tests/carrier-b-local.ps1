@@ -211,7 +211,9 @@ if ($Scenario -eq 'heavy-ship-recovery') {
     & (Join-Path $repo 'target/release/validate_limits.exe') --limits-file $limits
     if ($LASTEXITCODE -ne 0) { throw 'HEAVY_PROFILE_REJECTED' }
     . (Join-Path $repo 'tools/carrier-b-package-contract.ps1')
-    if (-not (Write-HeavyProfileLua (Get-Content -LiteralPath $limits -Raw) (Join-Path $run 'extensions/live_galaxy/lua/live_galaxy_config.lua'))) {
+    $inventory = Join-Path $repo 'config/faction-source-inventory.json'
+    Copy-Item -LiteralPath $inventory -Destination (Join-Path $run 'faction-source-inventory.json')
+    if (-not (Write-HeavyProfileLua (Get-Content -LiteralPath $limits -Raw) (Join-Path $run 'extensions/live_galaxy/lua/live_galaxy_config.lua') $inventory)) {
         throw 'HEAVY_PROFILE_REQUIRED'
     }
     . (Join-Path $repo 'tests/carrier-b-heavy-configured.ps1')

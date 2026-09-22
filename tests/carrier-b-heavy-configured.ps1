@@ -2,17 +2,19 @@ function Assert-HeavySamePeerInterleave([string]$Data) {
     $events = @(Get-ChildItem -LiteralPath $Data -File | Where-Object { $_.Name -like 'operational-history.jsonl*' } |
         ForEach-Object { Get-Content -LiteralPath $_.FullName | ForEach-Object { $_ | ConvertFrom-Json } })
     $first = $events | Where-Object { $_.state -ceq 'committed' -and $_.revision -eq 1 } | Select-Object -First 1
-    $last = $events | Where-Object { $_.state -ceq 'committed' -and $_.revision -eq 19 } | Select-Object -First 1
+    $last = $events | Where-Object { $_.state -ceq 'committed' -and $_.revision -eq 20 } | Select-Object -First 1
     if ($null -eq $first -or $null -eq $last) { throw 'THROUGHPUT_SAME_PEER_HISTORY_MISSING' }
     $active = @($events | Where-Object { $_.at -ge $first.at -and $_.at -le $last.at })
     if (@($active | Where-Object { $_.state -ceq 'disconnected' -or $_.reason -cin @('peer-disconnected', 'peer-absent', 'compatible-session') }).Count -gt 0) {
         throw 'THROUGHPUT_SAME_PEER_CONTINUITY_LOSS'
     }
-    if (@($active | Where-Object { $_.state -ceq 'waiting' -and $_.reason -ceq 'peer-inactive' }).Count -ne 1 -or
+    if (@($active | Where-Object { $_.state -ceq 'degraded' -and $_.reason -ceq 'receive-timeout' }).Count -ne 1 -or
+        @($active | Where-Object { $_.state -ceq 'recovered' -and $_.reason -ceq 'stale-scope-rotated' }).Count -ne 1 -or
+        @($active | Where-Object { $_.state -ceq 'rejected' -and $_.reason -ceq 'receive-timeout' }).Count -ne 0 -or
         @($active.session | Sort-Object -Unique).Count -ne 1 -or @($active.epoch | Sort-Object -Unique).Count -ne 1) {
         throw 'THROUGHPUT_SAME_PEER_REFRESH_MISSING'
     }
-    Write-Output 'SAME_PEER_INTERLEAVE revisions=1..19 inactivity_recovery=waiting sessions=1 epochs=1 reconnect=false'
+    Write-Output 'SAME_PEER_INTERLEAVE revisions=1..20 inactivity_recovery=recovered sessions=1 epochs=1 reconnect=false'
 }
 
 function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [string]$Data, [string]$Limits, [string]$Repo, [switch]$Throughput, [switch]$Interleave, [switch]$PerformanceGate) {
@@ -34,7 +36,7 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
             if (-not $producer.HasExited) { throw 'HEAVY_CONFIGURED_HOST_WATCHDOG' }
             $producer.WaitForExit()
             if ($producer.ExitCode -ne 0) { throw "HEAVY_CONFIGURED_HOST_FAILED:$($producer.StandardError.ReadToEnd())" }
-            $expected = if ($Interleave) { (1..19) -join ',' } elseif ($mode -ceq 'first') { '1,2,3,4,5,6,7,8' } else { '9,10,11,12' }
+            $expected = if ($Interleave) { (1..20) -join ',' } elseif ($mode -ceq 'first') { (1..9) -join ',' } else { (10..14) -join ',' }
             if (-not (Select-String -LiteralPath $result -SimpleMatch "revisions=$expected" -Quiet)) { throw 'HEAVY_CONFIGURED_REVISION_MISMATCH' }
             if ($Throughput) {
                 Get-Content -LiteralPath $result
@@ -54,8 +56,8 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
                 Write-Output (Format-HeavyPerformanceGate $policy $measurement)
             }
         }
-        if (-not $Throughput) { $readbackRows = @(@('ship_core', 1), @('ship_core', 9), @('ship_cargo:g0', 2), @('ship_cargo:g0', 10), @('ship_crew:g0', 3), @('ship_crew:g0', 11), @('ship_loadout:g0', 4), @('ship_loadout:g0', 12)) }
-        if ($Interleave -and @($readbackRows | Where-Object { $_[0] -ceq 'ship_core' }).Count -lt 2) { throw 'THROUGHPUT_PARENT_INTERLEAVING_MISSING' }
+        if (-not $Throughput) { $readbackRows = @(@('ship_core:argon', 2), @('ship_core:argon', 11), @('ship_cargo:argon:g0', 3), @('ship_cargo:argon:g0', 12), @('ship_crew:argon:g0', 4), @('ship_crew:argon:g0', 13), @('ship_loadout:argon:g0', 5), @('ship_loadout:argon:g0', 14)) }
+        if ($Interleave -and @($readbackRows | Where-Object { $_[0] -ceq 'ship_core:argon' }).Count -lt 2) { throw 'THROUGHPUT_PARENT_INTERLEAVING_MISSING' }
         if ($Interleave) { Assert-HeavySamePeerInterleave $Data }
         $trace = @()
         foreach ($row in $readbackRows) {
@@ -74,7 +76,10 @@ function Invoke-HeavyConfiguredRestart([string]$Run, [string]$HostExecutable, [s
             if ($Throughput -and $row[0] -like 'ship_loadout:*' -and @($content -split "`n" | Where-Object { $_ -like 'software=*' }).Count -ne 80) { throw 'THROUGHPUT_NESTED_LOADOUT_LOSS' }
             if ($Throughput) { Write-Output "READBACK section=$($row[0]) revision=$($row[1]) records=$count content_bytes=$([Text.Encoding]::UTF8.GetByteCount(($value.records.content -join "`n")))" }
         }
-        if ($Throughput) { Assert-HeavyCapturedTrace $trace $(if ($Interleave) { 1..19 } else { 1..12 }) }
+        if ($Throughput) {
+            $expectedTrace = if ($Interleave) { 2..20 } else { @(2..9) + @(11..14) }
+            Assert-HeavyCapturedTrace $trace $expectedTrace
+        }
         Write-Output 'PASS heavy-ship-recovery actual_lua_dll_pipe_production=true earlier_current_reopen=true runtime_acceptance=pending'
     } finally { Stop-Owned $producer; Stop-Owned $bridge }
     if (-not $Throughput) { foreach ($family in @('core', 'cargo', 'crew', 'loadout')) { Invoke-HeavyInterruptedRestart $Run $HostExecutable $Limits $Repo $family } }
@@ -103,7 +108,7 @@ function Invoke-HeavyInterruptedRestart([string]$Run, [string]$HostExecutable, [
         $commits = @($events | Where-Object state -CEQ committed)
         $distinct = @($commits | ForEach-Object { "$($_.section):$($_.revision)" } | Sort-Object -Unique)
         if ($commits.Count -ne $distinct.Count) { throw 'HEAVY_DUPLICATE_PUBLICATION' }
-        foreach ($key in @('ship_core', 'ship_cargo:g0', 'ship_crew:g0', 'ship_loadout:g0')) {
+        foreach ($key in @('ship_core:argon', 'ship_cargo:argon:g0', 'ship_crew:argon:g0', 'ship_loadout:argon:g0')) {
             $earlier = $commits | Where-Object section -CEQ $key | Select-Object -First 1
             $current = $commits | Where-Object section -CEQ $key | Select-Object -Last 1
             foreach ($entry in @($earlier, $current)) {
