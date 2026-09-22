@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Phase 05.5 Plan 10 package 65dbea0 installed; replacement normal-time and SETA Gate A pending
-last_updated: "2026-09-21T16:04:25Z"
-last_activity: 2026-09-21
-last_activity_desc: Core per-record churn repair 65dbea0 installed and rehashed with verified owner-only rollback
-state_head: 65dbea0
+stopped_at: Completed 05.5-10-PLAN.md; ready for 05.5-11
+last_updated: "2026-09-22T10:13:53.280Z"
+last_activity: 2026-09-22
+last_activity_desc: Plan 10 Gate A accepted and dynamic full-set production path verified locally at d0ba0d7
+state_head: d0ba0d74ba6aefb4715592f09ac46819df07c8a0
 progress:
   total_phases: 14
-  completed_phases: 7
+  completed_phases: 6
   total_plans: 51
-  completed_plans: 49
+  completed_plans: 50
   percent: 43
 ---
 
@@ -27,12 +27,12 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — CORE CHURN REPAIR INSTALLED
-Plan: 2 of 4 active plans complete; next is 10
-Status: Plans 01 and 09 complete locally; package 65dbea0 is installed for replacement normal-time and SETA Gate A evidence
-Last activity: 2026-09-21 — Exact package 65dbea0 was independently verified, installed while X4 was closed and rehashed 26/26
+Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; GATE B PENDING
+Plan: 3 of 4 active plans complete; next is 11
+Status: Gate A accepted; dynamic full-set production path verified locally; Plan 11 reviews and runs owner Gate B
+Last activity: 2026-09-22 — Task 2 GREEN `d0ba0d7`; exact prepared Gate B package built from that revision
 
-Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 05.5 has 2 of 4 active plans complete)
+Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Progress: [████░░░░░░] 43% (7 of 14 phases complete; Phase 0
 | Phase 05.3 P03 | 17h 17m | 3 tasks | 19 files |
 | Phase 05.3 P05 | 33min | 2 tasks | 5 files |
 | Phase 05.3 P04 | 28min | 3 tasks | 27 files |
+| Phase 05.5 P10 | 5d | 2 tasks | 162 files |
 
 ## Accumulated Context
 
@@ -210,6 +211,10 @@ Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md o
 - [Phase 05.3]: The stop-and-wait slot remains the sole owner of raw replay bytes; ambiguous publication retains only typed authority and request state.
 - [Phase 05.3]: Decision-current state changes only after committed-new, committed-replay, or committed reconciliation evidence.
 - [Phase 05.3]: Reconciliation delegates to the existing SQLite classifier; the application layer adds no second durable classification algorithm.
+- [Phase 05.5]: Gate A uses 144 FPS normal and 60 FPS SETA average floors; callback ceiling derives from 1000/144. — Owner accepted the measured production windows and requested the 144 FPS frame budget remain explicit.
+- [Phase 05.5]: One requested X4 ship selection is captured synchronously, then delivered through bounded transport without repeating getters. — Measured synchronous capture stayed within the accepted frame interval; resumable source slicing remains conditional on real stalls.
+- [Phase 05.5]: Every discovered faction remains Included, Excluded, or Unknown; Unknown blocks closure and zero ships is partial observation. — Discovery identity is primary and source uncertainty cannot silently reduce coverage or invent KnownEmpty authority.
+- [Phase 05.5]: Faction identity is part of durable ship section and dependency keys; blocked faction work rotates without cancelling healthy factions. — Receiver-owned scope validation prevents cross-faction carry-forward while the existing scheduler preserves fair progress.
 
 ### Pending Todos
 
@@ -217,8 +222,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 05.5]: Declaration and detail-source enrichment are available in registered snapshots `x4-9.00-steam-23660954-faction-ship-observation-v1` and `x4-9.00-steam-23660954-ship-detail-source-v1`. Plan 01 is locally complete and merged. Runtime semantics, measured limits, owner-operated Gate A/B and phase reviews remain pending.
-- [Phase 05.5]: Package `d93e6f9` closed the lexical `UniverseID` order mismatch. Owner-operated normal-time run `055-gate-a-d93e6f9-20260920-123239` then transferred, committed and read back 906 core records in one batch within 239 ms, so the core Gate-A path passed. The immediately requested `ship_cargo:g0` detail section failed closed at `cargo_storage_count` before allocation. Exact X4 9.00 evidence showed that native detail getters require `UniverseID`, while the adapter supplied LuaID; `GetPeopleCapacity` also had the wrong arity. Package `658def3` converts all affected native detail calls to `UniverseID`, preserves the LuaID-only `GetComponentData(..., "cargo")` boundary and corrects `GetPeopleCapacity(UniverseID, "", false)`. Full regression and exact closed-game installation passed; a fresh owner-operated detail run remains pending. No numerical acceptance, SETA, full Gate A/B or Plan 10 completion is claimed.
+- [Phase 05.5]: Gate A passed at source revision `f4465ef` with 184.671 normal active FPS, 129.260 SETA active FPS, 4 ms maximum callbacks, zero rejected/failed outcomes, and independent detail history/current readback. Plan 10 dynamic full-set collection is locally verified at `d0ba0d7`. Plan 11 code/security review, mutation, final regression, reviewed package identity, owner Gate B, and goal verification remain pending.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -251,6 +255,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-19
-Stopped at: Phase 05.5 Plan 10 package d93e6f9 installed; launch X4, load the disposable campaign at normal time and repeat Gate A
-Resume file: .planning/phases/05.5-heavy-faction-ship-conformance/05.5-EXECUTION-REVISION.md
+Last session: 2026-09-22T10:13:09.261Z
+Stopped at: Completed 05.5-10-PLAN.md; ready for 05.5-11
+Resume file: None
