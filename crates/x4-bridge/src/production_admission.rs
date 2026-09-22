@@ -119,6 +119,7 @@ const fn production_reason(error: crate::ProductionError) -> &'static str {
         crate::ProductionError::RevisionExhausted => "production-revision-exhausted",
         crate::ProductionError::Storage => "production-storage",
         crate::ProductionError::StaleShipParent => "stale-ship-parent",
+        crate::ProductionError::InvalidFactionCensus => "invalid-faction-census",
         crate::ProductionError::Lifecycle(error) => lifecycle_reason(error),
     }
 }

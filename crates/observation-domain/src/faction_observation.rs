@@ -53,6 +53,26 @@ impl FactionOriginEvidence {
             })
             .ok_or(FactionObservationError::InvalidIdentity)
     }
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+    #[must_use]
+    pub const fn origin(&self) -> FactionOrigin {
+        self.origin
+    }
+    #[must_use]
+    pub const fn independent(&self) -> Option<bool> {
+        self.independent
+    }
+    #[must_use]
+    pub const fn mind_candidate(&self) -> bool {
+        self.mind_candidate
+    }
+    #[must_use]
+    pub const fn source(&self) -> &SourceEvidenceRef {
+        &self.source
+    }
 }
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -114,6 +134,12 @@ impl FactionObservationRoster {
         self.entries
             .iter()
             .any(|entry| entry.disposition == FactionObservationDisposition::Unknown)
+    }
+    pub fn included_ids(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().filter_map(|entry| {
+            (entry.disposition == FactionObservationDisposition::Included)
+                .then_some(entry.id.as_str())
+        })
     }
 }
 

@@ -32,6 +32,7 @@ pub enum ProductionError {
     RevisionExhausted,
     Storage,
     StaleShipParent,
+    InvalidFactionCensus,
     Lifecycle(LifecycleError),
 }
 
@@ -43,6 +44,7 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     ship_scope_index: usize,
     heavy_limits: Option<crate::HeavyShipLimits>,
     ship_timing: timing::ShipTiming,
+    faction_roster: Option<observation_domain::FactionObservationRoster>,
 }
 
 impl ProductionObservationSession {
@@ -86,6 +88,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             ship_scope_index: 0,
             heavy_limits: None,
             ship_timing: timing::ShipTiming::default(),
+            faction_roster: None,
         };
         session
             .restore_current_snapshot()

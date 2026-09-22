@@ -1,5 +1,8 @@
 use super::{ProductionError, ProductionObservationSession};
-use observation_domain::{ShipSectionIdentity, ShipSectionKind, SourceScopeId};
+use observation_domain::{
+    FactionObservationDisposition, FactionOriginEvidence, ShipSectionIdentity, ShipSectionKind,
+    SourceScopeId,
+};
 use observation_persistence::ObservationRepository;
 
 impl<R: ObservationRepository> ProductionObservationSession<R> {
@@ -13,6 +16,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     ) -> Result<(), ProductionError> {
         let mut scopes = Vec::new();
         for faction in factions {
+            let disposition = self
+                .faction_roster
+                .as_ref()
+                .and_then(|roster| roster.entry(faction))
+                .map(|entry| entry.disposition());
+            if disposition != Some(FactionObservationDisposition::Included) {
+                return Err(ProductionError::InvalidFactionCensus);
+            }
             push_unique_scope(&mut scopes, faction)?;
         }
         let first = scopes
@@ -25,6 +36,45 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         self.ship_timing.clear();
         self.last_received = None;
         Ok(())
+    }
+
+    pub fn accept_faction_census<I, S>(
+        &mut self,
+        discovery_revision: u64,
+        discovered: I,
+        inventory: &[FactionOriginEvidence],
+    ) -> Result<(), ProductionError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let prior = self
+            .faction_roster
+            .as_ref()
+            .map_or(0, |roster| roster.discovery_revision());
+        if discovery_revision <= prior {
+            return Err(ProductionError::InvalidFactionCensus);
+        }
+        let roster = observation_domain::classify_observation_factions(
+            discovery_revision,
+            discovered,
+            inventory,
+        )
+        .map_err(|_| ProductionError::InvalidFactionCensus)?;
+        self.faction_roster = Some(roster);
+        self.ship_scope = None;
+        self.ship_scopes.clear();
+        self.ship_scope_index = 0;
+        self.ship_timing.clear();
+        self.last_received = None;
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn faction_census_blocks_closure(&self) -> bool {
+        self.faction_roster
+            .as_ref()
+            .is_none_or(|roster| roster.has_unknown_blocker())
     }
 
     pub fn collection_key(&self) -> String {
