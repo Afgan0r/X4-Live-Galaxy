@@ -24,7 +24,7 @@ pub fn run(
     loop {
         history.bind_session("", 0);
         let _ = history.record("waiting", "peer-absent");
-        let scope = connect(&config, limits)
+        let scope = connect(&config, limits, history)
             .and_then(|mut peer| serve(&mut peer, limits, history, session, &mut schedule));
         if let Some(schedule) = &mut schedule {
             schedule.complete();
@@ -37,9 +37,22 @@ pub fn run(
         ));
     }
 }
-fn connect(config: &TransportConfig, limits: &ProductionLimits) -> Option<BridgePeer> {
+fn connect(
+    config: &TransportConfig,
+    limits: &ProductionLimits,
+    history: &mut OperationalHistory,
+) -> Option<BridgePeer> {
     let timeout = Duration::from_millis(limits.reconnect_delay_millis as u64);
-    (0..limits.reconnect_attempts).find_map(|_| BridgePeer::connect(config, timeout).ok())
+    (1..=limits.reconnect_attempts).find_map(|attempt| {
+        BridgePeer::connect(config, timeout).map_or_else(
+            |_| {
+                history.bind_message(&format!("attempt-{attempt}"), "transport", 0);
+                let _ = history.record("waiting", "connect-failed");
+                None
+            },
+            Some,
+        )
+    })
 }
 fn serve(
     peer: &mut BridgePeer,
@@ -68,7 +81,14 @@ fn serve(
         let _ = history.record("waiting", "heavy-admission-window");
         return None;
     }
-    let issued = initial(peer, &identity, &collection_key, revision, limits).ok()?;
+    let issued = initial(peer, &identity, &collection_key, revision, limits).map_or_else(
+        |()| {
+            history.bind_message("attempt-1", &collection_key, revision);
+            let _ = history.record("rejected", "control-send-failed");
+            None
+        },
+        Some,
+    )?;
     let _ = history.record("collection", "compatible-session");
     receive_loop(peer, limits, history, session, &identity, schedule, issued)
 }

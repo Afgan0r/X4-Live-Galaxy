@@ -3,6 +3,10 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use crate::{DiagnosticError, diagnostics::escape, operational_status};
+#[path = "operational_history_access.rs"]
+mod access;
+#[path = "operational_correlation.rs"]
+mod correlation;
 #[path = "operational_history_sink.rs"]
 mod sink_io;
 const MAX_HISTORY_BYTES: usize = 64 * 1_024;
@@ -81,27 +85,6 @@ impl OperationalHistory {
         self.record_status(state, reason)
     }
 
-    #[must_use]
-    pub const fn history_gap_count(&self) -> u64 {
-        self.gaps
-    }
-
-    pub fn bind_session(&mut self, session: &str, epoch: u64) {
-        self.reset_duplicate_window();
-        session.clone_into(&mut self.session);
-        self.epoch = epoch;
-        self.message.clear();
-        self.section.clear();
-        self.revision = 0;
-    }
-
-    pub fn bind_message(&mut self, message: &str, section: &str, revision: u64) {
-        self.reset_duplicate_window();
-        message.clone_into(&mut self.message);
-        section.clone_into(&mut self.section);
-        self.revision = revision;
-    }
-
     fn is_suppressed(&mut self, state: &str, reason: &str) -> bool {
         let same = self
             .last
@@ -143,13 +126,16 @@ impl OperationalHistory {
     }
     fn event_line(&self, state: &str, reason: &str) -> String {
         format!(
-            "{{\"clock\":\"unix-ms\",\"at\":{},\"component\":\"x4-bridge\",\"session\":\"{}\",\"epoch\":{},\"message\":\"{}\",\"section\":\"{}\",\"revision\":{},\"state\":\"{}\",\"reason\":\"{}\",\"suppressed_before\":{},\"status_gap_count\":{}}}\n",
+            "{{\"clock\":\"unix-ms\",\"at\":{},\"component\":\"x4-bridge\",\"session\":\"{}\",\"epoch\":{},\"message\":\"{}\",\"section\":\"{}\",\"scope\":\"{}\",\"revision\":{},\"attempt\":{},\"outcome\":\"{}\",\"state\":\"{}\",\"reason\":\"{}\",\"suppressed_before\":{},\"status_gap_count\":{}}}\n",
             operational_status::now(),
             escape(&self.session),
             self.epoch,
             escape(&self.message),
             escape(&self.section),
+            escape(&correlation::scope(&self.section)),
             self.revision,
+            correlation::attempt(&self.message),
+            escape(state),
             escape(state),
             escape(reason),
             self.suppressed,

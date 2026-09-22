@@ -46,11 +46,17 @@ pub fn await_progress(
     let poll_interval = idle_limit.min(Duration::from_millis(10));
     loop {
         match peer.receive_timeout(limits.complete_message_bytes, poll_interval) {
-            Ok(Some(_)) if progress.expired(Instant::now()) => return Err(()),
+            Ok(Some(_)) if progress.expired(Instant::now()) => {
+                let _ = history.record("rejected", "receive-timeout");
+                return Err(());
+            }
             Ok(Some(bytes)) => return Ok(bytes),
             Ok(None) if on_idle(history, session, progress) => return Err(()),
             Ok(None) => {}
-            Err(_) => return Err(()),
+            Err(_) => {
+                let _ = history.record("rejected", "receive-failed");
+                return Err(());
+            }
         }
     }
 }
@@ -66,7 +72,7 @@ fn on_idle(
     if !progress.expired(Instant::now()) {
         return false;
     }
-    let _ = history.record("waiting", "peer-inactive");
+    let _ = history.record("rejected", "receive-timeout");
     true
 }
 
