@@ -2,6 +2,7 @@
 
 mod absence;
 mod completion_envelope;
+mod faction_classification;
 mod faction_observation;
 mod identity;
 mod observation;
@@ -24,9 +25,10 @@ mod ship_loadout_decode;
 mod ship_section;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
+pub use faction_classification::classify_observation_factions;
 pub use faction_observation::{
     FactionCensusEntry, FactionObservationDisposition, FactionObservationError,
-    FactionObservationRoster, FactionOrigin, FactionOriginEvidence, classify_observation_factions,
+    FactionObservationRoster, FactionOrigin, FactionOriginEvidence,
 };
 pub use identity::{
     BatchId, CanonicalizationVersion, CompletionCoverage, ControlEnvelope, DecisionSnapshotId,

@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_void};
 
-use crate::abi::{API, PRODUCER, TRANSPORT, bytes, integer, push_code};
-use crate::lua_producer_context::{context, with_producer};
+use crate::abi::{PRODUCER, TRANSPORT, bytes, integer, push_code};
+use crate::lua_producer_context::{context, invalid, with_producer};
 use crate::lua_progress::{error_code, outcome_code};
 use crate::lua_transport::error_code_for_transport;
 use crate::{ProducerOutcome, TransportPoll, TransportSendOutcome};
@@ -32,6 +32,10 @@ pub unsafe extern "C" fn begin_section(state: *mut c_void) -> c_int {
     };
     let result = with_producer(handle, |producer| match input {
         crate::lua_input::BeginInput::Clock(evidence) => producer.begin_section(evidence),
+        crate::lua_input::BeginInput::FactionCensus {
+            evidence,
+            expected_records,
+        } => producer.begin_faction_census(evidence, expected_records),
         crate::lua_input::BeginInput::ShipCore {
             evidence,
             expected_records,
@@ -185,12 +189,6 @@ pub unsafe extern "C" fn poll_control(state: *mut c_void) -> c_int {
         TransportPoll::Rejected(error) => error_code_for_transport(error),
     };
     unsafe { push_code(api, state, code) }
-}
-
-fn invalid(state: *mut c_void) -> c_int {
-    API.get()
-        .copied()
-        .map_or(0, |api| unsafe { push_code(api, state, -20) })
 }
 
 #[cfg(all(test, windows))]

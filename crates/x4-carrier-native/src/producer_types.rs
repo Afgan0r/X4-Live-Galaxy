@@ -90,9 +90,21 @@ pub struct TypedFact {
     pub raw_value: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FactionCensusRecord {
+    pub faction_id: String,
+    pub discovery_revision: u64,
+    pub disposition: String,
+    pub reason: String,
+    pub origin: String,
+    pub source_evidence: String,
+    pub mind_candidate: bool,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ProducerProfile {
     Clock,
+    FactionCensus,
     ShipCore,
     ShipCargo,
     ShipCrew,
@@ -101,6 +113,9 @@ pub(crate) enum ProducerProfile {
 
 impl ProducerProfile {
     pub(crate) fn from_section_key(value: &str) -> Option<Self> {
+        if value == "faction_census" {
+            return Some(Self::FactionCensus);
+        }
         let section = observation_domain::ShipSectionIdentity::parse(value);
         match section.map(|section| section.kind()) {
             Some(observation_domain::ShipSectionKind::Core) => Some(Self::ShipCore),

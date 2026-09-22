@@ -1,5 +1,7 @@
-use std::path::Path;
-
+#[path = "production_open.rs"]
+mod open;
+#[path = "receiver_faction.rs"]
+mod receiver_faction;
 #[path = "production_reconciliation.rs"]
 mod reconciliation;
 #[path = "production_retention.rs"]
@@ -22,9 +24,7 @@ use observation_ingest::{
     AcceptedProjection, DecisionEligibility, DecisionRevisionIndex, GenerationLimits,
     GenerationStager,
 };
-use observation_persistence::{
-    ObservationRepository, PublicationLimits, SqliteObservationRepository,
-};
+use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProductionError {
@@ -45,25 +45,7 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     heavy_limits: Option<crate::HeavyShipLimits>,
     ship_timing: timing::ShipTiming,
     faction_roster: Option<observation_domain::FactionObservationRoster>,
-}
-
-impl ProductionObservationSession {
-    pub fn open(
-        path: &Path,
-        generation_limits: GenerationLimits,
-        publication_limits: PublicationLimits,
-        lifecycle_limits: LifecycleLimits,
-        blocker_limit: usize,
-    ) -> Result<Self, ProductionError> {
-        let repository = SqliteObservationRepository::open(path, publication_limits)
-            .map_err(|_| ProductionError::Storage)?;
-        Self::from_repository(
-            repository,
-            generation_limits,
-            lifecycle_limits,
-            blocker_limit,
-        )
-    }
+    faction_inventory: Vec<observation_domain::FactionOriginEvidence>,
 }
 
 impl<R: ObservationRepository> ProductionObservationSession<R> {
@@ -89,6 +71,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             heavy_limits: None,
             ship_timing: timing::ShipTiming::default(),
             faction_roster: None,
+            faction_inventory: Vec::new(),
         };
         session
             .restore_current_snapshot()
@@ -149,6 +132,13 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         }
         .map_err(ProductionError::Lifecycle)?;
         self.last_received = Some((identity, bytes, context));
+        if matches!(
+            result,
+            LifecycleResult::Disposition(observation_ingest::ReceiverDisposition::Committed)
+        ) && matches!(&message, observation_domain::CompleteMessage::SectionCompletion(value) if value.section_key.as_str() == "faction_census")
+        {
+            self.accept_committed_faction_census()?;
+        }
         Ok(result)
     }
 

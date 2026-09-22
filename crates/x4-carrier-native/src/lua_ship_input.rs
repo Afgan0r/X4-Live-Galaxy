@@ -67,17 +67,25 @@ pub unsafe fn begin(
             "transport_reconnect" => SourceBoundary::TransportReconnect,
             _ => return None,
         };
-    let source_scope = observation_domain::ShipSectionIdentity::parse(&section_key)?
-        .faction()
-        .map_or_else(
-            || source.source_scope.clone(),
-            |faction| format!("x4:faction:{faction}:ships"),
-        );
+    let faction = observation_domain::ShipSectionIdentity::parse(&section_key)
+        .and_then(|section| section.faction().map(str::to_owned));
+    let source_scope = faction.map_or_else(
+        || source.source_scope.clone(),
+        |faction| format!("x4:faction:{faction}:ships"),
+    );
+    let evidence = SectionEvidence {
+        source_scope,
+        sender,
+    };
+    if section_key == "faction_census" {
+        return Some(BeginInput::FactionCensus {
+            evidence,
+            expected_records,
+        });
+    }
+    let _section = observation_domain::ShipSectionIdentity::parse(&section_key)?;
     Some(BeginInput::ShipCore {
-        evidence: SectionEvidence {
-            source_scope,
-            sender,
-        },
+        evidence,
         expected_records,
     })
 }

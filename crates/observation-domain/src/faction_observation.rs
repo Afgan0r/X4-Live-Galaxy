@@ -1,5 +1,4 @@
 use crate::SourceEvidenceRef;
-use std::collections::{BTreeMap, BTreeSet};
 #[must_use]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FactionObservationDisposition {
@@ -26,11 +25,11 @@ pub enum FactionObservationError {
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FactionOriginEvidence {
-    id: String,
-    origin: FactionOrigin,
-    independent: Option<bool>,
-    mind_candidate: bool,
-    source: SourceEvidenceRef,
+    pub(super) id: String,
+    pub(super) origin: FactionOrigin,
+    pub(super) independent: Option<bool>,
+    pub(super) mind_candidate: bool,
+    pub(super) source: SourceEvidenceRef,
 }
 impl FactionOriginEvidence {
     pub fn new(
@@ -57,7 +56,6 @@ impl FactionOriginEvidence {
     pub fn id(&self) -> &str {
         &self.id
     }
-    #[must_use]
     pub const fn origin(&self) -> FactionOrigin {
         self.origin
     }
@@ -69,7 +67,6 @@ impl FactionOriginEvidence {
     pub const fn mind_candidate(&self) -> bool {
         self.mind_candidate
     }
-    #[must_use]
     pub const fn source(&self) -> &SourceEvidenceRef {
         &self.source
     }
@@ -77,12 +74,12 @@ impl FactionOriginEvidence {
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FactionCensusEntry {
-    id: String,
-    origin: Option<FactionOrigin>,
-    disposition: FactionObservationDisposition,
-    reason: &'static str,
-    mind_candidate: bool,
-    source: Option<SourceEvidenceRef>,
+    pub(super) id: String,
+    pub(super) origin: Option<FactionOrigin>,
+    pub(super) disposition: FactionObservationDisposition,
+    pub(super) reason: &'static str,
+    pub(super) mind_candidate: bool,
+    pub(super) source: Option<SourceEvidenceRef>,
 }
 impl FactionCensusEntry {
     #[must_use]
@@ -113,8 +110,8 @@ impl FactionCensusEntry {
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FactionObservationRoster {
-    discovery_revision: u64,
-    entries: Vec<FactionCensusEntry>,
+    pub(super) discovery_revision: u64,
+    pub(super) entries: Vec<FactionCensusEntry>,
 }
 
 impl FactionObservationRoster {
@@ -143,78 +140,7 @@ impl FactionObservationRoster {
     }
 }
 
-pub fn classify_observation_factions<I, S>(
-    discovery_revision: u64,
-    discovered: I,
-    inventory: &[FactionOriginEvidence],
-) -> Result<FactionObservationRoster, FactionObservationError>
-where
-    I: IntoIterator<Item = S>,
-    S: Into<String>,
-{
-    let mut evidence = BTreeMap::new();
-    for item in inventory {
-        if evidence.insert(item.id.as_str(), item).is_some() {
-            return Err(FactionObservationError::DuplicateInventory);
-        }
-    }
-    let mut seen = BTreeSet::new();
-    let mut entries = Vec::new();
-    for raw in discovered {
-        let id = raw.into();
-        if !token(&id) {
-            return Err(FactionObservationError::InvalidIdentity);
-        }
-        if !seen.insert(id.clone()) {
-            return Err(FactionObservationError::DuplicateCensus);
-        }
-        let item = evidence.get(id.as_str()).copied();
-        entries.push(classify(id, item));
-    }
-    Ok(FactionObservationRoster {
-        discovery_revision,
-        entries,
-    })
-}
-
-fn classify(id: String, evidence: Option<&FactionOriginEvidence>) -> FactionCensusEntry {
-    let Some(evidence) = evidence else {
-        return FactionCensusEntry {
-            id,
-            origin: None,
-            disposition: FactionObservationDisposition::Unknown,
-            reason: "origin-unresolved",
-            mind_candidate: false,
-            source: None,
-        };
-    };
-    let (disposition, reason) = match (evidence.origin, evidence.independent) {
-        (FactionOrigin::Vanilla | FactionOrigin::Dlc, Some(true)) => (
-            FactionObservationDisposition::Included,
-            "independent-first-party",
-        ),
-        (FactionOrigin::Player | FactionOrigin::Modded, _) => (
-            FactionObservationDisposition::Excluded,
-            "outside-mandatory-coverage",
-        ),
-        (_, Some(false)) => (FactionObservationDisposition::Excluded, "not-independent"),
-        _ => (
-            FactionObservationDisposition::Unknown,
-            "independence-unresolved",
-        ),
-    };
-    FactionCensusEntry {
-        id,
-        origin: Some(evidence.origin),
-        disposition,
-        reason,
-        mind_candidate: disposition == FactionObservationDisposition::Included
-            && evidence.mind_candidate,
-        source: Some(evidence.source.clone()),
-    }
-}
-
-fn token(value: &str) -> bool {
+pub fn token(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
         && value

@@ -1,6 +1,6 @@
-use core::ffi::c_void;
+use core::ffi::{c_int, c_void};
 
-use crate::abi::{API, PRODUCER, REGISTRY, token};
+use crate::abi::{API, PRODUCER, REGISTRY, push_code, token};
 use crate::{HandleToken, Producer, ProducerError};
 
 pub(crate) fn with_producer<T>(
@@ -27,4 +27,10 @@ pub(crate) unsafe fn context(
     let api = API.get().copied()?;
     let handle = unsafe { token(api, state) }?;
     Some((api, handle))
+}
+
+pub(crate) fn invalid(state: *mut c_void) -> c_int {
+    API.get()
+        .copied()
+        .map_or(0, |api| unsafe { push_code(api, state, -20) })
 }

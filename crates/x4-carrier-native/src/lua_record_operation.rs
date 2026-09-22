@@ -18,6 +18,7 @@ pub unsafe extern "C" fn push_record(state: *mut c_void) -> c_int {
     };
     let result = with_producer(handle, |producer| match input {
         RecordInput::Clock(fact) => producer.push_record(&fact),
+        RecordInput::FactionCensus(record) => producer.push_faction_census(&record),
         RecordInput::ShipCore(record) => producer.push_ship_core(&record),
         RecordInput::ShipCargo(scope, record) => producer.push_ship_cargo(&scope, &record),
         RecordInput::ShipCrew(scope, record) => producer.push_ship_crew(&scope, &record),

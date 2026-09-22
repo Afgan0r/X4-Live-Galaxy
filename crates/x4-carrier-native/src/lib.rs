@@ -12,6 +12,7 @@ mod abi_windows_sid;
 mod handle;
 mod lua_detail_array;
 mod lua_detail_budget;
+mod lua_faction_input;
 mod lua_generation;
 mod lua_input;
 mod lua_open;
@@ -28,6 +29,7 @@ mod lua_table;
 mod lua_transport;
 mod producer;
 mod producer_collection;
+mod producer_faction;
 mod producer_feedback;
 mod producer_feedback_codec;
 mod producer_identity;
@@ -53,8 +55,8 @@ pub use handle::HandleRegistry;
 pub use producer::Producer;
 pub use producer_policy::ProducerAdmissionPolicy;
 pub use producer_types::{
-    ProducerError, ProducerFeedback, ProducerLimits, ProducerOutcome, ProducerSource,
-    ProducerState, SectionEvidence, SectionFinishEvidence, TypedFact,
+    FactionCensusRecord, ProducerError, ProducerFeedback, ProducerLimits, ProducerOutcome,
+    ProducerSource, ProducerState, SectionEvidence, SectionFinishEvidence, TypedFact,
 };
 pub use transport::NativeTransport;
 pub use transport_peer::BridgePeer;

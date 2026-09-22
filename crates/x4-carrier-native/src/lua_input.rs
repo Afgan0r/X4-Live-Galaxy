@@ -11,6 +11,10 @@ use crate::{ProducerSource, SectionEvidence, SectionFinishEvidence, TypedFact};
 
 pub enum BeginInput {
     Clock(SectionEvidence),
+    FactionCensus {
+        evidence: SectionEvidence,
+        expected_records: usize,
+    },
     ShipCore {
         evidence: SectionEvidence,
         expected_records: usize,
@@ -19,6 +23,7 @@ pub enum BeginInput {
 
 pub enum RecordInput {
     Clock(TypedFact),
+    FactionCensus(crate::FactionCensusRecord),
     ShipCore(observation_domain::ShipCoreRecord),
     ShipCargo(String, observation_domain::CargoObservation),
     ShipCrew(String, observation_domain::CrewObservation),
@@ -38,13 +43,6 @@ const BEGIN_KEYS: [&str; 11] = [
     "source_epoch_status",
     "source_boundary",
 ];
-const FACT_KEYS: [&str; 5] = [
-    "entity_id",
-    "observation_version",
-    "getter",
-    "raw_value",
-    "semantics",
-];
 const FINISH_KEYS: [&str; 7] = [
     "capture_end_millis",
     "success",
@@ -61,7 +59,9 @@ pub unsafe fn begin(
     source: &ProducerSource,
 ) -> Option<BeginInput> {
     let section_key = unsafe { field_string(api, state, 2, "section_key", 128) }?;
-    if observation_domain::ShipSectionIdentity::parse(&section_key).is_some() {
+    if observation_domain::ShipSectionIdentity::parse(&section_key).is_some()
+        || section_key == "faction_census"
+    {
         return unsafe { crate::lua_ship_input::begin(api, state, source, &BEGIN_KEYS) };
     }
     if !unsafe { exact_keys(api, state, 2, &BEGIN_KEYS) }
@@ -76,7 +76,9 @@ pub unsafe fn begin(
     {
         return None;
     }
-    let start = decimal(&unsafe { field_string(api, state, 2, "capture_start_millis", 20) }?)?;
+    let start = crate::lua_table::decimal_u64(&unsafe {
+        field_string(api, state, 2, "capture_start_millis", 20)
+    }?)?;
     let mut sender = SenderEvidence::legacy_default();
     sender.section_state = SectionState::with_evidence(
         CaptureWindow::new(start, start)?,
@@ -108,6 +110,10 @@ pub unsafe fn begin(
 
 pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
     let profile = unsafe { field_string(api, state, 2, "profile", 32) };
+    if profile.as_deref() == Some("faction_census") {
+        return unsafe { crate::lua_faction_input::record(api, state) }
+            .map(RecordInput::FactionCensus);
+    }
     if matches!(
         profile.as_deref(),
         Some("ship_cargo" | "ship_crew" | "ship_loadout")
@@ -140,7 +146,7 @@ pub unsafe fn record(api: LuaApi, state: *mut c_void) -> Option<RecordInput> {
     if unsafe { crate::lua_ship_input::is_ship_core(api, state) } {
         return unsafe { crate::lua_ship_input::record(api, state) }.map(RecordInput::ShipCore);
     }
-    if !unsafe { exact_keys(api, state, 2, &FACT_KEYS) } {
+    if !unsafe { exact_keys(api, state, 2, &crate::lua_table::FACT_KEYS) } {
         return None;
     }
     Some(RecordInput::Clock(TypedFact {
@@ -159,7 +165,9 @@ pub unsafe fn finish(api: LuaApi, state: *mut c_void) -> Option<SectionFinishEvi
     if !unsafe { exact_keys(api, state, 2, &FINISH_KEYS) } {
         return None;
     }
-    let end = decimal(&unsafe { field_string(api, state, 2, "capture_end_millis", 20) }?)?;
+    let end = crate::lua_table::decimal_u64(&unsafe {
+        field_string(api, state, 2, "capture_end_millis", 20)
+    }?)?;
     Some(SectionFinishEvidence {
         capture_end_millis: end,
         succeeded: unsafe { field_bool(api, state, 2, "success") }?,
@@ -183,9 +191,4 @@ pub unsafe fn finish(api: LuaApi, state: *mut c_void) -> Option<SectionFinishEvi
         },
         stable_identity: unsafe { field_bool(api, state, 2, "stable_identity") }?,
     })
-}
-
-fn decimal(value: &str) -> Option<u64> {
-    (!value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
-        .then(|| value.parse().ok())?
 }

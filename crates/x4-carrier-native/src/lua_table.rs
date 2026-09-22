@@ -2,6 +2,19 @@ use core::ffi::{c_int, c_void};
 
 use crate::abi_windows::LuaApi;
 
+pub const FACT_KEYS: [&str; 5] = [
+    "entity_id",
+    "observation_version",
+    "getter",
+    "raw_value",
+    "semantics",
+];
+
+pub fn decimal_u64(value: &str) -> Option<u64> {
+    (!value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()))
+        .then(|| value.parse().ok())?
+}
+
 pub unsafe fn exact_keys(api: LuaApi, state: *mut c_void, index: c_int, expected: &[&str]) -> bool {
     let table = unsafe { absolute(api, state, index) };
     if unsafe { (api.lua_type)(state, table) } != 5 {

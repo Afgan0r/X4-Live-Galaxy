@@ -16,14 +16,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     ) -> Result<(), ProductionError> {
         let mut scopes = Vec::new();
         for faction in factions {
-            let disposition = self
-                .faction_roster
-                .as_ref()
-                .and_then(|roster| roster.entry(faction))
-                .map(|entry| entry.disposition());
-            if disposition != Some(FactionObservationDisposition::Included) {
-                return Err(ProductionError::InvalidFactionCensus);
-            }
+            self.validate_included_faction(faction)?;
             push_unique_scope(&mut scopes, faction)?;
         }
         let first = scopes
@@ -48,10 +41,10 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        let prior = self
-            .faction_roster
-            .as_ref()
-            .map_or(0, |roster| roster.discovery_revision());
+        let prior = self.faction_roster.as_ref().map_or(
+            0,
+            observation_domain::FactionObservationRoster::discovery_revision,
+        );
         if discovery_revision <= prior {
             return Err(ProductionError::InvalidFactionCensus);
         }
@@ -74,10 +67,22 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub fn faction_census_blocks_closure(&self) -> bool {
         self.faction_roster
             .as_ref()
-            .is_none_or(|roster| roster.has_unknown_blocker())
+            .is_none_or(observation_domain::FactionObservationRoster::has_unknown_blocker)
+    }
+
+    fn validate_included_faction(&self, faction: &str) -> Result<(), ProductionError> {
+        self.faction_roster
+            .as_ref()
+            .and_then(|roster| roster.entry(faction))
+            .filter(|entry| entry.disposition() == FactionObservationDisposition::Included)
+            .ok_or(ProductionError::InvalidFactionCensus)
+            .map(|_| ())
     }
 
     pub fn collection_key(&self) -> String {
+        if self.faction_roster.is_none() {
+            return "faction_census".to_owned();
+        }
         self.ship_scope.as_ref().map_or_else(
             || "carrier_b_realtime_sample".to_owned(),
             |_| {

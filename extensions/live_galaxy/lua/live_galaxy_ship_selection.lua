@@ -56,6 +56,50 @@ local function refresh_boundary(self)
     self.key, self.revision, self.boundary, self.incarnation = nil, nil, nil, nil
     self.run_started, self.budget = nil, nil
 end
+local function census_record(entry, revision)
+    return { profile = "faction_census", faction_id = entry.id,
+        discovery_revision = revision, disposition = entry.disposition,
+        reason = entry.reason, origin = entry.origin or "",
+        source_evidence = entry.evidence or "", mind_candidate = entry.mind_candidate == true }
+end
+local function drive_census(self, context, carrier, status)
+    local txn = self.census_txn
+    if not txn then
+        local roster, err = factions.capture(self.api, self.options.faction_inventory or {},
+            self.discovery_revision or 1, { max_factions = math.floor(self.limits.max_allocation_bytes / 8),
+                max_allocation_bytes = self.limits.max_allocation_bytes, pointer_bytes = 8 })
+        if not roster then return discard(self, carrier, err, status) end
+        local begin, begin_error = self.clock:begin_evidence()
+        local finish, finish_error = self.clock:finish_evidence()
+        if not begin or not finish then return discard(self, carrier, begin_error or finish_error, status) end
+        begin.section_key, begin.expected_records = "faction_census", #roster.entries
+        begin.coverage, begin.consistency, begin.stable_identity = "partial", "observed_count_fill_only", true
+        begin.source_epoch_status, begin.source_boundary = context.source_epoch_status or "unknown", context.source_boundary
+        finish.coverage, finish.consistency, finish.stable_identity = "partial", "observed_count_fill_only", true
+        txn = { roster = roster, begin = begin, finish = finish, index = 1, stage = "begin" }
+        self.census_txn = txn
+    end
+    if txn.stage == "begin" then
+        local code = carrier:begin_section(txn.begin)
+        if code == -21 then return { disposition = "producer_busy" } end
+        if code ~= 0 then return discard(self, carrier, "reservation_failed", status) end
+        txn.stage = #txn.roster.entries == 0 and "finish" or "record"
+    end
+    if txn.stage == "record" then
+        local code = carrier:push_record(census_record(txn.roster.entries[txn.index], txn.roster.discovery_revision))
+        if code == -21 then return { disposition = "producer_busy" } end
+        if code ~= 0 then return discard(self, carrier, "fact_rejected", status) end
+        txn.index = txn.index + 1
+        if txn.index > #txn.roster.entries then txn.stage = "finish" end
+    end
+    if txn.stage == "finish" then
+        if carrier:finish_section(txn.finish) ~= 0 then return discard(self, carrier, "finish_rejected", status) end
+        self.roster, self.discovery_revision, self.census_txn = txn.roster, txn.roster.discovery_revision, nil
+        return { disposition = "sampled", discovery_revision = self.discovery_revision,
+            unknown_blocker = self.roster.unknown_blocker }
+    end
+    return { disposition = "collecting" }
+end
 local function observe_qualification(self, carrier, status)
     local producer_state = type(status) == "table" and status.producer_state or nil
     if producer_state == "awaiting_compatibility" and self.producer_state
@@ -198,6 +242,9 @@ end
 function selection.advance(self, context, carrier, status)
     context.source_boundary = context.source_boundary or "runtime_start"
     observe_qualification(self, carrier, status)
+    if status.selection == "faction_census" then
+        return drive_census(self, context, carrier, status)
+    end
     local now = tonumber(status.monotonic_millis)
     if self.run_started and (not now or now - self.run_started >= self.limits.admission_window_millis) then
         return discard(self, carrier, "admission_window_exhausted", status)
