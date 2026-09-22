@@ -1,4 +1,4 @@
-use observation_domain::{CompleteMessage, SourceScopeId};
+use observation_domain::{CompleteMessage, ShipSectionIdentity, ShipSectionKind, SourceScopeId};
 use observation_ingest::CarrierIdentity;
 
 #[derive(Default)]
@@ -8,11 +8,11 @@ pub(super) struct ShipTiming {
 }
 
 fn family(key: &str) -> Option<usize> {
-    match key.split_once(":g")?.0 {
-        "ship_cargo" => Some(0),
-        "ship_crew" => Some(1),
-        "ship_loadout" => Some(2),
-        _ => None,
+    match ShipSectionIdentity::parse(key)?.kind() {
+        ShipSectionKind::Cargo => Some(0),
+        ShipSectionKind::Crew => Some(1),
+        ShipSectionKind::Loadout => Some(2),
+        ShipSectionKind::Core => None,
     }
 }
 
