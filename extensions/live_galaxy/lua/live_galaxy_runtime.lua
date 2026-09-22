@@ -83,7 +83,7 @@ local function diagnostic(event, detail, metrics, rejection)
             text = text .. " section=" .. metrics.section .. " revision=" .. metrics.revision
                 .. " run=" .. metrics.incarnation .. " calls=" .. metrics.calls
                 .. " allocation_bytes=" .. metrics.allocation_bytes .. " steps=" .. metrics.steps
-                .. " duration_millis=" .. metrics.duration_millis .. " backlog=1"
+                .. " duration_millis=" .. metrics.duration_millis
             if metrics.max_callback_duration_millis ~= nil then
                 text = text .. " max_callback_duration_millis=" .. metrics.max_callback_duration_millis
                     .. " max_callback_overrun_millis=" .. metrics.max_callback_overrun_millis
