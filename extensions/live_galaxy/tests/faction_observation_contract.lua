@@ -90,4 +90,44 @@ describe("dynamic faction observation contract", function()
         assert.equals(inventory, options.observation.faction_inventory)
         assert.equals("x4:faction:argon:ships", options.observation.source_scope)
     end)
+
+    it("refreshes the active census and fences stale selections at a source boundary", function()
+        local profile_options = assert(profile.options(values(), { "argon", "xenon" }, inventory))
+        local options = profile_options.observation
+        local census = { "argon" }
+        options.ship_api = api(census)
+        options.ship_api.count_ships = function() return 0 end
+        options.ship_api.new_buffer = function() return {} end
+        options.ship_api.fill_ships = function() return 0 end
+        options.clock_getter = function() return 100 end
+        local adapter = {
+            begin_evidence = function() return { capture_start_millis = "100" } end,
+            finish_evidence = function() return { capture_end_millis = "101" } end,
+        }
+        assert(fixture.load("live_galaxy_ship_selection").attach(adapter, options))
+        local carrier = {
+            progress = function() return 0, { monotonic_millis = "100" } end,
+            begin_section = function() return 0 end,
+            finish_section = function() return 0 end,
+            fail_section = function() return 0 end,
+        }
+        local first = adapter:advance({ source_boundary = "runtime_start" }, carrier, {
+            selection = "ship_core:argon", collection_revision = "1",
+            producer_incarnation = "run-1", monotonic_millis = "100",
+        })
+        assert.equals("sampled", first.disposition)
+
+        census[1], census[2] = "argon", "xenon"
+        local stale = adapter:advance({ source_boundary = "game_loaded" }, carrier, {
+            selection = "ship_core:xenon", collection_revision = "2",
+            producer_incarnation = "run-1", monotonic_millis = "102",
+        })
+        assert.equals("source_boundary_changed", stale.disposition)
+        local refreshed = adapter:advance({ source_boundary = "game_loaded" }, carrier, {
+            selection = "ship_core:xenon", collection_revision = "2",
+            producer_incarnation = "run-1", monotonic_millis = "103",
+        })
+        assert.equals("sampled", refreshed.disposition)
+        assert.equals(2, refreshed.discovery_revision)
+    end)
 end)
