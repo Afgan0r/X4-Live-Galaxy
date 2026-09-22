@@ -11,18 +11,20 @@ const fn rejected() -> ProductionError {
 }
 
 pub fn is_key(key: &str) -> bool {
-    ["ship_cargo:g", "ship_crew:g", "ship_loadout:g"]
-        .iter()
-        .any(|prefix| {
-            key.strip_prefix(prefix)
-                .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
-        })
+    observation_domain::ShipSectionIdentity::parse(key)
+        .is_some_and(|section| section.kind() != observation_domain::ShipSectionKind::Core)
 }
 
 fn core<R: ObservationRepository>(
     lifecycle: &ObservationLifecycle<R>,
+    detail_key: &str,
 ) -> Result<CurrentRevision, ProductionError> {
-    let key = SectionKey::new("ship_core").ok_or_else(rejected)?;
+    let section = observation_domain::ShipSectionIdentity::parse(detail_key)
+        .filter(|section| section.kind() != observation_domain::ShipSectionKind::Core)
+        .ok_or_else(rejected)?;
+    let key = observation_domain::ShipSectionIdentity::core(section.faction())
+        .and_then(|value| SectionKey::new(value.key()))
+        .ok_or_else(rejected)?;
     lifecycle
         .current_revision(&key)
         .map_err(|_| ProductionError::Storage)?
@@ -37,10 +39,8 @@ fn group(
     use observation_domain::{
         ObservationPolicyVersion, ShipDetailGroup, ShipGroupDescriptor, ShipIdentity,
     };
-    let ordinal = key
-        .split_once(":g")
-        .map(|(_, ordinal)| ordinal)
-        .and_then(|v| v.parse::<u16>().ok())
+    let ordinal = observation_domain::ShipSectionIdentity::parse(key)
+        .and_then(|section| section.group())
         .ok_or_else(rejected)?;
     let members = parent
         .records
@@ -70,7 +70,7 @@ pub fn dependencies<R: ObservationRepository>(
     if !is_key(key) {
         return Ok(BTreeMap::new());
     }
-    let current = core(lifecycle)?;
+    let current = core(lifecycle, key)?;
     Ok(BTreeMap::from([(
         current.revision().section_key.clone(),
         current.receipt().revision,
@@ -108,7 +108,7 @@ pub fn validate_dependency<R: ObservationRepository>(
     if !is_key(key.as_str()) {
         return Ok(());
     }
-    let current = core(lifecycle)?;
+    let current = core(lifecycle, key.as_str())?;
     if freshness.is_some_and(|(now, max_age)| {
         now < current.receipt().accepted_at || now - current.receipt().accepted_at > max_age
     }) {

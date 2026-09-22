@@ -41,11 +41,22 @@ function profile.validate(values)
         or v.max_inner_records ~= v.complete_message_bytes then return nil, "invalid_limits" end
     return copy
 end
-function profile.options(values, faction)
+function profile.options(values, faction, inventory)
     local v, err = profile.validate(values)
     if not v then return nil, err end
+    local faction_ids
+    if type(faction) == "table" then
+        faction_ids = {}
+        for index, value in ipairs(faction) do
+            if type(value) ~= "string" or not value:match("^[%w_%-]+$") or #value > 64
+                or value == "player" then return nil, "selection_unavailable" end
+            faction_ids[index] = value
+        end
+        faction = faction_ids[1]
+        if faction == nil or type(inventory) ~= "table" then return nil, "selection_unavailable" end
+    end
     if type(faction) ~= "string" or not faction:match("^[%w_%-]+$") or #faction > 64
-        or faction == "player" or faction == "xenon" or faction == "khaak" then return nil, "selection_unavailable" end
+        or faction == "player" then return nil, "selection_unavailable" end
     local scope = "x4:faction:" .. faction .. ":ships"
     return { carrier = { limits = {
         data_message_bytes = v.complete_message_bytes, control_message_bytes = v.control_message_bytes,
@@ -56,7 +67,8 @@ function profile.options(values, faction)
         availability_interval_millis = v.availability_interval_millis,
         heavy_profile_version = v.heavy_profile_version, max_inner_records = v.max_inner_records,
     }, source = { source_scope = scope, source_epoch_status = "unknown", source_boundary = "runtime_start" } },
-    observation = { profile = "ship_core", faction_id = faction, source_scope = scope, heavy_limits = v,
+    observation = { profile = "ship_core", faction_id = faction, faction_ids = faction_ids,
+        faction_inventory = inventory, source_scope = scope, heavy_limits = v,
         ship_limits = { max_records = v.max_candidate_records, max_allocation_bytes = v.max_allocation_bytes,
             max_work = v.max_collection_steps, max_attempts = 1, max_age_millis = v.max_message_age_millis,
             faction_pointer_bytes = 8 } } }

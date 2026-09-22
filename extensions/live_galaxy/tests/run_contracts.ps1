@@ -38,6 +38,9 @@ try {
         Invoke-Stage 'Carrier-B-process-restart' 'pwsh' ($actual + @('-Scenario', 'process-restart', '-StartupOrder', 'native-first'))
         Invoke-Stage 'Carrier-B-bridge-restart' 'pwsh' ($actual + @('-Scenario', 'bridge-restart', '-StartupOrder', 'native-first'))
         Invoke-Stage 'Carrier-B-unload' 'pwsh' ($actual + @('-Scenario', 'pending-io-unload'))
+        Invoke-Stage 'Carrier-B-heavy-full-set' 'pwsh' @('-NoProfile', '-File',
+            (Join-Path $root 'tests/carrier-b-local.ps1'), '-SelfTest', '-Scenario',
+            'heavy-ship-full-set', '-LimitsFile', (Join-Path $root 'config/heavy-ship-limits.json'))
     }
     if ($Suite -in @('all', 'performance')) {
         Invoke-Stage 'Heavy-performance-contract' 'pwsh' @('-NoProfile', '-File',
@@ -63,14 +66,14 @@ try {
         if ($Filter) { $arguments += @('--filter', $Filter) }
         $files = switch ($Suite) {
             'component_discovery' { 'component_discovery_contract.lua' }
-            'ship_detail' { 'ship_detail_contract.lua'; 'ship_source_ffi_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua' }
+            'ship_detail' { 'ship_detail_contract.lua'; 'ship_source_ffi_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua'; 'faction_observation_contract.lua' }
             'x4_discovery' { 'carrier_b_contract.lua' }
             'telemetry' { 'telemetry_spec.lua' }
             'scheduler' { 'carrier_b_contract.lua' }
             'loader' { 'x4_loader_contract.lua' }
             'syntax' { 'module_loading_spec.lua'; $arguments += '--tags=syntax' }
             'carrier_b_actual' { 'carrier_b_contract.lua' }
-            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua'; 'x4_loader_contract.lua'; 'ship_collection_contract.lua'; 'ship_detail_contract.lua'; 'ship_source_ffi_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua' }
+            default { 'component_discovery_contract.lua'; 'telemetry_spec.lua'; 'carrier_b_contract.lua'; 'x4_loader_contract.lua'; 'ship_collection_contract.lua'; 'ship_detail_contract.lua'; 'ship_source_ffi_contract.lua'; 'heavy_profile_contract.lua'; 'ship_synchronous_contract.lua'; 'faction_observation_contract.lua' }
         }
         $arguments += @($files | ForEach-Object { Join-Path $PSScriptRoot $_ })
         Invoke-Stage 'Busted' $busted $arguments

@@ -30,7 +30,7 @@ function details.new(options, clock)
         group = options.group, scope = options.source_scope, expected_cores = expected_cores,
         work_budget = options.work_budget,
         capture_only = options.capture_only,
-        kind = options.group.key:match("^(ship_%w+):g") }, { __index = details })
+        kind = options.group.key:match("^(ship_%w+):") }, { __index = details })
 end
 
 function details:deliver()
@@ -52,7 +52,8 @@ function details:step(context, carrier, status)
     local group = self.group
     if self.stage == "done" then return { disposition = "producer_busy" } end
     if self.stage == "failed" then return { disposition = "failed" } end
-    if status.selection ~= group.key and not (self.capture_only and status.selection == "ship_core") then
+    if status.selection ~= group.key and not (self.capture_only
+        and (status.selection == "ship_core" or status.selection:match("^ship_core:[%w_%-]+$"))) then
         return self:fail(carrier, "restart_required")
     end
     if self.stage == "reserve" then

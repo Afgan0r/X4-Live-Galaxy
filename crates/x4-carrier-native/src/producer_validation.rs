@@ -1,14 +1,18 @@
 use crate::{SectionEvidence, TypedFact};
 
-pub(super) fn qualified_empty(evidence: &SectionEvidence) -> bool {
+pub(super) fn observable_zero_members(evidence: &SectionEvidence) -> bool {
     use observation_domain::{SectionCoverage, SourceConsistency};
-    evidence.sender.section_state.coverage() == SectionCoverage::KnownEmpty
+    let coverage = evidence.sender.section_state.coverage();
+    (coverage == SectionCoverage::KnownEmpty
         && matches!(
             evidence.sender.source_consistency,
             SourceConsistency::Barrier
                 | SourceConsistency::VersionedManifest
                 | SourceConsistency::EventInterval
-        )
+        ))
+        || (coverage == SectionCoverage::Partial
+            && evidence.sender.source_consistency == SourceConsistency::ObservedCountFillOnly
+            && evidence.sender.stable_identity)
 }
 
 pub(super) fn invalid_clock(fact: &TypedFact, max_raw_bytes: usize) -> bool {

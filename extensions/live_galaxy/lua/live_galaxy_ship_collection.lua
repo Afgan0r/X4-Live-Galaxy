@@ -11,8 +11,7 @@ local function token(value, limit)
         and value:match("^[%w_:%-]+$") ~= nil
 end
 function collection.new(options, clock)
-    if not token(options.faction_id, 64) or options.faction_id == "player"
-        or options.faction_id == "xenon" or options.faction_id == "khaak" then
+    if not token(options.faction_id, 64) or options.faction_id == "player" then
         return nil, "selection_unavailable"
     end
     local limits = options.ship_limits
@@ -26,6 +25,7 @@ function collection.new(options, clock)
     local api = options.ship_api or source.runtime()
     return setmetatable({ api = api, limits = copied, clock = clock, faction = options.faction_id,
         source_scope = options.source_scope or "x4:faction:" .. options.faction_id .. ":ships",
+        section_key = options.section_key or "ship_core",
         stage = "census", work = 0, attempts = 1, work_budget = options.work_budget,
         capture_only = options.capture_only }, { __index = collection })
 end
@@ -52,7 +52,7 @@ end
 
 function collection:step(context, carrier, status)
     if self.stage == "halted" then return { disposition = "retry_exhausted" } end
-    if status.selection ~= "ship_core" then return self:discard(carrier, "restart_required") end
+    if status.selection ~= self.section_key then return self:discard(carrier, "restart_required") end
     local boundary = context.source_boundary or "runtime_start"
     local incarnation = status.producer_incarnation
     if self.boundary and (self.boundary ~= boundary or self.incarnation ~= incarnation) then
@@ -120,7 +120,6 @@ function collection:step(context, carrier, status)
             or self.count * 3 + 4 > self.limits.max_work - self.work then
             return self:discard(carrier, "collection_overflow")
         end
-        if self.count == 0 then return self:discard(carrier, "empty_unproven") end
         self.stage = "allocate"
     elseif stage == "allocate" then
         self.buffer = self.count > 0 and api:new_buffer(self.count) or {}
@@ -151,17 +150,22 @@ function collection:step(context, carrier, status)
     elseif stage == "capture_begin" then
         local begin, err = self.clock:begin_evidence()
         if begin == nil then return self:discard(carrier, err) end
-        begin.section_key, begin.expected_records = "ship_core", self.count
+        begin.section_key, begin.expected_records = self.section_key, self.count
         begin.coverage, begin.consistency, begin.stable_identity = "partial", "observed_count_fill_only", true
         begin.source_epoch_status = context.source_epoch_status or "unknown"
         begin.source_boundary = boundary
-        self.begin, self.index, self.cores, self.records, self.stage = begin, 1, {}, {}, "core"
+        self.begin, self.index, self.cores, self.records = begin, 1, {}, {}
+        self.stage = self.count == 0 and "capture_finish" or "core"
     elseif stage == "reserve" then
         local code = carrier:begin_section(self.begin)
         if code == -21 then return { disposition = "producer_busy" } end
-        if code ~= 0 then return self:discard(carrier, "reservation_failed") end
+        if code ~= 0 then
+            local result = self:discard(carrier, "reservation_failed")
+            result.rejection.native_code = code
+            return result
+        end
         self.reserved, self.index = true, 1
-        self.stage = "record"
+        self.stage = self.count == 0 and "complete" or "record"
     elseif stage == "core" then
         local core, source_rejection = api:read_core(self.identities[self.index])
         if type(core) ~= "table" then
@@ -218,7 +222,11 @@ function collection:step(context, carrier, status)
         self.pending.profile, self.pending.source_scope = "ship_core", self.source_scope
         local code = carrier:push_record(self.pending)
         if code == -21 then return { disposition = "producer_busy" } end
-        if code ~= 0 then return self:discard(carrier, "fact_rejected") end
+        if code ~= 0 then
+            local result = self:discard(carrier, "fact_rejected")
+            result.rejection.native_code = code
+            return result
+        end
         self.pending, self.index = nil, self.index + 1
         self.stage = self.index > self.count and "complete" or "record"
     elseif stage == "complete" then

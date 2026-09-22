@@ -806,3 +806,31 @@ The 45 SETA files are retained under owner-only logical artifact
 `b4d5de96566dcf017d68d88ce0ff198f0aebb2df13355448038d21978ef87980`.
 Gate A is accepted for this exact package/profile identity. Full dynamic-faction
 implementation and Gate B remain pending.
+
+## Dynamic full-set local production expansion
+
+Plan 10 now derives observation eligibility independently of Faction Mind
+participation. Lua copies the complete `GetAllFactions(false)` count/fill result,
+retains every discovered ID as included, excluded, or unknown, and treats the
+first-party inventory as provenance rather than a discovery allowlist. XEN and
+KHK are included observation subjects without Minds; player is excluded; an
+unknown discovered ID remains a visible closure blocker.
+
+Faction-scoped section identities (`ship_core:<faction>` and
+`ship_<family>:<faction>:gN`) prevent current-state collisions while preserving
+legacy single-faction keys. The receiver binds each section to its selected
+scope and exact scoped core dependency. One existing scheduler rotates across
+factions and the three detail families. A stale blocked detail advances to the
+next faction instead of starving the roster.
+
+Zero observed ships now publish a zero-record `partial` core revision. This is
+an observation that the count/fill source returned zero, not a `known_empty`
+claim and not deletion authority. No detail section is scheduled for that
+revision.
+
+The actual local `heavy-ship-full-set` chain passed with four included factions,
+three rotations, a zero-ship XEN fixture, one blocked small-pirate detail branch,
+producer restart, varied census order, per-record churn, and independent
+earlier/current SQLite readback. Excluded player and unknown modded identities
+were never scheduled. The source remains a fake X4 fixture, so Gate B and all
+full-set in-game performance claims remain pending.

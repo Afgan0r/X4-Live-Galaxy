@@ -2,6 +2,7 @@
 
 mod absence;
 mod completion_envelope;
+mod faction_observation;
 mod identity;
 mod observation;
 mod reconciliation;
@@ -20,8 +21,13 @@ mod ship_field;
 mod ship_group;
 mod ship_loadout;
 mod ship_loadout_decode;
+mod ship_section;
 
 pub use absence::{AbsenceEvidence, AbsenceTracker, reconcile_qualified_membership};
+pub use faction_observation::{
+    FactionCensusEntry, FactionObservationDisposition, FactionObservationError,
+    FactionObservationRoster, FactionOrigin, FactionOriginEvidence, classify_observation_factions,
+};
 pub use identity::{
     BatchId, CanonicalizationVersion, CompletionCoverage, ControlEnvelope, DecisionSnapshotId,
     DigestAlgorithmVersion, EntityId, EnvelopeDecodeError, EventId, FrameHeader,
@@ -60,3 +66,4 @@ pub use ship_group::{ShipDetailGroup, ShipGroupDescriptor, ShipGroupError};
 pub use ship_loadout::{
     InstalledSlot, InstalledSoftware, LoadoutObservation, MissileCargo, ShipUnit, VirtualSlot,
 };
+pub use ship_section::{ShipSectionIdentity, ShipSectionKind};

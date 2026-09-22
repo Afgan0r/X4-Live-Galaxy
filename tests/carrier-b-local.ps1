@@ -2,7 +2,7 @@
 param(
     [switch]$SelfTest,
     [switch]$PrepareOnly,
-    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload', 'heavy-ship-core', 'heavy-ship-detail', 'heavy-ship-recovery')]
+    [ValidateSet('actual-chain', 'multi-collection', 'sustained-collection', 'process-restart', 'bridge-restart', 'pending-io-unload', 'heavy-ship-core', 'heavy-ship-detail', 'heavy-ship-recovery', 'heavy-ship-full-set')]
     [string]$Scenario = 'actual-chain',
     [ValidateSet('bridge-first', 'native-first')]
     [string]$StartupOrder = 'bridge-first',
@@ -202,7 +202,8 @@ if ($Calibration) {
     }
     $expectedLimitsHash = '440a55d8a0aed233f29fca14a6e06482c5880a0655f5beb98675f075303f4748'
     $actualLimitsHash = (Get-FileHash $limits -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($Scenario -ne 'heavy-ship-recovery' -and $actualLimitsHash -cne $expectedLimitsHash) { throw 'FROZEN_LIMITS_DIGEST_MISMATCH' }
+    if ($Scenario -notin @('heavy-ship-recovery', 'heavy-ship-full-set') -and
+        $actualLimitsHash -cne $expectedLimitsHash) { throw 'FROZEN_LIMITS_DIGEST_MISMATCH' }
 }
 $hostExecutable = Build-Host $run
 $data = Join-Path $run 'data'; [IO.Directory]::CreateDirectory($data) | Out-Null
@@ -216,6 +217,23 @@ if ($Scenario -eq 'heavy-ship-recovery') {
     . (Join-Path $repo 'tests/carrier-b-heavy-configured.ps1')
     if ($PerformanceGate -and -not $Throughput) { throw 'PERFORMANCE_GATE_REQUIRES_THROUGHPUT' }
     Invoke-HeavyConfiguredRestart $run $hostExecutable $data $limits $repo -Throughput:$Throughput -Interleave:$Interleave -PerformanceGate:$PerformanceGate
+    return
+}
+if ($Scenario -eq 'heavy-ship-full-set') {
+    & (Join-Path $repo 'target/release/validate_limits.exe') --limits-file $limits
+    if ($LASTEXITCODE -ne 0) { throw 'HEAVY_PROFILE_REJECTED' }
+    . (Join-Path $repo 'tools/carrier-b-package-contract.ps1')
+    $inventory = Join-Path $repo 'config/faction-source-inventory.json'
+    $profileRaw = Get-Content -LiteralPath $limits -Raw
+    $profileTarget = Join-Path $run 'extensions/live_galaxy/lua/live_galaxy_config.lua'
+    if (-not (Write-HeavyProfileLua $profileRaw $profileTarget $inventory)) {
+        throw 'FULL_SET_PROFILE_REQUIRED'
+    }
+    $arguments = @('run', '--locked', '-p', 'x4-bridge', '--example', 'carrier-b-ship-local', '--',
+        $run, $hostExecutable, (Join-Path $repo 'extensions/live_galaxy/tests/carrier_b_ship_full_set.lua'),
+        $data, $Scenario, $limits)
+    & cargo @arguments
+    if ($LASTEXITCODE -ne 0) { throw 'HEAVY_SHIP_FULL_SET_LOCAL_FAILED' }
     return
 }
 if ($Scenario -in @('heavy-ship-core', 'heavy-ship-detail')) {

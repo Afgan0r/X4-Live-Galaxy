@@ -9,7 +9,7 @@ impl Producer {
     pub(crate) fn intent_state_matches(&self, key: &str) -> bool {
         use crate::producer::Readiness;
         if self.readiness == Readiness::RefreshCore {
-            return key == "ship_core"
+            return is_core_section(key)
                 && matches!(
                     self.state,
                     crate::ProducerState::Ready | crate::ProducerState::PausedAfterFailure
@@ -71,4 +71,9 @@ impl Producer {
     pub(crate) const fn collection_revision(&self) -> u64 {
         self.revision
     }
+}
+
+fn is_core_section(key: &str) -> bool {
+    observation_domain::ShipSectionIdentity::parse(key)
+        .is_some_and(|section| section.kind() == observation_domain::ShipSectionKind::Core)
 }

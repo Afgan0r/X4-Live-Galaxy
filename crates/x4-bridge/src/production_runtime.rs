@@ -58,14 +58,15 @@ fn serve(
         .map_err(|_| history.record("waiting", "revision-floor-storage"))
         .ok()?;
     history.bind_session(&identity.session_id, identity.epoch.get());
+    let collection_key = session.collection_key();
     if schedule
         .as_mut()
-        .is_some_and(|value| !value.admit(session.collection_key()))
+        .is_some_and(|value| !value.admit(&collection_key))
     {
         let _ = history.record("waiting", "heavy-admission-window");
         return None;
     }
-    let issued = initial(peer, &identity, session.collection_key(), revision, limits).ok()?;
+    let issued = initial(peer, &identity, &collection_key, revision, limits).ok()?;
     let _ = history.record("collection", "compatible-session");
     receive_loop(peer, limits, history, session, &identity, schedule, issued)
 }
@@ -80,7 +81,7 @@ fn receive_loop(
 ) -> Option<observation_domain::SourceScopeId> {
     let mut progress = ReceiveProgress::issued(issued, limits, schedule.is_some());
     let mut active_scope = None;
-    let mut selected_key = session.collection_key().to_owned();
+    let mut selected_key = session.collection_key();
     loop {
         let bytes = match await_progress(peer, limits, history, session, &progress) {
             Ok(bytes) => bytes,

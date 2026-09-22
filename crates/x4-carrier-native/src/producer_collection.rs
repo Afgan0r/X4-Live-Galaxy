@@ -1,7 +1,7 @@
 use crate::producer::{Pending, Readiness};
 use crate::producer_message::assemble;
 use crate::producer_types::{PreparedRecord, ProducerProfile};
-use crate::producer_validation::{invalid_clock, qualified_empty};
+use crate::producer_validation::{invalid_clock, observable_zero_members};
 use crate::{
     Producer, ProducerError, ProducerOutcome, ProducerState, SectionEvidence,
     SectionFinishEvidence, TypedFact,
@@ -15,7 +15,7 @@ impl Producer {
     ) -> Result<(), ProducerError> {
         if self.profile == ProducerProfile::Clock
             || expected_records > self.limits.max_records
-            || (expected_records == 0 && !qualified_empty(&evidence))
+            || (expected_records == 0 && !observable_zero_members(&evidence))
         {
             return Err(ProducerError::InvalidInput);
         }

@@ -85,14 +85,21 @@ pub fn recover_idle(
     key: &mut String,
     progress: &mut ReceiveProgress,
 ) -> bool {
-    if key == "ship_core" || !session.stale_ship_parent(now()) {
+    if observation_domain::ShipSectionIdentity::parse(key)
+        .is_some_and(|section| section.kind() == observation_domain::ShipSectionKind::Core)
+        || !session.stale_ship_parent(now())
+    {
         return false;
     }
     let Some(active) = schedule else {
         return false;
     };
     active.complete();
-    let Some(issued) = next(peer, identity, limits, session, schedule, key) else {
+    let Ok(next_key) = session.skip_stale_ship_scope() else {
+        return false;
+    };
+    *key = next_key;
+    let Some(issued) = issue(peer, identity, limits, session, schedule, key) else {
         return false;
     };
     *progress = ReceiveProgress::issued(issued, limits, true);
@@ -108,8 +115,21 @@ pub fn next(
     key: &mut String,
 ) -> Option<Instant> {
     // Reconcile completion before issuing fresh collection demand.
-    if let Some(schedule) = schedule {
+    if schedule.is_some() {
         *key = session.next_ship_key(key, now()).ok()?;
+    }
+    issue(peer, identity, limits, session, schedule, key)
+}
+
+fn issue(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    session: &mut ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    key: &str,
+) -> Option<Instant> {
+    if let Some(schedule) = schedule {
         if !schedule.admit(key) {
             return None;
         }

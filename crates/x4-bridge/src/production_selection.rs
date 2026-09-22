@@ -63,7 +63,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         let Some(limits) = self.heavy_limits.as_ref() else {
             return false;
         };
-        let Some(key) = SectionKey::new("ship_core") else {
+        let Some(key) = SectionKey::new(self.collection_key()) else {
             return false;
         };
         self.lifecycle
@@ -87,8 +87,8 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .map_err(|_| ProductionError::Storage)?
             .iter()
             .filter(|v| {
-                v.revision().section_key.as_str() == "ship_core"
-                    || crate::receiver_ship_detail::is_key(v.revision().section_key.as_str())
+                observation_domain::ShipSectionIdentity::parse(v.revision().section_key.as_str())
+                    .is_some()
             })
             .try_fold(1, |floor, v| {
                 let next = v
@@ -101,15 +101,11 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 Ok(floor.max(next))
             })
     }
-    pub(crate) fn next_ship_key(
-        &self,
-        previous: &str,
-        now: u64,
-    ) -> Result<String, ProductionError> {
+    pub fn next_ship_key(&mut self, previous: &str, now: u64) -> Result<String, ProductionError> {
         if self.heavy_limits.is_none() {
-            return Ok(self.collection_key().into());
+            return Ok(self.collection_key());
         }
-        let key = SectionKey::new("ship_core").ok_or(ProductionError::InvalidLimits)?;
+        let key = SectionKey::new(self.collection_key()).ok_or(ProductionError::InvalidLimits)?;
         let parent = self
             .lifecycle
             .current_revision(&key)
@@ -136,14 +132,16 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         let last = details
             .iter()
             .max_by_key(|value| value.receipt().revision.get());
-        let cursor = last.and_then(|value| durable_cursor(value));
+        let cursor = last.and_then(|value| crate::production_ship_cursor::durable_cursor(value));
         let limits = self
             .heavy_limits
             .as_ref()
             .ok_or(ProductionError::InvalidLimits)?;
+        let previous_legacy = crate::production_ship_cursor::legacy_key(previous)
+            .ok_or(ProductionError::InvalidLimits)?;
         let next = crate::production_ship_cursor::next_member(
             &members,
-            previous,
+            &previous_legacy,
             cursor,
             limits.group_members,
         )?;
@@ -156,9 +154,12 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             observed,
             margin,
         ) {
-            return Ok("ship_core".into());
+            return Ok(self.collection_key());
         }
-        Ok(next)
+        if next == "ship_core" && (previous_legacy != "ship_core" || members.is_empty()) {
+            self.rotate_ship_scope();
+        }
+        self.scoped_key(&next)
     }
     pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
         let current = self
@@ -177,22 +178,4 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 .ok_or(ProductionError::RevisionExhausted)
         })
     }
-    pub fn select_ship_core(&mut self, faction: &str) -> Result<(), ProductionError> {
-        self.ship_scope = Some(crate::receiver_ship::scope(faction)?);
-        self.ship_timing.clear();
-        self.last_received = None;
-        Ok(())
-    }
-    pub const fn collection_key(&self) -> &'static str {
-        if self.ship_scope.is_some() {
-            "ship_core"
-        } else {
-            "carrier_b_realtime_sample"
-        }
-    }
-}
-fn durable_cursor(value: &observation_persistence::CurrentRevision) -> Option<(&str, &str)> {
-    let record = value.revision().records.first()?;
-    let (family, _) = value.revision().section_key.as_str().split_once(":g")?;
-    Some((record.entity_id.as_str(), family))
 }

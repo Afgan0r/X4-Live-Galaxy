@@ -101,22 +101,14 @@ pub(crate) enum ProducerProfile {
 
 impl ProducerProfile {
     pub(crate) fn from_section_key(value: &str) -> Option<Self> {
-        if let Some(group) = value.strip_prefix("ship_loadout:g") {
-            let index = group.parse::<u16>().ok()?;
-            return (index.to_string() == group).then_some(Self::ShipLoadout);
-        }
-        if let Some(group) = value.strip_prefix("ship_crew:g") {
-            let index = group.parse::<u16>().ok()?;
-            return (index.to_string() == group).then_some(Self::ShipCrew);
-        }
-        if let Some(group) = value.strip_prefix("ship_cargo:g") {
-            let index = group.parse::<u16>().ok()?;
-            return (index.to_string() == group).then_some(Self::ShipCargo);
-        }
-        match value {
-            "carrier_b_realtime_sample" => Some(Self::Clock),
-            "ship_core" => Some(Self::ShipCore),
-            _ => None,
+        let section = observation_domain::ShipSectionIdentity::parse(value);
+        match section.map(|section| section.kind()) {
+            Some(observation_domain::ShipSectionKind::Core) => Some(Self::ShipCore),
+            Some(observation_domain::ShipSectionKind::Cargo) => Some(Self::ShipCargo),
+            Some(observation_domain::ShipSectionKind::Crew) => Some(Self::ShipCrew),
+            Some(observation_domain::ShipSectionKind::Loadout) => Some(Self::ShipLoadout),
+            None if value == "carrier_b_realtime_sample" => Some(Self::Clock),
+            None => None,
         }
     }
 }

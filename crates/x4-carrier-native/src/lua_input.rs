@@ -60,12 +60,8 @@ pub unsafe fn begin(
     state: *mut c_void,
     source: &ProducerSource,
 ) -> Option<BeginInput> {
-    let section_key = unsafe { field_string(api, state, 2, "section_key", 64) }?;
-    if section_key == "ship_core"
-        || section_key.starts_with("ship_cargo:g")
-        || section_key.starts_with("ship_crew:g")
-        || section_key.starts_with("ship_loadout:g")
-    {
+    let section_key = unsafe { field_string(api, state, 2, "section_key", 128) }?;
+    if observation_domain::ShipSectionIdentity::parse(&section_key).is_some() {
         return unsafe { crate::lua_ship_input::begin(api, state, source, &BEGIN_KEYS) };
     }
     if !unsafe { exact_keys(api, state, 2, &BEGIN_KEYS) }

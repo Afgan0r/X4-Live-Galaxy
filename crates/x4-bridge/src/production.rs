@@ -1,15 +1,19 @@
 use std::path::Path;
 
+#[path = "production_reconciliation.rs"]
+mod reconciliation;
 #[path = "production_retention.rs"]
 mod retention;
 #[path = "production_selection.rs"]
 mod selection;
+#[path = "production_ship_scope.rs"]
+mod ship_scope;
 #[path = "production_ship_timing.rs"]
 mod timing;
 
 use observation_application::{
     LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
-    ObservationLifecycle, PublicationReconciler,
+    ObservationLifecycle,
 };
 use observation_domain::{
     BatchId, SectionKey, SourceScopeId, SourceSessionIdentity, TransportEpoch,
@@ -35,6 +39,8 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     lifecycle: ObservationLifecycle<R>,
     last_received: Option<(BatchId, Vec<u8>, LifecycleContext)>,
     ship_scope: Option<SourceScopeId>,
+    ship_scopes: Vec<SourceScopeId>,
+    ship_scope_index: usize,
     heavy_limits: Option<crate::HeavyShipLimits>,
     ship_timing: timing::ShipTiming,
 }
@@ -76,6 +82,8 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             ),
             last_received: None,
             ship_scope: None,
+            ship_scopes: Vec::new(),
+            ship_scope_index: 0,
             heavy_limits: None,
             ship_timing: timing::ShipTiming::default(),
         };
@@ -181,17 +189,5 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )
         .map_err(|_| ProductionError::Lifecycle(LifecycleError::DecodeRejected))?;
         crate::receiver_context::assemble(&self.lifecycle, &message)
-    }
-}
-impl<R: ObservationRepository + PublicationReconciler> ProductionObservationSession<R> {
-    pub fn reconcile_ambiguous(&mut self, now: u64) -> Result<LifecycleResult, ProductionError> {
-        self.lifecycle
-            .reconcile_ambiguous(now)
-            .map_err(ProductionError::Lifecycle)
-    }
-    pub fn retry_proven_not_committed(&mut self) -> Result<LifecycleResult, ProductionError> {
-        self.lifecycle
-            .retry_proven_not_committed()
-            .map_err(ProductionError::Lifecycle)
     }
 }

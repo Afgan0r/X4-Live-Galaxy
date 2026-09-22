@@ -10,7 +10,7 @@ describe("bounded faction core continuation", function()
 
     local function environment(options)
         options = options or {}
-        local calls, records, finished, failed, now, core_reads = {}, {}, 0, 0, 0, {}
+        local calls, records, finished, failed, begins, now, core_reads = {}, {}, 0, 0, {}, 0, {}
         local api = {
             list_factions = function() calls[#calls + 1] = "census"; return { "argon" } end,
             count_ships = function() calls[#calls + 1] = "count"; return options.count or 2 end,
@@ -40,7 +40,9 @@ describe("bounded faction core continuation", function()
             finish_evidence = function() return { capture_end_millis = "2" } end,
         }
         local carrier = {
-            begin_section = function() calls[#calls + 1] = "reserve"; return 0 end,
+            begin_section = function(_, evidence)
+                calls[#calls + 1] = "reserve"; begins[#begins + 1] = evidence; return 0
+            end,
             push_record = function(_, record)
                 if options.busy then return -21 end
                 records[#records + 1] = record; return 0
@@ -63,7 +65,7 @@ describe("bounded faction core continuation", function()
                 return collector:tick({ source_boundary = boundary or "runtime_start" }, carrier,
                     { selection = "ship_core", monotonic_millis = tostring(now), producer_incarnation = "1" })
             end,
-            result = function() return records, finished, failed end,
+            result = function() return records, finished, failed, begins end,
         }
     end
 
@@ -174,12 +176,14 @@ describe("bounded faction core continuation", function()
 
     it("never turns an empty observed count into known-empty", function()
         local env, result = environment({ count = 0 }), nil
-        for _ = 1, 12 do
+        for _ = 1, 20 do
             result = env.step()
-            if result.disposition == "empty_unproven" then break end
+            if result.disposition == "sampled" then break end
         end
-        assert.equals("empty_unproven", result.disposition)
-        local records, finished = env.result()
-        assert.same({ 0, 0 }, { #records, finished })
+        assert.equals("sampled", result.disposition)
+        local records, finished, _, begins = env.result()
+        assert.same({ 0, 1 }, { #records, finished })
+        assert.equals(0, begins[1].expected_records)
+        assert.equals("partial", begins[1].coverage)
     end)
 end)

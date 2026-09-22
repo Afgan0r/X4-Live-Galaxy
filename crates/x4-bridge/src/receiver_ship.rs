@@ -2,7 +2,8 @@ use crate::ProductionError;
 use observation_application::LifecycleError;
 use observation_domain::{
     CompleteMessage, SenderEvidence, ShipClass, ShipIdentity, ShipLocation, ShipOwner,
-    ShipRecordConsistency, ShipStaleReason, ShipType, SourceScopeId,
+    ShipRecordConsistency, ShipSectionIdentity, ShipSectionKind, ShipStaleReason, ShipType,
+    SourceScopeId,
 };
 
 const fn rejected() -> ProductionError {
@@ -10,7 +11,7 @@ const fn rejected() -> ProductionError {
 }
 
 pub fn scope(faction: &str) -> Result<SourceScopeId, ProductionError> {
-    if !token(faction) || matches!(faction, "player" | "xenon" | "khaak") {
+    if !token(faction) || faction == "player" {
         return Err(rejected());
     }
     SourceScopeId::new(format!("x4:faction:{faction}:ships")).ok_or_else(rejected)
@@ -26,14 +27,16 @@ pub fn validate(
         CompleteMessage::SectionCompletion(v) => (&v.section_key, &v.source_scope),
         CompleteMessage::Control(_) => return Ok(()),
     };
-    let detail = crate::receiver_ship_detail::is_key(key.as_str());
-    if selected.is_some() && ((key.as_str() != "ship_core" && !detail) || selected != Some(source))
-    {
+    let section = ShipSectionIdentity::parse(key.as_str());
+    let detail = section
+        .as_ref()
+        .is_some_and(|value| value.kind() != ShipSectionKind::Core);
+    if selected.is_some() && (section.is_none() || selected != Some(source)) {
         return Err(rejected());
     }
-    if key.as_str() != "ship_core" && !detail {
+    let Some(section) = section else {
         return Ok(());
-    }
+    };
     if selected != Some(source) {
         return Err(rejected());
     }
@@ -42,15 +45,15 @@ pub fn validate(
         .strip_prefix("x4:faction:")
         .and_then(|v| v.strip_suffix(":ships"))
         .ok_or_else(rejected)?;
+    if section.faction().is_some_and(|value| value != faction) {
+        return Err(rejected());
+    }
     if scope(faction)?.as_str() != source.as_str() {
         return Err(rejected());
     }
     match message {
         CompleteMessage::SectionStart(v) => {
             validate_evidence(&v.sender_evidence)?;
-            if v.expected_records == 0 {
-                return Err(rejected());
-            }
         }
         CompleteMessage::ImmutableBatch(v) => {
             if detail {
@@ -61,8 +64,7 @@ pub fn validate(
         }
         CompleteMessage::SectionCompletion(v) => {
             validate_evidence(&v.sender_evidence)?;
-            if v.coverage != observation_domain::CompletionCoverage::Partial || v.record_count == 0
-            {
+            if v.coverage != observation_domain::CompletionCoverage::Partial {
                 return Err(rejected());
             }
         }

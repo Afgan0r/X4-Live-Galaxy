@@ -1,7 +1,4 @@
-use observation_domain::{
-    CaptureWindow, CompleteMessage, SectionAvailability, SectionCoverage, SectionFreshness,
-    SectionQuality, SectionState, SourceConsistency,
-};
+use observation_domain::CompleteMessage;
 use observation_ingest::decode_complete_message;
 use x4_carrier_native::{ProducerError, ProducerOutcome, ProducerState, SectionEvidence};
 
@@ -170,27 +167,4 @@ fn exact_durable_reconciliation_never_republishes_completion() {
         producer.reconcile_committed(&id, &digest),
         Err(ProducerError::InvalidTransition)
     );
-}
-
-#[test]
-fn zero_records_require_authoritative_empty_evidence() {
-    let (mut producer, _) = ready_ship(0);
-    assert_eq!(
-        producer.begin_ship_section(
-            SectionEvidence::point_measurement("x4:faction:argon:ships"),
-            0
-        ),
-        Err(ProducerError::InvalidInput)
-    );
-    let window = CaptureWindow::new(0, 0).expect("window is ordered");
-    let mut evidence = SectionEvidence::point_measurement("x4:faction:argon:ships");
-    evidence.sender.section_state = SectionState::with_evidence(
-        window,
-        SectionFreshness::Fresh,
-        SectionQuality::KnownEmpty,
-        SectionAvailability::Available,
-        SectionCoverage::KnownEmpty,
-    );
-    evidence.sender.source_consistency = SourceConsistency::Barrier;
-    assert_eq!(producer.begin_ship_section(evidence, 0), Ok(()));
 }

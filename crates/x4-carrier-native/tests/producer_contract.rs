@@ -27,6 +27,8 @@ mod ship_stream;
 mod ship_support;
 #[path = "producer_contract/support.rs"]
 mod support;
+#[path = "producer_contract/zero_members.rs"]
+mod zero_members;
 use support::{control, ready, sample, source, take};
 
 fn take_revision(

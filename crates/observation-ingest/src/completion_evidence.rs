@@ -1,13 +1,7 @@
 use observation_domain::SenderEvidence;
 
 pub fn is_ship_section(key: &str) -> bool {
-    key == "ship_core"
-        || ["ship_cargo:g", "ship_crew:g", "ship_loadout:g"]
-            .iter()
-            .any(|prefix| {
-                key.strip_prefix(prefix)
-                    .is_some_and(|v| v.parse::<u16>().is_ok_and(|n| n.to_string() == v))
-            })
+    observation_domain::ShipSectionIdentity::parse(key).is_some()
 }
 
 pub fn ship_order_matches(
@@ -18,7 +12,9 @@ pub fn ship_order_matches(
     if !is_ship_section(key.as_str()) {
         return true;
     }
-    if key.as_str() != "ship_core" {
+    if observation_domain::ShipSectionIdentity::parse(key.as_str())
+        .is_none_or(|section| section.kind() != observation_domain::ShipSectionKind::Core)
+    {
         return records
             .windows(2)
             .all(|pair| pair[0].entity_id.as_str() < pair[1].entity_id.as_str());

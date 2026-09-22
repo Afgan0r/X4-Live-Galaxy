@@ -1,4 +1,27 @@
 use crate::ProductionError;
+use observation_domain::{ShipSectionIdentity, ShipSectionKind};
+
+pub fn durable_cursor(
+    value: &observation_persistence::CurrentRevision,
+) -> Option<(&str, &'static str)> {
+    let record = value.revision().records.first()?;
+    let family = match ShipSectionIdentity::parse(value.revision().section_key.as_str())?.kind() {
+        ShipSectionKind::Cargo => "ship_cargo",
+        ShipSectionKind::Crew => "ship_crew",
+        ShipSectionKind::Loadout => "ship_loadout",
+        ShipSectionKind::Core => return None,
+    };
+    Some((record.entity_id.as_str(), family))
+}
+
+pub fn legacy_key(value: &str) -> Option<String> {
+    let section = ShipSectionIdentity::parse(value)?;
+    let legacy = match section.kind() {
+        ShipSectionKind::Core => ShipSectionIdentity::core(None)?,
+        kind => ShipSectionIdentity::detail(kind, None, section.group()?)?,
+    };
+    Some(legacy.key())
+}
 
 pub fn next_member(
     members: &[String],

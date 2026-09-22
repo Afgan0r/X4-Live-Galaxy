@@ -13,12 +13,14 @@ pub fn validate_batch(
     if batch.records.is_empty() || batch.optional_detail.is_some() || batch.section_ordinal == 0 {
         return Err(rejected());
     }
-    let profile = batch
-        .section_key
-        .as_str()
-        .split_once(":g")
-        .map(|v| v.0)
-        .ok_or_else(rejected)?;
+    let profile = match observation_domain::ShipSectionIdentity::parse(batch.section_key.as_str())
+        .map(|section| section.kind())
+    {
+        Some(observation_domain::ShipSectionKind::Cargo) => "ship_cargo",
+        Some(observation_domain::ShipSectionKind::Crew) => "ship_crew",
+        Some(observation_domain::ShipSectionKind::Loadout) => "ship_loadout",
+        _ => return Err(rejected()),
+    };
     let mut prior_ordinal = None;
     for record in &batch.records {
         if !record.content.starts_with(&format!("profile={profile}\n")) {

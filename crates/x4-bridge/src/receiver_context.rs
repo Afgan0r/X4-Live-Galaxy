@@ -18,14 +18,15 @@ pub fn assemble<R: ObservationRepository>(
                 .map_err(|_| ProductionError::Storage)?
                 .map(|value| value.receipt().revision);
             let evidence = &start.sender_evidence;
-            let versions = if start.section_key.as_str() == "ship_core"
-                || crate::receiver_ship_detail::is_key(start.section_key.as_str())
-            {
-                crate::receiver_ship::validate_evidence(evidence)?;
-                observation_domain::SenderEvidence::legacy_default()
-            } else {
-                evidence.clone()
-            };
+            let versions =
+                if observation_domain::ShipSectionIdentity::parse(start.section_key.as_str())
+                    .is_some()
+                {
+                    crate::receiver_ship::validate_evidence(evidence)?;
+                    observation_domain::SenderEvidence::legacy_default()
+                } else {
+                    evidence.clone()
+                };
             Ok(LifecycleContext::Start(CandidateContext::new(
                 ContractVersions::new(
                     versions.schema_version,

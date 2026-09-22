@@ -13,9 +13,7 @@ pub fn is_committed<R: ObservationRepository>(
     let CompleteMessage::SectionCompletion(done) = message else {
         return Ok(false);
     };
-    if done.section_key.as_str() != "ship_core"
-        && !crate::receiver_ship_detail::is_key(done.section_key.as_str())
-    {
+    if observation_domain::ShipSectionIdentity::parse(done.section_key.as_str()).is_none() {
         return Ok(false);
     }
     let current = lifecycle

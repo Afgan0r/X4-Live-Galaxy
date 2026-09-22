@@ -2,8 +2,11 @@ use std::io::Write as _;
 mod cargo_readback;
 mod crew_readback;
 mod detail_peer;
+mod full_set_peer;
+mod full_set_readback;
 mod peer;
 mod readback;
+mod scenarios;
 mod wire;
 
 use observation_application::LifecycleLimits;
@@ -19,41 +22,35 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).map(PathBuf::from).collect();
-    let [root, host, script, data, scenario] = args.as_slice() else {
-        return Err("expected root host script data scenario".into());
+    let [root, host, script, data, scenario, rest @ ..] = args.as_slice() else {
+        return Err("expected root host script data scenario [limits]".into());
     };
     let database = data.join("observations.sqlite3");
-    let mut receiver = session(&database)?;
-    if scenario == Path::new("heavy-ship-detail") {
-        let mut host = Host::start(root, host, script, data, "heavy-ship-detail")?;
-        let (_, completions) = detail_peer::serve(&mut receiver)?;
-        host.finish()?;
-        drop(receiver);
-        readback::verify_cargo(&database)?;
-        crew_readback::verify(&database)?;
-        let mut receiver = session(&database)?;
-        // Exact replay reconciles the current revision for each group. Earlier
-        // retained revisions were independently read above, not republished.
-        for (_, completion) in completions
-            .iter()
-            .enumerate()
-            .filter(|(index, _)| matches!(index, 3 | 4 | 7 | 8 | 11 | 12))
-        {
-            peer::replay(&mut receiver, completion)?;
-        }
-        writeln!(
-            std::io::stdout(),
-            "PASS actual_chain_cargo_crew_loadout independent_history_current=true groups=2 revisions=2..13 replay=current_exact"
-        )?;
-        return Ok(());
+    let receiver = session(&database)?;
+    if scenario == Path::new("heavy-ship-full-set") {
+        return scenarios::run_full_set(root, host, script, data, rest, &database, receiver);
     }
+    if scenario == Path::new("heavy-ship-detail") {
+        return scenarios::run_detail(root, host, script, data, &database, receiver);
+    }
+    run_core(root, host, script, data, &database, receiver)
+}
+
+fn run_core(
+    root: &Path,
+    host: &Path,
+    script: &Path,
+    data: &Path,
+    database: &Path,
+    mut receiver: ProductionObservationSession,
+) -> Result<()> {
     let key = SectionKey::new("ship_core").ok_or("section key")?;
     let mut first = Host::start(root, host, script, data, "heavy-ship-core")?;
     let (identity1, completion1) = peer::serve(&mut receiver, 2, false)?;
     first.finish()?;
     drop(receiver);
-    readback::verify(&database, &[1, 2], &completion1.1)?;
-    let mut receiver = session(&database)?;
+    readback::verify(database, &[1, 2], &completion1.1)?;
+    let mut receiver = session(database)?;
     if receiver
         .next_revision(&key)
         .map_err(|e| format!("floor:{e:?}"))?
@@ -63,8 +60,8 @@ fn main() -> Result<()> {
     }
     peer::replay(&mut receiver, &completion1)?;
     drop(receiver);
-    readback::verify(&database, &[1, 2], &completion1.1)?;
-    let mut receiver = session(&database)?;
+    readback::verify(database, &[1, 2], &completion1.1)?;
+    let mut receiver = session(database)?;
     let mut second = Host::start(root, host, script, data, "heavy-ship-restart")?;
     let (identity2, completion2) = peer::serve(&mut receiver, 1, true)?;
     second.finish()?;
@@ -73,7 +70,7 @@ fn main() -> Result<()> {
     }
     peer::replay(&mut receiver, &completion2)?;
     drop(receiver);
-    readback::verify(&database, &[1, 2, 3], &completion2.1)?;
+    readback::verify(database, &[1, 2, 3], &completion2.1)?;
     writeln!(
         std::io::stdout(),
         "PASS heavy-ship-core actual_native=true revisions=1,2,3 connections=2 producer_processes=2 batches=24 replay=exact malformed=atomic independent_history_current=true"

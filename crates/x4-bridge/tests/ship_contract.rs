@@ -2,6 +2,10 @@
 mod carrier_b_support;
 #[path = "ship_contract/core_consistency.rs"]
 mod core_consistency;
+#[path = "ship_contract/faction_scope.rs"]
+mod faction_scope;
+#[path = "ship_contract/scoped_messages.rs"]
+mod scoped_messages;
 #[path = "ship_contract/replay.rs"]
 mod ship_contract_replay;
 mod ship_support;

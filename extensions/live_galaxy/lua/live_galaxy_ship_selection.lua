@@ -2,7 +2,24 @@ local selection = {}
 local source, core = require("live_galaxy.lua.live_galaxy_ship_source"), require("live_galaxy.lua.live_galaxy_ship_collection")
 local detail, budget_module = require("live_galaxy.lua.live_galaxy_ship_details"), require("live_galaxy.lua.live_galaxy_ship_budget")
 local profile = require("live_galaxy.lua.live_galaxy_ship_profile")
-local DETAIL_KEYS = { "ship_cargo:g0", "ship_crew:g0", "ship_loadout:g0" }
+local factions = require("live_galaxy.lua.live_galaxy_factions")
+local function section(key, fallback)
+    if key == "ship_core" then return "core", fallback, 0 end
+    local faction = key:match("^ship_core:([%w_%-]+)$")
+    if faction then return "core", faction, 0 end
+    local family, scoped, group = key:match("^ship_(cargo):([%w_%-]+):g(%d+)$")
+    if not family then family, scoped, group = key:match("^ship_(crew):([%w_%-]+):g(%d+)$") end
+    if not family then family, scoped, group = key:match("^ship_(loadout):([%w_%-]+):g(%d+)$") end
+    if not family then family, group = key:match("^ship_(cargo):g(%d+)$") end
+    if not family then family, group = key:match("^ship_(crew):g(%d+)$") end
+    if not family then family, group = key:match("^ship_(loadout):g(%d+)$") end
+    return family, scoped or fallback, group and tonumber(group)
+end
+local function detail_keys(faction, scoped)
+    local middle = scoped and ":" .. faction or ""
+    return { "ship_cargo" .. middle .. ":g0", "ship_crew" .. middle .. ":g0",
+        "ship_loadout" .. middle .. ":g0" }
+end
 local function metrics(self)
     local b = self.budget
     return b and { calls = b.calls, allocation_bytes = b.allocation, steps = b.steps,
@@ -68,6 +85,13 @@ function selection.attach(adapter, options)
 end
 local function start(self, context, carrier, status)
     local key = status.selection
+    local family, faction = section(key, self.options.faction_id)
+    if not family or not faction then return nil, "selection_unavailable" end
+    if self.roster and (not self.roster.by_id[faction]
+        or self.roster.by_id[faction].disposition ~= "included") then return nil, "selection_unavailable" end
+    self.faction = faction
+    self.scoped = key ~= "ship_core" and key:match(":g%d+$") and key:match("^ship_%w+:[%w_%-]+:g%d+$") ~= nil
+        or key:match("^ship_core:[%w_%-]+$") ~= nil
     local now = tonumber(status.monotonic_millis)
     if not now or not status.collection_revision or not status.collection_revision:match("^[1-9]%d*$") then return nil, "clock_unavailable" end
     self.run_started = self.run_started or now
@@ -76,20 +100,21 @@ local function start(self, context, carrier, status)
     self.budget = cached and self.snapshot.budget or budget_module.new(self.api, self.limits)
     local clock = { begin_evidence = self.clock.begin_evidence, finish_evidence = self.clock.finish_evidence,
         clock_getter = function() return self.budget:clock(self.clock.clock_getter) end }
-    local options = self.options
-    if key == "ship_core" then
+    local options = {}; for name, value in pairs(self.options) do options[name] = value end
+    options.faction_id, options.source_scope = faction, "x4:faction:" .. faction .. ":ships"
+    if family == "core" then
         self.snapshot = nil
         local core_options = {}; for name, value in pairs(options) do core_options[name] = value end
         core_options.ship_api, core_options.work_budget, core_options.capture_only = self.budget.api, self.budget, true
+        core_options.section_key = key
         self.collector = assert(core.new(core_options, clock))
     else
-        if not key:match("^ship_cargo:g%d+$") and not key:match("^ship_crew:g%d+$")
-            and not key:match("^ship_loadout:g%d+$") then return nil, "selection_unavailable" end
+        if not family or family == "core" then return nil, "selection_unavailable" end
         local parent = self.accepted
-        local ordinal = key:match("^ship_%w+:g(%d+)$")
-        ordinal = ordinal and tonumber(ordinal)
+        local ordinal = select(3, section(key, self.options.faction_id))
         if not parent or not ordinal or ordinal % 1 ~= 0 or ordinal > 65535
             or parent.incarnation ~= status.producer_incarnation or parent.boundary ~= context.source_boundary
+            or parent.faction ~= faction
             or now - parent.accepted_at > self.limits.freshness_millis then return nil, "stale_parent" end
         if cached and self.snapshot.revision == parent.revision then
             self.collector = cached
@@ -121,20 +146,31 @@ local function capture_snapshot(self, context, carrier, status)
     if not self.snapshot_capture then
         self.snapshot_capture = { parent = { members = self.collector.identities, cores = self.collector.cores,
             revision = self.revision, boundary = self.boundary, incarnation = self.incarnation,
+            faction = self.faction,
             budget = self.budget }, detail_index = 1 }
     end
     local capture = self.snapshot_capture
     local parent = capture.parent
+    if #parent.members == 0 then
+        self.snapshot, self.snapshot_capture = parent, nil
+        assert(self.collector:deliver())
+        while true do
+            local result = self.collector:step(context, carrier, status)
+            if result.disposition ~= "collecting" then return result end
+            if self.budget:should_yield(carrier) then return result end
+        end
+    end
     local clock = { begin_evidence = self.clock.begin_evidence, finish_evidence = self.clock.finish_evidence,
         clock_getter = function() return self.budget:clock(self.clock.clock_getter) end }
-    while capture.detail_index <= #DETAIL_KEYS do
-        local key = DETAIL_KEYS[capture.detail_index]
+    local keys = detail_keys(parent.faction, self.scoped)
+    while capture.detail_index <= #keys do
+        local key = keys[capture.detail_index]
         if not capture.collector then
             capture.collector = assert(detail.new({ ship_api = self.budget.api, capture_only = true,
                 max_inner = self.limits.max_inner_records, max_allocation_bytes = self.limits.max_allocation_bytes,
-                source_scope = self.options.source_scope, expected_cores = parent.cores,
+                source_scope = "x4:faction:" .. parent.faction .. ":ships", expected_cores = parent.cores,
                 work_budget = self.budget, group = { key = key, members = parent.members,
-                    owner = self.options.faction_id, core_revision = parent.revision } }, clock))
+                    owner = parent.faction, core_revision = parent.revision } }, clock))
         end
         local result = capture.collector:tick(context, carrier, status)
         if result.disposition == "collecting" then return result end
@@ -170,9 +206,23 @@ function selection.advance(self, context, carrier, status)
     end
     local ok, err = self.budget:before(status)
     if not ok then return discard(self, carrier, err) end
+    if self.options.faction_inventory and not self.roster then
+        local roster, roster_error = factions.capture(self.budget.api,
+            self.options.faction_inventory, self.discovery_revision or 1, {
+                max_factions = math.floor(self.limits.max_allocation_bytes / 8),
+                max_allocation_bytes = self.limits.max_allocation_bytes, pointer_bytes = 8,
+            })
+        if not roster then return discard(self, carrier, roster_error) end
+        self.roster = roster
+        if not roster.by_id[self.faction]
+            or roster.by_id[self.faction].disposition ~= "included" then
+            return discard(self, carrier, "selection_unavailable", status)
+        end
+    end
     local success, result = pcall(self.collector.tick, self.collector, context, carrier, status)
     if not success then return discard(self, carrier, self.budget.reason or "source_failure") end
-    if self.key == "ship_core" and (result.disposition == "captured" or self.snapshot_capture) then
+    local active_family = section(self.key, self.options.faction_id)
+    if active_family == "core" and (result.disposition == "captured" or self.snapshot_capture) then
         local capture_success, captured, capture_result = pcall(capture_snapshot, self, context, carrier, status)
         if not capture_success then return discard(self, carrier, self.budget.reason or "source_failure") end
         if captured == nil then
@@ -184,11 +234,11 @@ function selection.advance(self, context, carrier, status)
     end
     ok, err = self.budget:after(carrier)
     if not ok then return discard(self, carrier, err) end
-    if result.disposition == "sampled" and self.key == "ship_core" then
+    if result.disposition == "sampled" and active_family == "core" then
         -- Transfer owned, already bytewise-ordered membership; do not repeat an
         -- copy/sort after the source collector has completed.
         self.pending = { members = self.collector.identities, cores = self.collector.cores, revision = self.revision,
-            boundary = self.boundary, incarnation = self.incarnation }
+            boundary = self.boundary, incarnation = self.incarnation, faction = self.faction }
     elseif result.disposition == "sampled" and self.snapshot then
         self.snapshot[self.key] = nil
     end

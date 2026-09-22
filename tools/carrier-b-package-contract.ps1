@@ -1,6 +1,10 @@
 Set-StrictMode -Version Latest
 
-function Write-HeavyProfileLua([string]$LimitsRaw, [string]$Target) {
+function Write-HeavyProfileLua(
+    [string]$LimitsRaw,
+    [string]$Target,
+    [string]$FactionInventoryPath
+) {
     $values = $LimitsRaw | ConvertFrom-Json
     if (-not ($values.PSObject.Properties.Name -ccontains 'heavy_profile_version')) { return $false }
     $rows = @($values.PSObject.Properties | Sort-Object Name | ForEach-Object {
@@ -10,9 +14,34 @@ function Write-HeavyProfileLua([string]$LimitsRaw, [string]$Target) {
         "    $($_.Name) = $($_.Value),"
     })
     $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($LimitsRaw))).ToLowerInvariant()
-    $lua = @('local config = {}', "config.profile_sha256 = '$digest'", 'function config.options()',
-        "    return require('live_galaxy.lua.live_galaxy_ship_profile').options({") + $rows + @(
-        "    }, 'argon')", 'end', 'return config', '')
+    $prefix = @('local config = {}', "config.profile_sha256 = '$digest'")
+    $suffix = @("    }, 'argon')", 'end', 'return config', '')
+    if (-not [string]::IsNullOrWhiteSpace($FactionInventoryPath)) {
+        $inventory = Get-Content -LiteralPath $FactionInventoryPath -Raw | ConvertFrom-Json
+        if ($inventory.schema_version -ne 1 -or @($inventory.entries).Count -eq 0) {
+            throw 'FACTION_INVENTORY_INVALID'
+        }
+        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        $inventoryRows = [Collections.Generic.List[string]]::new()
+        $included = [Collections.Generic.List[string]]::new()
+        foreach ($entry in $inventory.entries) {
+            if ($entry.id -notmatch '^[a-z0-9_-]{1,64}$' -or -not $seen.Add($entry.id) -or
+                $entry.origin -notin @('vanilla', 'dlc', 'player', 'service', 'modded') -or
+                $entry.evidence -notmatch '^[a-z0-9_:+-]{1,64}$') {
+                throw 'FACTION_INVENTORY_INVALID'
+            }
+            $independent = if ($null -eq $entry.independent) { 'nil' } elseif ($entry.independent) { 'true' } else { 'false' }
+            $mind = if ($entry.mind_candidate) { 'true' } else { 'false' }
+            $inventoryRows.Add("    ['$($entry.id)'] = { origin = '$($entry.origin)', independent = $independent, mind_candidate = $mind, evidence = '$($entry.evidence)' },")
+            if ($entry.independent -eq $true -and $entry.origin -in @('vanilla', 'dlc')) {
+                $included.Add("'$($entry.id)'")
+            }
+        }
+        $prefix += @('local inventory = {') + @($inventoryRows) + @('}', 'local factions = { ' + (@($included) -join ', ') + ' }')
+        $suffix = @('    }, factions, inventory)', 'end', 'return config', '')
+    }
+    $lua = $prefix + @('function config.options()',
+        "    return require('live_galaxy.lua.live_galaxy_ship_profile').options({") + $rows + $suffix
     [IO.File]::WriteAllText($Target, ($lua -join "`n"), [Text.UTF8Encoding]::new($false))
     return $true
 }

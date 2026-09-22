@@ -30,6 +30,7 @@ pub unsafe fn begin(
     source: &ProducerSource,
     keys: &[&str],
 ) -> Option<BeginInput> {
+    let section_key = unsafe { field_string(api, state, 2, "section_key", 128) }?;
     if !unsafe { exact_keys(api, state, 2, keys) }
         || unsafe { field_string(api, state, 2, "capture_clock", 32) }? != "game_time_millis"
         || unsafe { field_string(api, state, 2, "quality", 32) }? != "unknown"
@@ -66,9 +67,15 @@ pub unsafe fn begin(
             "transport_reconnect" => SourceBoundary::TransportReconnect,
             _ => return None,
         };
+    let source_scope = observation_domain::ShipSectionIdentity::parse(&section_key)?
+        .faction()
+        .map_or_else(
+            || source.source_scope.clone(),
+            |faction| format!("x4:faction:{faction}:ships"),
+        );
     Some(BeginInput::ShipCore {
         evidence: SectionEvidence {
-            source_scope: source.source_scope.clone(),
+            source_scope,
             sender,
         },
         expected_records,

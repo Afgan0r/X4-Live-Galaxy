@@ -57,9 +57,10 @@ local function rejection_text(rejection)
         end
     end
     local section = rejection.section
-    if type(section) == "string" and #section <= 32 and (section == "ship_core"
-        or section:match("^ship_cargo:g%d+$") or section:match("^ship_crew:g%d+$")
-        or section:match("^ship_loadout:g%d+$")) then text = text .. " section=" .. section end
+    if type(section) == "string" and #section <= 128 and (section == "ship_core"
+        or section:match("^ship_core:[%w_%-]+$") or section:match("^ship_cargo:[%w_%-]*:?g%d+$")
+        or section:match("^ship_crew:[%w_%-]*:?g%d+$")
+        or section:match("^ship_loadout:[%w_%-]*:?g%d+$")) then text = text .. " section=" .. section end
     local revision, run = rejection.revision, rejection.run
     if type(revision) == "string" and #revision <= 20 and revision:match("^[1-9]%d*$") then
         text = text .. " revision=" .. revision
