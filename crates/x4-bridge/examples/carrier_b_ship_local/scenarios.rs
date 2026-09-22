@@ -37,7 +37,7 @@ pub fn run_full_set(
     full_set_readback::verify(database, &completions)?;
     writeln!(
         std::io::stdout(),
-        "PASS heavy-ship-full-set actual_native=true factions=4 zero_ship=xenon blocked_recovery=1 rotations=3 restart=true earlier_current=true unknown_blocker={} ",
+        "PASS heavy-ship-full-set actual_native=true factions=5 zero_ship=xenon blocked_recovery=1 rotations=3 restart=true earlier_current=true unknown_blocker={} ",
         first_run.closure_blocked
     )?;
     Ok(())
@@ -65,6 +65,12 @@ fn full_set_inventory() -> Result<Vec<observation_domain::FactionOriginEvidence>
         ),
         (
             "khaak",
+            observation_domain::FactionOrigin::Vanilla,
+            true,
+            false,
+        ),
+        (
+            "teladi",
             observation_domain::FactionOrigin::Vanilla,
             true,
             false,

@@ -73,6 +73,28 @@ fn receiver_rejects_unvalidated_faction_authority() {
         4,
     )
     .expect("valid test fixture");
+    let inventory = vec![
+        observation_domain::FactionOriginEvidence::new(
+            "argon",
+            observation_domain::FactionOrigin::Vanilla,
+            Some(true),
+            true,
+            "base",
+        )
+        .expect("included"),
+        observation_domain::FactionOriginEvidence::new(
+            "visitor",
+            observation_domain::FactionOrigin::Service,
+            Some(false),
+            false,
+            "base:hidden",
+        )
+        .expect("excluded"),
+    ];
+    receiver
+        .accept_faction_census(1, ["argon", "visitor", "unresolved"], &inventory)
+        .expect("valid mixed roster");
+    assert!(receiver.select_ship_factions(["argon"]).is_ok());
     for faction in ["custom_mod", "visitor", "unresolved"] {
         assert!(
             receiver.select_ship_factions([faction]).is_err(),

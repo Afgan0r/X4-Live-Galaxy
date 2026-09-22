@@ -75,6 +75,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .is_none_or(observation_domain::FactionObservationRoster::has_unknown_blocker)
     }
 
+    pub fn included_faction_ids(&self) -> Vec<String> {
+        self.faction_roster
+            .as_ref()
+            .map_or_else(Vec::new, |roster| {
+                roster.included_ids().map(str::to_owned).collect()
+            })
+    }
+
     pub fn refresh_faction_census(&mut self) {
         self.faction_roster = None;
         self.ship_scope = None;

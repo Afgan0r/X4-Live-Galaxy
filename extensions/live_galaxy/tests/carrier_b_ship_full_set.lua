@@ -3,13 +3,14 @@ package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 
 local config = assert(require("live_galaxy.lua.live_galaxy_config").options())
 local faction_values = mode == "heavy-ship-full-set-restart"
-    and { "argon", "player", "scaleplate", "custom_mod", "khaak", "xenon" }
-    or { "custom_mod", "khaak", "player", "xenon", "scaleplate", "argon" }
+    and { "argon", "player", "scaleplate", "custom_mod", "khaak", "xenon", "teladi" }
+    or { "custom_mod", "khaak", "player", "xenon", "scaleplate", "argon", "teladi" }
 local ships = {
     argon = { "9007199254740101", "9007199254740102" },
     scaleplate = { "9007199254740201" },
     xenon = {},
     khaak = { "9007199254740301" },
+    teladi = { "9007199254740401" },
 }
 local owner = {}
 for faction, values in pairs(ships) do
@@ -73,7 +74,7 @@ local roster = assert(require("live_galaxy.lua.live_galaxy_factions").capture(
     { max_factions = 64, max_allocation_bytes = 4096, pointer_bytes = 8 }))
 assert(roster.by_id.player.disposition == "excluded")
 assert(roster.by_id.custom_mod.disposition == "unknown" and roster.unknown_blocker)
-for _, faction in ipairs({ "argon", "scaleplate", "xenon", "khaak" }) do
+for _, faction in ipairs({ "argon", "scaleplate", "xenon", "khaak", "teladi" }) do
     assert(roster.by_id[faction].disposition == "included")
 end
 
@@ -113,7 +114,7 @@ local adapter = {
 }
 assert(require("live_galaxy.lua.live_galaxy_ship_selection").attach(adapter, config.observation))
 local context = { source_boundary = "runtime_start", source_epoch_status = "unknown" }
-local target = mode == "heavy-ship-full-set-restart" and 27 or 11
+local target = mode == "heavy-ship-full-set-restart" and 35 or 15
 local committed, deadline = 0, host_monotonic_millis() + 30000
 local closure_blocked
 while committed < target do

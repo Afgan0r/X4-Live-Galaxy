@@ -52,10 +52,12 @@ pub fn serve(
             )?;
             blocked_skips = 1;
         }
+        let expected = receiver.included_faction_ids();
         if next.starts_with("ship_core:")
-            && ["argon", "scaleplate", "xenon", "khaak"]
+            && !expected.is_empty()
+            && expected
                 .iter()
-                .all(|faction| cores.get(*faction).copied().unwrap_or(0) >= rotations)
+                .all(|faction| cores.get(faction).copied().unwrap_or(0) >= rotations)
         {
             break;
         }
