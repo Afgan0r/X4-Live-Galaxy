@@ -250,6 +250,13 @@ function Invoke-SelfTest {
         catch { if ($_.Exception.Message -eq 'NEGATIVE_IDENTITY_ACCEPTED') { throw } }
         $manifest.candidate = $savedCandidate
         Assert-Bundle $bundle $expectedCandidate
+        if ($expectedCandidate -ceq 'prepared-heavy-experiment') {
+            $startupText = Get-Content -LiteralPath (Join-Path $bundle 'STARTUP.txt') -Raw
+            if ($startupText -match '--ship-faction' -or
+                $startupText -notmatch '--limits-file carrier-b-limits\.json\.') {
+                throw 'HEAVY_STARTUP_NOT_CENSUS_FIRST'
+            }
+        }
         $extra = Join-Path $bundle 'extensions/live_galaxy/md/unmanifested.xml'
         [IO.File]::WriteAllText($extra, '<mdscript />', [Text.UTF8Encoding]::new($false))
         try { Assert-Bundle $bundle $expectedCandidate; throw 'NEGATIVE_EXTRA_FILE_ACCEPTED' }
