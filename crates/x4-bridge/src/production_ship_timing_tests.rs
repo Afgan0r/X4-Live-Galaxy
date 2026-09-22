@@ -28,6 +28,16 @@ fn completion() -> observation_domain::CompleteMessage {
     })
 }
 
+fn scoped_completion(kind: &str) -> observation_domain::CompleteMessage {
+    let mut message = completion();
+    let observation_domain::CompleteMessage::SectionCompletion(value) = &mut message else {
+        panic!("completion")
+    };
+    value.section_key = observation_domain::SectionKey::new(format!("{kind}:argon:g0"))
+        .expect("scoped detail key");
+    message
+}
+
 fn identity() -> observation_ingest::CarrierIdentity {
     observation_ingest::CarrierIdentity {
         session_id: "session:ship".into(),
@@ -53,6 +63,21 @@ fn accelerated_game_capture_does_not_inflate_receiver_wall_cost() {
         "five receiver-wall seconds must not become thirty game seconds and force core refresh"
     );
     assert_eq!(observed, receiver_commit - receiver_start);
+}
+
+#[test]
+fn faction_scoped_detail_timings_preserve_each_family_cost() {
+    let mut timing = super::super::timing::ShipTiming::default();
+    for (family, duration) in [
+        ("ship_cargo", 4_000),
+        ("ship_crew", 5_000),
+        ("ship_loadout", 6_000),
+    ] {
+        let key = format!("{family}:argon:g0");
+        timing.issued(&identity(), &key, 1, 10_000, &scope());
+        timing.completed(&scoped_completion(family), 10_000 + duration);
+        assert_eq!(timing.observed(&key), duration);
+    }
 }
 
 #[test]
