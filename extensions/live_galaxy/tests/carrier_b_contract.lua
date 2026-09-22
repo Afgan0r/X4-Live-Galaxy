@@ -417,6 +417,22 @@ describe("owned Carrier B adapter", function()
         end)
     end
 
+    it("keeps distinct scoped terminal correlation", function()
+        local scheduler = fixture.load("live_galaxy_scheduler")
+        for _, faction in ipairs({ "argon", "teladi" }) do
+            local env = native({ progress_code = 6, selection = "ship_core:" .. faction,
+                revision = "9" })
+            local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+            local observation = assert(fixture.load("live_galaxy_observation").new({
+                getter = function() return 1 end, clock_getter = function() return 0 end,
+            }))
+            local result = scheduler.tick("telemetry_tick", carrier, observation)
+            assert.equals("ship_core:" .. faction, result.rejection.section)
+            assert.equals("9", result.rejection.revision)
+            assert.equals("producer:1", result.rejection.run)
+        end
+    end)
+
     it("does not call the getter while immutable retry is pending", function()
         local env, getter_calls = native({ progress_code = 2, capacity = "occupied:1" }), 0
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))

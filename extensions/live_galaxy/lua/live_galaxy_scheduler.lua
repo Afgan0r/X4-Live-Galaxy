@@ -23,9 +23,15 @@ function scheduler.tick(context, carrier, observation)
     if type(context) ~= "table" then return { disposition = "clock_unavailable" } end
     if context.reentry_guard then return { disposition = "reentry_suppressed" } end
     context.reentry_guard = true
-    local function finish(disposition, code)
+    local function finish(disposition, code, status)
         context.reentry_guard = false
-        return { disposition = disposition, code = code }
+        local rejection
+        if type(status) == "table" then
+            rejection = { stage = "scheduler", condition = disposition,
+                section = status.selection, revision = status.collection_revision,
+                run = status.producer_incarnation }
+        end
+        return { disposition = disposition, code = code, rejection = rejection }
     end
 
     local progress, progress_status = call(carrier, "progress", 1)
@@ -36,14 +42,17 @@ function scheduler.tick(context, carrier, observation)
         discard(observation, carrier, terminal[progress])
         -- A replacement core intent may recover a paused heavy producer.
         -- Poll control before returning so that pause cannot starve recovery.
-        return finish(terminal[progress], progress)
+        return finish(terminal[progress], progress, progress_status)
     end
     if type(observation.feedback) == "function" then
         local ok, result = pcall(observation.feedback, observation, context, carrier, progress_status, control)
         if not ok then discard(observation, carrier, "source_failure"); return finish("source_failure", nil) end
         if result then context.reentry_guard = false; return result end
     end
-    if terminal[control] then discard(observation, carrier, terminal[control]); return finish(terminal[control], control) end
+    if terminal[control] then
+        discard(observation, carrier, terminal[control])
+        return finish(terminal[control], control, progress_status)
+    end
     if type(progress_status) ~= "table"
         or type(progress_status.capacity) ~= "string"
         or not progress_status.capacity:match("^available:%d+$") then
