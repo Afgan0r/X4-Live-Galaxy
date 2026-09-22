@@ -1,0 +1,9 @@
+{
+  "command": "$output = & cargo test --locked -p x4-bridge --test ship_contract ship_source_requires_receiver_selection -- --exact 2>&1; normalize a detected named assertion failure to TAP",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - ship_source_requires_receiver_selection\n1..1\n# tests 1\n# pass 0\n# fail 1\n",
+  "targetTest": "ship_source_requires_receiver_selection",
+  "targetFile": "crates/x4-bridge/tests/ship_contract.rs",
+  "expected": "The receiver admits XEN as a mandatory hostile observation subject.",
+  "actual": "select_ship_core(\"xenon\") returned Lifecycle(AuthorityRejected)."
+}

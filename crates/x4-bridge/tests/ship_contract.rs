@@ -111,7 +111,9 @@ fn ship_source_requires_receiver_selection() {
     let messages = ship_support::messages(1, "argon");
     assert!(submit(&mut receiver, &messages[0], 1).is_err());
     assert!(receiver.select_ship_core("player").is_err());
-    assert!(receiver.select_ship_core("xenon").is_err());
+    receiver
+        .select_ship_core("xenon")
+        .expect("mandatory hostile observation subject");
     receiver
         .select_ship_core("teladi")
         .expect("valid test fixture");
