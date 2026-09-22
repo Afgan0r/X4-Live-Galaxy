@@ -120,12 +120,12 @@ describe("dynamic faction observation contract", function()
         census[1], census[2] = "argon", "xenon"
         local stale = adapter:advance({ source_boundary = "game_loaded" }, carrier, {
             selection = "ship_core:xenon", collection_revision = "2",
-            producer_incarnation = "run-1", monotonic_millis = "102",
+            producer_incarnation = "run-1", monotonic_millis = "100",
         })
         assert.equals("source_boundary_changed", stale.disposition)
         local refreshed = adapter:advance({ source_boundary = "game_loaded" }, carrier, {
             selection = "ship_core:xenon", collection_revision = "2",
-            producer_incarnation = "run-1", monotonic_millis = "103",
+            producer_incarnation = "run-1", monotonic_millis = "100",
         })
         assert.equals("sampled", refreshed.disposition)
         assert.equals(2, refreshed.discovery_revision)

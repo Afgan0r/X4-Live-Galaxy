@@ -49,13 +49,19 @@ local function discard(self, carrier, reason, request)
     result.capture_metrics = not request and metrics(self) or nil
     return result
 end
+local function refresh_boundary(self)
+    self.roster_history = self.roster
+    self.roster = nil
+    self.discovery_revision = (self.discovery_revision or 1) + 1
+    self.key, self.revision, self.boundary, self.incarnation = nil, nil, nil, nil
+    self.run_started, self.budget = nil, nil
+end
 local function observe_qualification(self, carrier, status)
     local producer_state = type(status) == "table" and status.producer_state or nil
     if producer_state == "awaiting_compatibility" and self.producer_state
         and self.producer_state ~= producer_state then
         discard(self, carrier, "source_boundary_changed")
-        self.run_started, self.budget = nil, nil
-        self.key, self.revision, self.boundary, self.incarnation = nil, nil, nil, nil
+        refresh_boundary(self)
     end
     if type(producer_state) == "string" then self.producer_state = producer_state end
 end
@@ -76,7 +82,9 @@ function selection.attach(adapter, options)
             state.accepted, state.pending = pending, nil
         end
         if control == 9 or control == 10 or context.source_boundary ~= (state.boundary or context.source_boundary) then
-            return discard(state, carrier, "source_boundary_changed")
+            local result = discard(state, carrier, "source_boundary_changed")
+            refresh_boundary(state)
+            return result
         end
     end
     function adapter:advance(context, carrier, status) return selection.advance(state, context, carrier, status) end
@@ -195,7 +203,9 @@ function selection.advance(self, context, carrier, status)
         return discard(self, carrier, "admission_window_exhausted", status)
     end
     if self.incarnation and (self.incarnation ~= status.producer_incarnation or self.boundary ~= context.source_boundary) then
-        return discard(self, carrier, "source_boundary_changed", status)
+        local result = discard(self, carrier, "source_boundary_changed", status)
+        refresh_boundary(self)
+        return result
     end
     if not self.collector or self.key ~= status.selection or self.collector.stage == "done" then
         local ok, err = start(self, context, carrier, status)
@@ -214,6 +224,7 @@ function selection.advance(self, context, carrier, status)
             })
         if not roster then return discard(self, carrier, roster_error) end
         self.roster = roster
+        self.discovery_revision = roster.discovery_revision
         if not roster.by_id[self.faction]
             or roster.by_id[self.faction].disposition ~= "included" then
             return discard(self, carrier, "selection_unavailable", status)
@@ -245,6 +256,7 @@ function selection.advance(self, context, carrier, status)
     if result.disposition ~= "collecting" and result.disposition ~= "producer_busy" then
         result.capture_metrics = metrics(self)
     end
+    if self.roster then result.discovery_revision = self.roster.discovery_revision end
     return result
 end
 return selection
