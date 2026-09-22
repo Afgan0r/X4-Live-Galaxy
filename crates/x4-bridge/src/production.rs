@@ -12,7 +12,6 @@ mod selection;
 mod ship_scope;
 #[path = "production_ship_timing.rs"]
 mod timing;
-
 use observation_application::{
     LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits, LifecycleResult,
     ObservationLifecycle,
@@ -25,7 +24,6 @@ use observation_ingest::{
     GenerationStager,
 };
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProductionError {
     InvalidLimits,
@@ -35,7 +33,6 @@ pub enum ProductionError {
     InvalidFactionCensus,
     Lifecycle(LifecycleError),
 }
-
 pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     lifecycle: ObservationLifecycle<R>,
     last_received: Option<(BatchId, Vec<u8>, LifecycleContext)>,
@@ -48,7 +45,6 @@ pub struct ProductionObservationSession<R = SqliteObservationRepository> {
     faction_inventory: Vec<observation_domain::FactionOriginEvidence>,
     faction_census_mode: bool,
 }
-
 impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub fn from_repository(
         repository: R,
@@ -126,15 +122,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         );
         let census_completion = matches!(&message, observation_domain::CompleteMessage::SectionCompletion(value) if value.section_key.as_str() == "faction_census");
         let result = if census_completion {
-            let inventory = self.faction_inventory.clone();
-            self.lifecycle.submit_validated(input, &|revision| {
-                receiver_faction::validate_census(
-                    revision.section_revision().get(),
-                    revision.records(),
-                    &inventory,
-                )
-                .is_ok()
-            })
+            self.submit_validated_census(input)
         } else if let Some((scope, source_session)) =
             crate::receiver_context::source_boundary(&self.lifecycle, &message)
         {
@@ -154,7 +142,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         }
         Ok(result)
     }
-
     pub fn invalidate_source_scope(&mut self, scope: &SourceScopeId) {
         self.lifecycle.invalidate_source_scope(scope);
         if self.faction_census_mode {
@@ -164,7 +151,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             self.last_received = None;
         }
     }
-
     pub fn mark_source_scope_uncertain(
         &mut self,
         scope: &SourceScopeId,
@@ -178,7 +164,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             self.last_received = None;
         }
     }
-
     pub fn expire_candidates(&mut self, now: u64) -> usize {
         let expired = self.lifecycle.expire_candidates(now);
         if expired > 0 {
@@ -186,7 +171,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         }
         expired
     }
-
     pub fn decision_eligibility(
         &self,
         required: &[SectionKey],
@@ -195,7 +179,6 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
     ) -> DecisionEligibility {
         self.lifecycle.decision_eligibility(required, now, max_age)
     }
-
     fn receiver_context(&self, bytes: &[u8]) -> Result<LifecycleContext, ProductionError> {
         let message = observation_ingest::decode_complete_message(
             bytes,

@@ -34,7 +34,7 @@ static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 fn long_lived_and_stalled_sessions_keep_distinct_deadlines() {
     let _guard = TEST_LOCK
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     long_lived_session_accepts_late_transport_progress();
     stalled_candidate_expires_before_peer_disconnect();
 }

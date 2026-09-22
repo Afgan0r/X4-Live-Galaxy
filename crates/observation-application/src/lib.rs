@@ -13,5 +13,5 @@ pub use lifecycle::ObservationLifecycle;
 pub use publication::{PublicationReconciler, RetainedPublicationAttempt};
 pub use types::{
     AttemptState, LifecycleContext, LifecycleError, LifecycleInput, LifecycleLimits,
-    LifecycleResult, ReconcileResult,
+    LifecycleResult, ReconcileResult, RevisionValidator,
 };

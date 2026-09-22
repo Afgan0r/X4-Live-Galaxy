@@ -29,7 +29,10 @@ fn parse_entry(raw: &str) -> Option<FactionOriginEvidence> {
         "modded" => FactionOrigin::Modded,
         _ => return None,
     };
-    let independent = optional_bool_field(raw, "independent")?;
+    let independent = match independence_field(raw, "independent")? {
+        Independence::Known(value) => Some(value),
+        Independence::Unknown => None,
+    };
     let mind = bool_field(raw, "mind_candidate")?;
     let source = string_field(raw, "evidence")?;
     FactionOriginEvidence::new(id, origin, independent, mind, source).ok()
@@ -64,11 +67,16 @@ fn bool_field(raw: &str, key: &str) -> Option<bool> {
     }
 }
 
-fn optional_bool_field(raw: &str, key: &str) -> Option<Option<bool>> {
+enum Independence {
+    Known(bool),
+    Unknown,
+}
+
+fn independence_field(raw: &str, key: &str) -> Option<Independence> {
     match value(raw, key)? {
-        value if value.starts_with("true") => Some(Some(true)),
-        value if value.starts_with("false") => Some(Some(false)),
-        value if value.starts_with("null") => Some(None),
+        value if value.starts_with("true") => Some(Independence::Known(true)),
+        value if value.starts_with("false") => Some(Independence::Known(false)),
+        value if value.starts_with("null") => Some(Independence::Unknown),
         _ => None,
     }
 }

@@ -1,7 +1,5 @@
-use crate::production_runtime_control::{
-    RecoveryState, complete_selection, initial, recover_idle, send,
-};
-use crate::production_runtime_idle::{ProgressError, ReceiveProgress, await_progress};
+use crate::production_runtime_control::{complete_selection, initial, send};
+use crate::production_runtime_idle::{ProgressError, ReceiveProgress};
 use crate::production_runtime_message::{record_disposition, selection_finished};
 use crate::production_ship_schedule::ShipSchedule;
 use crate::{OperationalHistory, PIPE_ENDPOINT, ProductionLimits, ProductionObservationSession};
@@ -105,22 +103,17 @@ fn receive_loop(
     let mut active_scope = None;
     let mut selected_key = session.collection_key();
     loop {
-        let bytes = match await_progress(peer, limits, history, session, &progress) {
-            Ok(bytes) => bytes,
-            Err(ProgressError::Timeout)
-                if try_recover(
-                    peer,
-                    identity,
-                    limits,
-                    session,
-                    schedule,
-                    &mut selected_key,
-                    &mut progress,
-                ) =>
-            {
-                let _ = history.record("recovered", "stale-scope-rotated");
-                continue;
-            }
+        let bytes = match crate::production_runtime_recover::receive(
+            peer,
+            identity,
+            limits,
+            history,
+            session,
+            schedule,
+            crate::production_runtime_recover::state(&mut selected_key, &mut progress),
+        ) {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => continue,
             Err(ProgressError::Timeout) => {
                 let _ = history.record("rejected", "receive-timeout");
                 break;
@@ -167,29 +160,6 @@ fn receive_loop(
     active_scope
 }
 
-fn try_recover(
-    peer: &mut BridgePeer,
-    identity: &CarrierIdentity,
-    limits: &ProductionLimits,
-    session: &mut ProductionObservationSession,
-    schedule: &mut Option<ShipSchedule>,
-    key: &mut String,
-    progress: &mut ReceiveProgress,
-) -> bool {
-    recover_idle(
-        peer,
-        identity,
-        limits,
-        session,
-        schedule,
-        RecoveryState {
-            key,
-            progress,
-            monotonic_millis: now(),
-            issued_at: Instant::now(),
-        },
-    )
-}
 pub fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

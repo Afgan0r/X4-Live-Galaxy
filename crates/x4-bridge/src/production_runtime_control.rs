@@ -8,33 +8,15 @@ use observation_ingest::{
 };
 use std::time::Instant;
 use x4_carrier_native::BridgePeer;
+#[path = "production_control_failure.rs"]
+mod failure;
+use failure::SelectionFailure;
 
 pub struct RecoveryState<'a> {
     pub key: &'a mut String,
     pub progress: &'a mut ReceiveProgress,
     pub monotonic_millis: u64,
     pub issued_at: Instant,
-}
-
-#[derive(Clone, Copy)]
-enum SelectionFailure {
-    Cursor,
-    Admission,
-    Revision,
-    Intent,
-    Demand,
-}
-
-impl SelectionFailure {
-    const fn reason(self) -> &'static str {
-        match self {
-            Self::Cursor => "next-selection-cursor",
-            Self::Admission => "next-selection-admission",
-            Self::Revision => "next-selection-revision",
-            Self::Intent => "next-selection-intent-send",
-            Self::Demand => "next-selection-demand-send",
-        }
-    }
 }
 
 pub fn initial(

@@ -16,6 +16,7 @@ mod production_runtime;
 mod production_runtime_control;
 mod production_runtime_idle;
 mod production_runtime_message;
+mod production_runtime_recover;
 mod production_ship_cursor;
 mod production_ship_limits;
 mod production_ship_schedule;

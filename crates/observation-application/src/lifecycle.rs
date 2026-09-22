@@ -35,7 +35,6 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             limits,
         }
     }
-
     pub fn submit(&mut self, input: LifecycleInput) -> Result<LifecycleResult, LifecycleError> {
         self.submit_admitted(input, None, None)
     }
@@ -64,7 +63,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
             observation_domain::SourceScopeId,
             observation_domain::SourceSessionIdentity,
         )>,
-        validator: Option<&dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>,
+        validator: crate::RevisionValidator<'_>,
     ) -> Result<LifecycleResult, LifecycleError> {
         if self.retained.is_some() {
             return Err(LifecycleError::BlockedAmbiguous);
@@ -132,7 +131,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         context: LifecycleContext,
         work: usize,
         now: u64,
-        validator: Option<&dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>,
+        validator: crate::RevisionValidator<'_>,
     ) -> Result<LifecycleResult, LifecycleError> {
         let disposition = match (message, context) {
             (CompleteMessage::SectionStart(start), LifecycleContext::Start(context)) => {

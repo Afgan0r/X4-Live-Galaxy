@@ -71,7 +71,7 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
         completion: SectionCompletionEnvelope,
         current: &CompletionCurrent,
         now: u64,
-        validator: Option<&dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>,
+        validator: crate::RevisionValidator<'_>,
     ) -> Result<LifecycleResult, LifecycleError> {
         let Some(certificate) = self.stager.completion_certificate(completion) else {
             return self.finish_disposition(ReceiverDisposition::PermanentlyRejected);

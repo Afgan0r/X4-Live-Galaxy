@@ -6,6 +6,16 @@ use observation_domain::{
 use observation_persistence::ObservationRepository;
 
 impl<R: ObservationRepository> ProductionObservationSession<R> {
+    pub(super) fn submit_validated_census(
+        &mut self,
+        input: observation_application::LifecycleInput,
+    ) -> Result<observation_application::LifecycleResult, observation_application::LifecycleError>
+    {
+        let inventory = self.faction_inventory.clone();
+        self.lifecycle
+            .submit_validated(input, &|revision| validates_revision(revision, &inventory))
+    }
+
     pub fn configure_faction_inventory(
         &mut self,
         inventory: Vec<FactionOriginEvidence>,
@@ -60,6 +70,18 @@ pub(super) fn validate_census(
         .all(|claim| claim.matches(roster.entry(&claim.id)))
         .then_some(roster)
         .ok_or(ProductionError::InvalidFactionCensus)
+}
+
+pub(super) fn validates_revision(
+    revision: &observation_ingest::ValidatedSectionRevision,
+    inventory: &[FactionOriginEvidence],
+) -> bool {
+    validate_census(
+        revision.section_revision().get(),
+        revision.records(),
+        inventory,
+    )
+    .is_ok()
 }
 
 struct Claim {

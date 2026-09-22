@@ -5,6 +5,9 @@ use observation_ingest::{
     ApplicationContextIdentity, CandidateContext, CompletionCurrent, ReceiverDisposition,
 };
 
+pub type RevisionValidator<'a> =
+    Option<&'a dyn Fn(&observation_ingest::ValidatedSectionRevision) -> bool>;
+
 #[must_use]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LifecycleInput {
