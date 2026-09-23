@@ -83,6 +83,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             })
     }
 
+    #[must_use]
+    pub fn heavy_collection_complete(&self) -> bool {
+        self.faction_census_mode
+            && self.faction_roster.as_ref().is_some_and(|roster| {
+                !roster.has_unknown_blocker() && roster.included_ids().next().is_none()
+            })
+    }
+
     pub fn refresh_faction_census(&mut self) {
         self.faction_roster = None;
         self.ship_scope = None;
@@ -109,7 +117,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             return "faction_census".to_owned();
         }
         self.ship_scope.as_ref().map_or_else(
-            || "carrier_b_realtime_sample".to_owned(),
+            || "faction_census".to_owned(),
             |_| {
                 self.scoped_key("ship_core")
                     .unwrap_or_else(|_| "ship_core".to_owned())

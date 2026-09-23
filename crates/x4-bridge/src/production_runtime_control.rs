@@ -1,7 +1,6 @@
-use crate::production_runtime::now;
 use crate::production_runtime_idle::ReceiveProgress;
 use crate::production_ship_schedule::ShipSchedule;
-use crate::{OperationalHistory, ProductionLimits, ProductionObservationSession};
+use crate::{ProductionLimits, ProductionObservationSession};
 use observation_ingest::{
     CarrierControl, CarrierIdentity, CollectionIntentBody, ControlBody, DemandBody, HandshakeBody,
     encode_carrier_control,
@@ -10,7 +9,9 @@ use std::time::Instant;
 use x4_carrier_native::BridgePeer;
 #[path = "production_control_failure.rs"]
 mod failure;
-use failure::SelectionFailure;
+#[path = "production_runtime_selection.rs"]
+mod selection;
+pub use selection::complete_selection;
 
 pub struct RecoveryState<'a> {
     pub key: &'a mut String,
@@ -18,7 +19,6 @@ pub struct RecoveryState<'a> {
     pub monotonic_millis: u64,
     pub issued_at: Instant,
 }
-
 pub fn initial(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -85,7 +85,6 @@ pub fn send(
     .map_err(|_| ())?;
     peer.send_control(&bytes).map_err(|_| ())
 }
-
 pub fn recover_idle(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -114,87 +113,9 @@ pub fn recover_idle(
         return false;
     };
     *key = next_key;
-    let Ok(issued) = issue(peer, identity, limits, session, schedule, key) else {
+    let Ok(issued) = selection::issue(peer, identity, limits, session, schedule, key) else {
         return false;
     };
     *progress = ReceiveProgress::issued(issued_at.max(issued), limits, true);
     true
-}
-
-fn next(
-    peer: &mut BridgePeer,
-    identity: &CarrierIdentity,
-    limits: &ProductionLimits,
-    session: &mut ProductionObservationSession,
-    schedule: &mut Option<ShipSchedule>,
-    key: &mut String,
-) -> Result<Instant, SelectionFailure> {
-    // Reconcile completion before issuing fresh collection demand.
-    if schedule.is_some() {
-        *key = session
-            .next_ship_key(key, now())
-            .map_err(|_| SelectionFailure::Cursor)?;
-    }
-    issue(peer, identity, limits, session, schedule, key)
-}
-
-fn issue(
-    peer: &mut BridgePeer,
-    identity: &CarrierIdentity,
-    limits: &ProductionLimits,
-    session: &mut ProductionObservationSession,
-    schedule: &mut Option<ShipSchedule>,
-    key: &str,
-) -> Result<Instant, SelectionFailure> {
-    if let Some(schedule) = schedule {
-        if !schedule.admit(key) {
-            return Err(SelectionFailure::Admission);
-        }
-        let revision = session
-            .heavy_revision_floor()
-            .map_err(|_| SelectionFailure::Revision)?;
-        let issued_at = now();
-        intent(peer, identity, key, revision, limits).map_err(|()| SelectionFailure::Intent)?;
-        session.ship_intent_issued(identity, key, revision, issued_at);
-    }
-    let issued = Instant::now();
-    send(
-        peer,
-        identity,
-        ControlBody::Demand(DemandBody { credit: 1 }),
-        limits,
-    )
-    .map_err(|()| SelectionFailure::Demand)?;
-    Ok(issued)
-}
-
-pub fn complete_selection(
-    peer: &mut BridgePeer,
-    identity: &CarrierIdentity,
-    limits: &ProductionLimits,
-    history: &mut OperationalHistory,
-    session: &mut ProductionObservationSession,
-    schedule: &mut Option<ShipSchedule>,
-    key: &mut String,
-) -> Option<Instant> {
-    if session.maintain_heavy_history().is_err() {
-        let _ = history.record("waiting", "heavy-retention-storage");
-        return None;
-    }
-    if let Some(schedule) = schedule {
-        schedule.complete();
-    }
-    match next(peer, identity, limits, session, schedule, key) {
-        Ok(issued) => {
-            let revision = session.heavy_revision_floor().unwrap_or(0);
-            history.bind_message("attempt-1", key, revision);
-            Some(issued)
-        }
-        Err(error) => {
-            let revision = session.heavy_revision_floor().unwrap_or(0);
-            history.bind_message("attempt-1", key, revision);
-            let _ = history.record("rejected", error.reason());
-            None
-        }
-    }
 }

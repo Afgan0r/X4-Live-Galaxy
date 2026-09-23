@@ -4,6 +4,8 @@ mod carrier_b_support;
 mod core_consistency;
 #[path = "ship_contract/faction_scope.rs"]
 mod faction_scope;
+#[path = "ship_contract/no_work.rs"]
+mod no_work;
 #[path = "ship_contract/scoped_messages.rs"]
 mod scoped_messages;
 #[path = "ship_contract/replay.rs"]
