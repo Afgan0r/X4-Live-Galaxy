@@ -139,7 +139,16 @@ impl BatchBudget {
 
 #[cfg(test)]
 mod tests {
-    use super::{CandidateLimits, CandidateUsage};
+    use super::{BatchBudget, CandidateLimits, CandidateUsage, MAX_BATCH_BYTES};
+
+    #[test]
+    fn frame_bytes_accumulate_across_the_batch() {
+        let Ok(mut budget) = BatchBudget::new(2) else {
+            panic!("two-frame fixture is within the batch limit");
+        };
+        assert!(budget.record_frame(MAX_BATCH_BYTES).is_ok());
+        assert!(budget.record_frame(1).is_err());
+    }
 
     #[test]
     fn each_candidate_resource_limit_rejects_one_over_independently() {
