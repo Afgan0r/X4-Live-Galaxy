@@ -1,4 +1,4 @@
-use crate::production_runtime_control::recover_idle;
+use crate::production_runtime_control::recover_idle_selection;
 use crate::production_runtime_idle::{ProgressError, await_progress};
 use crate::{
     OperationalHistory, ProductionLimits, ProductionObservationSession, RecoveryState, ShipSchedule,
@@ -31,9 +31,12 @@ pub fn receive(
         Ok(bytes) => Ok(Some(bytes)),
         Err(ProgressError::Timeout) => {
             recovery.monotonic_millis = crate::production_runtime::now();
-            if !recover_idle(peer, identity, limits, session, schedule, recovery) {
+            let Some(issued) =
+                recover_idle_selection(peer, identity, limits, session, schedule, recovery)
+            else {
                 return Err(ProgressError::Timeout);
-            }
+            };
+            history.bind_selection(issued.attempt, &issued.key, issued.revision);
             let _ = history.record("recovered", "stale-scope-rotated");
             Ok(None)
         }

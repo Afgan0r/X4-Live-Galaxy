@@ -88,10 +88,9 @@ fn stalled_candidate_expires_before_peer_disconnect() {
     wait_for_history(harness.directory.path(), "candidate-expired");
     wait_for_history(harness.directory.path(), "receive-timeout");
     wait_for_history(harness.directory.path(), "receive-timeout-exhausted");
-    let history = std::fs::read_to_string(
-        harness.directory.path().join("operational-history.jsonl"),
-    )
-    .expect("history");
+    let history =
+        std::fs::read_to_string(harness.directory.path().join("operational-history.jsonl"))
+            .expect("history");
     assert!(!history.contains("peer-disconnected"));
     harness.stop();
 }

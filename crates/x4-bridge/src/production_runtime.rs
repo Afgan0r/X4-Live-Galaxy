@@ -79,9 +79,10 @@ fn serve(
         let _ = history.record("waiting", "heavy-admission-window");
         return None;
     }
+    let attempt = schedule.as_mut().map_or(0, ShipSchedule::next_attempt);
+    history.bind_selection(attempt, &collection_key, Some(revision));
     let issued = initial(peer, &identity, &collection_key, revision, limits).map_or_else(
         |()| {
-            history.bind_message("attempt-1", &collection_key, revision);
             let _ = history.record("rejected", "control-send-failed");
             None
         },
@@ -156,12 +157,16 @@ fn receive_loop(
         };
         progress = ReceiveProgress::issued(issued, limits, schedule.is_some());
     };
+    record_loop_exit(history, &exit);
+    active_scope
+}
+
+fn record_loop_exit(history: &mut OperationalHistory, exit: &ProgressError) {
     let reason = match exit {
         ProgressError::Timeout => "receive-timeout-exhausted",
         ProgressError::Receive => "peer-disconnected",
     };
     let _ = history.record("waiting", reason);
-    active_scope
 }
 
 pub fn now() -> u64 {

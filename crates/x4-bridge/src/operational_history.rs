@@ -27,7 +27,7 @@ pub struct OperationalHistory {
     epoch: u64,
     message: String,
     section: String,
-    revision: u64,
+    revision: Option<u64>,
 }
 
 impl OperationalHistory {
@@ -53,7 +53,7 @@ impl OperationalHistory {
             epoch: 0,
             message: String::new(),
             section: String::new(),
-            revision: 0,
+            revision: None,
         };
         history
             .record("startup", "journal-accepted")
@@ -133,7 +133,8 @@ impl OperationalHistory {
             escape(&self.message),
             escape(&self.section),
             escape(&correlation::scope(&self.section)),
-            self.revision,
+            self.revision
+                .map_or_else(|| "null".to_owned(), |value| value.to_string()),
             correlation::attempt(&self.message),
             escape(state),
             escape(state),

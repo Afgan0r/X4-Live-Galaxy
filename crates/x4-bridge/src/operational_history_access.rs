@@ -12,12 +12,19 @@ impl OperationalHistory {
         self.epoch = epoch;
         self.message.clear();
         self.section.clear();
-        self.revision = 0;
+        self.revision = None;
     }
 
     pub fn bind_message(&mut self, message: &str, section: &str, revision: u64) {
         self.reset_duplicate_window();
         message.clone_into(&mut self.message);
+        section.clone_into(&mut self.section);
+        self.revision = Some(revision);
+    }
+
+    pub fn bind_selection(&mut self, attempt: u64, section: &str, revision: Option<u64>) {
+        self.reset_duplicate_window();
+        self.message = format!("attempt-{attempt}");
         section.clone_into(&mut self.section);
         self.revision = revision;
     }

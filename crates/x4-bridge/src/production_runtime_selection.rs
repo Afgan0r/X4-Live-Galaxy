@@ -7,6 +7,15 @@ use observation_ingest::{CarrierIdentity, ControlBody, DemandBody};
 use std::time::Instant;
 use x4_carrier_native::BridgePeer;
 
+pub struct IssuedSelection {
+    pub at: Instant,
+    pub revision: Option<u64>,
+    pub attempt: u64,
+    pub key: String,
+}
+
+type SelectionError = (SelectionFailure, Option<u64>);
+
 fn next(
     peer: &mut BridgePeer,
     identity: &CarrierIdentity,
@@ -14,13 +23,14 @@ fn next(
     session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
     key: &mut String,
-) -> Result<Instant, SelectionFailure> {
+    attempt: u64,
+) -> Result<IssuedSelection, SelectionError> {
     if schedule.is_some() {
         *key = session
             .next_ship_key(key, now())
-            .map_err(|_| SelectionFailure::Cursor)?;
+            .map_err(|_| (SelectionFailure::Cursor, None))?;
     }
-    issue(peer, identity, limits, session, schedule, key)
+    issue(peer, identity, limits, session, schedule, key, attempt)
 }
 
 pub(super) fn issue(
@@ -30,17 +40,21 @@ pub(super) fn issue(
     session: &mut ProductionObservationSession,
     schedule: &mut Option<ShipSchedule>,
     key: &str,
-) -> Result<Instant, SelectionFailure> {
+    attempt: u64,
+) -> Result<IssuedSelection, SelectionError> {
+    let mut revision = None;
     if let Some(schedule) = schedule {
         if !schedule.admit(key) {
-            return Err(SelectionFailure::Admission);
+            return Err((SelectionFailure::Admission, None));
         }
-        let revision = session
+        let next_revision = session
             .heavy_revision_floor()
-            .map_err(|_| SelectionFailure::Revision)?;
+            .map_err(|_| (SelectionFailure::Revision, None))?;
+        revision = Some(next_revision);
         let issued_at = now();
-        intent(peer, identity, key, revision, limits).map_err(|()| SelectionFailure::Intent)?;
-        session.ship_intent_issued(identity, key, revision, issued_at);
+        intent(peer, identity, key, next_revision, limits)
+            .map_err(|()| (SelectionFailure::Intent, revision))?;
+        session.ship_intent_issued(identity, key, next_revision, issued_at);
     }
     let issued = Instant::now();
     send(
@@ -49,8 +63,13 @@ pub(super) fn issue(
         ControlBody::Demand(DemandBody { credit: 1 }),
         limits,
     )
-    .map_err(|()| SelectionFailure::Demand)?;
-    Ok(issued)
+    .map_err(|()| (SelectionFailure::Demand, revision))?;
+    Ok(IssuedSelection {
+        at: issued,
+        revision,
+        attempt,
+        key: key.to_owned(),
+    })
 }
 
 pub fn complete_selection(
@@ -73,15 +92,19 @@ pub fn complete_selection(
         let _ = history.record("completed", "no-included-factions");
         return None;
     }
-    match next(peer, identity, limits, session, schedule, key) {
+    let attempt = schedule.as_mut().map_or(0, ShipSchedule::next_attempt);
+    match next(peer, identity, limits, session, schedule, key, attempt) {
         Ok(issued) => {
-            let revision = session.heavy_revision_floor().unwrap_or(0);
-            history.bind_message("attempt-1", key, revision);
-            Some(issued)
+            history.bind_selection(issued.attempt, &issued.key, issued.revision);
+            Some(issued.at)
         }
-        Err(error) => {
-            let revision = session.heavy_revision_floor().unwrap_or(0);
-            history.bind_message("attempt-1", key, revision);
+        Err((error, revision)) => {
+            let section = if matches!(error, SelectionFailure::Cursor) {
+                ""
+            } else {
+                key.as_str()
+            };
+            history.bind_selection(attempt, section, revision);
             let _ = history.record("rejected", error.reason());
             None
         }

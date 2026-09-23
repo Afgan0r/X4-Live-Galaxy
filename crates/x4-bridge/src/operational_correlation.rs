@@ -4,7 +4,7 @@ pub fn scope(section: &str) -> String {
         .map_or_else(String::new, |faction| format!("x4:faction:{faction}:ships"))
 }
 
-pub fn attempt(message: &str) -> u8 {
+pub fn attempt(message: &str) -> u64 {
     message
         .strip_prefix("attempt-")
         .and_then(|value| value.parse().ok())

@@ -11,6 +11,7 @@ use x4_carrier_native::BridgePeer;
 mod failure;
 #[path = "production_runtime_selection.rs"]
 mod selection;
+pub use selection::IssuedSelection;
 pub use selection::complete_selection;
 
 pub struct RecoveryState<'a> {
@@ -93,6 +94,17 @@ pub fn recover_idle(
     schedule: &mut Option<ShipSchedule>,
     recovery: RecoveryState<'_>,
 ) -> bool {
+    recover_idle_selection(peer, identity, limits, session, schedule, recovery).is_some()
+}
+
+pub fn recover_idle_selection(
+    peer: &mut BridgePeer,
+    identity: &CarrierIdentity,
+    limits: &ProductionLimits,
+    session: &mut ProductionObservationSession,
+    schedule: &mut Option<ShipSchedule>,
+    recovery: RecoveryState<'_>,
+) -> Option<IssuedSelection> {
     let RecoveryState {
         key,
         progress,
@@ -103,19 +115,16 @@ pub fn recover_idle(
         .is_some_and(|section| section.kind() == observation_domain::ShipSectionKind::Core)
         || !session.stale_ship_parent(monotonic_millis)
     {
-        return false;
+        return None;
     }
     let Some(active) = schedule else {
-        return false;
+        return None;
     };
     active.complete();
-    let Ok(next_key) = session.skip_stale_ship_scope() else {
-        return false;
-    };
+    let next_key = session.skip_stale_ship_scope().ok()?;
     *key = next_key;
-    let Ok(issued) = selection::issue(peer, identity, limits, session, schedule, key) else {
-        return false;
-    };
-    *progress = ReceiveProgress::issued(issued_at.max(issued), limits, true);
-    true
+    let attempt = schedule.as_mut()?.next_attempt();
+    let issued = selection::issue(peer, identity, limits, session, schedule, key, attempt).ok()?;
+    *progress = ReceiveProgress::issued(issued_at.max(issued.at), limits, true);
+    Some(issued)
 }

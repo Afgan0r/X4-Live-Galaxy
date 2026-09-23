@@ -89,6 +89,22 @@ fn scoped_failures_keep_distinct_bounded_correlation() {
 }
 
 #[test]
+fn selection_failure_does_not_invent_a_revision_or_reuse_the_prior_scope() {
+    let path = std::env::temp_dir().join(format!("history-selection-{}", std::process::id()));
+    let mut history = OperationalHistory::open(&path).expect("history");
+    history.bind_selection(1, "ship_core:argon", Some(7));
+    assert!(history.record("collection", "issued"));
+    history.bind_selection(2, "ship_core:teladi", None);
+    assert!(history.record("rejected", "next-selection-revision"));
+    let events = std::fs::read_to_string(path.join("operational-history.jsonl")).expect("history");
+    let failed = events.lines().last().expect("failure event");
+    assert!(failed.contains("\"scope\":\"x4:faction:teladi:ships\""));
+    assert!(failed.contains("\"revision\":null,\"attempt\":2"));
+    assert!(!failed.contains("ship_core:argon"));
+    let _ = std::fs::remove_dir_all(path);
+}
+
+#[test]
 fn transient_history_sink_failure_recovers_with_an_honest_marker() {
     let path = std::env::temp_dir().join(format!("history-recovery-{}", std::process::id()));
     let mut history = OperationalHistory::open(&path).expect("history");
