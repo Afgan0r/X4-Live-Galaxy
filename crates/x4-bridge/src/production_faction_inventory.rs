@@ -62,6 +62,9 @@ mod tests {
                     1,
                 )
             }),
+            fixture(|value| {
+                value.replacen("\"sources\": {", "\"sources\": { \"base\": \"forged\",", 1)
+            }),
         ] {
             assert!(read(&invalid).is_none(), "accepted {}", invalid.display());
             let _ = std::fs::remove_file(invalid);

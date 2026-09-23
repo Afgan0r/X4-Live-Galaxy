@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 use observation_domain::{FactionOrigin, FactionOriginEvidence};
-use serde::Deserialize;
+use serde::de::{MapAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 
 pub const MAX_DOCUMENT_BYTES: usize = 64 * 1_024;
 const SCHEMA_VERSION: u8 = 1;
@@ -14,6 +16,7 @@ const MAX_SOURCES: usize = 32;
 struct Inventory {
     schema_version: u8,
     game_build: String,
+    #[serde(deserialize_with = "unique_sources")]
     sources: BTreeMap<String, String>,
     entries: Vec<Entry>,
 }
@@ -45,6 +48,44 @@ enum Origin {
 enum Classification {
     Documented,
     Inferred,
+}
+
+fn unique_sources<'de, D>(deserializer: D) -> Result<BTreeMap<String, String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_map(UniqueSources)
+}
+
+struct UniqueSources;
+impl<'de> Visitor<'de> for UniqueSources {
+    type Value = BTreeMap<String, String>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a source map without duplicate keys")
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut sources = BTreeMap::new();
+        while let Some((key, value)) = map.next_entry::<String, String>()? {
+            insert_unique(&mut sources, key, value)?;
+        }
+        Ok(sources)
+    }
+}
+
+fn insert_unique<E: serde::de::Error>(
+    sources: &mut BTreeMap<String, String>,
+    key: String,
+    value: String,
+) -> Result<(), E> {
+    if sources.insert(key, value).is_some() {
+        return Err(E::custom("duplicate source key"));
+    }
+    Ok(())
 }
 
 pub fn decode(bytes: &[u8]) -> Option<Vec<FactionOriginEvidence>> {
