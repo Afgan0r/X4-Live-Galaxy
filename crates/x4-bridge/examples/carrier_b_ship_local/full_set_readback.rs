@@ -3,10 +3,13 @@ use observation_domain::{CompletionCoverage, SectionKey, SectionRevisionId};
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 use std::collections::BTreeMap;
 use std::path::Path;
+#[path = "full_set_census_readback.rs"]
+mod census;
 
 pub fn verify(database: &Path, completions: &BTreeMap<String, Vec<u64>>) -> Result<()> {
     let repository = SqliteObservationRepository::open(database, publication_limits()?)
         .map_err(|e| format!("full-set reopen:{e:?}"))?;
+    census::verify(&repository, completions)?;
     let expected = [
         ("argon", 2usize, 3usize),
         ("scaleplate", 1, 2),

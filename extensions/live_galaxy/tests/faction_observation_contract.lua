@@ -130,4 +130,45 @@ describe("dynamic faction observation contract", function()
         assert.equals("sampled", refreshed.disposition)
         assert.equals(2, refreshed.discovery_revision)
     end)
+
+    it("restarts an interrupted census from record one after a boundary", function()
+        local options = assert(profile.options(values(), { "argon", "xenon" }, inventory)).observation
+        local discovered = { "argon", "scaleplate" }
+        options.ship_api = api(discovered)
+        local adapter = {
+            begin_evidence = function() return { capture_start_millis = "100" } end,
+            finish_evidence = function() return { capture_end_millis = "101" } end,
+        }
+        assert(fixture.load("live_galaxy_ship_selection").attach(adapter, options))
+        local pushed, begins, resets = {}, 0, 0
+        local carrier = {
+            begin_section = function() begins = begins + 1; return 0 end,
+            push_record = function(_, record)
+                if #pushed == 1 and resets == 0 then return -21 end
+                pushed[#pushed + 1] = { id = record.faction_id, revision = record.discovery_revision }
+                return 0
+            end,
+            finish_section = function() return 0 end,
+            reset = function() resets = resets + 1 end,
+        }
+        local request = { selection = "faction_census", collection_revision = "1",
+            producer_incarnation = "run-1" }
+        assert.equals("collecting", adapter:advance({ source_boundary = "runtime_start" }, carrier, request).disposition)
+        assert.equals("producer_busy", adapter:advance({ source_boundary = "runtime_start" }, carrier, request).disposition)
+        assert.same({ { id = "argon", revision = 1 } }, pushed)
+
+        adapter:feedback({ source_boundary = "game_loaded" }, carrier, request, 9)
+        discovered[1], discovered[2] = "xenon", nil
+        request.collection_revision = "2"
+        local outcome
+        for _ = 1, 3 do
+            outcome = adapter:advance({ source_boundary = "game_loaded" }, carrier, request)
+            if outcome.disposition == "sampled" then break end
+        end
+        assert.equals("sampled", outcome.disposition)
+        assert.equals(2, outcome.discovery_revision)
+        assert.equals(2, begins)
+        assert.equals(1, resets)
+        assert.same({ { id = "argon", revision = 1 }, { id = "xenon", revision = 2 } }, pushed)
+    end)
 end)
