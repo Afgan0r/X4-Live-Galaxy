@@ -1,5 +1,6 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('A', 'B')][string]$Gate = 'A',
     [ValidateSet('Normal', 'Seta')][string]$Mode = 'Normal',
     [int]$X4ProcessId,
     [string]$DebugLog,
@@ -12,6 +13,16 @@ param(
     [switch]$SelfTest
 )
 $ErrorActionPreference = 'Stop'
+
+function New-RuntimeIds([string]$Gate, [string]$Mode, [string]$Stamp) {
+    $gateLabel = $Gate.ToLowerInvariant()
+    $modeLabel = $Mode.ToLowerInvariant()
+    $capturePrefix = if ($Gate -eq 'A') { '055-fps-loaded' } else { '055-gate-b-fps-loaded' }
+    [pscustomobject]@{
+        RunId = "055-gate-$gateLabel-$modeLabel-$Stamp"
+        CaptureId = "$capturePrefix-$modeLabel-$Stamp"
+    }
+}
 
 function Get-GameTimes([string]$Text) {
     @([regex]::Matches($Text, '(?m)^\[Economy_Verbose\]\s+(?<time>\d+(?:\.\d+)?)') |
@@ -154,6 +165,16 @@ function Complete-OwnedProcess($Owned, [switch]$Stop) {
 }
 
 function Invoke-SelfTest {
+    $gateA = New-RuntimeIds 'A' 'Normal' 'fixture'
+    if ($gateA.RunId -cne '055-gate-a-normal-fixture' -or
+        $gateA.CaptureId -cne '055-fps-loaded-normal-fixture') {
+        throw 'HEAVY_RUNTIME_LEGACY_IDENTITY'
+    }
+    $gateB = New-RuntimeIds 'B' 'Seta' 'fixture'
+    if ($gateB.RunId -cne '055-gate-b-seta-fixture' -or
+        $gateB.CaptureId -cne '055-gate-b-fps-loaded-seta-fixture') {
+        throw 'HEAVY_RUNTIME_GATE_IDENTITY'
+    }
     $times = @(Get-GameTimes "ignored`n[Economy_Verbose] 10.25 sample`n[Economy_Verbose] 72.25 sample")
     if ($times.Count -ne 2 -or $times[0] -ne 10.25 -or $times[1] -ne 72.25) {
         throw 'HEAVY_RUNTIME_GAME_CLOCK_PARSE'
@@ -266,8 +287,9 @@ foreach ($path in @($DebugLog, $PresentMonPath, $BridgePath, $LimitsFile)) {
 }
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$captureId = "055-fps-loaded-$($Mode.ToLowerInvariant())-$stamp"
-$runId = "055-gate-a-$($Mode.ToLowerInvariant())-$stamp"
+$ids = New-RuntimeIds $Gate $Mode $stamp
+$captureId = $ids.CaptureId
+$runId = $ids.RunId
 $captureRoot = Join-Path $EvidenceRoot "frame-captures\$captureId"
 $runRoot = Join-Path $EvidenceRoot "runs\$runId"
 $dataRoot = Join-Path $runRoot 'data'
@@ -410,7 +432,7 @@ if ($Mode -eq 'Seta') {
     $valid = $valid -and $gameFactorSeconds -ge 10 -and $null -ne $gameFactor `
         -and $gameFactor -ge 4.0 -and $gameFactor -le 8.0
 }
-$result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); mode = $Mode.ToLowerInvariant()
+$result = [ordered]@{ status = $(if ($valid) { 'passed' } else { 'failed' }); gate = $Gate.ToLowerInvariant(); mode = $Mode.ToLowerInvariant()
     run_id = $runId; capture_id = $captureId; x4_process_id = $X4ProcessId; frames = $rows.Count
     raw_frame_rows = $rawRows.Count; duplicate_frame_rows = $rawRows.Count - $rows.Count
     average_fps = $(if ($averageFrame -gt 0) { 1000 / $averageFrame } else { 0 }); commits = $commits
