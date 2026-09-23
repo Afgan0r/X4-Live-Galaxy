@@ -136,3 +136,42 @@ impl BatchBudget {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CandidateLimits, CandidateUsage};
+
+    #[test]
+    fn each_candidate_resource_limit_rejects_one_over_independently() {
+        let Some(limits) = CandidateLimits::new(10, 10, 10, 10, 10, 10) else {
+            panic!("positive fixture limits must exist");
+        };
+        let at_limit = CandidateUsage {
+            raw_bytes: 10,
+            records: 10,
+            batches: 10,
+            work: 10,
+        };
+        assert!(at_limit.within(limits));
+        for over in [
+            CandidateUsage {
+                raw_bytes: 11,
+                ..at_limit
+            },
+            CandidateUsage {
+                records: 11,
+                ..at_limit
+            },
+            CandidateUsage {
+                batches: 11,
+                ..at_limit
+            },
+            CandidateUsage {
+                work: 11,
+                ..at_limit
+            },
+        ] {
+            assert!(!over.within(limits), "one over must reject: {over:?}");
+        }
+    }
+}

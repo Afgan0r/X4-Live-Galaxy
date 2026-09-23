@@ -95,12 +95,9 @@ fn exclusion_authority_and_mind_admission_follow_distinct_evidence() {
         evidence("service", FactionOrigin::Service, Some(false), true),
         evidence("argon", FactionOrigin::Vanilla, Some(true), true),
     ];
-    let roster = classify_observation_factions(
-        3,
-        ["player", "modded", "service", "argon"],
-        &inventory,
-    )
-    .expect("all evidenced origins remain classifiable");
+    let roster =
+        classify_observation_factions(3, ["player", "modded", "service", "argon"], &inventory)
+            .expect("all evidenced origins remain classifiable");
 
     for id in ["player", "modded"] {
         let entry = roster.entry(id).expect("excluded origin is present");
@@ -109,7 +106,10 @@ fn exclusion_authority_and_mind_admission_follow_distinct_evidence() {
         assert!(!entry.mind_candidate());
     }
     let service = roster.entry("service").expect("service origin is present");
-    assert_eq!(service.disposition(), FactionObservationDisposition::Excluded);
+    assert_eq!(
+        service.disposition(),
+        FactionObservationDisposition::Excluded
+    );
     assert_eq!(service.reason(), "not-independent");
     assert!(!service.mind_candidate());
 
