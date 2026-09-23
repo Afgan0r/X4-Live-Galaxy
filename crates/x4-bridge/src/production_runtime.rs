@@ -102,7 +102,7 @@ fn receive_loop(
     let mut progress = ReceiveProgress::issued(issued, limits, schedule.is_some());
     let mut active_scope = None;
     let mut selected_key = session.collection_key();
-    loop {
+    let exit = loop {
         let bytes = match crate::production_runtime_recover::receive(
             peer,
             identity,
@@ -116,9 +116,9 @@ fn receive_loop(
             Ok(None) => continue,
             Err(ProgressError::Timeout) => {
                 let _ = history.record("rejected", "receive-timeout");
-                break;
+                break ProgressError::Timeout;
             }
-            Err(ProgressError::Receive) => break,
+            Err(ProgressError::Receive) => break ProgressError::Receive,
         };
         progress.received(Instant::now());
         if let Some(schedule) = schedule {
@@ -155,8 +155,12 @@ fn receive_loop(
             return active_scope;
         };
         progress = ReceiveProgress::issued(issued, limits, schedule.is_some());
-    }
-    let _ = history.record("waiting", "peer-disconnected");
+    };
+    let reason = match exit {
+        ProgressError::Timeout => "receive-timeout-exhausted",
+        ProgressError::Receive => "peer-disconnected",
+    };
+    let _ = history.record("waiting", reason);
     active_scope
 }
 
