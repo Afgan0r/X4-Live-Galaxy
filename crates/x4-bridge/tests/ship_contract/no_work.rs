@@ -37,4 +37,9 @@ fn all_excluded_census_never_schedules_the_legacy_collection() {
         receiver.next_ship_key("faction_census", 1),
         Ok(String::from("carrier_b_realtime_sample"))
     );
+    let scope = observation_domain::SourceScopeId::new("x4:global:faction-census")
+        .expect("census scope is valid");
+    receiver.finish_peer(Some(&scope));
+    assert!(receiver.heavy_collection_complete());
+    assert!(!receiver.faction_census_blocks_closure());
 }

@@ -151,6 +151,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             self.last_received = None;
         }
     }
+    pub fn finish_peer(&mut self, scope: Option<&SourceScopeId>) {
+        if self.heavy_collection_complete() {
+            return;
+        }
+        if let Some(scope) = scope {
+            self.invalidate_source_scope(scope);
+        }
+    }
     pub fn mark_source_scope_uncertain(
         &mut self,
         scope: &SourceScopeId,

@@ -20,6 +20,12 @@ pub fn run(
     // One experiment window belongs to the bridge run, not every reconnect.
     let mut schedule = session.heavy_limits().and_then(ShipSchedule::new);
     loop {
+        if session.heavy_collection_complete() {
+            std::thread::sleep(Duration::from_millis(
+                limits.availability_interval_millis as u64,
+            ));
+            continue;
+        }
         history.bind_session("", 0);
         let _ = history.record("waiting", "peer-absent");
         let scope = connect(&config, limits, history)
@@ -27,9 +33,7 @@ pub fn run(
         if let Some(schedule) = &mut schedule {
             schedule.complete();
         }
-        if let Some(scope) = scope {
-            session.invalidate_source_scope(&scope);
-        }
+        session.finish_peer(scope.as_ref());
         std::thread::sleep(Duration::from_millis(
             limits.availability_interval_millis as u64,
         ));
