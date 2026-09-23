@@ -86,3 +86,34 @@ fn uncertain_lifetime_stays_visible_and_duplicate_census_rejects() {
     );
     assert!(classify_observation_factions(2, ["boron", "boron"], &inventory).is_err());
 }
+
+#[test]
+fn exclusion_authority_and_mind_admission_follow_distinct_evidence() {
+    let inventory = [
+        evidence("player", FactionOrigin::Player, Some(true), true),
+        evidence("modded", FactionOrigin::Modded, Some(true), true),
+        evidence("service", FactionOrigin::Service, Some(false), true),
+        evidence("argon", FactionOrigin::Vanilla, Some(true), true),
+    ];
+    let roster = classify_observation_factions(
+        3,
+        ["player", "modded", "service", "argon"],
+        &inventory,
+    )
+    .expect("all evidenced origins remain classifiable");
+
+    for id in ["player", "modded"] {
+        let entry = roster.entry(id).expect("excluded origin is present");
+        assert_eq!(entry.disposition(), FactionObservationDisposition::Excluded);
+        assert_eq!(entry.reason(), "outside-mandatory-coverage");
+        assert!(!entry.mind_candidate());
+    }
+    let service = roster.entry("service").expect("service origin is present");
+    assert_eq!(service.disposition(), FactionObservationDisposition::Excluded);
+    assert_eq!(service.reason(), "not-independent");
+    assert!(!service.mind_candidate());
+
+    let argon = roster.entry("argon").expect("included origin is present");
+    assert_eq!(argon.disposition(), FactionObservationDisposition::Included);
+    assert!(argon.mind_candidate());
+}
