@@ -230,7 +230,14 @@ Gate A/B, SETA and numerical acceptance remain pending. Retained initial evidenc
 logical ID `055-normal-e661f36-20260917-051641`, locator
 `%LOCALAPPDATA%/LiveGalaxy/runs/055-normal-e661f36-20260917-051641/locator.json`.
 
-Build and verify locally before installation of the owned experimental package:
+### Superseded 2026-09-17 single-faction experiment
+
+The following commands and installation notes describe the earlier single-faction
+experiment, not the current Gate B package or startup procedure. For the current
+census-first dynamic full-set run, use
+`tests/x4-disposable/05.5-heavy-ship-procedure.md`.
+
+Build and verify the historical owned experimental package locally:
 
 <!-- markdownlint-disable MD013 -->
 
@@ -242,11 +249,11 @@ pwsh -NoProfile -File tools/package-live-galaxy.ps1 -OutputDirectory dist/live-g
 
 <!-- markdownlint-enable MD013 -->
 
-The bundle is labelled `prepared-heavy-experiment`, not ready or accepted. Its
-startup procedure invokes the packaged bridge with `--ship-faction argon` and
-the packaged limits file. Record manifest/source revision, native SHA-256,
-profile SHA-256 and bundle manifest SHA-256 before owner approval. Never mix a
-different limits file or DLL into that identity.
+The bundle was labelled `prepared-heavy-experiment`, not ready or accepted. Its
+historical startup used a fixed faction; the current production bridge discovers
+the faction census before scheduling ship sections. Record manifest/source
+revision, native SHA-256, profile SHA-256 and bundle manifest SHA-256 before
+owner approval. Never mix a different limits file or DLL into that identity.
 
 An already-entered synchronous X4 call has unknown latency and cannot be
 interrupted by this timer. The 2-ms target detects an overrun only after return;
