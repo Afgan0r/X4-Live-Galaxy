@@ -39,7 +39,14 @@ pub fn verify(database: &Path, completions: &BTreeMap<String, Vec<u64>>) -> Resu
             )?;
         }
     }
-    for forbidden in ["player", "custom_mod"] {
+    for forbidden in [
+        "player",
+        "custom_mod",
+        "civilian",
+        "criminal",
+        "outlaw",
+        "ownerless",
+    ] {
         if completions.keys().any(|key| key.contains(forbidden)) {
             return Err(format!("disposed faction scheduled:{forbidden}").into());
         }

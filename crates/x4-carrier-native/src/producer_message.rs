@@ -73,11 +73,14 @@ pub(super) fn batch(
                     .checked_add(offset)
                     .ok_or(ProducerError::DataLimit)?;
                 Ok(EnvelopeRecord {
-                    record_id: RecordId::new(if section_key.starts_with("ship_") {
-                        format!("carrier-b:{}:{record_ordinal:020}", revision.get())
-                    } else {
-                        format!("carrier-b:{}:{record_ordinal}", revision.get())
-                    })
+                    // Certificate order is lexical: variable-width ordinals fail at 10.
+                    record_id: RecordId::new(
+                        if section_key.starts_with("ship_") || section_key == "faction_census" {
+                            format!("carrier-b:{}:{record_ordinal:020}", revision.get())
+                        } else {
+                            format!("carrier-b:{}:{record_ordinal}", revision.get())
+                        },
+                    )
                     .ok_or(ProducerError::InvalidInput)?,
                     entity_id: EntityId::new(record.entity_id.clone())
                         .ok_or(ProducerError::InvalidInput)?,

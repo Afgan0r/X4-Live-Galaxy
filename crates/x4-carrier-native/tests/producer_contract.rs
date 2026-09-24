@@ -11,6 +11,8 @@ use x4_carrier_native::{
     Producer, ProducerLimits, ProducerOutcome, ProducerSource, ProducerState, SectionEvidence,
 };
 
+#[path = "producer_contract/faction_census.rs"]
+mod faction_census;
 #[path = "producer_contract/failure_paths.rs"]
 mod failure_paths;
 #[path = "producer_contract/heavy_policy.rs"]

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-24
+
+- Added a cross-language decimal-width and durable-order oracle after the
+  Phase 05.5 Gate B census stopped after nine batches while the seven-faction
+  local fixture stayed green.
+
 ## 2026-09-22
 
 - Required FrameView SDK metric deduplication by process, swap chain, and QPC

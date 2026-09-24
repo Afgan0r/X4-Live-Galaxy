@@ -3,8 +3,10 @@ package.path = root .. "/?.lua;" .. root .. "/extensions/?.lua;" .. package.path
 
 local config = assert(require("live_galaxy.lua.live_galaxy_config").options())
 local faction_values = mode == "heavy-ship-full-set-restart"
-    and { "argon", "player", "scaleplate", "custom_mod", "khaak", "xenon", "teladi" }
-    or { "custom_mod", "khaak", "player", "xenon", "scaleplate", "argon", "teladi" }
+    and { "argon", "player", "scaleplate", "custom_mod", "khaak", "xenon", "teladi",
+        "civilian", "criminal", "outlaw", "ownerless" }
+    or { "ownerless", "outlaw", "criminal", "civilian", "custom_mod", "khaak", "player",
+        "xenon", "scaleplate", "argon", "teladi" }
 local ships = {
     argon = { "9007199254740101", "9007199254740102" },
     scaleplate = { "9007199254740201" },
@@ -73,6 +75,9 @@ local roster = assert(require("live_galaxy.lua.live_galaxy_factions").capture(
     api, config.observation.faction_inventory, 1,
     { max_factions = 64, max_allocation_bytes = 4096, pointer_bytes = 8 }))
 assert(roster.by_id.player.disposition == "excluded")
+for _, faction in ipairs({ "civilian", "criminal", "outlaw", "ownerless" }) do
+    assert(roster.by_id[faction].disposition == "excluded")
+end
 assert(roster.by_id.custom_mod.disposition == "unknown" and roster.unknown_blocker)
 for _, faction in ipairs({ "argon", "scaleplate", "xenon", "khaak", "teladi" }) do
     assert(roster.by_id[faction].disposition == "included")

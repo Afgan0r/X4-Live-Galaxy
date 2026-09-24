@@ -3,7 +3,7 @@ use observation_domain::{EnvelopeRecord, SectionKey, SectionRevisionId};
 use observation_persistence::{ObservationRepository, SqliteObservationRepository};
 use std::collections::BTreeMap;
 
-const EXPECTED: [(&str, &str); 7] = [
+const EXPECTED: [(&str, &str); 11] = [
     (
         "argon",
         "disposition=included\nreason=independent_first_party\norigin=vanilla\nsource_evidence=base\nmind_candidate=true",
@@ -31,6 +31,22 @@ const EXPECTED: [(&str, &str); 7] = [
     (
         "custom_mod",
         "disposition=unknown\nreason=origin_unresolved\norigin=\nsource_evidence=\nmind_candidate=false",
+    ),
+    (
+        "civilian",
+        "disposition=excluded\nreason=not_independent\norigin=service\nsource_evidence=base:hidden\nmind_candidate=false",
+    ),
+    (
+        "criminal",
+        "disposition=excluded\nreason=not_independent\norigin=service\nsource_evidence=base:hidden\nmind_candidate=false",
+    ),
+    (
+        "outlaw",
+        "disposition=excluded\nreason=not_independent\norigin=service\nsource_evidence=base:hidden\nmind_candidate=false",
+    ),
+    (
+        "ownerless",
+        "disposition=excluded\nreason=not_independent\norigin=service\nsource_evidence=base:hidden\nmind_candidate=false",
     ),
 ];
 
@@ -72,6 +88,11 @@ pub fn verify(
 fn verify_records(records: &[EnvelopeRecord], revision: u64) -> Result<()> {
     if records.len() != EXPECTED.len() {
         return Err(format!("census record count:{}", records.len()).into());
+    }
+    for (index, record) in records.iter().enumerate() {
+        if record.record_id.as_str() != format!("carrier-b:{revision}:{:020}", index + 1) {
+            return Err(format!("census record order:{revision}:{}", index + 1).into());
+        }
     }
     for (id, claim) in EXPECTED {
         let entity = format!("x4:faction:{id}");

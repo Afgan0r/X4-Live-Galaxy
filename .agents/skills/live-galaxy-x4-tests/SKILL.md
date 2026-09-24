@@ -44,6 +44,10 @@ oracles, doubles, fixtures, diagnostics assertions, and evidence reporting.
   preceding scenario to release it. A `PipeCreationFailed` caused by another
   owned test is an isolation failure, not production evidence; establish the
   result with a clean serial run before claiming regression success.
+  For streamed numeric ordinals encoded as string record IDs, cross the first
+  decimal-width boundary (9 to 10) in the real producer/receiver path and
+  verify the committed IDs in independent readback. A producer-only test does
+  not prove receiver completion or durable acceptance.
 - **XT-05 — In-game evidence:** Use a disposable Creative Custom campaign or
   approved test copy under a written plan. The user performs all X4 actions.
   Report a scenario as `observed in X4` only after expected behavior and its

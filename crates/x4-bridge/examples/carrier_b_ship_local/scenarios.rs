@@ -44,48 +44,29 @@ pub fn run_full_set(
 }
 
 fn full_set_inventory() -> Result<Vec<observation_domain::FactionOriginEvidence>> {
+    use observation_domain::FactionOrigin::{Player, Service, Vanilla};
     [
-        (
-            "argon",
-            observation_domain::FactionOrigin::Vanilla,
-            true,
-            true,
-        ),
-        (
-            "scaleplate",
-            observation_domain::FactionOrigin::Vanilla,
-            true,
-            false,
-        ),
-        (
-            "xenon",
-            observation_domain::FactionOrigin::Vanilla,
-            true,
-            false,
-        ),
-        (
-            "khaak",
-            observation_domain::FactionOrigin::Vanilla,
-            true,
-            false,
-        ),
-        (
-            "teladi",
-            observation_domain::FactionOrigin::Vanilla,
-            true,
-            false,
-        ),
-        (
-            "player",
-            observation_domain::FactionOrigin::Player,
-            false,
-            false,
-        ),
+        ("argon", Vanilla, true, true, "base"),
+        ("scaleplate", Vanilla, true, false, "base"),
+        ("xenon", Vanilla, true, false, "base"),
+        ("khaak", Vanilla, true, false, "base"),
+        ("teladi", Vanilla, true, false, "base"),
+        ("player", Player, false, false, "base"),
+        ("civilian", Service, false, false, "base:hidden"),
+        ("criminal", Service, false, false, "base:hidden"),
+        ("outlaw", Service, false, false, "base:hidden"),
+        ("ownerless", Service, false, false, "base:hidden"),
     ]
     .into_iter()
-    .map(|(id, origin, independent, mind)| {
-        observation_domain::FactionOriginEvidence::new(id, origin, Some(independent), mind, "base")
-            .map_err(|error| format!("faction inventory:{error:?}").into())
+    .map(|(id, origin, independent, mind, evidence)| {
+        observation_domain::FactionOriginEvidence::new(
+            id,
+            origin,
+            Some(independent),
+            mind,
+            evidence,
+        )
+        .map_err(|error| format!("faction inventory:{error:?}").into())
     })
     .collect()
 }

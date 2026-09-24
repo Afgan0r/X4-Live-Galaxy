@@ -182,7 +182,7 @@ fn receive_section(
         let result = wire::submit(receiver, identity, &id, &bytes)
             .map_err(|e| format!("full-set submit:{key}:{revision}:{id}:{e}"))?;
         if result != LifecycleResult::Disposition(expected) {
-            return Err(format!("full-set publication:{key}:{revision}:{result:?}").into());
+            return Err(format!("full-set publication:{key}:{revision}:{id}:{result:?}").into());
         }
         wire::respond(
             peer,
