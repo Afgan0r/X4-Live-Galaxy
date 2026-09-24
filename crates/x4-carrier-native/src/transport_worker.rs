@@ -61,10 +61,13 @@ fn run(context: &WorkerContext) {
         );
         refresh_clock(context);
         advance_connect(context, &mut state, &mut connect, closing);
-        let forced_reconnect = context
-            .shared
-            .reconnect_requested
-            .swap(false, Ordering::AcqRel);
+        // A request made during the initial connect must remain pending until
+        // there is a connected generation to replace.
+        let forced_reconnect = state != ConnectionState::Connecting
+            && context
+                .shared
+                .reconnect_requested
+                .swap(false, Ordering::AcqRel);
         let io_failed = !forced_reconnect
             && state == ConnectionState::Connected
             && (progress_write(context, &mut write, &mut retained_write)

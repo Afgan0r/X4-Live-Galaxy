@@ -112,6 +112,35 @@ fn explicit_reconnect_advances_generation_without_peer_failure() {
 }
 
 #[test]
+fn reconnect_requested_while_connecting_survives_until_first_peer_arrives() {
+    let config = config();
+    let transport = NativeTransport::start(config.clone(), token()).expect("transport");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while transport.snapshot().pending_operation_owners == 0 {
+        assert!(Instant::now() < deadline, "connect did not start");
+        std::thread::yield_now();
+    }
+    let initial_clock = transport.snapshot().monotonic_millis.expect("clock");
+    transport
+        .request_reconnect(token())
+        .expect("reconnect request during connect");
+    while transport.snapshot().monotonic_millis <= Some(initial_clock + 1) {
+        assert!(Instant::now() < deadline, "worker did not process request");
+        std::thread::yield_now();
+    }
+    assert!(!transport.snapshot().connected);
+    let _first = BridgePeer::connect(&config, Duration::from_secs(2)).expect("first peer");
+    let _replacement = connect_until(&config, &transport);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while transport.snapshot().connection_generation < 2 {
+        assert!(Instant::now() < deadline, "generation did not advance");
+        std::thread::yield_now();
+    }
+    let _ = transport.request_close(token());
+    assert!(transport.wait_closed_for_test(Duration::from_secs(2)));
+}
+
+#[test]
 fn stale_control_is_fenced_from_replacement_connection() {
     let config = config();
     let transport = NativeTransport::start(config.clone(), token()).expect("transport");
