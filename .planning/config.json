@@ -18,9 +18,9 @@
   "dynamic_routing": {
     "enabled": true,
     "tier_models": {
-      "heavy": "gpt-5.6-sol",
-      "standard": "gpt-5.6-sol",
-      "light": "gpt-5.6-luna"
+      "heavy": "gpt-6.1-sol",
+      "standard": "gpt-6.1-sol",
+      "light": "gpt-6-luna"
     },
     "escalate_on_failure": false,
     "max_escalations": 0
@@ -220,7 +220,7 @@
   "runtime": "codex",
   "model_profile_overrides": {
     "codex": {
-      "sonnet": "gpt-5.6-sol"
+      "sonnet": "gpt-6.1-sol"
     }
   }
 }
