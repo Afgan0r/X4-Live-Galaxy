@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 normal Gate B coverage failed; reviewed diagnostic package installed, awaiting owner normal-time run
+stopped_at: Plan 11 diagnostic captured; large selection gaps observed, runtime cause and Gate B remain open
 last_updated: "2026-10-10"
 last_activity: 2026-10-10
-last_activity_desc: Prepared observed timing attribution without changing collection cadence or budgets; actual runtime diagnosis remains pending
+last_activity_desc: Retained normal timing evidence and 28 exact readbacks; stopped on observed 32 ms interval; FrameView final row invalidates FPS verdict
 state_head: 3b6d3deb307e536eb9c83d0d975c4851c5dee5d7
 progress:
   total_phases: 14
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
 Plan: 3 of 4 active plans complete; next is 11
 Status: Plan 11 in-scope diagnostic loop; normal run committed only 8 of 24 included factions before the admission deadline. SETA and recovery remain pending.
-Last activity: 2026-10-10 — Diagnostic source `3b6d3de` passed scoped review and final all-suite regression. Exact package installed while X4 was closed; all 27 files match its manifest. Awaiting owner normal-time diagnostic window; runtime acceptance remains failed/pending.
+Last activity: 2026-10-10 — Diagnostic source `3b6d3de` captured 28 durable sections with exact readbacks. Argon completed 945 ships in 25.011 s, with 1.074 s selection-active intervals and 23.937 s between them. Stopped on observed 32 ms ceiling violation; truncated FrameView final row prevents an FPS verdict. Evidence retained; SDK stopped. Gate B remains failed/pending.
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)
 
@@ -222,7 +222,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 05.5]: Gate A passed at `f4465ef`. Normal Gate B run `055-gate-b-normal-20261001-005056` on package `b9a16c1` committed 27 sections but covered only 8 of 24 included factions before the 60-second admission boundary. Active/control average FPS were 172.552/195.193 in sequential windows; the difference does not isolate causal overhead. Timing instrumentation is locally verified and independently reviewed; exclusive CPU, full callback cost and the runtime bottleneck remain unresolved. Next: final regression, diagnostic package and owner normal-time measurement; no budget extension or cadence change. SETA/recovery and goal verification remain pending.
+- [Phase 05.5]: Gate A passed at `f4465ef`. Normal Gate B run `055-gate-b-normal-20261001-005056` failed full faction coverage. Reviewed diagnostic source `3b6d3de` passed final regression and was measured in run `055-gate-b-normal-20261010-110531`: 28 exact durable readbacks; Argon 25.011 s elapsed / 1.074 s selection-active / 23.937 s between-selection intervals. The observed 32 ms peak stopped the run; a truncated final FrameView row invalidates FPS. Exclusive CPU, full callback and gap attribution remain unresolved. Next: scheduling/feedback and status-cost diagnosis; no budget extension or cadence change. SETA/recovery and goal verification remain pending.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -256,5 +256,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Plan 11 timing diagnosis; package installed and verified, awaiting owner normal-time readiness
+Stopped at: Plan 11 timing diagnosis; retained measured selection gaps, next attribute scheduling/feedback and status cost
 Resume file: .planning/debug/heavy-ship-timing.md

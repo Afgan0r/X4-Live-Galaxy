@@ -98,7 +98,27 @@ delivery, safety refusals, native ABI and protocol remain unchanged.
 
 ## Eliminated
 
-None yet. Configured cadence and cumulative logs do not quantify causal cost.
+Continuous selection work does not explain most observed wall time in the
+2026-10-10 normal diagnostic: Argon finished all four sections in 25011 ms,
+with 1074 ms measured selection-active intervals and 23937 ms between them.
+This does not eliminate scheduler/feedback cost, native-call stalls,
+instrumentation overhead or clock/preemption effects.
+
+## Runtime diagnostic (2026-10-10)
+
+Source `3b6d3de`, run `055-gate-b-normal-20261010-110531`, retained evidence
+and locator are recorded in `tests/x4-disposable/05.5-heavy-ship-evidence.md`.
+28 durable sections passed exact independent readback; Argon has 945 ships.
+Its retained budget recorded 354 selection callbacks, 84216 status samples,
+840 ms source-class intervals and a 32 ms maximum callback interval.
+The run stopped intentionally on that ceiling violation; full Gate B was
+not attempted to completion. Exclusive CPU and full callback remain unknown.
+
+The final FrameView CSV row was truncated and conflicted with complete rows
+for the same frame identity. FPS is invalid, not deduplicated into a pass.
+Next: narrowly inspect between-selection scheduling/feedback and sampling
+cost. Cadence changes still require the applicable source contract; do not
+expand budgets to compensate. SDK service and owned processes are stopped.
 
 ## Resolution
 
