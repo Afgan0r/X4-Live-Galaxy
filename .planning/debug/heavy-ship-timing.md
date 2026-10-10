@@ -20,7 +20,7 @@ Reproduction: Existing dynamic full-set Lua producer and Carrier B bridge; retai
 hypothesis: Frequent 2 ms cooperative yields resume on a 50 ms configured MD cue; the same cue clocks stop-and-wait sends and ACK consumption, adding delay to already captured detail delivery.
 test: Trace real selection/budget/scheduler and native send/feedback paths against retained Argon endpoint differences and receiver timestamps.
 expecting: Separate pre-core-publication continuation gaps from cached-detail delivery gaps; do not equate configured cue spacing with exact observed idle time.
-next_action: Present the verified continuation/pump coupling and a scoped remedy for owner approval; exact runtime cue-versus-scheduler cost and true per-call CPU remain unmeasured.
+next_action: Finish reviewed same-tick ACK successor remedy and final offline regression. Source continuation frequency needs Docs MCP registration/lifecycle enrichment; exact runtime cue-versus-scheduler cost and true per-call CPU remain unmeasured.
 package_checkpoint: Diagnostic source `3b6d3de` installed and measured in retained run `055-gate-b-normal-20261010-110531`; full Gate B remains open.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
@@ -185,6 +185,47 @@ Changing pump/continuation scheduling requires the owner-approved scope and
 focused ordering/backpressure tests plus a new runtime comparison. Exact
 exclusive scheduler/feedback/idle durations cannot be reconstructed from the
 existing terminal-only aggregates.
+
+## Approved remedy checkpoint (2026-10-10)
+
+The owner approved trying more frequent bounded continuations and same-tick
+ACK successor handoff. The independent transport slice now performs one extra
+`progress(1)` after `poll_control()` returns Received (4), unless the initial
+progress was terminal. It does not poll again or wait for another ACK. Fresh
+progress/status still controls feedback and source admission; errors discard
+the selection. Successor failures preserve operation and owned correlation;
+the ordinary renderer exposes only a validated negative signed-32 numeric
+code, not native text. The prior status is never used to admit source work
+after a failed operation.
+
+Independent full-depth review of scheduler/runtime/contract tests resolved
+WR-ACK-01 (lost successor-failure diagnostics) with no open findings.
+The final `pwsh -NoProfile -File extensions/live_galaxy/tests/run_contracts.ps1
+-Suite all` exited 0 in 71.226 seconds: 139 Lua tests, 21 syntax checks,
+XML/schema, actual native bridge lifecycle/full-set/recovery and performance
+gate. Synthetic callback maxima were 3.625 ms before restart and 3.2914 ms
+afterward, below `1000 / 144` ms; both final backlogs were zero. These are
+offline regression measurements, not an X4 FPS verdict or a causal speedup
+comparison. No runtime package was installed or game experiment started.
+
+The source-continuation slice remains blocked on supported global callback
+registration/lifecycle evidence. Docs MCP searches for `onUpdate`, `SetScript`,
+`RegisterEvent` and `checkinterval` exhausted to null in snapshots
+`x4-9.00-steam-23660954`,
+`x4-9.00-steam-23660954-faction-ship-observation-v1` and
+`x4-9.00-steam-23660954-ship-detail-source-v1`, with no matching items or
+conflicts. This is a corpus limit, not proof that the API is absent.
+
+Snapshot `x4-probe-md-pulse-a70af158-v1` returned entity
+`entity:47eea368f480d4b1c105f886f4018eb6fb0d9bf8d6eb035cd5a0c87711c46b08`;
+all four inspect pages were exhausted. Its cadence/lifecycle claims observe
+a 50 ms MD pulse, pause suspension and accelerated real-time delivery under
+SETA; they do not establish a safe global per-frame Lua callback. Narrow
+read-only vanilla evidence also shows menu-owned `menu.onUpdate` and a
+`Check_Fadeout` cinematic cue using `checkinterval="1ms"`; neither proves
+global registration, removal/reload ownership or once-per-frame admission.
+No timer/callback change or runtime experiment is authorized by that evidence
+alone. Request enrichment through the shared chat-only knowledge-gap handoff.
 
 ## Resolution
 

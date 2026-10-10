@@ -83,6 +83,180 @@ describe("owned Carrier B adapter", function()
         error("ship collection did not reach a terminal disposition")
     end
 
+    -- Model the native stop-and-wait seam: Received seals one successor;
+    -- progress hands it off once, and Committed waits for new demand.
+    local function pending_carrier(options)
+        options = options or {}
+        local env = native()
+        local message, handed_off, acknowledged = 1, true, false
+        env.handoffs, env.progress_count, env.poll_count = {}, 0, 0
+        function env.api.progress(_, work)
+            assert.equals(1, work)
+            env.progress_count = env.progress_count + 1
+            env.calls[#env.calls + 1] = "progress"
+            local code = 0
+            if acknowledged and options.on_successor_progress then options.on_successor_progress() end
+            if acknowledged and options.successor_error then error("PRIVATE/path\ninjected successor failure") end
+            if acknowledged and options.successor_code then code = options.successor_code
+            elseif not handed_off then
+                env.handoffs[#env.handoffs + 1] = message
+                handed_off, code = true, 1
+            end
+            local capacity = env.progress_count == 1 and options.initial_capacity or "occupied:1"
+            return code, message == 3 and "pending_completion" or "pending_batch",
+                "connected", tostring(10000 + env.progress_count), capacity,
+                "producer:1", "ship_core:argon", "0", "7"
+        end
+        function env.api.poll_control()
+            env.poll_count = env.poll_count + 1
+            env.calls[#env.calls + 1] = "poll_control"
+            if options.control then return options.control end
+            if acknowledged then return 3 end
+            assert.is_true(handed_off, "only an already handed-off message can be acknowledged")
+            acknowledged = true
+            message, handed_off = message + 1, false
+            return 4
+        end
+        return env
+    end
+
+    it("hands off the prepared ACK successor in the same tick without polling again", function()
+        local env = pending_carrier({ initial_capacity = "occupied:0" })
+        local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+        local sources, feedbacks, feedback_status, feedback_control = 0, 0, nil, nil
+        local context = { source_boundary = "game_loaded" }
+        local observation = {
+            advance = function() sources = sources + 1; return { disposition = "collecting" } end,
+            feedback = function(_, active_context, _, status, control)
+                feedbacks = feedbacks + 1
+                feedback_status, feedback_control = status, control
+                assert.equals("game_loaded", active_context.source_boundary)
+            end,
+        }
+        local scheduler = fixture.load("live_galaxy_scheduler")
+        assert.equals("producer_busy", scheduler.tick(context, carrier, observation).disposition)
+        assert.same({ 2 }, env.handoffs, "the sealed successor must not wait for another event")
+        assert.equals(4, feedback_control)
+        assert.equals("10002", feedback_status.monotonic_millis)
+        assert.equals("occupied:1", feedback_status.capacity)
+        assert.same({ 2, 1, 0, 1 }, { env.progress_count, env.poll_count, sources, feedbacks })
+        assert.is_false(context.reentry_guard)
+        observation.feedback = nil
+        assert.equals("producer_busy", scheduler.tick(context, carrier, observation).disposition)
+        assert.same({ 2 }, env.handoffs, "no ACK must not duplicate a handoff")
+        assert.same({ 3, 2, 0 }, { env.progress_count, env.poll_count, sources })
+    end)
+
+    it("retains a backpressured ACK successor without retrying inside the tick", function()
+        local env = pending_carrier({ successor_code = 2, initial_capacity = "occupied:0" })
+        local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+        local sources, discards = 0, 0
+        local result = fixture.load("live_galaxy_scheduler").tick({}, carrier, {
+            advance = function() sources = sources + 1; return { disposition = "collecting" } end,
+            discard = function() discards = discards + 1 end,
+        })
+        assert.equals("producer_busy", result.disposition)
+        assert.same({ 2, 1, 0, 0 }, { env.progress_count, env.poll_count, sources, discards })
+        assert.same({}, env.handoffs)
+    end)
+
+    it("suppresses reentry during ACK successor handoff and releases the guard", function()
+        local context, nested = {}, nil
+        local scheduler = fixture.load("live_galaxy_scheduler")
+        local carrier
+        local env = pending_carrier({ on_successor_progress = function()
+            nested = scheduler.tick(context, carrier, {})
+        end })
+        carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+        assert.equals("producer_busy", scheduler.tick(context, carrier, {}).disposition)
+        assert.equals("reentry_suppressed", nested.disposition)
+        assert.same({ 2, 1 }, { env.progress_count, env.poll_count })
+        assert.same({ 2 }, env.handoffs)
+        assert.is_false(context.reentry_guard)
+    end)
+
+    for _, control in ipairs({ 3, 5, 6, 7, 8, 9, 10, -20 }) do
+        it("does not send an ACK successor for control " .. control, function()
+            local env = pending_carrier({ control = control })
+            local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+            local result = fixture.load("live_galaxy_scheduler").tick({}, carrier, {})
+            assert.is_table(result)
+            assert.same({}, env.handoffs)
+            assert.same({ 1, 1 }, { env.progress_count, env.poll_count })
+        end)
+    end
+
+    it("does not hand off an ACK successor after terminal initial progress", function()
+        local env = native({ progress_code = 6, control_code = 4 })
+        local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+        local result = fixture.load("live_galaxy_scheduler").tick({}, carrier, {})
+        assert.equals("permanently_rejected", result.disposition)
+        assert.same({ "loadlib", "open", "progress", "poll_control" }, env.calls)
+    end)
+
+    for _, case in ipairs({
+        { successor_error = true, expected = "operation_failure" },
+        { successor_code = -20, expected = "progress_rejected" },
+        { successor_code = 6, expected = "permanently_rejected" },
+        { successor_code = 9, expected = "disconnected" },
+    }) do
+        it("preserves ACK successor failure " .. case.expected .. " without source work", function()
+            local env = pending_carrier(case)
+            local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+            local sources, discarded = 0, nil
+            local context = {}
+            local result = fixture.load("live_galaxy_scheduler").tick(context, carrier, {
+                advance = function() sources = sources + 1; return { disposition = "collecting" } end,
+                discard = function(_, _, reason) discarded = reason end,
+            })
+            assert.equals(case.expected, result.disposition)
+            assert.equals(case.successor_code, result.code)
+            assert.equals(case.expected, discarded)
+            assert.equals(0, sources)
+            assert.same({}, env.handoffs)
+            assert.same({ 2, 1 }, { env.progress_count, env.poll_count })
+            assert.is_false(context.reentry_guard)
+        end)
+    end
+
+    for _, case in ipairs({
+        { successor_code = -20, expected = "progress_rejected", diagnostic_code = -20 },
+        { successor_code = -22, expected = "progress_rejected", diagnostic_code = -22 },
+        { successor_code = -2147483649, expected = "progress_rejected" },
+        { successor_code = -20.5, expected = "result_shape" },
+        { successor_code = -math.huge, expected = "result_shape" },
+        { successor_error = true, expected = "operation_failure" },
+        { successor_code = 9, expected = "disconnected" },
+    }) do
+        it("renders ACK successor failure safely " .. tostring(case.successor_code or case.expected), function()
+            local env, tick, diagnostic = pending_carrier(case), nil, nil
+            local getters = 0
+            _G.RegisterEvent = function(_, callback) tick = callback end
+            _G.DebugError = function(value) diagnostic = value end
+            local runtime = fixture.runtime()
+            assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = {
+                getter = function() getters = getters + 1; return 1 end,
+                clock_getter = function() return 0 end,
+            } }))
+            assert.same({ false, case.expected }, { tick("live_galaxy_observation", "telemetry_tick") })
+            assert.equals(case.expected, diagnostic:match(" detail=([a-z_]+)"), diagnostic)
+            if case.diagnostic_code then
+                assert.equals(tostring(case.diagnostic_code), diagnostic:match(" carrier_code=([%-]?%d+)"), diagnostic)
+            else assert.is_nil(diagnostic:match("carrier_code=")) end
+            assert.is_truthy(diagnostic:match("section=ship_core:argon"), diagnostic)
+            assert.is_truthy(diagnostic:match("revision=7"), diagnostic)
+            assert.is_truthy(diagnostic:match("run=producer:1"), diagnostic)
+            if case.expected ~= "disconnected" then
+                assert.equals("progress", diagnostic:match(" operation=([a-z_]+)"), diagnostic)
+            end
+            assert.is_nil(diagnostic:match("injected"))
+            assert.is_nil(diagnostic:match("PRIVATE"))
+            assert.is_nil(diagnostic:match("[%c]"))
+            assert.equals(0, getters)
+            assert.same({ 2, 1 }, { env.progress_count, env.poll_count })
+        end)
+    end
+
     it("loads ABI 2 and samples one reserved realtime fact", function()
         local env, getter_calls, clock_calls = native(), 0, 0
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))

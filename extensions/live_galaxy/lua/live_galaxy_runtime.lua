@@ -31,7 +31,7 @@ local safe_details = {
     ambiguous_commit = true, retry_exhausted = true, disconnected = true,
     restart_required = true, clock_unavailable = true, source_failure = true,
     invalid_fact = true, fact_rejected = true, finish_rejected = true,
-    reservation_failed = true, result_shape = true,
+    reservation_failed = true, result_shape = true, progress_rejected = true,
     collecting = true, core_changed = true, stale_parent = true, collection_overflow = true,
     allocation_limit = true, native_call_limit = true, callback_budget_exceeded = true,
     source_boundary_changed = true, selection_unavailable = true, admission_window_exhausted = true,
@@ -55,6 +55,12 @@ local function rejection_text(rejection)
         if type(value) == "number" and value >= 0 and value <= 9007199254740991 and value % 1 == 0 then
             text = text .. " " .. key .. "=" .. value
         end
+    end
+    -- Successor failures expose only bounded numeric codes, never native text.
+    local carrier_code = rejection.carrier_code
+    if rejection.condition == "progress_rejected" and type(carrier_code) == "number"
+        and carrier_code >= -2147483648 and carrier_code <= -1 and carrier_code % 1 == 0 then
+        text = text .. " carrier_code=" .. carrier_code
     end
     local section = rejection.section
     if type(section) == "string" and #section <= 128 and (section == "ship_core"

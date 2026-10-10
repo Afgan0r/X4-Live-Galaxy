@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 diagnosed 2 ms yield / 50 ms cue coupling and ACK-successor next-tick latency; remedy pending
+stopped_at: Plan 11 same-tick ACK remedy verified offline; source-continuation callback evidence missing
 last_updated: "2026-10-10"
 last_activity: 2026-10-10
-last_activity_desc: Traced 18.101 s pre-core continuation gaps and 5.836 s cached-detail gaps to shared cue/pump paths; exact CPU and runtime gate remain open
+last_activity_desc: ACK successor remedy reviewed and full offline regression passed; global callback lifecycle requires Docs MCP enrichment; X4 timing/FPS/Gate B remain pending
 state_head: 3b6d3deb307e536eb9c83d0d975c4851c5dee5d7
 progress:
   total_phases: 14
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in-scope diagnostic loop; normal run committed only 8 of 24 included factions before the admission deadline. SETA and recovery remain pending.
+Status: Plan 11 in-scope remedy checkpoint; same-tick ACK handoff reviewed and verified offline. Source continuation frequency awaits Docs MCP evidence. Normal coverage, X4 timing/FPS, SETA and recovery remain pending.
 Last activity: 2026-10-10 — Diagnostic source `3b6d3de` captured 28 durable sections with exact readbacks. Argon completed 945 ships in 25.011 s, with 1.074 s selection-active intervals and 23.937 s between them. Stopped on observed 32 ms ceiling violation; truncated FrameView final row prevents an FPS verdict. Evidence retained; SDK stopped. Gate B remains failed/pending.
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)

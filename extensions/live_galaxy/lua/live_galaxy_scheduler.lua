@@ -38,6 +38,25 @@ function scheduler.tick(context, carrier, observation)
     if progress == nil then return finish(progress_status, nil) end
     local control, control_error = call(carrier, "poll_control")
     if control == nil then return finish(control_error, nil) end
+    if control == 4 and not terminal[progress] then
+        -- Received seals one immutable successor. Hand it off now, without
+        -- polling again or waiting for its acknowledgement in this callback.
+        local prior_status = progress_status
+        progress, progress_status = call(carrier, "progress", 1)
+        if progress == nil or progress < 0 then
+            local reason = progress == nil and progress_status or "progress_rejected"
+            discard(observation, carrier, reason)
+            -- A failed operation may supply no snapshot. Retain only owned
+            -- correlation from the prior one; never use it for admission.
+            local correlation = type(progress_status) == "table" and progress_status or prior_status
+            local result = finish(reason, progress, correlation)
+            if result.rejection then
+                result.rejection.operation = "progress"
+                result.rejection.carrier_code = progress
+            end
+            return result
+        end
+    end
     if terminal[progress] then
         discard(observation, carrier, terminal[progress])
         -- A replacement core intent may recover a paused heavy producer.
