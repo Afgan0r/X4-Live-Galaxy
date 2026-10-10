@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 normal Gate B coverage failed; timing instrumentation reviewed and regression-tested, diagnostic package preparation in progress
+stopped_at: Plan 11 normal Gate B coverage failed; reviewed diagnostic package installed, awaiting owner normal-time run
 last_updated: "2026-10-10"
 last_activity: 2026-10-10
 last_activity_desc: Prepared observed timing attribution without changing collection cadence or budgets; actual runtime diagnosis remains pending
-state_head: e4ee1d6
+state_head: 3b6d3deb307e536eb9c83d0d975c4851c5dee5d7
 progress:
   total_phases: 14
   completed_phases: 6
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
 Plan: 3 of 4 active plans complete; next is 11
 Status: Plan 11 in-scope diagnostic loop; normal run committed only 8 of 24 included factions before the admission deadline. SETA and recovery remain pending.
-Last activity: 2026-10-10 — Bounded observed-interval diagnostics passed independent scoped review and the final all-suite regression (116 Lua tests, 21 syntax checks, actual full-set/recovery chains and performance gate). Diagnostic packaging and runtime measurement remain pending, not acceptance.
+Last activity: 2026-10-10 — Diagnostic source `3b6d3de` passed scoped review and final all-suite regression. Exact package installed while X4 was closed; all 27 files match its manifest. Awaiting owner normal-time diagnostic window; runtime acceptance remains failed/pending.
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)
 
@@ -256,5 +256,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Plan 11 timing diagnosis; diagnostic source reviewed and regression-tested, packaging in progress
+Stopped at: Plan 11 timing diagnosis; package installed and verified, awaiting owner normal-time readiness
 Resume file: .planning/debug/heavy-ship-timing.md

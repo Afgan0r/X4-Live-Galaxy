@@ -21,6 +21,7 @@ hypothesis: Runtime throughput cause remains unknown. Offline diagnostic prepara
 test: Main performs independent scoped review, final regression and package preparation before the approved finite X4 diagnostic experiment.
 expecting: Runtime evidence separates observed active selection intervals from between-selection-callback waits without treating cumulative age as getter CPU.
 next_action: Main reviews the bounded Lua diff and prepares the exact package/procedure for the authorized timing experiment; retain Gate B as failed/pending.
+package_checkpoint: Source `3b6d3deb307e536eb9c83d0d975c4851c5dee5d7` packaged and installed with X4 closed; all 27 extension hashes match manifest `42e4eba243dfb441f8620fe43d6eff3d2864ad9951afcb78b654286403a1ab2e`. Awaiting owner normal-time readiness; no actual diagnostic run yet.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
 
