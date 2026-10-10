@@ -154,6 +154,16 @@ describe("synchronous selection capture with resumable delivery", function()
         repeat result = advance() until result.disposition ~= "collecting"
         assert.equals("sampled", result.disposition); assert.equals(1, finished)
         assert.equals(950, #delivered); assert.equals(4750, reads)
+        local core_metrics = result.capture_metrics
+        local core_timing = core_metrics.timing
+        assert.equals("ship_core", core_metrics.timing_origin_section)
+        assert.equals("1", core_metrics.timing_origin_revision)
+        assert.is_true(core_timing.intervals.source.total_millis > 0)
+        assert.is_true(core_timing.intervals.delivery.total_millis > 0)
+        assert.equals(core_timing.callbacks.count - 1, core_timing.between_callbacks.count)
+        local total = 0
+        for _, value in pairs(core_timing.intervals) do total = total + value.total_millis end
+        assert.equals(core_timing.callbacks.total_millis, total, "nested samples cannot double-count active time")
         local captured_detail_reads = detail_reads.count
         assert.is_nil(adapter:feedback({ source_boundary = "runtime_start" }, carrier, status, 5))
         for revision, key in ipairs({ "ship_cargo:g0", "ship_crew:g0", "ship_loadout:g0" }) do
@@ -162,8 +172,14 @@ describe("synchronous selection capture with resumable delivery", function()
             assert.equals("sampled", result.disposition)
             assert.equals(4750, reads, "cached detail delivery must not reread X4 core state")
             assert.equals(captured_detail_reads, detail_reads.count, "cached detail delivery must not repeat getters")
+            assert.equals(core_timing.operations.source, result.capture_metrics.timing.operations.source)
+            assert.equals("ship_core", result.capture_metrics.timing_origin_section)
+            assert.equals("1", result.capture_metrics.timing_origin_revision)
+            assert.is_true(result.capture_metrics.timing.operations.delivery > core_timing.operations.delivery)
         end
         assert.equals(3800, #delivered)
+        assert.equals(950 + 2 + 4, core_timing.operations.delivery,
+            "snapshot retains 950 records, begin/finish and four busy reservation attempts")
         for i, row in ipairs(delivered) do
             local member = expected[(i - 1) % 950 + 1]
             assert.equals(member, row.identity)

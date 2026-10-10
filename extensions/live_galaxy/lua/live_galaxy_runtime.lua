@@ -89,6 +89,31 @@ local function diagnostic(event, detail, metrics, rejection)
                     .. " max_callback_overrun_millis=" .. metrics.max_callback_overrun_millis
                     .. " source_value_bytes=" .. metrics.source_value_bytes
             end
+            if metrics.timing then
+                local timing = metrics.timing
+                text = text .. " timing_clock=" .. timing.clock .. " timing_scope=" .. timing.scope
+                    .. " timing_sampling_overhead=" .. timing.sampling_overhead
+                    .. " timing_origin_section=" .. metrics.timing_origin_section
+                    .. " timing_origin_revision=" .. metrics.timing_origin_revision
+                    .. " timing_origin_run=" .. metrics.timing_origin_incarnation
+                    .. " timing_status_samples=" .. timing.status_samples
+                    .. " timing_clock_regressions=" .. timing.clock_regressions
+                    .. " timing_unsampled_callbacks=" .. timing.unsampled_callbacks
+                    .. " timing_pending_operations=" .. tostring(timing.pending_operations)
+                for _, category in ipairs({ "source", "allocation", "clock", "processing", "delivery", "mixed" }) do
+                    local value = timing.intervals[category]
+                    local prefix = " observed_" .. category
+                    text = text .. prefix .. "_interval_count=" .. value.count
+                        .. prefix .. "_total_millis=" .. value.total_millis .. prefix .. "_max_millis=" .. value.max_millis
+                        .. prefix .. "_operations=" .. timing.operations[category]
+                end
+                for _, category in ipairs({ "callbacks", "between_callbacks" }) do
+                    local value = timing[category]
+                    local prefix = " selection_" .. category
+                    text = text .. prefix .. "_count=" .. value.count .. prefix .. "_total_millis=" .. value.total_millis
+                        .. prefix .. "_max_millis=" .. value.max_millis
+                end
+            end
         end
         if not pcall(DebugError, text) then
             diagnostic_gap_count = math.min(diagnostic_gap_count + 1, 65535)

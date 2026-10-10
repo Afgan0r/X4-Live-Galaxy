@@ -194,11 +194,13 @@ function details:step(context, carrier, status)
             if not ok then return self:fail(carrier, reason) end
         end
     elseif self.stage == "reserve_delivery" then
+        if self.work_budget then self.work_budget:observe_operation("delivery") end
         local code = carrier:begin_section(self.begin)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then return self:fail(carrier, "reservation_failed") end
         self.reserved, self.stage = true, "deliver"
     elseif self.stage == "deliver" then
+        if self.work_budget then self.work_budget:observe_operation("delivery") end
         local code = carrier:push_record(self.pending)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then return self:fail(carrier, "fact_rejected") end
@@ -206,6 +208,7 @@ function details:step(context, carrier, status)
         self.pending = self.records[self.index]
         self.stage = self.pending and "deliver" or "complete"
     elseif self.stage == "complete" then
+        if self.work_budget then self.work_budget:observe_operation("delivery") end
         if carrier:finish_section(self.finish) ~= 0 then return self:fail(carrier, "finish_rejected") end
         self.stage, self.reserved = "done", false
         return { disposition = "sampled" }

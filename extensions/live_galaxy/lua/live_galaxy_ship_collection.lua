@@ -157,6 +157,7 @@ function collection:step(context, carrier, status)
         self.begin, self.index, self.cores, self.records = begin, 1, {}, {}
         self.stage = self.count == 0 and "capture_finish" or "core"
     elseif stage == "reserve" then
+        if self.work_budget then self.work_budget:observe_operation("delivery") end
         local code = carrier:begin_section(self.begin)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then
@@ -220,6 +221,7 @@ function collection:step(context, carrier, status)
     elseif stage == "record" then
         self.pending = self.records[self.index]
         self.pending.profile, self.pending.source_scope = "ship_core", self.source_scope
+        if self.work_budget then self.work_budget:observe_operation("delivery") end
         local code = carrier:push_record(self.pending)
         if code == -21 then return { disposition = "producer_busy" } end
         if code ~= 0 then
@@ -230,6 +232,7 @@ function collection:step(context, carrier, status)
         self.pending, self.index = nil, self.index + 1
         self.stage = self.index > self.count and "complete" or "record"
     elseif stage == "complete" then
+        if self.work_budget then self.work_budget:observe_operation("delivery") end
         if carrier:finish_section(self.finish) ~= 0 then return self:discard(carrier, "finish_rejected") end
         self.reserved, self.stage = false, "done"
         return { disposition = "sampled", source_transition_accepted = true }

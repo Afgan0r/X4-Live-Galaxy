@@ -27,6 +27,8 @@ local function metrics(self)
         max_callback_duration_millis = b.max_callback_duration,
         max_callback_overrun_millis = b.max_callback_overrun,
         source_value_bytes = b.source_value_bytes,
+        timing = b:timing_snapshot(), timing_origin_section = b.timing_origin_section,
+        timing_origin_revision = b.timing_origin_revision, timing_origin_incarnation = b.timing_origin_incarnation,
         section = self.key, incarnation = self.incarnation } or nil
 end
 local function discard(self, carrier, reason, request)
@@ -264,6 +266,10 @@ function selection.advance(self, context, carrier, status)
             if err == "stale_parent" then carrier:fail_section("stale_parent") end
             return discard(self, carrier, err, status)
         end
+    end
+    if not self.budget.timing_origin_section then
+        self.budget.timing_origin_section, self.budget.timing_origin_revision, self.budget.timing_origin_incarnation =
+            self.key, self.revision, self.incarnation
     end
     local ok, err = self.budget:before(status)
     if not ok then return discard(self, carrier, err) end

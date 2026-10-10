@@ -146,6 +146,79 @@ describe("shared heavy profile and bounded game work", function()
         assert.equals(v.callback_budget_millis, b.max_callback_duration)
         assert.equals(0, b.max_callback_overrun)
     end)
+    it("attributes observed step intervals and callback waits without extra status reads", function()
+        local now, samples = 10, 0
+        local b = budget.new({ count_ships = function() now = now + 3; return 1 end }, values())
+        local carrier = { progress = function(_, work)
+            assert.equals(0, work)
+            samples = samples + 1; now = now + 2
+            return 0, { monotonic_millis = tostring(now) }
+        end }
+        assert(b:before({ monotonic_millis = "10" }))
+        b.api:count_ships()
+        now = now + 1 -- Owned processing outside the source seam.
+        assert.is_true(b:should_yield(carrier)); assert(b:after(carrier))
+        now = now + 50
+        assert(b:before({ monotonic_millis = tostring(now) }))
+        now = now + 1
+        assert.is_true(b:should_yield(carrier)); assert(b:after(carrier))
+        assert.equals(2, samples, "instrumentation must not add carrier progress calls")
+        assert.is_table(b.timing, "component attribution must accompany cumulative age")
+        assert.same({ count = 1, total_millis = 6, max_millis = 6 }, b.timing.intervals.source)
+        assert.same({ count = 1, total_millis = 3, max_millis = 3 }, b.timing.intervals.processing)
+        assert.same({ count = 2, total_millis = 9, max_millis = 6 }, b.timing.callbacks)
+        assert.same({ count = 1, total_millis = 50, max_millis = 50 }, b.timing.between_callbacks)
+        assert.equals(1, b.timing.operations.source)
+        assert.equals(2, b.timing.status_samples)
+        assert.equals("included_unmeasured", b.timing.sampling_overhead)
+        assert.equals("carrier_monotonic_millis", b.timing.clock)
+    end)
+    it("retains coarse interval bounds and rejects frozen callbacks without inventing elapsed work", function()
+        local now, samples = 10, 0
+        local b = budget.new({ count_ships = function() return 1 end }, values())
+        local carrier = { progress = function(_, work)
+            assert.equals(0, work); samples = samples + 1
+            return 0, { monotonic_millis = tostring(now) }
+        end }
+        assert(b:before({ monotonic_millis = "10" }))
+        b.api:count_ships(); assert.is_false(b:should_yield(carrier))
+        local saved = b:timing_snapshot()
+        now = 14; assert.is_true(b:should_yield(carrier)); assert(b:after(carrier))
+        assert.same({ count = 1, total_millis = 0, max_millis = 0 }, saved.intervals.source)
+        assert.same({ count = 1, total_millis = 4, max_millis = 4 }, b.timing.callbacks)
+        assert.is_nil(b:before({ monotonic_millis = "14" }))
+        assert.is_nil(b:before({ monotonic_millis = "13" }))
+        assert.equals(1, b.timing.callbacks.count); assert.equals(0, b.timing.between_callbacks.count)
+        assert.equals(2, samples)
+        now = 15; assert(b:before({ monotonic_millis = "15" }))
+        now = 14
+        local ok, reason = b:after(carrier)
+        assert.is_nil(ok); assert.equals("clock_unavailable", reason)
+        assert.equals(1, b.timing.unsampled_callbacks)
+        assert.equals(4, b.timing.callbacks.total_millis)
+    end)
+    it("reports an intra-callback clock regression without double-counting elapsed time", function()
+        local now = 10
+        local b = budget.new({}, values())
+        local carrier = { progress = function() return 0, { monotonic_millis = tostring(now) } end }
+        assert(b:before({ monotonic_millis = "10" }))
+        now = 14; assert.is_true(b:should_yield(carrier))
+        now = 13; assert.is_true(b:should_yield(carrier))
+        now = 15; assert.is_true(b:should_yield(carrier))
+        assert.equals(1, b.timing.clock_regressions)
+        assert.equals(5, b.timing.intervals.processing.total_millis)
+        assert.equals(5, b.timing.callbacks.total_millis)
+    end)
+    it("keeps entered operation counts and the unmeasured tail after an aborted getter", function()
+        local b = budget.new({ count_ships = function() error("injected getter failure") end }, values())
+        assert(b:before({ monotonic_millis = "10" }))
+        assert.has_error(function() b.api:count_ships() end, "injected getter failure")
+        local timing = b:timing_snapshot()
+        assert.equals(1, timing.operations.source)
+        assert.equals(0, timing.status_samples); assert.equals(1, timing.unsampled_callbacks)
+        assert.is_true(timing.pending_operations)
+        assert.equals(0, timing.intervals.source.count)
+    end)
     it("requires committed core feedback and revalidates one full-faction detail group", function()
         local v, now, finishes, failures, reads = values(), 0, 0, 0, 0
         local identities = { "9007199254740993", "9007199254740995" }
