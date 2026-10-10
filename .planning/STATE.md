@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 diagnostic captured; large selection gaps observed, runtime cause and Gate B remain open
+stopped_at: Plan 11 diagnosed 2 ms yield / 50 ms cue coupling and ACK-successor next-tick latency; remedy pending
 last_updated: "2026-10-10"
 last_activity: 2026-10-10
-last_activity_desc: Retained normal timing evidence and 28 exact readbacks; stopped on observed 32 ms interval; FrameView final row invalidates FPS verdict
+last_activity_desc: Traced 18.101 s pre-core continuation gaps and 5.836 s cached-detail gaps to shared cue/pump paths; exact CPU and runtime gate remain open
 state_head: 3b6d3deb307e536eb9c83d0d975c4851c5dee5d7
 progress:
   total_phases: 14
@@ -256,5 +256,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Plan 11 timing diagnosis; retained measured selection gaps, next attribute scheduling/feedback and status cost
+Stopped at: Plan 11 diagnosed source continuation / transport cadence coupling; owner remedy scope and supported higher-frequency seam pending
 Resume file: .planning/debug/heavy-ship-timing.md

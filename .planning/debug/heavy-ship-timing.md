@@ -17,11 +17,11 @@ Reproduction: Existing dynamic full-set Lua producer and Carrier B bridge; retai
 
 ## Current Focus
 
-hypothesis: Runtime throughput cause remains unknown. Offline diagnostic preparation is complete; observed source/processing/delivery intervals and callback gaps can now distinguish candidate causes.
-test: Main performs independent scoped review, final regression and package preparation before the approved finite X4 diagnostic experiment.
-expecting: Runtime evidence separates observed active selection intervals from between-selection-callback waits without treating cumulative age as getter CPU.
-next_action: Main reviews the bounded Lua diff and prepares the exact package/procedure for the authorized timing experiment; retain Gate B as failed/pending.
-package_checkpoint: Source `3b6d3deb307e536eb9c83d0d975c4851c5dee5d7` packaged and installed with X4 closed; all 27 extension hashes match manifest `42e4eba243dfb441f8620fe43d6eff3d2864ad9951afcb78b654286403a1ab2e`. Awaiting owner normal-time readiness; no actual diagnostic run yet.
+hypothesis: Frequent 2 ms cooperative yields resume on a 50 ms configured MD cue; the same cue clocks stop-and-wait sends and ACK consumption, adding delay to already captured detail delivery.
+test: Trace real selection/budget/scheduler and native send/feedback paths against retained Argon endpoint differences and receiver timestamps.
+expecting: Separate pre-core-publication continuation gaps from cached-detail delivery gaps; do not equate configured cue spacing with exact observed idle time.
+next_action: Present the verified continuation/pump coupling and a scoped remedy for owner approval; exact runtime cue-versus-scheduler cost and true per-call CPU remain unmeasured.
+package_checkpoint: Diagnostic source `3b6d3de` installed and measured in retained run `055-gate-b-normal-20261010-110531`; full Gate B remains open.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
 
@@ -119,6 +119,72 @@ for the same frame identity. FPS is invalid, not deduplicated into a pass.
 Next: narrowly inspect between-selection scheduling/feedback and sampling
 cost. Cadence changes still require the applicable source contract; do not
 expand budgets to compensate. SDK service and owned processes are stopped.
+
+## Continuation and delivery attribution (2026-10-10)
+
+Read-only diagnosis used fresh, clean `e7e2d42`, synchronized with origin.
+The actual package JSON and generated Lua configuration both set
+`callback_budget_millis=2` (not the separate `1000 / 144` complete-frame
+ceiling). `ship_budget.should_yield` returns true at this elapsed threshold;
+the core/detail tick loops return without finishing the requested selection.
+`md/live_galaxy_observation.xml` schedules the next runtime event through its
+configured `checkinterval="50ms"` cue. There is no local sleep, but returning
+to this infrequent event creates continuation latency. The September 22
+fallback intentionally introduced cooperative yielding after a failed
+synchronous performance gate; removing safety yielding is not the diagnosis.
+
+Retained same-origin endpoint differences separate the measured gaps:
+
+| Endpoint | Additional measured selection-active ms | Additional between-selection ms |
+| --- | --- | --- |
+| Core publication, after all families captured | 1000 | 18101 |
+| Cached cargo delivery | 10 | 918 |
+| Cached crew delivery | 31 | 2466 |
+| Cached loadout delivery | 33 | 2452 |
+
+Core publication reached 322 selection callbacks (321 gaps, mean 56.39 ms).
+All four endpoints reached 354 callbacks (353 gaps, mean 67.81 ms).
+The 50 ms value is configured cue cadence, not a measured real-time sleep:
+do not multiply it by callback count and claim an exact causal time split.
+The pre-core 18101 ms includes capture continuations and initial core delivery;
+the terminal aggregate does not isolate the capture-finish instant.
+
+Cached detail requests reuse owned records and the same budget: native source
+call count stays 55854 across all four endpoints. Their extra 5836 ms gaps
+are therefore not repeated X4 getter work. Receiver history records core,
+cargo, crew and loadout reception spans of 532, 691, 2274 and 2255 ms,
+respectively; received-message outcome counts are 4, 5, 15 and 15. These
+receiver timestamps use Unix ms, not the producer monotonic clock; no absolute
+cross-clock subtraction was used.
+
+The shared transport cadence explains a concrete avoidable latency:
+`live_galaxy_scheduler.tick` calls `carrier.progress(1)` before
+`carrier.poll_control()`, once per event. Native `progress(0)` used by the
+84216 budget samples only snapshots status; it never sends or consumes ACKs.
+Native `producer_feedback.advance_message` clears an acknowledged pending
+message and seals its successor; there is no subsequent send in that scheduler
+tick. The successor waits for the next event's `progress(1)`. While awaiting
+final ACK/new demand, occupied capacity also skips selection.advance entirely;
+these events are absent from selection callback counts but remain inside the
+between-selection elapsed intervals. No synchronous wait for ACK was found
+in Lua; native control polling uses try_lock/try_recv rather than waiting.
+
+The clock itself is a worker-refreshed atomic snapshot (`transport.snapshot`,
+`transport_worker.refresh_clock`, with a worker-loop 1 ms sleep), not a fresh
+high-resolution clock read on each Lua sample. Therefore active/gap boundaries
+and the 32 ms outlier remain sampled observations, not exclusive CPU proof.
+Status-sampling cost is included in sampled active intervals where observed;
+it must not be added again as a separate explanation for all 23937 ms gaps.
+
+Executed attribution contract again: 1 success / 0 failures / 0 errors,
+exit 0. No production code, installed package, game state or cadence changed.
+Recommendation: preserve bounded yielding and stop-and-wait authority, but
+avoid tying source continuation and transport progress to the same slow cue;
+first resolve the supported higher-frequency runtime seam through Docs MCP.
+Changing pump/continuation scheduling requires the owner-approved scope and
+focused ordering/backpressure tests plus a new runtime comparison. Exact
+exclusive scheduler/feedback/idle durations cannot be reconstructed from the
+existing terminal-only aggregates.
 
 ## Resolution
 
