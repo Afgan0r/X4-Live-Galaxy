@@ -156,8 +156,8 @@ receipt in chat. The consumer must not mutate Docs MCP directly.
 
 ## Memory
 
-Read `.agent-instructions/x4/MEMORY.md` before project-memory use, together
-with the global `game-repo-standard` skill and its shared family registry.
+Read `.agent-instructions/x4/MEMORY.md` before project-memory use and resolve
+the current client's X4 project-memory binding as it directs.
 For external or cross-project questions, the canonical entrypoint is
 `shared/MEMORY.md` in `x4/agent-instructions`; resolve that checkout locally.
 Consult relevant project memory by content and usefulness, regardless of the

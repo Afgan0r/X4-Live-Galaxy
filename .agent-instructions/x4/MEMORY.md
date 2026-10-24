@@ -2,17 +2,18 @@
 
 ## Authority and Scope
 
-Use the personal MemPalace MCP registration `mempalace-personal`, exposed as
-`mcp__mempalace_personal__*`.
+Resolve the exact MCP server and authorized scopes from the current client's
+X4 project-memory binding before memory I/O. Do not infer a transport from a
+wing name. If the binding cannot be resolved, report the gap and continue from
+primary evidence under the outage policy below.
 The game family is `x4`; `wing_x4_modding` remains the primary write owner for
 engineering knowledge across the registered development repositories.
 
-Before recall or capture, read the global `game-repo-standard` skill and its
-`references/profiles-and-registry.md` and `references/memory-lifecycle.md` under
-`~/.agents/skills/game-repo-standard/`. The shared family registry owns the
-write routing and known scope refinements; it is not a mandatory search
-checklist. This contract keeps the engineering write owner, rooms, recall
-access, capture timing, and outage behavior below.
+Use the scope registry supplied by that client binding for known related and
+historical sources; it is not a mandatory search checklist. This contract owns
+X4 engineering write routing, rooms, recall access, capture timing, and outage
+behavior. Other subjects and memory sources follow their own contracts; this
+contract does not prohibit independently governed reads from them.
 
 The canonical external entrypoint is `shared/MEMORY.md` in
 `x4/agent-instructions`; resolve its checkout locally. Registered consumers
@@ -25,17 +26,16 @@ consumer's workflow to another project.
 Keep the read source, knowledge owner, and applicability of a rule separate.
 Each source's own contract governs its access, subagents, outages, and capture;
 neither this contract nor a shared retrieval rule overrides another owner.
-Sharing one physical personal palace does not merge logical project ownership,
-privacy, game, spoiler, or source restrictions.
+Sharing a physical store does not merge logical project ownership or source
+restrictions. Each configured source retains its own access boundaries.
 
 Repository files, current source snapshots, current documentation, and fresh
 runtime evidence remain primary. Memory supplies historical context; it does
 not override contradictory current evidence.
 
-The gameplay wing `wing_x4` participates in family recall and owns general
-game knowledge and player requirements. It does not own engineering decisions.
-Active campaign state remains in its repository; finding a campaign choice
-does not make it a requirement for a development project.
+Related game or tool knowledge may inform a task through its own source
+contract. Finding a requirement in another context does not make it binding
+on an X4 development project.
 
 ## Rooms
 
@@ -55,8 +55,8 @@ Do not add a parallel owner taxonomy or repository-specific wings.
 
 The main agent owns recall for the top-level task:
 
-1. Resolve the `x4` family in the shared registry; do not maintain a second
-   sibling list here or in consumer repositories.
+1. Resolve the X4 project-memory binding and its scope registry; do not
+   maintain a second sibling list here or in consumer repositories.
 2. Before substantive analysis, check the topic's coverage and reuse intact,
    applicable evidence. For uncovered needs, run bounded thematic searches
    across the selected physical palace by default, using task identifiers and
@@ -100,20 +100,15 @@ validation, limitations, and exact sources. Deduplicate before writing and
 re-fetch the retained drawer after writing. Capture the semantic conclusion,
 not the entire artifact that led to it.
 
-Choose the write owner by content through the shared registry. X4-specific
-engineering conclusions remain in `wing_x4_modding`; general game conclusions
-use the game owner and its memory lifecycle. Use relevant retrieved context when
+X4-specific engineering conclusions belong in `wing_x4_modding`. Route other
+subjects through their own contracts. Use relevant retrieved context when
 deduplicating: an equivalent historical or sibling record is not a reason to
-create a copy.
+create a copy. Project records need stable evidence accessible to their
+intended readers.
 
-Project or skill work may also establish a distinct reusable cross-project
-conclusion owned by personal memory. Capture it only under that owner's own
-rules; X4 facts and paraphrases remain project-owned. Personal records may cite
-project memory. Project records must never cite or depend on personal memory,
-even when both owners share the same physical palace.
-
-Follow `game-repo-standard` for reporting verified writes, thematic retrieval,
-and task-specific citations. A memory write alone requires no repository edit.
+Report each verified write with its owner, returned drawer ID, and readback
+result. Cite only relevant retrieved evidence for the current task. A memory
+write alone requires no repository edit.
 
 Corrections, invalidations, and deletions require an exact preview and the
 user's explicit approval. Do not create a local memory outbox when the server
@@ -121,9 +116,10 @@ is unavailable; warn and continue from primary evidence.
 
 ## Legacy Wings
 
-The shared registry marks earlier X4 project wings as read-only history. They
+The configured scope registry marks earlier X4 project wings as read-only
+history. They
 remain available as read-only context when relevant; their status restricts
 new writes, not recall. Verify applicability against current evidence and
 reuse a relevant historical drawer in place. Moving, correcting,
 or deleting it requires the exact-preview approval flow above. Do not bulk-copy
-drawers or create tunnels as a substitute for the shared family map.
+drawers or create tunnels as a substitute for the configured scope registry.
