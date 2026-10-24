@@ -158,6 +158,11 @@ receipt in chat. The consumer must not mutate Docs MCP directly.
 
 Read `.agent-instructions/x4/MEMORY.md` before project-memory use, together
 with the global `game-repo-standard` skill and its shared family registry.
+For external or cross-project questions, the canonical entrypoint is
+`shared/MEMORY.md` in `x4/agent-instructions`; resolve that checkout locally.
+Consult relevant project memory by content and usefulness, regardless of the
+current directory or result owner. Its source contract governs access without
+applying this repository's engineering rules to the external project.
 The family is `x4`; `wing_x4_modding` is the primary engineering write owner,
 not the limit of recall. The main agent owns recall and capture for the
 top-level task. Specialists and
