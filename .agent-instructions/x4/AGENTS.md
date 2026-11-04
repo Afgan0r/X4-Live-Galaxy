@@ -164,10 +164,10 @@ Consult relevant project memory by content and usefulness, regardless of the
 current directory or result owner. Its source contract governs access without
 applying this repository's engineering rules to the external project.
 The family is `x4`; `wing_x4_modding` is the primary engineering write owner,
-not the limit of recall. The main agent owns recall and capture for the
-top-level task. Specialists and
-subagents receive filtered context and do not independently query or mutate
-X4 project memory.
+not the limit of recall. The main agent owns top-level coverage and all memory
+mutations. Specialists and subagents may fill bounded recall gaps only under
+the delegated-read rules in `MEMORY.md`; pass its complete required source
+chain and existing provenance-bearing findings with the assignment.
 
 The shared contract intentionally does not select GSD, OpenSpec, or another
 development framework. Follow the current repository's local workflow.
