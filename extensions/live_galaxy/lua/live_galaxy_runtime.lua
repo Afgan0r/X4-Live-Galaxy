@@ -3,13 +3,15 @@ if not package.path:find(extension_path, 1, true) then
     package.path = package.path .. ";" .. extension_path
 end
 
-local runtime = {}
+local runtime = { scope_active = false }
 local carrier_module = require("live_galaxy.lua.live_galaxy_carrier")
 local observation_module = require("live_galaxy.lua.live_galaxy_observation")
 local scheduler = require("live_galaxy.lua.live_galaxy_scheduler")
 
 local active_carrier, active_observation
 local initialized, callback_active = false, false
+local update_callback
+local registered, registration_attempted, stopped, dispatch_active = false, false, false, false
 local last_diagnostic
 local diagnostic_gap_count = 0
 local pending_boundary
@@ -38,6 +40,9 @@ local safe_details = {
     identity_invalid = true, enumeration_incomplete = true, empty_unproven = true,
     cargo_unknown = true, failed = true,
     crew_unknown = true, invalid_capture_stage = true,
+    update_registered = true, update_removed = true, update_unavailable = true,
+    update_registration_failed = true, update_removal_failed = true,
+    callback_busy = true, runtime_stopped = true, teardown_failed = true,
 }
 
 -- Rejection metadata contains owned labels/types/ordinals, never source values.
@@ -131,7 +136,20 @@ local function diagnostic(event, detail, metrics, rejection)
     return true
 end
 
+local function discard_active(reason)
+    if not active_observation then return true end
+    if active_observation.discard then
+        return pcall(active_observation.discard, active_observation, active_carrier, reason)
+    elseif active_observation.collector then
+        return pcall(active_observation.collector.discard, active_observation.collector, active_carrier, reason)
+    end
+    return true
+end
+
 function runtime.handle_tick(_, event_parameter)
+    if stopped or rawget(_G, "LiveGalaxyObservationRuntime") ~= runtime then
+        return false, "runtime_stopped"
+    end
     local event_boundary = boundaries[event_parameter]
     if event_boundary == nil then return false, "event_ignored" end
     if event_parameter == "telemetry_game_loaded" then pending_boundary = event_boundary end
@@ -142,7 +160,10 @@ function runtime.handle_tick(_, event_parameter)
     local ok, result = pcall(scheduler.tick, boundary, active_carrier, active_observation)
     callback_active = false
     if not ok or type(result) ~= "table" then
-        diagnostic("callback_failure", ok and "invalid_result" or "exception")
+        boundary.reentry_guard = false
+        local discarded = discard_active("callback_failure")
+        diagnostic("callback_failure", ok and "invalid_result" or "exception", nil,
+            not discarded and { operation = "discard", condition = "teardown_failed" } or nil)
         return false, "callback_failure"
     end
     if result.disposition == "sampled" and boundary == pending_boundary then
@@ -155,6 +176,7 @@ function runtime.handle_tick(_, event_parameter)
 end
 
 function runtime.initialize(options)
+    if stopped then return false, "runtime_stopped" end
     if initialized then return true, "already_initialized" end
     if options == nil then
         local config = require("live_galaxy.lua.live_galaxy_config")
@@ -180,17 +202,107 @@ function runtime.initialize(options)
     return true, "initialized"
 end
 
-local function dispatch(event_name, event_parameter)
+local function dispatch_tick()
     if not initialized then
         local ok, reason = runtime.initialize()
         if not ok then return false, reason end
     end
-    return runtime.handle_tick(event_name, event_parameter)
+    return runtime.handle_tick(nil, "telemetry_tick")
 end
 
-if type(RegisterEvent) ~= "function" then
-    error("Live Galaxy Carrier B: RegisterEvent unavailable")
+-- This exact closure is retained for removal. Never edit the engine callback
+-- list during dispatch; teardown/reconstruction refuse that transition.
+update_callback = function()
+    if stopped or not registered or rawget(_G, "LiveGalaxyObservationRuntime") ~= runtime then
+        return false, "runtime_stopped"
+    end
+    if not runtime.scope_active then return false, "scope_inactive" end
+    if dispatch_active then return false, "reentry_suppressed" end
+    dispatch_active = true
+    local ok, accepted, reason = pcall(dispatch_tick)
+    dispatch_active = false
+    if not ok then
+        diagnostic("callback_failure", "exception")
+        return false, "callback_failure"
+    end
+    return accepted, reason
 end
-RegisterEvent("live_galaxy_observation", dispatch)
+
+local function register_update()
+    if registered then return true end
+    if type(SetScript) ~= "function" or type(RemoveScript) ~= "function" then
+        diagnostic("callback_registration", "update_unavailable")
+        return false, "update_unavailable"
+    end
+    registration_attempted = true -- A throwing hook may already have registered it.
+    if not pcall(SetScript, "onUpdate", update_callback) then
+        diagnostic("callback_registration", "update_registration_failed")
+        return false, "update_registration_failed"
+    end
+    registered = true
+    diagnostic("callback_registration", "update_registered")
+    return true
+end
+
+function runtime.handle_event(_, event_parameter)
+    if stopped then return false, "runtime_stopped" end
+    if event_parameter == "telemetry_game_loaded" then
+        pending_boundary = boundaries.telemetry_game_loaded
+    elseif event_parameter ~= "telemetry_game_start" then
+        return false, "event_ignored"
+    end
+    runtime.scope_active = true
+    -- Boundary cues do not run collection or a second transport pump.
+    if dispatch_active then return true, "boundary_pending" end
+    return register_update()
+end
+
+function runtime.shutdown()
+    if dispatch_active then
+        diagnostic("callback_teardown", "callback_busy")
+        return false, "callback_busy"
+    end
+    stopped = true -- Any retained callback is inert even when removal fails.
+    runtime.scope_active = false
+    if registration_attempted then
+        if not pcall(RemoveScript, "onUpdate", update_callback) then
+            diagnostic("callback_teardown", "update_removal_failed")
+            return false, "update_removal_failed"
+        end
+        registered, registration_attempted = false, false
+        diagnostic("callback_teardown", "update_removed")
+    end
+    if active_carrier then
+        local discarded = discard_active("source_boundary_changed")
+        local ok, code = pcall(active_carrier.close, active_carrier)
+        if not discarded or not ok or code ~= 0 then
+            diagnostic("callback_teardown", "teardown_failed")
+            return false, "teardown_failed"
+        end
+    end
+    active_carrier, active_observation, initialized = nil, nil, false
+    return true
+end
+
+local previous = rawget(_G, "LiveGalaxyObservationRuntime")
+if previous then
+    local live_scope = previous.scope_active
+    local ok, reason = previous.shutdown()
+    if not ok then error("Live Galaxy Carrier B: " .. reason) end
+    -- Same-state reconstruction may retain an already live scope; a fresh VM
+    -- still waits for an MD lifecycle event. This does not prove VM continuity.
+    runtime.scope_active = live_scope
+    pending_boundary = { source_epoch_status = "boundary_uncertain", source_boundary = "lua_reload" }
+end
+if type(RegisterEvent) ~= "function" then error("Live Galaxy Carrier B: RegisterEvent unavailable") end
+-- Reuse the one event closure across module reconstruction. It resolves only
+-- the current owner, without retaining an old runtime or its native resource.
+runtime.event_callback = previous and previous.event_callback or function(name, parameter)
+    local current = rawget(_G, "LiveGalaxyObservationRuntime")
+    if current then return current.handle_event(name, parameter) end
+end
+_G.LiveGalaxyObservationRuntime = runtime
+if not previous then RegisterEvent("live_galaxy_observation", runtime.event_callback) end
+register_update()
 
 return runtime

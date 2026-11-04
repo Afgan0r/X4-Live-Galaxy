@@ -1,21 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mdscript name="live_galaxy_observation">
   <!--
-    X4 owns this bounded callback seam. Lua owns collection and co-operative
-    progress; this cue declares no mutation or support-API dependency.
+    MD supplies one-shot lifecycle boundaries. The Lua global update callback
+    owns bounded collection and transport progress; there is no periodic MD pump.
   -->
   <cues>
     <cue name="live_galaxy_game_start">
       <conditions>
         <event_cue_signalled cue="md.Setup.GameStart" />
       </conditions>
-      <cues>
-        <cue name="live_galaxy_observation" instantiate="true" checkinterval="50ms">
-          <actions>
-            <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_tick'" />
-          </actions>
-        </cue>
-      </cues>
+      <actions>
+        <raise_lua_event name="'live_galaxy_observation'" param="'telemetry_game_start'" />
+      </actions>
     </cue>
     <cue name="live_galaxy_game_loaded">
       <conditions>

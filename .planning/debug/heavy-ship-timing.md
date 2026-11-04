@@ -20,7 +20,7 @@ Reproduction: Existing dynamic full-set Lua producer and Carrier B bridge; retai
 hypothesis: Frequent 2 ms cooperative yields resume on a 50 ms configured MD cue; the same cue clocks stop-and-wait sends and ACK consumption, adding delay to already captured detail delivery.
 test: Trace real selection/budget/scheduler and native send/feedback paths against retained Argon endpoint differences and receiver timestamps.
 expecting: Separate pre-core-publication continuation gaps from cached-detail delivery gaps; do not equate configured cue spacing with exact observed idle time.
-next_action: Resume Plan 11 after restarting Codex to load refreshed GSD definitions. Adapt bounded continuations using consumed callback evidence, protect lifecycle/error/budget behavior, review and regress offline before owner-operated X4 acceptance. Exact runtime cue-versus-scheduler cost and true per-call CPU remain unmeasured.
+next_action: Package the reviewed and offline-verified global callback remedy, then await owner-operated normal/SETA/load/reload evidence. Exact runtime cue-versus-scheduler cost, complete engine callback cost and true per-call CPU remain unmeasured.
 package_checkpoint: Diagnostic source `3b6d3de` installed and measured in retained run `055-gate-b-normal-20261010-110531`; full Gate B remains open.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
@@ -308,6 +308,63 @@ launch, package installation or runtime acceptance occurred. Memory search
 worked, but fetching the previous ACK checkpoint drawer failed with
 `TypeError | fetch failed`; historical coverage is partial and primary
 evidence is used under the X4 outage policy. No memory write was attempted.
+
+## Global callback consumer remedy (2026-11-04)
+
+Resumed from fresh `9fd11cc` after Codex restart; project-local GSD routing
+was current. The GSD base check selected sequential execution in the current
+milestone checkout. No branch, model, budget, native ABI or protocol setting
+was changed.
+
+Runtime now retains one direct update callback and exact-reference teardown.
+MD delivers GameStart/GameLoaded boundaries only, not a periodic second pump.
+Fresh state performs no initialization, source or transport work before a
+game-scope boundary. Live same-state module replacement may carry that scope
+with uncertain lua_reload evidence; an explicitly stopped owner cannot revive
+it. Reentry, reconstruction/teardown during dispatch, stale callbacks and
+registration/removal errors are covered without assuming native nonreentrancy
+or changing the callback list during dispatch. Existing scheduler/ACK logic
+and the 2 ms cooperative target remain unchanged.
+
+Two assertion REDs established absent update registration and unintended
+pre-game source work. Focused GREEN: scheduler 68, ship detail 37, loader 1,
+syntax 21. The real runtime fake-clock test exercises source and retained
+delivery yielding, no premature publication and exactly five core/revalidation
+reads for its single member, with no repeated getters. Its complete test
+callback ceiling is derived from the configured target_fps, not engine-clock
+precision or a claimed real X4 measurement.
+
+Independent full-depth review of all eight implementation/procedure files
+resolved WR-CB-01: package assertions formerly accepted missing lifecycle
+conditions. Assertion RED confirmed that gap; the corrected checker rejects
+missing, replaced, extra and malformed triggers in 18 negative fixtures.
+Full-task re-review converged with no open BLOCKER/WARNING. The review record
+preserves the original finding and disposition.
+
+Final verification after convergence:
+
+- `cargo fmt --all -- --check`: exit 0.
+- `cargo clippy --locked --workspace --all-targets -- -D warnings`: exit 0
+  after repeating with Cargo-cache access following a sandbox unpack denial.
+- `cargo test --locked --workspace -- --test-threads=1`: exit 0. Five
+  pre-existing deferred 05.1 named-pipe contracts remain ignored; no new test
+  was ignored to obtain green, and those old cases are not claimed as passed.
+- `cargo run --locked -p source-size-lint -- crates`: exit 0.
+- `pwsh -NoProfile -File extensions/live_galaxy/tests/run_contracts.ps1
+  -Suite all`: exit 0, 69.251 seconds; 149 Lua tests, 21 syntax checks,
+  XML/schema, actual native lifecycle/full-set/recovery and performance gate.
+  Local heavy-gate callback maxima were 5.5091 and 3.6363 ms against
+  `1000 / 144` ms, with zero final backlog in both processes.
+- Install-guard PowerShell parsing and diff checks passed; a real packaged
+  guard invocation follows packaging. Lua mutation is not claimed: no qualified
+  existing runner was introduced, and no Rust safety/domain logic changed.
+
+These are offline results, not global engine-callback timing, a causal
+throughput comparison, FPS evidence or normal/SETA acceptance. Existing
+security/mutation/goal-verification phase gates are not silently closed by
+this scoped review. The old MD cadence has been removed from production, but
+actual runtime improvement and affected Gate A lifecycle/timing still need
+owner evidence. No X4 launch, control, install or save access occurred.
 
 ## Resolution
 

@@ -5,6 +5,7 @@ local pipe_module = "extensions.sn_mod_support_apis.ui.named_pipes.Interface"
 local globals = {
     "DebugError", "Register_OnLoad_Init", "RegisterEvent", "GetCurRealTime",
     "ConvertStringToLuaID", "ConvertIDTo64Bit", "GetComponentData",
+    "SetScript", "RemoveScript", "LiveGalaxyObservationRuntime",
 }
 
 local function relevant(name)
@@ -36,6 +37,9 @@ function helper.new()
     for name in pairs(package.loaded) do if relevant(name) then package.loaded[name] = nil end end
     package.preload.ffi = nil
     package.preload[pipe_module] = nil
+    _G.RegisterEvent = function() end
+    _G.SetScript = function() end
+    _G.RemoveScript = function() end
 
     local fixture = {}
     function fixture.load(name) return require(prefix .. name) end
@@ -44,6 +48,11 @@ function helper.new()
         package.loaded[dotted_prefix .. "live_galaxy_runtime"] = nil
         package.loaded["extensions.live_galaxy.lua.live_galaxy_runtime"] = nil
         return fixture.load("live_galaxy_runtime")
+    end
+    function fixture.active_runtime()
+        local runtime = fixture.runtime()
+        runtime.handle_event(nil, "telemetry_game_start")
+        return runtime
     end
     function fixture.trace_config(fields)
         local config = fixture.load("live_galaxy_trace_config")

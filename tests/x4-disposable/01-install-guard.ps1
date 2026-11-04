@@ -54,19 +54,20 @@ if ($ui.addon.environment.type -ne 'menus' -or
     $ui.addon.environment.file.name -ne 'lua/live_galaxy_runtime.lua') {
     throw 'menus UI Lua registration is invalid'
 }
-$cues = @($md.SelectNodes('//cue[@checkinterval]'))
-if ($cues.Count -ne 1 -or $cues[0].Name -ne 'live_galaxy_observation' -or $cues[0].checkinterval -ne '50ms') {
-    throw 'single 50 ms Carrier B telemetry pump cadence is missing'
-}
-if ($runtime -notmatch 'RegisterEvent\("live_galaxy_observation", dispatch\)' -or
+# Reuse the production package's structural boundary assertions; MD must never
+# become a second periodic pump beside the global Lua update owner.
+& (Join-Path $root 'extensions/live_galaxy/tests/x4-package-conformance.ps1') -ExtensionRoot $extension
+if ($runtime -notmatch 'RegisterEvent\("live_galaxy_observation", runtime.event_callback\)' -or
+    $runtime -notmatch 'SetScript, "onUpdate", update_callback' -or
+    $runtime -notmatch 'RemoveScript, "onUpdate", update_callback' -or
     $runtime -match '(?i)sn_mod_support_apis') {
-    throw 'dependency-free direct event registration is invalid'
+    throw 'dependency-free global update registration or exact-reference teardown is invalid'
 }
 if ($carrier -notmatch [regex]::Escape('.\\extensions\\live_galaxy\\ui_c_library_live_galaxy_carrier_64.txt') -or
     $carrier -notmatch 'luaopen_live_galaxy_carrier') {
     throw 'owned native loader path or initializer is invalid'
 }
 
-Write-Output 'Carrier B install guard passed read-only: dependency-free package, 50 ms admitted pump, owned DLL and bridge.'
+Write-Output 'Carrier B install guard passed read-only: one-shot MD boundaries, global Lua update, owned DLL and bridge.'
 if ($VerifyPackageOnly) { exit 0 }
 throw 'installation remains an explicit caller-owned copy after this guard'

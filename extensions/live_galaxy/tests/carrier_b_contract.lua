@@ -231,9 +231,9 @@ describe("owned Carrier B adapter", function()
         it("renders ACK successor failure safely " .. tostring(case.successor_code or case.expected), function()
             local env, tick, diagnostic = pending_carrier(case), nil, nil
             local getters = 0
-            _G.RegisterEvent = function(_, callback) tick = callback end
+            _G.SetScript = function(_, callback) tick = callback end
             _G.DebugError = function(value) diagnostic = value end
-            local runtime = fixture.runtime()
+            local runtime = fixture.active_runtime()
             assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = {
                 getter = function() getters = getters + 1; return 1 end,
                 clock_getter = function() return 0 end,
@@ -364,15 +364,14 @@ describe("owned Carrier B adapter", function()
                 GetCurrentGameTime = function() return getter_calls == 0 and 10.25 or 10.5 end,
             } }
         end
-        _G.RegisterEvent = function(_, callback) tick = callback end
-        fixture.runtime()
+        _G.SetScript = function(_, callback) tick = callback end
+        fixture.active_runtime()
         assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.equals(1, getter_calls)
         assert.equals("10250", env.begin().capture_start_millis)
         assert.equals("10500", env.finish().capture_end_millis)
-        assert.same({ true, "sampled" }, {
-            tick("live_galaxy_observation", "telemetry_game_loaded"),
-        })
+        assert.is_true(_G.LiveGalaxyObservationRuntime.handle_event("live_galaxy_observation", "telemetry_game_loaded"))
+        assert.same({ true, "sampled" }, { tick() })
         assert.equals("boundary_uncertain", env.begin().source_epoch_status)
         assert.equals("game_loaded", env.begin().source_boundary)
     end)
@@ -390,12 +389,11 @@ describe("owned Carrier B adapter", function()
         package.preload.ffi = function()
             return { C = { GetCurrentGameTime = function() return 10 end } }
         end
-        _G.RegisterEvent = function(_, callback) tick = callback end
-        fixture.runtime()
+        _G.SetScript = function(_, callback) tick = callback end
+        fixture.active_runtime()
 
-        assert.same({ false, "producer_busy" }, {
-            tick("live_galaxy_observation", "telemetry_game_loaded"),
-        })
+        assert.is_true(_G.LiveGalaxyObservationRuntime.handle_event("live_galaxy_observation", "telemetry_game_loaded"))
+        assert.same({ false, "producer_busy" }, { tick() })
         assert.same({ true, "sampled" }, {
             tick("live_galaxy_observation", "telemetry_tick"),
         })
@@ -414,8 +412,8 @@ describe("owned Carrier B adapter", function()
             return { C = { GetCurrentGameTime = function() return 0 end } }
         end
         _G.DebugError = function(value) diagnostic = value end
-        _G.RegisterEvent = function(_, callback) tick = callback end
-        fixture.runtime()
+        _G.SetScript = function(_, callback) tick = callback end
+        fixture.active_runtime()
         tick("live_galaxy_observation", "telemetry_tick")
         assert.equals("Live Galaxy Carrier B: event=transition detail=operation_failure", diagnostic)
         assert.is_nil(diagnostic:match("[A-Z]:\\"))
@@ -427,27 +425,42 @@ describe("owned Carrier B adapter", function()
         _G.GetCurRealTime = function() samples = samples + 1; return 2 end
         package.preload.ffi = function() return { C = { GetCurrentGameTime = function() return 0 end } } end
         _G.DebugError = function() error("failed sink") end
-        _G.RegisterEvent = function(_, callback) tick = callback end
-        fixture.runtime()
+        _G.SetScript = function(_, callback) tick = callback end
+        fixture.active_runtime()
         assert.same({ false, "diagnostic_failure" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.same({ false, "diagnostic_failure" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.equals(2, samples, "diagnostic failure does not cancel valid observation work")
         _G.DebugError = function(value) recovered = value end
         assert.same({ true, "sampled" }, { tick("live_galaxy_observation", "telemetry_tick") })
-        assert.is_truthy(recovered:match("diagnostic_gap_count=3"))
+        assert.is_truthy(recovered:match("diagnostic_gap_count=4"))
     end)
 
-    it("renders measured heavy callback duration and overrun in ordinary runtime diagnostics", function()
-        local env, tick, diagnostic = native({ selection = "ship_core", remaining = "1", monotonic_step = 10 }), nil, nil
+    for _, step in ipairs({ 1, 10 }) do
+    it(step == 1 and "keeps global updates cooperative through source capture and retained delivery"
+        or "renders measured heavy callback duration and overrun in ordinary runtime diagnostics", function()
+        local env, tick, diagnostic = native({ selection = "ship_core", remaining = "1", monotonic_step = step }), nil, nil
         local file = assert(io.open("config/heavy-ship-experiment.json", "rb"))
         local text = assert(file:read("*a")); assert(file:close())
         local values = {}; for key, value in text:gmatch('"([%w_]+)"%s*:%s*(%d+)') do values[key] = tonumber(value) end
         local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
         options.getter, options.clock_getter = function() return 0 end, function() return 1 end
+        local reads, publications, now, callback_max = 0, 0, 0, 0
+        local original_progress, original_push = env.api.progress, env.api.push_record
+        env.api.progress = function(...)
+            now = now + step
+            return original_progress(...)
+        end
+        env.api.push_record = function(...)
+            publications = publications + 1
+            return original_push(...)
+        end
         options.ship_api = {
             list_factions = function() return { "argon" } end, count_ships = function() return 1 end,
             new_buffer = function() return { [0] = "9007199254740993" } end, fill_ships = function() return 1 end,
-            read_core = function(_, id) return { identity = id, owner = "argon", type = "macro", class = "ship", location = "sector:1" } end,
+            read_core = function(_, id)
+                reads = reads + 1
+                return { identity = id, owner = "argon", type = "macro", class = "ship", location = "sector:1" }
+            end,
             cargo_wares = function() return {} end, cargo_storage_count = function() return 0 end,
             cargo_storage_size = function() return 24 end, cargo_storage_allocate = function() return {} end,
             cargo_storage_fill = function() return {} end, crew_capacity = function() return 0 end,
@@ -463,13 +476,38 @@ describe("owned Carrier B adapter", function()
             units_count = function() return 0 end, units_size = function() return 24 end,
             units_allocate = function() return {} end, units_fill = function() return {} end,
         }
-        _G.RegisterEvent = function(_, callback) tick = callback end
+        _G.SetScript = function(_, callback) tick = callback end
         _G.DebugError = function(value) diagnostic = value end
-        local runtime = fixture.runtime()
+        local runtime = fixture.active_runtime()
         assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
-        assert.same({ true, "sampled" }, { tick_until_terminal(tick) })
-        assert.is_truthy(diagnostic:match("max_callback_duration_millis=10"))
-        assert.is_truthy(diagnostic:match("max_callback_overrun_millis=8"))
+        local callbacks, disposition = 0, nil
+        repeat
+            local started = now
+            local accepted
+            accepted, disposition = tick()
+            callback_max = math.max(callback_max, now - started)
+            callbacks = callbacks + 1
+            assert.is_true(disposition == "collecting" or accepted, disposition)
+            if reads < 5 then assert.equals(0, publications, "no incomplete source snapshot is published") end
+        until disposition ~= "collecting" or callbacks >= 1000
+        assert.equals("sampled", disposition)
+        assert.is_true(callbacks > 1, "the real update callback must yield and resume on later updates")
+        assert.equals(5, reads, "source capture and each revalidation execute exactly once across updates")
+        assert.equals(1, publications)
+        if step == 1 then
+            assert.equals(2, values.callback_budget_millis)
+            local measured = assert(tonumber(diagnostic:match("max_callback_duration_millis=(%d+)")))
+            assert.is_true(measured <= values.callback_budget_millis)
+            local policy = assert(io.open("config/heavy-ship-performance.json", "rb"))
+            local target_fps = assert(tonumber(assert(policy:read("*a")):match('"target_fps"%s*:%s*(%d+)')))
+            assert(policy:close())
+            assert.is_true(callback_max <= 1000 / target_fps,
+                "complete fake-clock callback remains below the target frame ceiling")
+            assert.is_truthy(diagnostic:match("max_callback_overrun_millis=0"))
+        else
+            assert.is_truthy(diagnostic:match("max_callback_duration_millis=10"))
+            assert.is_truthy(diagnostic:match("max_callback_overrun_millis=8"))
+        end
         assert.is_truthy(diagnostic:match("source_value_bytes=%d+"))
         assert.is_truthy(diagnostic:match("timing_clock=carrier_monotonic_millis"))
         assert.is_truthy(diagnostic:match("timing_sampling_overhead=included_unmeasured"))
@@ -481,6 +519,7 @@ describe("owned Carrier B adapter", function()
         assert.is_nil(diagnostic:match("backlog="),
             "runtime must omit backlog until an owned measured queue value exists")
     end)
+    end
 
     for _, case in ipairs({
         { field = "type", value = "PRIVATE/path\n", condition = "token_invalid", observed_type = "string" },
@@ -507,9 +546,9 @@ describe("owned Carrier B adapter", function()
                     return core
                 end,
             }
-            _G.RegisterEvent = function(_, callback) tick = callback end
+            _G.SetScript = function(_, callback) tick = callback end
             _G.DebugError = function(value) diagnostic = value; messages[#messages + 1] = value end
-            local runtime = fixture.runtime()
+            local runtime = fixture.active_runtime()
             assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
             assert.same({ false, "invalid_fact" }, { tick_until_terminal(tick) })
             assert.is_truthy(diagnostic:match("stage=core"))
@@ -558,9 +597,9 @@ describe("owned Carrier B adapter", function()
             units_size = function() return 24 end, units_allocate = function() return {} end,
             units_fill = function() return {} end,
         }
-        _G.RegisterEvent = function(_, callback) tick = callback end
+        _G.SetScript = function(_, callback) tick = callback end
         _G.DebugError = function(value) diagnostic = value end
-        assert(fixture.runtime().initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
+        assert(fixture.active_runtime().initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
         assert.same({ true, "sampled" }, { tick_until_terminal(tick) })
         assert.is_truthy(diagnostic:match("detail=sampled"))
     end)
@@ -573,9 +612,9 @@ describe("owned Carrier B adapter", function()
         local options = assert(fixture.load("live_galaxy_ship_profile").options(values, "argon")).observation
         options.getter, options.clock_getter = function() return 0 end, function() return 1 end
         options.ship_api = { read_core = function() error("unexpected source capture") end }
-        _G.RegisterEvent = function(_, callback) tick = callback end
+        _G.SetScript = function(_, callback) tick = callback end
         _G.DebugError = function(value) diagnostic = value end
-        local runtime = fixture.runtime()
+        local runtime = fixture.active_runtime()
         assert(runtime.initialize({ carrier = { loadlib = env.loadlib }, observation = options }))
         assert.same({ false, "stale_parent" }, { tick("live_galaxy_observation", "telemetry_tick") })
         assert.is_truthy(diagnostic:match("stage=selection"))
@@ -708,6 +747,225 @@ describe("owned Carrier B adapter", function()
         collectgarbage("collect")
         collectgarbage("collect")
         assert.equals(1, close_count(finalized.calls))
+    end)
+
+    -- Only the external engine hooks are doubled; frames load and execute the
+    -- real runtime, carrier, observation and scheduler through normal require.
+    local function update_environment()
+        local env = native()
+        env.registrations, env.removals, env.logs, env.event_count = {}, {}, {}, 0
+        package.loadlib = env.loadlib
+        _G.GetCurRealTime = function() return 2 end
+        package.preload.ffi = function() return { C = { GetCurrentGameTime = function() return 10 end } } end
+        _G.DebugError = function(value) env.logs[#env.logs + 1] = value end
+        _G.RegisterEvent = function(name, callback)
+            assert.equals("live_galaxy_observation", name)
+            env.event_count, env.event = env.event_count + 1, callback
+        end
+        _G.SetScript = function(name, callback)
+            assert.is_nil(env.dispatching, "registration during engine dispatch is not admitted")
+            assert.equals("onUpdate", name)
+            env.registrations[#env.registrations + 1] = callback
+            env.update = callback
+            if env.registration_failure then error("PRIVATE/path\nregistration failure") end
+        end
+        _G.RemoveScript = function(name, callback)
+            assert.is_nil(env.dispatching, "removal during engine dispatch is not admitted")
+            assert.equals("onUpdate", name)
+            assert.equals(env.update, callback, "removal must use the registered exact reference")
+            if env.removal_failure then error("PRIVATE/path\nremoval failure") end
+            env.removals[#env.removals + 1] = callback
+            env.update = nil
+        end
+        function env.frame()
+            env.dispatching = true
+            local ok, accepted, reason = pcall(env.update)
+            env.dispatching = nil
+            assert.is_true(ok, accepted)
+            return accepted, reason
+        end
+        return env
+    end
+
+    it("keeps a fresh global callback inactive until a one-shot game boundary", function()
+        local env = update_environment()
+        fixture.runtime()
+        assert.same({ false, "scope_inactive" }, { env.frame() })
+        assert.equals(0, #env.calls, "before a game event there are no initialization, source or transport calls")
+        assert.is_true(env.event(nil, "telemetry_game_start"))
+        assert.equals(0, #env.calls, "the one-shot event only latches readiness")
+        assert.same({ true, "sampled" }, { env.frame() })
+    end)
+
+    it("reconstructs the runtime with exact removal, one event owner and inert stale callbacks", function()
+        local env = update_environment()
+        local first = fixture.active_runtime()
+        local stale = env.update
+        assert.same({ true, "sampled" }, { env.frame() })
+        local replacement = fixture.runtime()
+        assert.equals(1, #env.removals)
+        assert.equals(stale, env.removals[1])
+        assert.equals(2, #env.registrations)
+        assert.equals(1, env.event_count)
+        local before = #env.calls
+        assert.same({ false, "runtime_stopped" }, { stale() })
+        assert.same({ false, "runtime_stopped" }, { first.handle_tick(nil, "telemetry_tick") })
+        assert.equals(before, #env.calls)
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals("lua_reload", env.begin().source_boundary)
+        assert.equals("boundary_uncertain", env.begin().source_epoch_status)
+        assert.equals(replacement, _G.LiveGalaxyObservationRuntime)
+        assert.is_true(replacement.shutdown())
+        assert.equals(2, #env.removals)
+        assert.same({ false, "runtime_stopped" }, { env.event(nil, "telemetry_game_loaded") })
+        local closes = 0
+        for _, call in ipairs(env.calls) do if call == "close" then closes = closes + 1 end end
+        assert.equals(2, closes)
+    end)
+
+    it("suppresses reentry and refuses lifecycle list mutation during an update", function()
+        local env, runtime, nested = update_environment(), nil, false
+        runtime = fixture.active_runtime()
+        _G.GetCurRealTime = function()
+            if not nested then
+                nested = true
+                assert.same({ false, "reentry_suppressed" }, { env.update() })
+                assert.same({ false, "callback_busy" }, { runtime.shutdown() })
+                local ok, reason = pcall(fixture.runtime)
+                assert.is_false(ok)
+                assert.is_truthy(reason:match("callback_busy"))
+                assert.is_true(env.event(nil, "telemetry_game_loaded"))
+            end
+            return 2
+        end
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals(0, #env.removals)
+        assert.equals(1, #env.registrations)
+        assert.equals(runtime, _G.LiveGalaxyObservationRuntime)
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals("game_loaded", env.begin().source_boundary,
+            "a boundary raised during sampling must survive until a later admitted sample")
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals("runtime_start", env.begin().source_boundary)
+        assert.is_table(fixture.runtime(), "reconstruction recovers outside dispatch")
+        assert.equals(1, #env.removals)
+    end)
+
+    it("contains callback initialization exceptions and recovers on a later update", function()
+        local env = update_environment()
+        local attempts = 0
+        package.loadlib = function(...)
+            attempts = attempts + 1
+            if attempts == 1 then error("PRIVATE/path\ninitializer exception") end
+            return env.loadlib(...)
+        end
+        fixture.active_runtime()
+        assert.same({ false, "callback_failure" }, { env.frame() })
+        assert.equals(0, #env.calls, "failed initialization cannot advance transport or source")
+        assert.is_truthy(env.logs[#env.logs]:match("event=callback_failure detail=exception"))
+        assert.is_nil(table.concat(env.logs):match("PRIVATE"))
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals(1, #env.registrations)
+    end)
+
+    it("reports missing update hooks without restoring an MD fallback pump", function()
+        local env = update_environment()
+        local set_script = _G.SetScript
+        _G.SetScript = nil
+        fixture.runtime()
+        assert.equals(0, #env.registrations)
+        assert.equals(0, #env.calls)
+        assert.is_truthy(env.logs[#env.logs]:match("callback_registration detail=update_unavailable"))
+        assert.same({ false, "event_ignored" }, { env.event(nil, "telemetry_tick") })
+        assert.equals(0, #env.calls)
+        _G.SetScript = set_script
+        assert.is_true(env.event(nil, "telemetry_game_start"))
+        assert.equals(1, #env.registrations)
+        assert.same({ true, "sampled" }, { env.frame() })
+    end)
+
+    it("fails registration closed and retries the same callback only at a lifecycle boundary", function()
+        local env = update_environment()
+        env.registration_failure = true
+        fixture.runtime()
+        local callback = env.update
+        assert.same({ false, "runtime_stopped" }, { env.frame() })
+        assert.equals(0, #env.calls)
+        assert.is_truthy(env.logs[#env.logs]:match("callback_registration detail=update_registration_failed"))
+        env.registration_failure = nil
+        assert.is_true(env.event(nil, "telemetry_game_loaded"))
+        assert.equals(callback, env.update)
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals("game_loaded", env.begin().source_boundary)
+        assert.is_nil(table.concat(env.logs):match("PRIVATE"))
+    end)
+
+    it("removes an ambiguous failed registration before reconstructing its owner", function()
+        local env = update_environment()
+        env.registration_failure = true
+        fixture.runtime()
+        local attempted = env.update
+        assert.same({ false, "runtime_stopped" }, { attempted() })
+        env.registration_failure = nil
+        fixture.runtime()
+        assert.same({ attempted }, env.removals)
+        assert.equals(2, #env.registrations)
+        assert.same({ false, "runtime_stopped" }, { attempted() })
+        assert.is_true(env.event(nil, "telemetry_game_start"))
+        assert.same({ true, "sampled" }, { env.frame() })
+    end)
+
+    it("keeps failed-removal callbacks inert and blocks replacement until exact cleanup succeeds", function()
+        local env = update_environment()
+        local runtime = fixture.active_runtime()
+        assert.same({ true, "sampled" }, { env.frame() })
+        env.removal_failure = true
+        assert.same({ false, "update_removal_failed" }, { runtime.shutdown() })
+        local before = #env.calls
+        assert.same({ false, "runtime_stopped" }, { env.frame() })
+        assert.equals(before, #env.calls)
+        local ok, reason = pcall(fixture.runtime)
+        assert.is_false(ok)
+        assert.is_truthy(reason:match("update_removal_failed"))
+        assert.equals(1, #env.registrations)
+        env.removal_failure = nil
+        assert.is_table(fixture.runtime())
+        assert.equals(1, #env.removals)
+        assert.equals(1, env.event_count)
+        assert.same({ false, "scope_inactive" }, { env.frame() })
+        assert.is_true(env.event(nil, "telemetry_game_loaded"))
+        assert.same({ true, "sampled" }, { env.frame() })
+        assert.equals("game_loaded", env.begin().source_boundary)
+        assert.is_nil(table.concat(env.logs):match("PRIVATE"))
+    end)
+
+    it("advances through one global update without an MD periodic pump", function()
+        local env, update, event, registrations = native(), nil, nil, 0
+        package.loadlib = env.loadlib
+        _G.GetCurRealTime = function() return 2 end
+        package.preload.ffi = function() return { C = { GetCurrentGameTime = function() return 10 end } } end
+        _G.RegisterEvent = function(_, callback) event = callback end
+        _G.SetScript = function(name, callback)
+            assert.equals("onUpdate", name)
+            registrations, update = registrations + 1, callback
+        end
+        _G.RemoveScript = function() end
+        local runtime = fixture.runtime()
+        assert.is_function(update, "production entrypoint must register the global update callback")
+        assert.same({ false, "scope_inactive" }, { update() })
+        event(nil, "telemetry_game_start")
+        assert.same({ true, "sampled" }, { update() })
+        local before = #env.calls
+        event("live_galaxy_observation", "telemetry_tick")
+        assert.equals(before, #env.calls, "MD must not provide a second periodic pump")
+        assert.same({ true, "already_initialized" }, { runtime.initialize() })
+        assert.equals(1, registrations)
+        event("live_galaxy_observation", "telemetry_game_loaded")
+        assert.equals(before, #env.calls, "a lifecycle event only latches its boundary")
+        assert.same({ true, "sampled" }, { update() })
+        assert.equals("game_loaded", env.begin().source_boundary)
+        assert.same({ true, "sampled" }, { update() })
+        assert.equals("runtime_start", env.begin().source_boundary)
     end)
 
     it("initializes once through normal require and registers one callback", function()

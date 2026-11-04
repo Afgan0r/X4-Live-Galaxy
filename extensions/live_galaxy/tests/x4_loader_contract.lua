@@ -16,12 +16,17 @@ local modules = {
 local function relevant(name) return name:sub(1, #dotted_prefix) == dotted_prefix end
 
 describe("X4 production Lua loader", function()
-    local saved_path, saved_loaded, saved_register
+    local saved_path, saved_loaded, saved_register, saved_set, saved_remove, saved_owner
 
     before_each(function()
         saved_path = package.path
         saved_register = rawget(_G, "RegisterEvent")
+        saved_set, saved_remove = rawget(_G, "SetScript"), rawget(_G, "RemoveScript")
+        saved_owner = rawget(_G, "LiveGalaxyObservationRuntime")
         _G.RegisterEvent = function() end
+        _G.SetScript = function() end
+        _G.RemoveScript = function() end
+        _G.LiveGalaxyObservationRuntime = nil
         saved_loaded = {}
         for name, value in pairs(package.loaded) do
             if relevant(name) then saved_loaded[name] = value end
@@ -39,6 +44,8 @@ describe("X4 production Lua loader", function()
         for name, value in pairs(saved_loaded) do package.loaded[name] = value end
         package.path = saved_path
         _G.RegisterEvent = saved_register
+        _G.SetScript, _G.RemoveScript = saved_set, saved_remove
+        _G.LiveGalaxyObservationRuntime = saved_owner
     end)
 
     it("adds the extension search path before loading local modules", function()
