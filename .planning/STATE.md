@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 global callback remedy reviewed and verified offline; packaging and owner runtime acceptance pending
+stopped_at: Plan 11 global callback package verified; await owner installation/runtime checkpoint
 last_updated: "2026-11-04"
 last_activity: 2026-11-04
 last_activity_desc: Direct global callback replaces periodic MD pump with game-scope and lifecycle guards. Full review converged; workspace and 149 Lua plus 21 syntax and 18 XML rejection checks passed. No X4 action performed.
-state_head: 3b6d3deb307e536eb9c83d0d975c4851c5dee5d7
+state_head: 7a60c7c42fedc5fd758b1e53fc69ac20dbf3af28
 progress:
   total_phases: 14
   completed_phases: 6
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in-scope remedy checkpoint; direct global callback implementation is reviewed and verified offline. Packaging and owner-operated normal/SETA/load/reload acceptance remain pending. No game launch or installation performed.
+Status: Plan 11 in-scope remedy checkpoint; direct global callback package `dist/live-galaxy-callback-7a60c7c` is reviewed, regression-tested and manifest-verified. Installation and owner-operated normal/SETA/load/reload acceptance remain pending. No game launch or installation performed.
 Last activity: 2026-10-10 — Diagnostic source `3b6d3de` captured 28 durable sections with exact readbacks. Argon completed 945 ships in 25.011 s, with 1.074 s selection-active intervals and 23.937 s between them. Stopped on observed 32 ms ceiling violation; truncated FrameView final row prevents an FPS verdict. Evidence retained; SDK stopped. Gate B remains failed/pending.
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)

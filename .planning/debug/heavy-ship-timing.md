@@ -20,7 +20,7 @@ Reproduction: Existing dynamic full-set Lua producer and Carrier B bridge; retai
 hypothesis: Frequent 2 ms cooperative yields resume on a 50 ms configured MD cue; the same cue clocks stop-and-wait sends and ACK consumption, adding delay to already captured detail delivery.
 test: Trace real selection/budget/scheduler and native send/feedback paths against retained Argon endpoint differences and receiver timestamps.
 expecting: Separate pre-core-publication continuation gaps from cached-detail delivery gaps; do not equate configured cue spacing with exact observed idle time.
-next_action: Package the reviewed and offline-verified global callback remedy, then await owner-operated normal/SETA/load/reload evidence. Exact runtime cue-versus-scheduler cost, complete engine callback cost and true per-call CPU remain unmeasured.
+next_action: Use verified package dist/live-galaxy-callback-7a60c7c at the owner installation/runtime checkpoint, then obtain normal/SETA/load/reload evidence. Exact runtime cue-versus-scheduler cost, complete engine callback cost and true per-call CPU remain unmeasured.
 package_checkpoint: Diagnostic source `3b6d3de` installed and measured in retained run `055-gate-b-normal-20261010-110531`; full Gate B remains open.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
@@ -365,6 +365,14 @@ security/mutation/goal-verification phase gates are not silently closed by
 this scoped review. The old MD cadence has been removed from production, but
 actual runtime improvement and affected Gate A lifecycle/timing still need
 owner evidence. No X4 launch, control, install or save access occurred.
+
+Package checkpoint: source `7a60c7c42fedc5fd758b1e53fc69ac20dbf3af28`, heavy
+candidate `dist/live-galaxy-callback-7a60c7c`, manifest SHA-256
+`4ec5cf114fb114ed8e1ad87d7a18e20750804864a4b84f209cdff85cfef898cd`.
+All 31 manifest files and packaged XML/schema assertions passed. Approved
+limits, DLL and bridge hashes remain unchanged; exact identities are in the
+current Gate B procedure. The separately rebuilt base clock package passed
+`01-install-guard.ps1 -VerifyPackageOnly`. No installation or game run occurred.
 
 ## Resolution
 
