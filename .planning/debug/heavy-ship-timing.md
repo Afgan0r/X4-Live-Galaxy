@@ -20,7 +20,7 @@ Reproduction: Existing dynamic full-set Lua producer and Carrier B bridge; retai
 hypothesis: Frequent 2 ms cooperative yields resume on a 50 ms configured MD cue; the same cue clocks stop-and-wait sends and ACK consumption, adding delay to already captured detail delivery.
 test: Trace real selection/budget/scheduler and native send/feedback paths against retained Argon endpoint differences and receiver timestamps.
 expecting: Separate pre-core-publication continuation gaps from cached-detail delivery gaps; do not equate configured cue spacing with exact observed idle time.
-next_action: Finish reviewed same-tick ACK successor remedy and final offline regression. Source continuation frequency needs Docs MCP registration/lifecycle enrichment; exact runtime cue-versus-scheduler cost and true per-call CPU remain unmeasured.
+next_action: Resume Plan 11 after restarting Codex to load refreshed GSD definitions. Adapt bounded continuations using consumed callback evidence, protect lifecycle/error/budget behavior, review and regress offline before owner-operated X4 acceptance. Exact runtime cue-versus-scheduler cost and true per-call CPU remain unmeasured.
 package_checkpoint: Diagnostic source `3b6d3de` installed and measured in retained run `055-gate-b-normal-20261010-110531`; full Gate B remains open.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
@@ -226,6 +226,88 @@ read-only vanilla evidence also shows menu-owned `menu.onUpdate` and a
 global registration, removal/reload ownership or once-per-frame admission.
 No timer/callback change or runtime experiment is authorized by that evidence
 alone. Request enrichment through the shared chat-only knowledge-gap handoff.
+
+## Callback evidence retry (2026-11-04)
+
+Fresh clean checkout `74c2e12` was fast-forwarded from `03ea3b4` after fetching
+origin. The registered `x4-docs` server was queried directly. The original
+`search` request (`query="onUpdate"`, `limit=20`) with snapshots
+`x4-9.00-steam-23660954`,
+`x4-9.00-steam-23660954-faction-ship-observation-v1`, and
+`x4-9.00-steam-23660954-ship-detail-source-v1` still returned zero items,
+complete coverage and null cursor, with no conflicts.
+
+The same search plus `SetScript`, `RemoveScript`,
+`Register_NewFrame_Callback`, `Unregister_NewFrame_Callback` and
+`Register_Require_With_Init` used this new snapshot set, unchanged for every
+inspection:
+
+- `x4-9.00-steam-23660954-lua-update-source-v1`, root
+  `blake3:b6899beafb6296c67d5ce5553cde59c2e98fc08253029ff4b84c31f309340930`;
+- `sn-mod-support-apis-1.95-lua-update-source-v1`, root
+  `blake3:58d7a86bfcef8e7731cb23bb3434f7487129499cd37359855994fed2f7aba1d4`;
+- `x4-probe-lua-update-20261101-02-v1`, root
+  `blake3:3377dea4a906fd9408aaa96e543edf7798f6aca4b9bcb81c8a502d89c56927cc`.
+
+All searches used limit 20 and ended with null cursor. Seven entities were
+selected; `inspect` limit 20 exhausted 50 pages to null, without conflicts:
+
+| Entity | Stable entity ID | Pages | Coverage |
+| --- | --- | --- | --- |
+| onUpdate | entity:6e37157eb0482fba481743d63bc779b60cedb7fb6632246076ae75dcdbf15be0 | 10 | partial |
+| Helper.onUpdate | entity:c6211a9431b00e308f6e9776e14ea985eba30e8cb54a1c1a6570975636c87dd9 | 2 | complete |
+| SetScript | entity:ecb05e111049f571c02c97f1c370d1d0093dc13d325b74af6b9ccafcd62377d4 | 7 | partial |
+| RemoveScript | entity:e0766b54e6c0c3b7ea8f324db1ef451c0f5591e91ca788698655c0f7a461d3d5 | 7 | partial |
+| Register_NewFrame_Callback | entity:06db683cdf90c5c5d5ec08b41210ff1bed4cb8c7dfb5af3a2a4364f2ea2ee630 | 16 | partial |
+| Unregister_NewFrame_Callback | entity:7818723452f39074b7ba09a52591c9a6e2392525852c2986e4dfb1c40bc13db8 | 7 | partial |
+| Register_Require_With_Init | entity:1370d452b6df4c227e868b9ed16fd8609beb69e8c29235197c1d206716e484fd | 1 | complete |
+
+Source claims `claim:lua-update:blake3:c2b137e878926c7b06db02cf643dd6c8501315d9a3933d01890d4e1ee075cdd6`
+and `claim:lua-update:blake3:d3051b0e7bf21c46476fd6453f0f9295fa580db3a72ac8e32e17edb639304288`
+establish direct `SetScript("onUpdate", callback)` and
+`RemoveScript("onUpdate", same_callback)` with exact function identity.
+The global list is separate from the current menu handler. The shared
+dispatcher protects individual calls with pcall; list mutation during dispatch
+is not established as supported.
+
+Source claims `claim:lua-update:blake3:3e2d79851ed95a9dd27ea284f50a7ae8752290970be3c4cf0137f1c1a5ea0a63`
+and `claim:lua-update:blake3:458b3a7d21c0055d772ce87c7bd0d63979a7f2533b7d26667151af7f85ead6d1`
+establish the SirNukes same-reference wrapper with no period argument. Neither
+wrapper name nor its MD fallback implies every-frame or millisecond delivery.
+Loader claim `claim:lua-update:blake3:af0a23d34cc1224b1d7563acb1150a1354cc87776f55379e4153d7092420cf9b`
+does not establish immediate late init or deduplicated init queueing.
+
+Runtime evidence is one instrumented serial session, not a controlled
+performance comparison. Both candidates delivered during owner-reported
+closed menus, clock-corroborated pause/SETA, removal/re-registration and
+reconstructed module states. This does not prove native VM recreation.
+Claim `claim:lua-update-runtime:aad5a687d77585e11487465bda573a85efa0f9b6fbd4605349d173f76d2e72dd`
+retains the support post-reload 109.1339 ms gap and an unmatched interior
+observer; no universal faster-than-50-ms or every-frame guarantee follows.
+Direct maximum latency is also unbounded by this evidence. Logging overhead,
+unsynchronized external intervals and uncalibrated engine clock precision
+remain limitations; `GetCurRealTime()` is not a proven subframe budget clock.
+Claim `claim:lua-update-runtime:40b1b0da557a7d7fd91364d389b8dc29628c8042804c0b49ae5b8f2997bcbd1a`
+preserves unknown support callback-error runtime behavior. Native reentrancy,
+general native safety and the original lua_rawgeti fault cause remain unknown.
+
+Assessment: registration/lifecycle source knowledge is sufficient to prepare a
+bounded consumer adaptation within the approved Plan 11 remedy. It is not a
+performance or safety acceptance. Prefer evaluating the direct API without
+adding a support-wrapper dependency; final wiring must follow actual consumer
+owners. Preserve the existing time budget and ACK authority, avoid two periodic
+collection pumps, protect duplicate init/reentry/stale callbacks, and test
+failure recovery plus ordinary diagnostics. Do not mutate callback lists from
+within dispatch based on an unproved assumption. Consumer normal/SETA,
+reload/load and complete-callback timing evidence remain required.
+
+Execution checkpoint: project-local GSD generation changed definitions at
+03:48:24 UTC; the actual owning codex.exe ancestor started at 03:07:14 UTC.
+Restart Codex before typed dispatch; no inline implementation bypass, new X4
+launch, package installation or runtime acceptance occurred. Memory search
+worked, but fetching the previous ACK checkpoint drawer failed with
+`TypeError | fetch failed`; historical coverage is partial and primary
+evidence is used under the X4 outage policy. No memory write was attempted.
 
 ## Resolution
 
