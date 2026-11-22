@@ -2,7 +2,7 @@
 status: investigating
 trigger: "Continue Phase 05.5 heavy ship collection performance diagnosis"
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-11-22
 ---
 
 # Heavy Ship Timing
@@ -17,11 +17,11 @@ Reproduction: Existing dynamic full-set Lua producer and Carrier B bridge; retai
 
 ## Current Focus
 
-hypothesis: Frequent 2 ms cooperative yields resume on a 50 ms configured MD cue; the same cue clocks stop-and-wait sends and ACK consumption, adding delay to already captured detail delivery.
-test: Trace real selection/budget/scheduler and native send/feedback paths against retained Argon endpoint differences and receiver timestamps.
-expecting: Separate pre-core-publication continuation gaps from cached-detail delivery gaps; do not equate configured cue spacing with exact observed idle time.
-next_action: Use verified package dist/live-galaxy-callback-7a60c7c at the owner installation/runtime checkpoint, then obtain normal/SETA/load/reload evidence. Exact runtime cue-versus-scheduler cost, complete engine callback cost and true per-call CPU remain unmeasured.
-package_checkpoint: Diagnostic source `3b6d3de` installed and measured in retained run `055-gate-b-normal-20261010-110531`; full Gate B remains open.
+hypothesis: Xenon rejects an engine storage label at the single-token boundary. Intermittent callback rejection is consistent with equality between a fresh callback's worker snapshot and the preceding terminal sample. Holy Order cargo was rejected at expiry of the bridge-owned admission window.
+test: Verify the matched repair package at the owner main-menu checkpoint, then observe the affected Gate A lifecycle and repeat the normal runtime window.
+expecting: Determine whether Xenon commits cargo after the repair and, for any repeated clock refusal, identify the actual rejecting phase and condition.
+next_action: Await owner installation and main-menu readiness for the verified candidate. Continue from tests/x4-disposable/05.5-heavy-ship-procedure.md.
+package_checkpoint: Source `6f2dd0f`; verified local candidate `dist/live-galaxy-gate-b-repair-6f2dd0f`. Full Gate B remains open.
 
 Preparation checkpoint: Independent scoped GSD review found no blocking findings. Final `run_contracts.ps1 -Suite all` passed in 79.804 seconds: 116 Lua tests, 21 syntax checks, XML/schema, actual native bridge lifecycle/full-set/recovery paths and performance gate. Measured local callback maxima were 3.329 ms before restart and 3.494 ms afterward against `1000 / 144` ms; final backlog was zero. These synthetic results are not X4 FPS evidence. No Rust/native/ABI/configuration source changed.
 
@@ -373,6 +373,143 @@ All 31 manifest files and packaged XML/schema assertions passed. Approved
 limits, DLL and bridge hashes remain unchanged; exact identities are in the
 current Gate B procedure. The separately rebuilt base clock package passed
 `01-install-guard.ps1 -VerifyPackageOnly`. No installation or game run occurred.
+
+## Gate B normal incident diagnosis (2026-11-22)
+
+Source comparison of `7a60c7c` to `fcf708c` found no differences under
+`extensions`, `crates` or `config`. The baseline is the authenticated normal
+run `055-gate-b-normal-20261122-083252`. Its evidence summary and private
+locator digest are in `tests/x4-disposable/05.5-heavy-ship-evidence.md`.
+
+- **Xenon 48 storage.** `live_galaxy_ship_source.lua:96–112` passes
+  `merge=true` to both native count and fill, `after_orders=false` to fill,
+  and copies each `StorageInfo.transport` verbatim. The two recorded
+  `storage_validate/token_invalid` events, field `transport`, type `string`,
+  identify `live_galaxy_ship_details.lua:115–119`. The exact rejected
+  string was empty, over 128 bytes, or contained a byte outside the token
+  pattern. Ordinal 1 is the member ordinal. The separate duplicate and volume
+  checks were not the emitted branch. The exact bytes, rejected row ordinal,
+  and pool/tag representation remain unknown. Same-build Docs MCP claim
+  `9f03360aa878de626b5c0cf36a3415b42afcf05ef26a1385913af5fa573085bb`
+  under `GetComponentData.cargo` supplies vanilla source precedent for
+  splitting merged labels into tags. The installed build's catalog member
+  `ui/addons/ego_detailmonitor/menu_map.lua` (catalog 08, member MD5
+  `505d57156f76d9e531277396ddcd81e4`) independently confirms whitespace
+  separation in lines 21202–21218 and universal storage detection for
+  container, solid and liquid tags in one row at 21220–21221. The rejected
+  Xenon value remains unknown. Both the native input and domain canonical codec
+  in the measured package
+  model one bounded token per storage row. Preserve each capacity/occupancy
+  pool once. Use a bounded multi-tag fixture grounded in the confirmed source
+  grammar through capture and durable readback. The replacement runtime
+  window must establish whether the live Xenon problem is resolved.
+- **Xenon 48 timeout.** `live_galaxy_ship_selection.lua:203–245,293–299`
+  makes successful cargo, crew and loadout capture a prerequisite for the
+  core `deliver` call. A rejected capture-only cargo stage writes no section
+  or failure frame. The outer core was not yet reserved and local discard
+  clears the collector and owned snapshot. This explains same-intent
+  recollection with no publication on those rejections. Bridge history
+  records `receive-timeout` and `receive-timeout-exhausted`. The heavy path
+  uses a 30-second initial wait and a 10-second inactivity limit after data.
+  `production_runtime_control.rs:114–119` excludes a core selection from
+  stale-detail timeout rotation. The two storage refusals and a separately
+  observed clock refusal are local evidence. Neither establishes the entire
+  no-data history of the receiver without the corresponding revision events.
+- **Intermittent callback clock.** Lines 46050, 47321 and 89202 correlate to
+  core revisions 48, 57 and 87. Their stages were `core`, `captured` and
+  `captured`. Here `operation` is the last recorded wrapped call, not the
+  call that failed. `live_galaxy_ship_selection.lua:274–304` can discard
+  through `budget:before`, a between-step sample, or the terminal sample.
+  `live_galaxy_ship_budget.lua:91–103` requires the next callback status to
+  be strictly greater than the last accepted sample. `sample_callback`
+  at 121–145 accepts equal values during the callback and rejects a missing,
+  invalid or pre-start value before its regression accounting. The status is
+  a millisecond-resolution worker snapshot (`transport.rs:126–137`,
+  `transport_worker.rs:62,108,123–138`), so a terminal sample and the next
+  callback can legitimately read the same value. A transient refresh failure
+  leaves the prior snapshot rather than clearing clock availability, so
+  worker starvation or refresh delay can also present as equality. A short
+  native result at `lua_producer_operations.rs:86–113` can instead become
+  a missing status through `live_galaxy_carrier.lua:45–63`, and the sampling
+  branch does not retain the progress code or wrapper reason. All three
+  retained diagnostics show zero regressions, zero unsampled callbacks and
+  no pending operation tail. Equality before admission fits this signature.
+  An invalid later sample can share the counters, so the signature is not
+  dispositive. The original stages/conditions do not identify the separate
+  core `monotonic_not_advancing` check or the X4 game-time getter. Argon 57
+  and Holy Order 87 later committed. For a bounded discriminator retain the
+  rejected phase (`before` or within/after callback), progress return code or
+  wrapper reason, and current versus last/callback-start comparison under the
+  same revision and incarnation. The existing `retains coarse interval
+  bounds` test passed (1 success, exit 0) and reproduced equality rejection
+  after a measured callback plus a separate pre-start sample rejection. A
+  future regression should exercise both through `selection.advance`, prove
+  no uncapped work under repeated equal status, and distinguish recovery when
+  the clock advances from a truly missing or regressive clock.
+- **Holy Order 89 admission.** After the durable core 87 commit, the bridge
+  `complete_selection` calls `schedule.complete()` to clear the active slot
+  before asking for the next key. `production_runtime_selection.rs:46–49`
+  is the unique branch emitting `next-selection-admission`; it rejects before
+  revision reservation, intent or demand, explaining the null revision. The
+  resolved key `ship_cargo:holyorder:g0` is 23 ASCII bytes, so the empty and
+  >64-byte branches are excluded. `production_ship_schedule.rs:13–32` leaves
+  one predicate, elapsed >= 60000 ms on the bridge's `Instant`, started before
+  the first connection and retained across reconnect. Accumulated received
+  bytes and attempts do not enter that predicate. The observed bridge Unix
+  timestamps are commit `1795311232289` and rejection `1795311232333`, 44 ms
+  apart. Both retained journals were inspected (362 events). Their earliest
+  event is already a Split core receipt. The first durable receipt is the
+  faction census at `1795311172564`, 59.769 seconds before the rejection on
+  the wall clock. It corroborates the source diagnosis within the elapsed
+  startup and first-collection time, without supplying the lost startup
+  marker or measuring the bridge's monotonic duration. Reporting the cutoff
+  as a generic rejection does not make this incomplete normal run pass.
+
+The verified database contains 87 receipts. Independent packaged-bridge reads
+validated all 87 on a digest-verified disposable copy. Only 56 of those
+section/revision pairs survive rotation in the operational journal. The
+canonical run evidence records the roster and remaining coverage gap.
+
+### Offline repair and focused checks
+
+Lua canonicalizes the bounded set of tags on each storage row. Rust validates
+the same canonical value in the DLL and the bridge. The canonical row stores
+one capacity and one occupied-volume value; the existing string field, total
+128-byte cap, receiver authority and single-tag bytes are preserved.
+Assertion-level RED covered Lua, the Rust canonical decoder, and the actual
+native full-set path. Focused ship-detail and Rust contracts passed. The
+full-set case confirmed one three-tag pool with exact unchanged volumes in
+earlier and current readbacks across producer restart. The separate legacy
+`heavy-ship-detail` harness stopped in core because it still expects one
+wire batch per record; the maintained full-set harness supplied the
+cross-language proof. The short clock response diagnostic preserves the
+previous disposition and status-sample count.
+
+Clock logs now distinguish a failure at callback entry, during a sample or
+at its end, and format only bounded reason classes and a validated status
+code. Independent review found WR-CLOCK-01: the wrapper converted short
+native results to `result_shape` without the code. A regression asserted
+distinct `-22` and `-18` diagnostics through the actual Lua wrapper. It
+failed before the repair and passed after exposing the bounded negative code
+in an optional third return. The first two wrapper return values are
+unchanged. Eleven focused clock scenarios passed. The 12-file re-review
+closed WR-CLOCK-01 and the independent security pass found no new delta
+blocker. The original clock incidents still lack a definite cause.
+
+The final workspace regression and all eight targeted cargo mutations
+passed. The matched package was built from commit `6f2dd0f`. All 31 files
+matched its manifest, and the bundled XML passed conformance. The exact
+hashes and owner checkpoint are in
+`tests/x4-disposable/05.5-heavy-ship-procedure.md`. No new run was performed.
+
+Classification: The token and admission decisions are deterministic for fixed
+inputs. The intermittent clock's occurrence depends on worker/sample timing or
+an unobserved status failure. Code, source data, runtime timing, and configured
+window were considered. The local Xenon refusal requires rejected data plus the
+single-token contract; an eventual receiver timeout requires continued lack of
+valid candidate progress within the configured deadline. No shared cause of the
+three symptoms is established. No failure spectrum with per-test coverage was
+available. Gate B normal failed and the accepted profile remains in force.
 
 ## Resolution
 

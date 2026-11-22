@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 global callback normal window failed Gate B; diagnose observed runtime rejection and clock paths
+stopped_at: Plan 11 matched repair package verified locally; awaiting owner X4 main-menu checkpoint
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: Global callback normal window averaged 214.35 FPS and verified 60 durable section readbacks. Argon finished in 2.065–2.515 s. Gate B failed on two rejections and five runtime diagnostics. SETA and recovery remain pending.
-state_head: 7a60c7c42fedc5fd758b1e53fc69ac20dbf3af28
+last_activity_desc: Reviewed cargo and clock repair passed local regression and eight mutations. All 31 files of the matched 6f2dd0f package were verified. Owner X4 validation is pending.
+state_head: 6f2dd0f1a09920d567689f396dd86e1b52c60a7c
 progress:
   total_phases: 14
   completed_phases: 6
@@ -29,8 +29,16 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in execution. The reviewed global callback package `dist/live-galaxy-callback-7a60c7c` was installed and exercised in the owner-operated normal window. Gate B remains open. Diagnose Xenon cargo transport validation, intermittent clock unavailability, and the separate Holy Order admission rejection before resuming acceptance.
-Last activity: 2026-11-22 — Run `055-gate-b-normal-20261122-083252` recorded 214.35 FPS and 60 exact durable readbacks. Argon elapsed 2.065–2.515 s with 1.354–1.717 s between selection callbacks. Complete callback time and FPS impact remain unmeasured. See [Gate B evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
+Status: Plan 11 in execution. The locally verified matched repair package
+`dist/live-galaxy-gate-b-repair-6f2dd0f` handles multi-tag storage and reports
+distinct clock failure context. Await the owner at the X4 main menu after
+installation. Verify the installed identity and affected Gate A activation
+before the replacement normal window.
+Last activity: 2026-11-22 — Normal run `055-gate-b-normal-20261122-083252`
+recorded 214.35 FPS and 87 durable readbacks. The repair passed independent
+review, focused mutation, full local regression, and manifest verification.
+See the [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
+[prior Gate B evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)
 
@@ -224,7 +232,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 05.5]: Gate A passed at `f4465ef`. Normal Gate B run `055-gate-b-normal-20261001-005056` failed full faction coverage. Reviewed diagnostic source `3b6d3de` passed final regression and was measured in run `055-gate-b-normal-20261010-110531`: 28 exact durable readbacks; Argon 25.011 s elapsed / 1.074 s selection-active / 23.937 s between-selection intervals. The observed 32 ms peak stopped the run; a truncated final FrameView row invalidates FPS. Exclusive CPU, full callback and gap attribution remain unresolved. Next: scheduling/feedback and status-cost diagnosis; no budget extension or cadence change. SETA/recovery and goal verification remain pending.
+- [Phase 05.5]: Gate A passed at `f4465ef`. The global callback package
+  failed the November normal Gate B window. Eleven of 24 included factions
+  had all four ship section families. The matched repair package awaits
+  affected Gate A revalidation and normal Gate B. Complete callback duration,
+  same-session control, SETA, recovery, and goal verification remain pending.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -258,5 +270,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 global callback normal-window evidence retained; runtime rejection diagnosis pending
-Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
+Stopped at: Plan 11 matched repair package verified locally; awaiting owner at the X4 main menu
+Resume file: tests/x4-disposable/05.5-heavy-ship-procedure.md
