@@ -11,6 +11,7 @@ use x4_carrier_native::BridgePeer;
 mod failure;
 #[path = "production_runtime_selection.rs"]
 mod selection;
+pub use failure::SelectionFailure;
 pub use selection::IssuedSelection;
 pub use selection::complete_selection;
 

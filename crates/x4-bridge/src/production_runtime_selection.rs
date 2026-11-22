@@ -44,9 +44,9 @@ pub(super) fn issue(
 ) -> Result<IssuedSelection, SelectionError> {
     let mut revision = None;
     if let Some(schedule) = schedule {
-        if !schedule.admit(key) {
-            return Err((SelectionFailure::Admission, None));
-        }
+        schedule
+            .try_admit(key)
+            .map_err(|denial| (SelectionFailure::Admission(denial), None))?;
         let next_revision = session
             .heavy_revision_floor()
             .map_err(|_| (SelectionFailure::Revision, None))?;
@@ -99,13 +99,7 @@ pub fn complete_selection(
             Some(issued.at)
         }
         Err((error, revision)) => {
-            let section = if matches!(error, SelectionFailure::Cursor) {
-                ""
-            } else {
-                key.as_str()
-            };
-            history.bind_selection(attempt, section, revision);
-            let _ = history.record("rejected", error.reason());
+            error.record(history, attempt, key, revision);
             None
         }
     }

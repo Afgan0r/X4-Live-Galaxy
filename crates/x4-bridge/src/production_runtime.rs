@@ -1,4 +1,4 @@
-use crate::production_runtime_control::{complete_selection, initial, send};
+use crate::production_runtime_control::{SelectionFailure, complete_selection, initial, send};
 use crate::production_runtime_idle::{ProgressError, ReceiveProgress};
 use crate::production_runtime_message::{record_disposition, selection_finished};
 use crate::production_ship_schedule::ShipSchedule;
@@ -76,11 +76,10 @@ fn serve(
         .ok()?;
     history.bind_session(&identity.session_id, identity.epoch.get());
     let collection_key = session.collection_key();
-    if schedule
-        .as_mut()
-        .is_some_and(|value| !value.admit(&collection_key))
+    if let Some(schedule) = schedule
+        && let Err(denial) = schedule.try_admit(&collection_key)
     {
-        let _ = history.record("waiting", "heavy-admission-window");
+        SelectionFailure::Admission(denial).record(history, 0, &collection_key, None);
         return None;
     }
     let attempt = schedule.as_mut().map_or(0, ShipSchedule::next_attempt);
