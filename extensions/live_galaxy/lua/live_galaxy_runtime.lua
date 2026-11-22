@@ -61,10 +61,19 @@ local function rejection_text(rejection)
             text = text .. " " .. key .. "=" .. value
         end
     end
-    -- Successor failures expose only bounded numeric codes, never native text.
-    local carrier_code = rejection.carrier_code
-    if rejection.condition == "progress_rejected" and type(carrier_code) == "number"
-        and carrier_code >= -2147483648 and carrier_code <= -1 and carrier_code % 1 == 0 then
+    local carrier_code
+    if rejection.condition == "progress_rejected" then carrier_code = rejection.carrier_code end
+    if rejection.condition == "clock_unavailable" and rejection.clock then
+        local clock = rejection.clock
+        text = text .. " clock_phase=" .. clock.phase .. " clock_issue=" .. clock.issue
+            .. " clock_operation=" .. clock.operation
+        if clock.wrapper_reason then text = text .. " clock_wrapper_reason=" .. clock.wrapper_reason end
+        carrier_code = clock.carrier_code
+    end
+    -- Carrier failures expose only bounded numeric codes, never native text.
+    if type(carrier_code) == "number"
+        and carrier_code >= -2147483648 and carrier_code % 1 == 0
+        and (carrier_code < 0 or carrier_code == 0 and rejection.condition == "clock_unavailable") then
         text = text .. " carrier_code=" .. carrier_code
     end
     local section = rejection.section

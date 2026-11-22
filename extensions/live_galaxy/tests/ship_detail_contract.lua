@@ -131,6 +131,54 @@ describe("source-faithful resumable cargo", function()
             { transport = "solid", capacity_cubic_metres = 1000, occupied_cubic_metres = 1001 } } })
         assert.equals(0, #rejected); assert.equals(0, completed); assert.equals(1, failed)
     end)
+    it("publishes sorted storage pools with canonical tags and unchanged volumes", function()
+        local _, records, finished, failed, last = run({ count = 2, rows = {
+            { transport = "solid", capacity_cubic_metres = 500, occupied_cubic_metres = 20 },
+            { transport = "  solid\tcontainer  liquid container ", capacity_cubic_metres = 1000,
+                occupied_cubic_metres = 170 },
+        } })
+        assert.equals("sampled", last.disposition)
+        assert.equals(1, finished); assert.equals(0, failed)
+        assert.same({
+            { transport = "container liquid solid", capacity_cubic_metres = 1000, occupied_cubic_metres = 170 },
+            { transport = "solid", capacity_cubic_metres = 500, occupied_cubic_metres = 20 },
+        }, records[1].storage)
+    end)
+    it("preserves ASCII token characters and accepts the 128-byte storage key boundary", function()
+        local last_tag = string.rep("z", 117)
+        local _, records, _, _, outcome = run({ rows = {
+            { transport = last_tag .. " a- a: a_ A", capacity_cubic_metres = 1000,
+                occupied_cubic_metres = 170 },
+        } })
+        assert.equals("sampled", outcome.disposition)
+        assert.equals("A a- a: a_ " .. last_tag, records[1].storage[1].transport)
+    end)
+    it("rejects malformed or duplicate storage pool keys before delivery", function()
+        for _, case in ipairs({
+            { transport = "", condition = "token_invalid" },
+            { transport = " \t ", condition = "token_invalid" },
+            { transport = "container|solid", condition = "token_invalid" },
+            { transport = "container,solid", condition = "token_invalid" },
+            { transport = "container\nsolid", condition = "token_invalid" },
+            { transport = "container\rsolid", condition = "token_invalid" },
+            { transport = "container\000solid", condition = "token_invalid" },
+            { transport = string.rep("x", 129), condition = "token_invalid" },
+            { transport = string.rep(" ", 124) .. " solid", condition = "token_invalid" },
+            { transport = "solid container solid", other = "container solid", condition = "duplicate" },
+        }) do
+            local rows = { { transport = case.transport, capacity_cubic_metres = 1000,
+                occupied_cubic_metres = 170 } }
+            if case.other then
+                rows[2] = { transport = case.other, capacity_cubic_metres = 500, occupied_cubic_metres = 20 }
+            end
+            local _, records, finished, failed, last = run({ count = #rows, rows = rows })
+            assert.equals("invalid_fact", last.disposition)
+            assert.equals("storage_validate", last.rejection.stage)
+            assert.equals(case.condition, last.rejection.condition)
+            assert.equals("transport", last.rejection.field)
+            assert.equals(0, #records); assert.equals(0, finished); assert.equals(1, failed)
+        end
+    end)
     it("marks only the changed ship stale without discarding the detail batch", function()
         local expected = { identity = "9007199254740993", owner = "argon", type = "ship_macro",
             class = "destroyer", location = "sector:argon_prime" }

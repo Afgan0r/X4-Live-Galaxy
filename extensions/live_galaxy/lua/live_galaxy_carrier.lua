@@ -59,6 +59,8 @@ local function invoke(self, name, ...)
             or type(selection) ~= "string" or #selection > 64
             or type(remaining) ~= "string" or not remaining:match("^%d+$")
             or #remaining > 20 then
+            -- Native progress can return an error code without a status tuple.
+            if code >= -2147483648 and code < 0 then return nil, "result_shape", code end
             return nil, "result_shape"
         end
         status = {

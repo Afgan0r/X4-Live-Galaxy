@@ -1,4 +1,5 @@
 local budget = {}
+local progress_failures = { closed = true, operation_failure = true, result_shape = true }
 local function integer(v) return type(v) == "number" and v >= 0 and v <= 9007199254740991 and v % 1 == 0 end
 local function aggregate() return { count = 0, total_millis = 0, max_millis = 0 } end
 local function add(value, elapsed)
@@ -88,9 +89,21 @@ function budget:charge_source_value(value, ancestors)
     end
     self.source_value_bytes = self.source_value_bytes + bytes
 end
+local function reject_clock(self, phase, issue, operation, code, wrapper_reason)
+    -- Keep the first failed check if a collector's terminal result is measured again.
+    self.clock_failure = self.clock_failure or { phase = phase, issue = issue, operation = operation,
+        carrier_code = code, wrapper_reason = wrapper_reason }
+    return nil, "clock_unavailable"
+end
 function budget:before(status)
+    self.clock_failure = nil
     local now = tonumber(status.monotonic_millis)
-    if not integer(now) or self.last and now <= self.last then return nil, "clock_unavailable" end
+    if not integer(now) then
+        return reject_clock(self, "before", status.monotonic_millis == nil and "absent" or "invalid", "callback_status")
+    end
+    if self.last and now <= self.last then
+        return reject_clock(self, "before", now == self.last and "equal" or "backward", "callback_status")
+    end
     self.started = self.started or now
     if now - self.started > self.v.max_message_age_millis or self.steps >= self.v.max_collection_steps then
         return nil, "collection_overflow"
@@ -118,14 +131,23 @@ function budget:clock(getter)
     self:observe_operation("clock")
     return getter()
 end
-function budget:sample_callback(carrier)
+function budget:sample_callback(carrier, phase)
     -- Status-only progress(0) reads the owned monotonic clock between
     -- indivisible source or carrier operations. It cannot interrupt an
     -- operation which has already entered X4.
-    local _, status = carrier:progress(0)
+    local code, status, rejected_code = carrier:progress(0)
     self.timing.status_samples = self.timing.status_samples + 1
-    local now = status and tonumber(status.monotonic_millis)
-    if not integer(now) or now < self.callback_start then return nil, "clock_unavailable" end
+    local raw
+    if type(status) == "table" then raw = status.monotonic_millis end
+    local now = tonumber(raw)
+    if not integer(now) then
+        local wrapper_reason = code == nil and type(status) == "string" and progress_failures[status] and status or nil
+        return reject_clock(self, phase, raw == nil and "absent" or "invalid", "progress",
+            code or rejected_code, wrapper_reason)
+    end
+    if now < self.callback_start then
+        return reject_clock(self, phase, "backward", "progress", code)
+    end
     if not self.callback_sampled then
         self.timing.unsampled_callbacks = self.timing.unsampled_callbacks - 1
         self.callback_sampled = true
@@ -163,7 +185,7 @@ function budget:timing_snapshot()
     return result
 end
 function budget:should_yield(carrier)
-    local now, reason = self:sample_callback(carrier)
+    local now, reason = self:sample_callback(carrier, "during")
     if not now then
         self.reason = reason
         error(reason, 0)
@@ -171,9 +193,9 @@ function budget:should_yield(carrier)
     self.callback_yielded = now - self.callback_start >= self.v.callback_budget_millis
     return self.callback_yielded
 end
-function budget:after(carrier)
+function budget:after(carrier, phase)
     if self.callback_yielded then return true end
-    local now, reason = self:sample_callback(carrier)
+    local now, reason = self:sample_callback(carrier, phase or "during")
     if not now then return nil, reason end
     return true
 end

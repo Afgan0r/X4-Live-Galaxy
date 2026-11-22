@@ -43,10 +43,14 @@ local api = {
             class = "ship", location = location }
     end,
     cargo_wares = function() return {} end,
-    cargo_storage_count = function() return 0 end,
+    cargo_storage_count = function(_, identity) return owner[identity] == "khaak" and 1 or 0 end,
     cargo_storage_size = function() return 24 end,
     cargo_storage_allocate = function() return {} end,
-    cargo_storage_fill = function() return {} end,
+    cargo_storage_fill = function(_, identity)
+        if owner[identity] ~= "khaak" then return {} end
+        return { { transport = " solid\tcontainer liquid solid ", capacity_cubic_metres = 1200,
+            occupied_cubic_metres = 110 } }
+    end,
     crew_capacity = function() return 0 end,
     crew_count = function() return 0 end,
     crew_size = function() return 40 end,

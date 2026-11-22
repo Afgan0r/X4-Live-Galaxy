@@ -197,6 +197,92 @@ describe("shared heavy profile and bounded game work", function()
         assert.equals(1, b.timing.unsampled_callbacks)
         assert.equals(4, b.timing.callbacks.total_millis)
     end)
+    for _, case in ipairs({
+        { phase = "before", issue = "equal", next_millis = "12" },
+        { phase = "before", issue = "backward", next_millis = "11" },
+        { phase = "during", issue = "absent", wrapper_reason = "operation_failure" },
+        { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = -22, carrier_code = "-22" },
+        { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = -18, carrier_code = "-18" },
+        { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = -2147483649 },
+        { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = -22.5 },
+        { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = 0 },
+        { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = 6 },
+        { phase = "during", issue = "invalid", carrier_code = "0", sample_millis = "9007199254740992" },
+        { phase = "after", issue = "backward", carrier_code = "0", sample_millis = "9" },
+    }) do
+        local suffix = case.wrapper_reason and " with " .. case.wrapper_reason or ""
+        if case.short_code then suffix = suffix .. " from bare progress code " .. case.short_code end
+        it("reports the budget clock rejection " .. case.phase .. " callback as " .. case.issue .. suffix, function()
+            local options = assert(profile.options(values(), "argon"))
+            local now, log = "10", nil
+            local polls, callback_reads, samples, census_reads, samples_after_finish = 0, 0, 0, 0, 0
+            local finished = false
+            local function success() return 0 end
+            local function snapshot(code, monotonic)
+                return code, "ready", "connected", monotonic, "available:0", "producer:1", "ship_core:argon", "1", "7"
+            end
+            local api = {
+                abi_version = function() return 2 end,
+                open = function() return 0, "1:1" end,
+                begin_section = success,
+                push_record = success,
+                finish_section = function() finished = true; return 0 end,
+                fail_section = success,
+                progress = function(_, work)
+                    if work == 1 then
+                        callback_reads = callback_reads + 1
+                        return snapshot(0, now)
+                    end
+                    assert.equals(0, work)
+                    samples = samples + 1
+                    if case.next_millis then return snapshot(0, "12") end
+                    if case.wrapper_reason == "operation_failure" then error("PRIVATE clock failure") end
+                    if case.short_code then return case.short_code end
+                    if finished then
+                        samples_after_finish = samples_after_finish + 1
+                        return snapshot(0, case.sample_millis)
+                    end
+                    return snapshot(0, case.phase == "during" and case.sample_millis or now)
+                end,
+                poll_control = function() polls = polls + 1; return 3 end,
+                reset = success,
+                close = success,
+            }
+            options.carrier.loadlib = function() return function() return api end end
+            options.observation.getter = function() return 0 end
+            options.observation.clock_getter = function() return 1 end
+            options.observation.ship_api = {
+                list_factions = function() census_reads = census_reads + 1; return { "argon" } end,
+                count_ships = function() return 0 end,
+            }
+            _G.DebugError = function(value) log = value end
+            local runtime = fixture.active_runtime()
+            assert.is_true(runtime.initialize(options))
+            if case.next_millis then
+                assert.same({ false, "collecting" }, { runtime.handle_tick(nil, "telemetry_tick") })
+                now = case.next_millis
+            end
+            assert.same({ false, "clock_unavailable" }, { runtime.handle_tick(nil, "telemetry_tick") })
+            assert.equals("transition", log:match(" event=([a-z_]+)"))
+            assert.equals("clock_unavailable", log:match(" condition=([a-z_]+)"))
+            assert.equals(case.phase, log:match(" clock_phase=([a-z_]+)"))
+            assert.equals(case.issue, log:match(" clock_issue=([a-z_]+)"))
+            assert.equals(case.phase == "before" and "callback_status" or "progress",
+                log:match(" clock_operation=([a-z_]+)"))
+            assert.equals(case.wrapper_reason, log:match(" clock_wrapper_reason=([a-z_]+)"))
+            assert.equals(case.carrier_code, log:match(" carrier_code=([%-]?%d+)"))
+            assert.equals("ship_core:argon", log:match(" section=(%S+)"))
+            assert.equals("7", log:match(" revision=(%d+)"))
+            assert.equals("producer:1", log:match(" run=(%S+)"))
+            assert.is_nil(log:match("PRIVATE"))
+            assert.is_nil(log:match("9007199254740992"))
+            assert.equals(1, census_reads)
+            assert.equals(case.next_millis and 2 or 1, polls)
+            assert.equals(polls, callback_reads)
+            if case.phase == "after" then assert.equals(1, samples_after_finish)
+            else assert.equals(1, samples) end
+        end)
+    end
     it("reports an intra-callback clock regression without double-counting elapsed time", function()
         local now = 10
         local b = budget.new({}, values())

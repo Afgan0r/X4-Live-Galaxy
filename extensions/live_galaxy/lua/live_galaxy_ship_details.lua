@@ -10,6 +10,25 @@ end
 local function token(v)
     return type(v) == "string" and #v > 0 and #v <= 128 and v:match("^[%w_:%-]+$") ~= nil
 end
+local function byte_less(left, right)
+    for index = 1, math.min(#left, #right) do
+        local a, b = left:byte(index), right:byte(index)
+        if a ~= b then return a < b end
+    end
+    return #left < #right
+end
+local function storage_transport(value)
+    if type(value) ~= "string" or #value > 128 or value:find("[^A-Za-z0-9_:%- \t]") then return nil end
+    local tags, seen = {}, {}
+    for tag in value:gmatch("[^ \t]+") do
+        if not seen[tag] then
+            tags[#tags + 1], seen[tag] = tag, true
+        end
+    end
+    if #tags == 0 then return nil end
+    table.sort(tags, byte_less)
+    return table.concat(tags, " ")
+end
 local function start_stage(kind)
     if kind == "ship_crew" then return "crew_capacity" end
     if kind == "ship_loadout" then return "loadout_init" end
@@ -116,18 +135,19 @@ function details:step(context, carrier, status)
         for i = self.row_index, #self.rows do
             if self.work_budget then self.work_budget:step() end
             local row = self.rows[i]
-            if not token(row.transport) then return self:fail(carrier, "invalid_fact", "token_invalid", "transport", type(row.transport)) end
-            if self.seen[row.transport] then return self:fail(carrier, "invalid_fact", "duplicate", "transport") end
+            local transport = storage_transport(row.transport)
+            if not transport then return self:fail(carrier, "invalid_fact", "token_invalid", "transport", type(row.transport)) end
+            if self.seen[transport] then return self:fail(carrier, "invalid_fact", "duplicate", "transport") end
             if not integer(row.capacity_cubic_metres, 4294967295) then
                 return self:fail(carrier, "invalid_fact", "integer_invalid", "capacity_cubic_metres", type(row.capacity_cubic_metres))
             end
             if not integer(row.occupied_cubic_metres, row.capacity_cubic_metres) then
                 return self:fail(carrier, "invalid_fact", "integer_invalid", "occupied_cubic_metres", type(row.occupied_cubic_metres))
             end
-            self.seen[row.transport], self.row_index = true, i + 1
+            row.transport, self.seen[transport], self.row_index = transport, true, i + 1
         end
         if self.row_index > #self.rows then
-            self.sort, self.stage = order.new(self.rows, function(a, b) return a.transport < b.transport end), "storage_order"
+            self.sort, self.stage = order.new(self.rows, function(a, b) return byte_less(a.transport, b.transport) end), "storage_order"
         end
     elseif self.stage == "storage_order" then
         local done, err = self.sort()

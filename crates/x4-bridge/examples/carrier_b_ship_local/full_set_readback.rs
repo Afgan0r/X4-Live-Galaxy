@@ -1,6 +1,8 @@
 use super::{Result, publication_limits};
-use observation_domain::{CompletionCoverage, SectionKey, SectionRevisionId};
-use observation_persistence::{ObservationRepository, SqliteObservationRepository};
+use observation_domain::{
+    CargoObservation, CargoStorage, CompletionCoverage, FieldOutcome, SectionKey, SectionRevisionId,
+};
+use observation_persistence::{ObservationRepository, RevisionRecord, SqliteObservationRepository};
 use std::collections::BTreeMap;
 use std::path::Path;
 #[path = "full_set_census_readback.rs"]
@@ -91,6 +93,7 @@ fn verify_key(
     {
         return Err(format!("current mismatch:{key}").into());
     }
+    verify_storage_pool(key, current.revision())?;
     for revision in revisions.iter().rev().take(2) {
         let stored = repository
             .stored_revision(
@@ -102,6 +105,30 @@ fn verify_key(
         if stored.0.records.len() != records || stored.1.revision.get() != *revision {
             return Err(format!("history mismatch:{key}:{revision}").into());
         }
+        verify_storage_pool(key, &stored.0)?;
+    }
+    Ok(())
+}
+
+fn verify_storage_pool(key: &str, revision: &RevisionRecord) -> Result<()> {
+    if key != "ship_cargo:khaak:g0" {
+        return Ok(());
+    }
+    let [record] = revision.records.as_slice() else {
+        return Err("Kha'ak storage revision must have exactly one ship".into());
+    };
+    let cargo = CargoObservation::from_content(&record.content, 16)
+        .map_err(|error| format!("Kha'ak cargo readback:{error:?}"))?;
+    if cargo.storage
+        != FieldOutcome::Value(vec![CargoStorage {
+            transport: "container liquid solid".to_owned(),
+            capacity_cubic_metres: 1200,
+            occupied_cubic_metres: 110,
+        }])
+    {
+        return Err(
+            "Kha'ak storage readback must preserve one pool with all tags and volumes".into(),
+        );
     }
     Ok(())
 }

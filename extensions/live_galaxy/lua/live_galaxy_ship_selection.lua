@@ -31,7 +31,12 @@ local function metrics(self)
         timing_origin_revision = b.timing_origin_revision, timing_origin_incarnation = b.timing_origin_incarnation,
         section = self.key, incarnation = self.incarnation } or nil
 end
-local function discard(self, carrier, reason, request)
+local function attach_clock_failure(self, result)
+    if result.disposition == "clock_unavailable" and result.rejection and self.budget then
+        result.rejection.clock = self.budget.clock_failure
+    end
+end
+local function discard(self, carrier, reason, request, rejection)
     local result
     if self.census_txn and carrier.reset then carrier:reset(reason) end
     if self.collector then
@@ -46,6 +51,8 @@ local function discard(self, carrier, reason, request)
         result.rejection.operation = self.budget.operation
         result.rejection.condition = self.budget.condition or result.rejection.condition
     end
+    result.rejection = rejection or result.rejection
+    if not request then attach_clock_failure(self, result) end
     self.collector, self.pending, self.accepted, self.snapshot, self.snapshot_capture = nil, nil, nil, nil, nil
     self.census_txn = nil
     -- A failed start performed no source capture. Never label previous capture
@@ -294,13 +301,11 @@ function selection.advance(self, context, carrier, status)
         local capture_success, captured, capture_result = pcall(capture_snapshot, self, context, carrier, status)
         if not capture_success then return discard(self, carrier, self.budget.reason or "source_failure") end
         if captured == nil then
-            local refused = discard(self, carrier, capture_result.disposition)
-            refused.rejection = capture_result.rejection
-            return refused
+            return discard(self, carrier, capture_result.disposition, nil, capture_result.rejection)
         end
         result = captured
     end
-    ok, err = self.budget:after(carrier)
+    ok, err = self.budget:after(carrier, "after")
     if not ok then return discard(self, carrier, err) end
     if result.disposition == "sampled" and active_family == "core" then
         -- Transfer owned, already bytewise-ordered membership; do not repeat an
@@ -311,6 +316,7 @@ function selection.advance(self, context, carrier, status)
         self.snapshot[self.key] = nil
     end
     if result.disposition ~= "collecting" and result.disposition ~= "producer_busy" then
+        attach_clock_failure(self, result)
         result.capture_metrics = metrics(self)
     end
     if self.roster then result.discovery_revision = self.roster.discovery_revision end

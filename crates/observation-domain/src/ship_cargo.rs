@@ -10,6 +10,7 @@ pub struct CargoWare {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CargoStorage {
+    /// The sorted, space-separated transport tags for one shared storage pool.
     pub transport: String,
     pub capacity_cubic_metres: u32,
     pub occupied_cubic_metres: u32,
@@ -81,12 +82,26 @@ fn validate_storage(
     }
     if values.windows(2).any(|v| v[0].transport >= v[1].transport)
         || values.iter().any(|v| {
-            !detail_token(&v.transport) || v.occupied_cubic_metres > v.capacity_cubic_metres
+            !canonical_storage_transport(&v.transport)
+                || v.occupied_cubic_metres > v.capacity_cubic_metres
         })
     {
         return Err(ShipDetailError::InvalidField);
     }
     Ok(())
+}
+fn canonical_storage_transport(value: &str) -> bool {
+    if value.len() > 128 {
+        return false;
+    }
+    let mut previous = "";
+    for tag in value.split(' ') {
+        if !detail_token(tag) || tag <= previous {
+            return false;
+        }
+        previous = tag;
+    }
+    true
 }
 fn append_wares(text: &mut String, outcome: &FieldOutcome<Vec<CargoWare>>) {
     use core::fmt::Write as _;
