@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 measured duplicate bridge snapshot reads; optimization pending
+stopped_at: Plan 11 shared-snapshot package verified; paired normal X4 run pending
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: Attributed the second-cycle intervals in the retained run. The largest measured delay preceded the first receive entry.
-state_head: a2b8c4e5c2236c4ef37926b2b2c97ef1b26feaad
+last_activity_desc: Verified shared-snapshot selection and package. Local retention and selection median fell from 140.437 ms to 68.940 ms.
+state_head: d72ee055b5501c92b64e502503e396ffcf7c9c17
 progress:
   total_phases: 14
   completed_phases: 6
@@ -29,13 +29,14 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; REPEAT-CYCLE COVERAGE OPEN
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in execution. The paired diagnostic on `a2b8c4e` verified
-`waiting/admission-window-exhausted` and measured 226.374 FPS with the
-bridge and 307.894 FPS in the same-session bridge-free control.
-Last activity: 2026-11-22 — Run `055-gate-a-normal-20261122-104800` reopened
-137 durable revisions. All 21 nonempty factions completed one cycle and
-11 completed two. Gate B still needs full two-cycle coverage and sustained
-SETA and recovery evidence. See the
+Status: Plan 11 in execution. The shared-snapshot package `d72ee05`
+passed review and local regression. Its installed extension files match.
+The owner-operated paired normal run is next.
+Last activity: 2026-11-22 — Local successor selection with retention
+measured a 68.940 ms median, from 140.437 ms previously. The previous X4
+run reopened 137 revisions and had two cycles for 11 of 21 nonempty
+factions. Gate B still needs two cycles for all 21, sustained SETA and
+recovery evidence. See the
 [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
 [runtime evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
@@ -236,7 +237,8 @@ None yet.
   under the tested load. Full two-cycle coverage requires 37 more nonempty
   family revisions in this run. The prior-commit to first-receive-entry
   interval accounts for 14.364 of 17.066 seconds in the 31 retained
-  transitions. Split that interval before selecting a throughput change.
+  transitions. The new build removes one full snapshot read per successor
+  selection. Measure its effect on the exact paired normal procedure.
   Complete callback timing, sustained SETA and recovery remain open.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
@@ -271,5 +273,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 measured two full snapshot reads per successor selection
-Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
+Stopped at: Plan 11 shared-snapshot package verified; paired normal X4 run pending
+Resume file: tests/x4-disposable/05.5-heavy-ship-procedure.md
