@@ -2,28 +2,25 @@
   "mode": "interactive",
   "granularity": "standard",
   "model_profile": "quality",
-  "model_overrides": {
-    "gsd-planner": "gpt-6-astra"
-  },
   "effort": {
     "agent_overrides": {
-      "gsd-planner": "high"
+      "gsd-code-fixer": "medium",
+      "gsd-codebase-mapper": "medium",
+      "gsd-doc-classifier": "medium",
+      "gsd-doc-verifier": "medium",
+      "gsd-doc-writer": "medium",
+      "gsd-dom-verifier": "medium",
+      "gsd-executor": "medium",
+      "gsd-intel-updater": "medium",
+      "gsd-mempalace-curator": "medium",
+      "gsd-pattern-mapper": "medium",
+      "gsd-ui-checker": "medium"
     },
     "routing_tier_defaults": {
       "heavy": "high",
-      "standard": "medium",
+      "standard": "high",
       "light": "high"
     }
-  },
-  "dynamic_routing": {
-    "enabled": true,
-    "tier_models": {
-      "heavy": "gpt-6.1-sol",
-      "standard": "gpt-6.1-sol",
-      "light": "gpt-6-luna"
-    },
-    "escalate_on_failure": false,
-    "max_escalations": 0
   },
   "fast_mode": {
     "enabled": true,
@@ -220,7 +217,9 @@
   "runtime": "codex",
   "model_profile_overrides": {
     "codex": {
-      "sonnet": "gpt-6.1-sol"
+      "opus": "gpt-6.2-sol",
+      "sonnet": "gpt-6.2-sol",
+      "haiku": "gpt-6.2-sol"
     }
   }
 }
