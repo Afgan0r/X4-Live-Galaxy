@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 admission-cutoff package verified locally; awaiting paired normal X4 diagnostic
+stopped_at: Plan 11 paired normal X4 diagnostic confirmed cutoff; Gate B repeat-cycle coverage remains open
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: Verified the admission-cutoff repair, package and installed extension. Paired normal X4 diagnostic and Gate B remain open.
+last_activity_desc: Verified paired normal FPS and the live admission cutoff. Reopened 137 receipts. Eleven of 21 nonempty factions completed two cycles.
 state_head: a2b8c4e5c2236c4ef37926b2b2c97ef1b26feaad
 progress:
   total_phases: 14
@@ -27,16 +27,15 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL X4 DIAGNOSTIC PENDING
+Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; REPEAT-CYCLE COVERAGE OPEN
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in execution. The admission-cutoff package `a2b8c4e` passed
-independent re-review and final local regression. All 27 installed extension
-files match the package. Next is a paired normal-time diagnostic with the
-new bridge and a same-session bridge-free FPS control.
-Last activity: 2026-11-22 — Prepared the new package after analysis of run
-`055-gate-a-normal-20261122-102638`. That run measured 185.585 FPS and reopened
-131 durable revisions. All 21 nonempty factions committed all four families,
-and 10 completed two cycles. See the
+Status: Plan 11 in execution. The paired diagnostic on `a2b8c4e` verified
+`waiting/admission-window-exhausted` and measured 226.374 FPS with the
+bridge and 307.894 FPS in the same-session bridge-free control.
+Last activity: 2026-11-22 — Run `055-gate-a-normal-20261122-104800` reopened
+137 durable revisions. All 21 nonempty factions completed one cycle and
+11 completed two. Gate B still needs full two-cycle coverage and sustained
+SETA and recovery evidence. See the
 [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
 [runtime evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
@@ -232,12 +231,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 05.5]: Gate A passed at `f4465ef`. The replacement normal
-  window on `6f2dd0f` recorded real Xenon multi-tag cargo and no clock
-  refusal, then recorded a legacy rejection at the 60-second cutoff. Verify
-  the corrected cutoff disposition and frame-time tails in the paired normal
-  diagnostic. Full two-cycle coverage, complete callback timing, SETA,
-  recovery, and goal verification remain pending.
+- [Phase 05.5]: The paired normal diagnostic on `a2b8c4e` confirmed the
+  cutoff disposition with no terminal rejection. The 144 FPS floor held
+  under the tested load. Full two-cycle coverage requires 37 more nonempty
+  family revisions within the existing limits in this run. Complete callback
+  timing, sustained SETA, recovery, and goal verification remain open.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -271,5 +269,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 admission-cutoff package verified; paired normal X4 diagnostic pending
-Resume file: tests/x4-disposable/05.5-heavy-ship-procedure.md
+Stopped at: Plan 11 paired normal diagnostic retained; repeat-cycle throughput remains open
+Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
