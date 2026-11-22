@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 tested targeted SQLite reads and queued handoff; combined local validation pending
+stopped_at: Plan 11 combined local roster check passed; X4 runtime evidence remains open
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: A targeted SQLite read preserved floor and cursor in 402 comparisons and saved 8.021 seconds over 133 reconstructed transitions.
-state_head: d72ee055b5501c92b64e502503e396ffcf7c9c17
+last_activity_desc: The isolated final candidate verified 175 receipts in 31.236 seconds versus 41.150 seconds on the reference.
+state_head: 3c338e357431552b63fa9d41fc1db74482330c72
 progress:
   total_phases: 14
   completed_phases: 6
@@ -29,13 +29,13 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; REPEAT-CYCLE COVERAGE OPEN
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in execution. The paired normal Gate B run on `d72ee05`
-failed at three equal-clock diagnostics while collecting Xenon revision
-135. The owner-operated control is retained.
-Last activity: 2026-11-22 — Reopened 134 receipts and verified two linked
-cycles for 11 of 21 nonempty factions. Average FPS was 187.780 with the
-bridge and 301.550 without it. Gate B needs complete cycles, sustained
-SETA and recovery evidence. See the
+Status: Plan 11 in execution. The combined SQLite, clock and Lua handoff
+fix verified the full synthetic roster locally. The paired normal Gate B
+run on `d72ee05` remains the last X4 measurement.
+Last activity: 2026-11-22 — The paced local candidate verified 175 receipts,
+with two linked cycles for all 21 nonempty factions in 31.236 seconds.
+The matching reference took 41.150 seconds. Gate B needs owner-operated
+normal-time, sustained SETA and recovery evidence. See the
 [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
 [runtime evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
