@@ -2,6 +2,10 @@
   "mode": "interactive",
   "granularity": "standard",
   "model_profile": "quality",
+  "model_overrides": {
+    "gsd-doc-classifier": "gpt-6-luna",
+    "gsd-pattern-mapper": "gpt-6-luna"
+  },
   "effort": {
     "agent_overrides": {
       "gsd-code-fixer": "medium",

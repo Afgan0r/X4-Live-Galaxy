@@ -114,6 +114,9 @@ the owner adopted GPT-6.2 Sol for all project GSD roles, with medium
 reasoning for roles that follow a specification or perform routine work
 and high reasoning for roles that require deeper analysis. The planner
 now follows the project policy at high reasoning.
+The owner subsequently approved GPT-6 Luna with medium reasoning for
+`gsd-doc-classifier` and `gsd-pattern-mapper`. GPT-6.2 Sol remains the
+project default.
 
 Decisions are logged in PROJECT.md Key Decisions table.
 Historical decisions follow. ADR-LG-001 through ADR-LG-024 and 05.3-CONTEXT.md override conflicting numerical, transport and retired research-platform policies:
