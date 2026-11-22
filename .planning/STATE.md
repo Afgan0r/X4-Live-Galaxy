@@ -7,7 +7,7 @@ stopped_at: Plan 11 has a 90-second admission profile; X4 runtime evidence remai
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
 last_activity_desc: Gate B admission is 90 seconds and the runner captures 95 seconds by default.
-state_head: 3c338e357431552b63fa9d41fc1db74482330c72
+state_head: ea9d73e5fc750fc92d993e54ab15e540c13ecc0f
 progress:
   total_phases: 14
   completed_phases: 6
