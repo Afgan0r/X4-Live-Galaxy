@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 global callback package verified; await owner installation/runtime checkpoint
-last_updated: "2026-11-04"
-last_activity: 2026-11-04
-last_activity_desc: Direct global callback replaces periodic MD pump with game-scope and lifecycle guards. Full review converged; workspace and 149 Lua plus 21 syntax and 18 XML rejection checks passed. No X4 action performed.
+stopped_at: Plan 11 global callback normal window failed Gate B; diagnose observed runtime rejection and clock paths
+last_updated: "2026-11-22"
+last_activity: 2026-11-22
+last_activity_desc: Global callback normal window averaged 214.35 FPS and verified 60 durable section readbacks. Argon finished in 2.065–2.515 s. Gate B failed on two rejections and five runtime diagnostics. SETA and recovery remain pending.
 state_head: 7a60c7c42fedc5fd758b1e53fc69ac20dbf3af28
 progress:
   total_phases: 14
@@ -29,8 +29,8 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in-scope remedy checkpoint; direct global callback package `dist/live-galaxy-callback-7a60c7c` is reviewed, regression-tested and manifest-verified. Installation and owner-operated normal/SETA/load/reload acceptance remain pending. No game launch or installation performed.
-Last activity: 2026-10-10 — Diagnostic source `3b6d3de` captured 28 durable sections with exact readbacks. Argon completed 945 ships in 25.011 s, with 1.074 s selection-active intervals and 23.937 s between them. Stopped on observed 32 ms ceiling violation; truncated FrameView final row prevents an FPS verdict. Evidence retained; SDK stopped. Gate B remains failed/pending.
+Status: Plan 11 in execution. The reviewed global callback package `dist/live-galaxy-callback-7a60c7c` was installed and exercised in the owner-operated normal window. Gate B remains open. Diagnose Xenon cargo transport validation, intermittent clock unavailability, and the separate Holy Order admission rejection before resuming acceptance.
+Last activity: 2026-11-22 — Run `055-gate-b-normal-20261122-083252` recorded 214.35 FPS and 60 exact durable readbacks. Argon elapsed 2.065–2.515 s with 1.354–1.717 s between selection callbacks. Complete callback time and FPS impact remain unmeasured. See [Gate B evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)
 
@@ -255,6 +255,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10
-Stopped at: Plan 11 diagnosed source continuation / transport cadence coupling; owner remedy scope and supported higher-frequency seam pending
-Resume file: .planning/debug/heavy-ship-timing.md
+Last session: 2026-11-22
+Stopped at: Plan 11 global callback normal-window evidence retained; runtime rejection diagnosis pending
+Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
