@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 combined local roster check passed; X4 runtime evidence remains open
+stopped_at: Plan 11 has a 90-second admission profile; X4 runtime evidence remains open
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: The isolated final candidate verified 175 receipts in 31.236 seconds versus 41.150 seconds on the reference.
+last_activity_desc: Gate B admission is 90 seconds and the runner captures 95 seconds by default.
 state_head: 3c338e357431552b63fa9d41fc1db74482330c72
 progress:
   total_phases: 14
@@ -34,7 +34,8 @@ fix verified the full synthetic roster locally. The paired normal Gate B
 run on `d72ee05` remains the last X4 measurement.
 Last activity: 2026-11-22 — The paced local candidate verified 175 receipts,
 with two linked cycles for all 21 nonempty factions in 31.236 seconds.
-The matching reference took 41.150 seconds. Gate B needs owner-operated
+The matching reference took 41.150 seconds. The approved Gate B admission
+window is now 90 seconds. Gate B needs owner-operated
 normal-time, sustained SETA and recovery evidence. See the
 [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
 [runtime evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).

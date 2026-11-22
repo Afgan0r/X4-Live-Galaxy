@@ -52,6 +52,20 @@ function Get-RuntimeDiagnosticFailures(
     })
 }
 
+function Get-CaptureSeconds(
+    [string]$Gate,
+    [int]$RequestedSeconds,
+    [bool]$ExplicitDuration,
+    [double]$WindowSeconds
+) {
+    if ($Gate -ne 'B' -or $ExplicitDuration) { return $RequestedSeconds }
+    $duration = [Math]::Max($RequestedSeconds, [Math]::Ceiling($WindowSeconds) + 5)
+    if ($WindowSeconds -le 0 -or $duration -gt 3600) {
+        throw 'HEAVY_RUNTIME_ADMISSION_WINDOW_INVALID'
+    }
+    [int]$duration
+}
+
 function Test-TerminalAdmissionWindow(
     $ObservedAt,
     [datetime]$Started,
@@ -206,13 +220,19 @@ function Invoke-SelfTest {
     if ($windowFailures.Count -ne 0) {
         throw 'HEAVY_RUNTIME_TERMINAL_ADMISSION_WINDOW_REJECTED'
     }
+    if ((Get-CaptureSeconds B 65 $false 90) -ne 95 -or
+        (Get-CaptureSeconds B 65 $false 60) -ne 65 -or
+        (Get-CaptureSeconds A 65 $false 90) -ne 65 -or
+        (Get-CaptureSeconds B 100 $true 90) -ne 100) {
+        throw 'HEAVY_RUNTIME_CAPTURE_DURATION_MISMATCH'
+    }
     $started = [DateTime]'2026-01-01T00:00:00Z'
-    if (Test-TerminalAdmissionWindow $started.AddSeconds(59) $started 60 8 0) {
+    if (Test-TerminalAdmissionWindow $started.AddSeconds(89) $started 90 8 0) {
         throw 'HEAVY_RUNTIME_EARLY_ADMISSION_WINDOW_ACCEPTED'
     }
-    if (-not (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 8 0) -or
-        (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 0 0) -or
-        (Test-TerminalAdmissionWindow $started.AddSeconds(60) $started 60 8 1)) {
+    if (-not (Test-TerminalAdmissionWindow $started.AddSeconds(90) $started 90 8 0) -or
+        (Test-TerminalAdmissionWindow $started.AddSeconds(90) $started 90 0 0) -or
+        (Test-TerminalAdmissionWindow $started.AddSeconds(90) $started 90 8 1)) {
         throw 'HEAVY_RUNTIME_TERMINAL_ADMISSION_WINDOW_GUARD'
     }
     $historyRoot = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N'))
@@ -285,6 +305,11 @@ if (-not (Get-Process -Id $X4ProcessId -ErrorAction SilentlyContinue)) { throw '
 foreach ($path in @($DebugLog, $PresentMonPath, $BridgePath, $LimitsFile)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "HEAVY_RUNTIME_FILE_MISSING:$path" }
 }
+
+$limits = Get-Content -LiteralPath $LimitsFile -Raw | ConvertFrom-Json
+$admissionWindowSeconds = [double]$limits.admission_window_millis / 1000
+$CaptureSeconds = Get-CaptureSeconds $Gate $CaptureSeconds `
+    ($PSBoundParameters.ContainsKey('CaptureSeconds')) $admissionWindowSeconds
 
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $ids = New-RuntimeIds $Gate $Mode $stamp
@@ -408,8 +433,6 @@ $events = @(Read-OperationalHistory $dataRoot)
 $commits = @($events | Where-Object { $_.state -eq 'committed' }).Count
 $bad = @($events | Where-Object { $_.state -in @('failed', 'rejected') }).Count
 $captureElapsed = ([DateTime]::UtcNow - $started).TotalSeconds
-$limits = Get-Content -LiteralPath $LimitsFile -Raw | ConvertFrom-Json
-$admissionWindowSeconds = [double]$limits.admission_window_millis / 1000
 $allowWindowExhaustion = Test-TerminalAdmissionWindow $windowExhaustionObservedAt $started `
     $admissionWindowSeconds $commits $bad
 $runtimeFailures = @(Get-RuntimeDiagnosticFailures $runtimeDiagnostics `

@@ -34,7 +34,7 @@
   "heavy_permits": 1,
   "rate_interval_millis": 50,
   "max_overrun_debt": 512,
-  "admission_window_millis": 60000,
+  "admission_window_millis": 90000,
   "freshness_millis": 30000,
   "retained_revisions": 2
 }
