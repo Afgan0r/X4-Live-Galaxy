@@ -121,7 +121,7 @@ fn publish_empty(receiver: &mut ProductionObservationSession, key: &str, revisio
 }
 
 #[test]
-fn successor_carries_revision_floor_from_its_current_snapshot() {
+fn successor_carries_floor_from_all_current_pointers() {
     let mut receiver = open();
     publish_empty(&mut receiver, "ship_core:argon", 7);
     publish_empty(&mut receiver, "faction_census", 14);

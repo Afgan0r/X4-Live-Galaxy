@@ -33,7 +33,7 @@ local safe_details = {
     ambiguous_commit = true, retry_exhausted = true, disconnected = true,
     restart_required = true, clock_unavailable = true, source_failure = true,
     invalid_fact = true, fact_rejected = true, finish_rejected = true,
-    reservation_failed = true, result_shape = true, progress_rejected = true,
+    reservation_failed = true, result_shape = true, progress_rejected = true, control_rejected = true,
     collecting = true, core_changed = true, stale_parent = true, collection_overflow = true,
     allocation_limit = true, native_call_limit = true, callback_budget_exceeded = true,
     source_boundary_changed = true, selection_unavailable = true, admission_window_exhausted = true,
@@ -62,7 +62,9 @@ local function rejection_text(rejection)
         end
     end
     local carrier_code
-    if rejection.condition == "progress_rejected" then carrier_code = rejection.carrier_code end
+    if rejection.condition == "progress_rejected" or rejection.condition == "control_rejected" then
+        carrier_code = rejection.carrier_code
+    end
     if rejection.condition == "clock_unavailable" and rejection.clock then
         local clock = rejection.clock
         text = text .. " clock_phase=" .. clock.phase .. " clock_issue=" .. clock.issue

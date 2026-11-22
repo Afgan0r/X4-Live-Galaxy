@@ -1,6 +1,6 @@
 use super::{ProductionError, ProductionObservationSession};
-use observation_domain::{SectionKey, ShipSectionIdentity};
-use observation_persistence::{CurrentRevision, ObservationRepository};
+use observation_domain::{SectionKey, SectionRevisionId, ShipSectionIdentity};
+use observation_persistence::ObservationRepository;
 
 impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub fn heavy_revision_floor(&self) -> Result<u64, ProductionError> {
@@ -9,11 +9,11 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 &SectionKey::new(self.collection_key()).ok_or(ProductionError::InvalidLimits)?,
             );
         }
-        let snapshot = self
+        let pointers = self
             .lifecycle
-            .current_snapshot()
+            .current_pointers()
             .map_err(|_| ProductionError::Storage)?;
-        from_snapshot(&snapshot)
+        from_pointers(&pointers)
     }
 
     pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
@@ -21,27 +21,26 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .current_revision(key)
             .map_err(|_| ProductionError::Storage)?
             .as_ref()
-            .map_or(Ok(1), revision_after)
+            .map_or(Ok(1), |value| revision_after(value.receipt().revision))
     }
 }
 
-pub(super) fn from_snapshot(snapshot: &[CurrentRevision]) -> Result<u64, ProductionError> {
+pub(super) fn from_pointers(
+    pointers: &[(SectionKey, SectionRevisionId)],
+) -> Result<u64, ProductionError> {
     // Include old durable groups that survive a smaller replacement census.
-    snapshot
+    pointers
         .iter()
-        .filter(|current| {
-            let key = current.revision().section_key.as_str();
-            key == "faction_census" || ShipSectionIdentity::parse(key).is_some()
+        .filter(|(key, _)| {
+            key.as_str() == "faction_census" || ShipSectionIdentity::parse(key.as_str()).is_some()
         })
-        .try_fold(1, |floor, current| {
-            revision_after(current).map(|next| floor.max(next))
+        .try_fold(1, |floor, (_, revision)| {
+            revision_after(*revision).map(|next| floor.max(next))
         })
 }
 
-fn revision_after(current: &CurrentRevision) -> Result<u64, ProductionError> {
-    current
-        .receipt()
-        .revision
+fn revision_after(revision: SectionRevisionId) -> Result<u64, ProductionError> {
+    revision
         .get()
         .checked_add(1)
         .filter(|next| *next <= observation_ingest::MAX_DURABLE_SECTION_REVISION)

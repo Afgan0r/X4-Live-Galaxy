@@ -146,6 +146,17 @@ impl ObservationRepository for SqliteObservationRepository {
         sqlite_current::snapshot(&self.connection)
     }
 
+    fn current_pointers(&self) -> Result<Vec<(SectionKey, SectionRevisionId)>, RepositoryError> {
+        sqlite_current::pointers(&self.connection)
+    }
+
+    fn current_dependents(
+        &self,
+        parent: &CurrentRevision,
+    ) -> Result<Vec<(SectionKey, SectionRevisionId)>, RepositoryError> {
+        sqlite_current::dependents(&self.connection, parent)
+    }
+
     fn pin_decision(
         &mut self,
         set: &DecisionRevisionSet,

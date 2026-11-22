@@ -38,8 +38,8 @@ local function attach_clock_failure(self, result)
 end
 local function discard(self, carrier, reason, request, rejection)
     local result
-    if self.census_txn and carrier.reset then carrier:reset(reason) end
-    if self.collector then
+    if carrier and self.census_txn and carrier.reset then carrier:reset(reason) end
+    if carrier and self.collector then
         if self.collector.discard then result = self.collector:discard(carrier, reason)
         else result = self.collector:fail(carrier, reason) end
     end
@@ -113,39 +113,51 @@ local function drive_census(self, context, carrier, status)
     end
     return { disposition = "collecting" }
 end
-local function observe_qualification(self, carrier, status)
-    local producer_state = type(status) == "table" and status.producer_state or nil
-    if producer_state == "awaiting_compatibility" and self.producer_state
-        and self.producer_state ~= producer_state then
-        discard(self, carrier, "source_boundary_changed")
-        refresh_boundary(self)
-    end
-    if type(producer_state) == "string" then self.producer_state = producer_state end
+local function reset_boundary(self, carrier, status)
+    local result = discard(self, carrier, "source_boundary_changed", status)
+    refresh_boundary(self)
+    return result
+end
+local function observe_qualification(self, status)
+    if type(status) ~= "table" then return end
+    local producer_state, incarnation = status.producer_state, status.producer_incarnation
+    local requalifying = producer_state == "awaiting_compatibility" and self.producer_state
+        and self.producer_state ~= producer_state
+    local replaced = incarnation and self.producer_incarnation and incarnation ~= self.producer_incarnation
+    self.producer_state = producer_state or self.producer_state
+    self.producer_incarnation = incarnation or self.producer_incarnation
+    -- The carrier already owns teardown at a native boundary. Clear only old
+    -- Lua state so an old collector cannot reset or fail the new bootstrap.
+    if requalifying or replaced then return reset_boundary(self, nil, status) end
 end
 function selection.attach(adapter, options)
     local limits, err = profile.validate(options.heavy_limits)
     if not limits then return nil, err end
     local state = { options = options, limits = limits, clock = adapter,
         api = options.ship_api or source.runtime() }
+    adapter.advance_after_commit = true
     function adapter:feedback(context, carrier, status, control)
-        observe_qualification(state, carrier, status)
+        local boundary = observe_qualification(state, status)
+        if boundary then return boundary end
+        if control == 9 or control == 10 then return reset_boundary(state, nil, status) end
         if control == 5 and state.pending then
             if type(status) ~= "table" or not tonumber(status.monotonic_millis) then
                 return discard(state, carrier, "clock_unavailable")
             end
             local pending = state.pending
-            if pending.incarnation ~= status.producer_incarnation then return discard(state, carrier, "source_boundary_changed") end
+            if pending.incarnation ~= status.producer_incarnation then return reset_boundary(state, nil, status) end
             pending.accepted_at = tonumber(status.monotonic_millis)
             state.accepted, state.pending = pending, nil
         end
-        if control == 9 or control == 10 or context.source_boundary ~= (state.boundary or context.source_boundary) then
-            local result = discard(state, carrier, "source_boundary_changed")
-            refresh_boundary(state)
-            return result
+        if context.source_boundary ~= (state.boundary or context.source_boundary) then
+            return reset_boundary(state, carrier)
         end
     end
     function adapter:advance(context, carrier, status) return selection.advance(state, context, carrier, status) end
-    function adapter:discard(carrier, reason) return discard(state, carrier, reason) end
+    function adapter:discard(carrier, reason)
+        if reason == "disconnected" or reason == "restart_required" then return reset_boundary(state) end
+        return discard(state, carrier, reason)
+    end
     return adapter
 end
 local function start(self, context, carrier, status)
@@ -254,7 +266,8 @@ local function capture_snapshot(self, context, carrier, status)
 end
 function selection.advance(self, context, carrier, status)
     context.source_boundary = context.source_boundary or "runtime_start"
-    observe_qualification(self, carrier, status)
+    local boundary = observe_qualification(self, status)
+    if boundary then return boundary end
     if status.selection == "faction_census" then
         return drive_census(self, context, carrier, status)
     end
@@ -262,10 +275,8 @@ function selection.advance(self, context, carrier, status)
     if self.run_started and (not now or now - self.run_started >= self.limits.admission_window_millis) then
         return discard(self, carrier, "admission_window_exhausted", status)
     end
-    if self.incarnation and (self.incarnation ~= status.producer_incarnation or self.boundary ~= context.source_boundary) then
-        local result = discard(self, carrier, "source_boundary_changed", status)
-        refresh_boundary(self)
-        return result
+    if self.incarnation and self.boundary ~= context.source_boundary then
+        return reset_boundary(self, carrier, status)
     end
     if not self.collector or self.key ~= status.selection or self.collector.stage == "done" then
         local ok, err = start(self, context, carrier, status)
@@ -279,6 +290,7 @@ function selection.advance(self, context, carrier, status)
             self.key, self.revision, self.incarnation
     end
     local ok, err = self.budget:before(status)
+    if ok == false then return { disposition = "collecting" } end
     if not ok then return discard(self, carrier, err) end
     if self.options.faction_inventory and not self.roster then
         local roster, roster_error = factions.capture(self.budget.api,

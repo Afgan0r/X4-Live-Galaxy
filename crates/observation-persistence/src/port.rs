@@ -1,4 +1,4 @@
-use observation_domain::{DecisionSnapshotId, SectionKey};
+use observation_domain::{DecisionSnapshotId, SectionKey, SectionRevisionId};
 use observation_ingest::DecisionRevisionSet;
 
 use crate::{
@@ -10,6 +10,43 @@ pub trait ObservationRepository {
     fn publish(&mut self, request: PublishRequest) -> PublishOutcome;
     fn current(&self, key: &SectionKey) -> Result<Option<CurrentRevision>, RepositoryError>;
     fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError>;
+    fn current_pointers(&self) -> Result<Vec<(SectionKey, SectionRevisionId)>, RepositoryError> {
+        Ok(self
+            .current_snapshot()?
+            .into_iter()
+            .map(|current| {
+                (
+                    current.receipt().section_key.clone(),
+                    current.receipt().revision,
+                )
+            })
+            .collect())
+    }
+
+    fn current_dependents(
+        &self,
+        parent: &CurrentRevision,
+    ) -> Result<Vec<(SectionKey, SectionRevisionId)>, RepositoryError> {
+        Ok(self
+            .current_snapshot()?
+            .into_iter()
+            .filter(|current| {
+                current.revision().source_scope == parent.revision().source_scope
+                    && current
+                        .revision()
+                        .dependencies
+                        .get(&parent.receipt().section_key)
+                        == Some(&parent.receipt().revision)
+            })
+            .map(|current| {
+                (
+                    current.receipt().section_key.clone(),
+                    current.receipt().revision,
+                )
+            })
+            .collect())
+    }
+
     fn pin_decision(
         &mut self,
         set: &DecisionRevisionSet,

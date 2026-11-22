@@ -23,15 +23,25 @@ function scheduler.tick(context, carrier, observation)
     if type(context) ~= "table" then return { disposition = "clock_unavailable" } end
     if context.reentry_guard then return { disposition = "reentry_suppressed" } end
     context.reentry_guard = true
-    local function finish(disposition, code, status)
+    local function finish(disposition, code, status, operation)
         context.reentry_guard = false
         local rejection
         if type(status) == "table" then
             rejection = { stage = "scheduler", condition = disposition,
                 section = status.selection, revision = status.collection_revision,
-                run = status.producer_incarnation }
+                run = status.producer_incarnation, operation = operation,
+                carrier_code = operation and code or nil }
         end
         return { disposition = disposition, code = code, rejection = rejection }
+    end
+    local function feedback(status, control)
+        if type(observation.feedback) ~= "function" then return nil end
+        local ok, result = pcall(observation.feedback, observation, context, carrier, status, control)
+        if not ok then
+            discard(observation, carrier, "source_failure")
+            return finish("source_failure", nil, status)
+        end
+        if result then context.reentry_guard = false; return result end
     end
 
     local progress, progress_status = call(carrier, "progress", 1)
@@ -49,12 +59,7 @@ function scheduler.tick(context, carrier, observation)
             -- A failed operation may supply no snapshot. Retain only owned
             -- correlation from the prior one; never use it for admission.
             local correlation = type(progress_status) == "table" and progress_status or prior_status
-            local result = finish(reason, progress, correlation)
-            if result.rejection then
-                result.rejection.operation = "progress"
-                result.rejection.carrier_code = progress
-            end
-            return result
+            return finish(reason, progress, correlation, "progress")
         end
     end
     if terminal[progress] then
@@ -63,14 +68,59 @@ function scheduler.tick(context, carrier, observation)
         -- Poll control before returning so that pause cannot starve recovery.
         return finish(terminal[progress], progress, progress_status)
     end
-    if type(observation.feedback) == "function" then
-        local ok, result = pcall(observation.feedback, observation, context, carrier, progress_status, control)
-        if not ok then discard(observation, carrier, "source_failure"); return finish("source_failure", nil, progress_status) end
-        if result then context.reentry_guard = false; return result end
-    end
+    local feedback_result = feedback(progress_status, control)
+    if feedback_result then return feedback_result end
     if terminal[control] then
         discard(observation, carrier, terminal[control])
         return finish(terminal[control], control, progress_status)
+    end
+    if control == 5 and observation.advance_after_commit then
+        -- Commit feedback above uses the old revision. The next intent and
+        -- demand may already be available without waiting for the next tick.
+        local committed_status = progress_status
+        for work = 0, 1 do
+            control, control_error = call(carrier, "poll_control")
+            if control == nil then return finish(control_error, nil, progress_status, "poll_control") end
+            if terminal[control] then
+                feedback_result = feedback(progress_status, control)
+                if feedback_result then return feedback_result end
+                discard(observation, carrier, terminal[control])
+                return finish(terminal[control], control, progress_status)
+            end
+            if control < 0 then return finish("control_rejected", control, progress_status, "poll_control") end
+            if control ~= 0 then return finish("producer_busy", control, progress_status) end
+            local prior_status = progress_status
+            -- The final ordinary progress applies a connection-generation
+            -- change before any source work. The intermediate read is status only.
+            local native_code
+            progress, progress_status, native_code = call(carrier, "progress", work)
+            if progress == nil then
+                local condition = native_code and "progress_rejected" or progress_status
+                return finish(condition, native_code, prior_status, "progress")
+            end
+            -- A ready producer has no data to advance. Native progress still
+            -- applies connection generation before returning its idle code.
+            local ready_idle = work == 1 and progress == -21 and type(progress_status) == "table"
+                and progress_status.producer_state == "ready"
+            if progress < 0 and not ready_idle then
+                return finish("progress_rejected", progress, progress_status, "progress")
+            end
+            if terminal[progress] then
+                discard(observation, carrier, terminal[progress])
+                return finish(terminal[progress], progress, progress_status)
+            end
+            if type(progress_status) ~= "table" then return finish("result_shape", nil, prior_status, "progress") end
+            if progress_status.producer_incarnation ~= committed_status.producer_incarnation
+                or progress_status.transport_state ~= "connected"
+                or progress_status.producer_state == "awaiting_compatibility" then
+                feedback_result = feedback(progress_status, control)
+                if feedback_result then return feedback_result end
+                return finish("source_boundary_changed", nil, progress_status)
+            end
+            if progress_status.producer_state ~= "ready" then
+                return finish("producer_busy", progress, progress_status)
+            end
+        end
     end
     if type(progress_status) ~= "table"
         or type(progress_status.capacity) ~= "string"

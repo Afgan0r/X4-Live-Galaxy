@@ -147,6 +147,105 @@ describe("owned Carrier B adapter", function()
         assert.same({ 3, 2, 0 }, { env.progress_count, env.poll_count, sources })
     end)
 
+    for _, case in ipairs({
+        { name = "buffered intent and demand", extra = { 0, 0 }, expected = "collecting", advance = true,
+            final_progress_code = -21 },
+        { name = "other negative ready progress", extra = { 0, 0 }, expected = "progress_rejected",
+            final_progress_code = -20, code = -20 },
+        { name = "negative progress without ready status", extra = { 0, 0 }, expected = "progress_rejected",
+            final_progress_code = -21, code = -21, status_override = { producer_state = "section_reserved" } },
+        { name = "split intent and demand", extra = { 0, 3, 0 }, expected = "producer_busy", resume = true },
+        { name = "empty queue", extra = { 3, 0 }, expected = "producer_busy" },
+        { name = "unknown outcome", extra = { 11, 0 }, expected = "producer_busy" },
+        { name = "negative outcome", extra = { -20, 0 }, expected = "control_rejected", code = -20 },
+        { name = "unavailable clock on refresh", extra = { 0, 0 }, expected = "progress_rejected",
+            refresh_error = -22, code = -22 },
+        { name = "terminal rejection", extra = { 6, 0 }, expected = "permanently_rejected", terminal = 6 },
+        { name = "reset", extra = { 9, 0 }, expected = "disconnected", terminal = 9 },
+        { name = "new incarnation", extra = { 0, 0 }, expected = "source_boundary_changed",
+            boundary = { producer_incarnation = "producer:2" } },
+        { name = "new transport generation", extra = { 0, 0 }, expected = "source_boundary_changed",
+            boundary = { producer_state = "awaiting_compatibility" }, final_boundary = true },
+        { name = "unready refreshed producer", extra = { 0, 0 }, expected = "producer_busy",
+            status_override = { producer_state = "section_reserved", capacity = "available:0" } },
+    }) do
+        it("bounds the ready control handoff for " .. case.name, function()
+            local poll, demand, advances = 0, false, 0
+            local refreshes, feedback, discards = {}, {}, {}
+            local function status(work)
+                local result = { producer_incarnation = "producer:1", transport_state = "connected",
+                    producer_state = "ready",
+                    selection = poll >= 2 and "ship_cargo:argon:g0" or "ship_core:argon",
+                    collection_revision = poll >= 2 and "8" or "7",
+                    capacity = demand and "available:0" or "occupied:0" }
+                local override = case.boundary or case.status_override
+                if override and poll == ((case.final_boundary or case.status_override) and 3 or 2) then
+                    for key, value in pairs(override) do result[key] = value end
+                end
+                refreshes[#refreshes + 1] = work
+                if poll == 2 and case.refresh_error then return case.refresh_error end
+                local code = poll == 3 and case.final_progress_code or 0
+                return code, result.producer_state, result.transport_state, "100",
+                    result.capacity, result.producer_incarnation, result.selection, "1", result.collection_revision
+            end
+            local env = native()
+            env.api.progress = function(_, work) return status(work) end
+            env.api.poll_control = function()
+                poll = poll + 1
+                if poll == 1 then return 5 end
+                local code = case.extra[poll - 1] or 3
+                if code == 0 and (poll == 3 or poll == 4) then demand = true end
+                return code
+            end
+            local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))
+            local observation = {
+                advance_after_commit = true,
+                feedback = function(_, _, _, snapshot, control)
+                    if control == 5 then
+                        assert.equals("ship_core:argon", snapshot.selection)
+                        assert.equals("7", snapshot.collection_revision)
+                        assert.equals("producer:1", snapshot.producer_incarnation)
+                    end
+                    feedback[#feedback + 1] = control
+                end,
+                advance = function(_, _, _, snapshot)
+                    advances = advances + 1
+                    assert.equals("ship_cargo:argon:g0", snapshot.selection)
+                    assert.equals("8", snapshot.collection_revision)
+                    assert.equals("producer:1", snapshot.producer_incarnation)
+                    return { disposition = "collecting" }
+                end,
+                discard = function(_, _, reason) discards[#discards + 1] = reason end,
+            }
+            local scheduler = fixture.load("live_galaxy_scheduler")
+            local result = scheduler.tick({}, carrier, observation)
+            assert.equals(case.expected, result.disposition)
+            assert.equals(case.advance and 1 or 0, advances)
+            if case.code then assert.equals(case.code, result.code) end
+            if case.refresh_error then
+                assert.equals("progress", result.rejection.operation)
+                assert.equals(case.refresh_error, result.rejection.carrier_code)
+                assert.equals("ship_core:argon", result.rejection.section)
+            end
+            local final_refresh = case.final_boundary or case.status_override or case.final_progress_code
+            assert.equals((case.advance or case.resume or final_refresh) and 3 or 2, poll)
+            if case.advance or final_refresh then assert.same({ 1, 0, 1 }, refreshes)
+            elseif case.resume or case.boundary or case.refresh_error then assert.same({ 1, 0 }, refreshes)
+            else assert.same({ 1 }, refreshes) end
+            if case.terminal then assert.same({ 5, case.terminal }, feedback)
+            elseif case.boundary then assert.same({ 5, 0 }, feedback)
+            else assert.same({ 5 }, feedback) end
+            if case.terminal then assert.same({ case.expected }, discards)
+            else assert.same({}, discards) end
+            if case.resume then
+                assert.equals("producer_busy", scheduler.tick({}, carrier, observation).disposition)
+                assert.equals("collecting", scheduler.tick({}, carrier, observation).disposition)
+                assert.equals(1, advances)
+                assert.same({ 5, 0, 3 }, feedback)
+            end
+        end)
+    end
+
     it("retains a backpressured ACK successor without retrying inside the tick", function()
         local env = pending_carrier({ successor_code = 2, initial_capacity = "occupied:0" })
         local carrier = assert(fixture.load("live_galaxy_carrier").new({ loadlib = env.loadlib }))

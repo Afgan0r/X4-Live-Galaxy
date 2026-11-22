@@ -1,3 +1,4 @@
+use observation_domain::{SectionKey, SectionRevisionId};
 use observation_persistence::{CurrentRevision, ObservationRepository, RepositoryError};
 
 use crate::ObservationLifecycle;
@@ -16,6 +17,19 @@ impl<R: ObservationRepository> ObservationLifecycle<R> {
 
     pub fn current_snapshot(&self) -> Result<Vec<CurrentRevision>, RepositoryError> {
         self.repository.current_snapshot()
+    }
+
+    pub fn current_pointers(
+        &self,
+    ) -> Result<Vec<(SectionKey, SectionRevisionId)>, RepositoryError> {
+        self.repository.current_pointers()
+    }
+
+    pub fn current_dependents(
+        &self,
+        parent: &CurrentRevision,
+    ) -> Result<Vec<(SectionKey, SectionRevisionId)>, RepositoryError> {
+        self.repository.current_dependents(parent)
     }
 
     #[must_use]

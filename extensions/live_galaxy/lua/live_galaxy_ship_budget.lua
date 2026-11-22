@@ -101,13 +101,15 @@ function budget:before(status)
     if not integer(now) then
         return reject_clock(self, "before", status.monotonic_millis == nil and "absent" or "invalid", "callback_status")
     end
-    if self.last and now <= self.last then
-        return reject_clock(self, "before", now == self.last and "equal" or "backward", "callback_status")
+    if self.last and now < self.last then
+        return reject_clock(self, "before", "backward", "callback_status")
     end
     self.started = self.started or now
     if now - self.started > self.v.max_message_age_millis or self.steps >= self.v.max_collection_steps then
         return nil, "collection_overflow"
     end
+    -- A coarse snapshot grants no new callback work until the clock advances.
+    if now == self.last then return false end
     if self.callback_end then add(self.timing.between_callbacks, math.max(0, now - self.callback_end)) end
     self.timing.callbacks.count = self.timing.callbacks.count + 1
     self.timing.unsampled_callbacks = self.timing.unsampled_callbacks + 1

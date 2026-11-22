@@ -173,7 +173,7 @@ describe("shared heavy profile and bounded game work", function()
         assert.equals("included_unmeasured", b.timing.sampling_overhead)
         assert.equals("carrier_monotonic_millis", b.timing.clock)
     end)
-    it("retains coarse interval bounds and rejects frozen callbacks without inventing elapsed work", function()
+    it("retains coarse interval bounds and defers frozen callbacks without inventing elapsed work", function()
         local now, samples = 10, 0
         local b = budget.new({ count_ships = function() return 1 end }, values())
         local carrier = { progress = function(_, work)
@@ -186,7 +186,7 @@ describe("shared heavy profile and bounded game work", function()
         now = 14; assert.is_true(b:should_yield(carrier)); assert(b:after(carrier))
         assert.same({ count = 1, total_millis = 0, max_millis = 0 }, saved.intervals.source)
         assert.same({ count = 1, total_millis = 4, max_millis = 4 }, b.timing.callbacks)
-        assert.is_nil(b:before({ monotonic_millis = "14" }))
+        assert.is_false(b:before({ monotonic_millis = "14" }))
         assert.is_nil(b:before({ monotonic_millis = "13" }))
         assert.equals(1, b.timing.callbacks.count); assert.equals(0, b.timing.between_callbacks.count)
         assert.equals(2, samples)
@@ -198,7 +198,7 @@ describe("shared heavy profile and bounded game work", function()
         assert.equals(4, b.timing.callbacks.total_millis)
     end)
     for _, case in ipairs({
-        { phase = "before", issue = "equal", next_millis = "12" },
+        { phase = "before", issue = "equal", next_millis = "12", deferred = true },
         { phase = "before", issue = "backward", next_millis = "11" },
         { phase = "during", issue = "absent", wrapper_reason = "operation_failure" },
         { phase = "during", issue = "absent", wrapper_reason = "result_shape", short_code = -22, carrier_code = "-22" },
@@ -212,10 +212,13 @@ describe("shared heavy profile and bounded game work", function()
     }) do
         local suffix = case.wrapper_reason and " with " .. case.wrapper_reason or ""
         if case.short_code then suffix = suffix .. " from bare progress code " .. case.short_code end
-        it("reports the budget clock rejection " .. case.phase .. " callback as " .. case.issue .. suffix, function()
+        local name = case.deferred and "defers an equal active clock and resumes the same collection"
+            or "reports the budget clock rejection " .. case.phase .. " callback as " .. case.issue .. suffix
+        it(name, function()
             local options = assert(profile.options(values(), "argon"))
             local now, log = "10", nil
             local polls, callback_reads, samples, census_reads, samples_after_finish = 0, 0, 0, 0, 0
+            local count_reads, reservations, failures = 0, 0, 0
             local finished = false
             local function success() return 0 end
             local function snapshot(code, monotonic)
@@ -224,10 +227,10 @@ describe("shared heavy profile and bounded game work", function()
             local api = {
                 abi_version = function() return 2 end,
                 open = function() return 0, "1:1" end,
-                begin_section = success,
+                begin_section = function() reservations = reservations + 1; return 0 end,
                 push_record = success,
                 finish_section = function() finished = true; return 0 end,
-                fail_section = success,
+                fail_section = function() failures = failures + 1; return 0 end,
                 progress = function(_, work)
                     if work == 1 then
                         callback_reads = callback_reads + 1
@@ -235,10 +238,10 @@ describe("shared heavy profile and bounded game work", function()
                     end
                     assert.equals(0, work)
                     samples = samples + 1
-                    if case.next_millis then return snapshot(0, "12") end
+                    if case.next_millis and now == "10" then return snapshot(0, "12") end
                     if case.wrapper_reason == "operation_failure" then error("PRIVATE clock failure") end
                     if case.short_code then return case.short_code end
-                    if finished then
+                    if finished and case.phase == "after" then
                         samples_after_finish = samples_after_finish + 1
                         return snapshot(0, case.sample_millis)
                     end
@@ -253,7 +256,7 @@ describe("shared heavy profile and bounded game work", function()
             options.observation.clock_getter = function() return 1 end
             options.observation.ship_api = {
                 list_factions = function() census_reads = census_reads + 1; return { "argon" } end,
-                count_ships = function() return 0 end,
+                count_ships = function() count_reads = count_reads + 1; return 0 end,
             }
             _G.DebugError = function(value) log = value end
             local runtime = fixture.active_runtime()
@@ -261,6 +264,25 @@ describe("shared heavy profile and bounded game work", function()
             if case.next_millis then
                 assert.same({ false, "collecting" }, { runtime.handle_tick(nil, "telemetry_tick") })
                 now = case.next_millis
+            end
+            if case.deferred then
+                local initial_log = log
+                for _ = 1, 3 do
+                    assert.same({ false, "collecting" }, { runtime.handle_tick(nil, "telemetry_tick") })
+                end
+                assert.equals(initial_log, log)
+                assert.equals(1, census_reads)
+                assert.equals(1, samples)
+                assert.equals(4, polls)
+                assert.equals(polls, callback_reads)
+                assert.same({ 0, 0, 0 }, { count_reads, reservations, failures })
+                assert.is_false(finished)
+                now = "13"
+                assert.same({ true, "sampled" }, { runtime.handle_tick(nil, "telemetry_tick") })
+                assert.is_true(finished)
+                assert.equals(1, census_reads, "resuming must retain the previous census")
+                assert.same({ 1, 1, 0 }, { count_reads, reservations, failures })
+                return
             end
             assert.same({ false, "clock_unavailable" }, { runtime.handle_tick(nil, "telemetry_tick") })
             assert.equals("transition", log:match(" event=([a-z_]+)"))
@@ -351,9 +373,11 @@ describe("shared heavy profile and bounded game work", function()
             begin_evidence = function() return { capture_start_millis = tostring(now) } end,
             finish_evidence = function() return { capture_end_millis = tostring(now) } end }
         assert(fixture.load("live_galaxy_ship_selection").attach(adapter, options))
+        local resets = 0
         local carrier = { begin_section = function() return 0 end, push_record = function() return 0 end,
             finish_section = function() finishes = finishes + 1; return 0 end,
             fail_section = function() failures = failures + 1; return 0 end,
+            reset = function() resets = resets + 1; return 0 end,
             progress = function() return 0, { monotonic_millis = tostring(now) } end }
         local context = { source_boundary = "runtime_start" }
         local status = { selection = "ship_core", collection_revision = "1", producer_incarnation = "7",
@@ -386,5 +410,51 @@ describe("shared heavy profile and bounded game work", function()
         status.producer_state, status.selection, status.collection_revision = "ready", "ship_core", "5"
         assert.equals("sampled", step().disposition,
             "a fresh bridge qualification opens a new finite experiment without reloading X4")
+        local scheduler, previous_failures = fixture.load("live_galaxy_scheduler"), failures
+        for _, boundary in ipairs({ "awaiting_compatibility", "incarnation", "native_reset" }) do
+            adapter:feedback(context, carrier, status, 5)
+            status.selection, status.collection_revision = "ship_cargo:g0", tostring(tonumber(status.collection_revision) + 1)
+            assert.equals("sampled", step().disposition)
+            status.producer_state, status.transport_state, status.capacity = "pending_completion", "connected", "occupied:0"
+            local poll, before = 0, reads
+            local bootstrap_pending = true
+            local original_progress, original_fail, original_reset = carrier.progress, carrier.fail_section, carrier.reset
+            function carrier:poll_control()
+                poll = poll + 1
+                if poll == 1 then return 5 end
+                if boundary == "native_reset" and poll == 3 then return 9 end
+                return 0
+            end
+            function carrier:progress()
+                if poll == 0 then return 0, status end
+                local awaiting = boundary == "awaiting_compatibility" and poll == 3
+                local incarnation = boundary == "incarnation" and poll >= 2
+                return 0, { producer_state = awaiting and "awaiting_compatibility" or "ready",
+                    producer_incarnation = incarnation and "8" or status.producer_incarnation,
+                    selection = "", collection_revision = status.collection_revision,
+                    capacity = "occupied:0", transport_state = "connected" }
+            end
+            function carrier:fail_section() bootstrap_pending = false; return original_fail() end
+            function carrier:reset() bootstrap_pending = false; return original_reset() end
+            assert.equals("source_boundary_changed", scheduler.tick(context, carrier, adapter).disposition)
+            assert.is_true(bootstrap_pending, "Lua teardown must preserve the native replacement")
+            assert.equals(boundary == "incarnation" and 2 or 3, poll)
+            assert.equals(before, reads, "the boundary callback must not read a new selection")
+            assert.equals(previous_failures, failures)
+            assert.equals(0, resets)
+            carrier.progress, carrier.fail_section, carrier.reset = original_progress, original_fail, original_reset
+            carrier.poll_control = nil
+            if boundary == "incarnation" then status.producer_incarnation = "8" end
+            status.producer_state, status.selection = "ready", "ship_core"
+            status.collection_revision = tostring(tonumber(status.collection_revision) + 1)
+            assert.equals("sampled", step().disposition, "new qualification must collect a fresh core")
+        end
+        adapter:feedback(context, carrier, status, 5)
+        status.selection, status.collection_revision = "ship_cargo:g0", tostring(tonumber(status.collection_revision) + 1)
+        assert.equals("sampled", step().disposition)
+        context.source_boundary = "game_loaded"
+        assert.equals("source_boundary_changed", adapter:feedback(context, carrier, status, 0).disposition)
+        assert.equals(previous_failures + 1, failures, "an X4 boundary still tears down the unchanged native producer")
+        assert.equals(0, resets)
     end)
 end)

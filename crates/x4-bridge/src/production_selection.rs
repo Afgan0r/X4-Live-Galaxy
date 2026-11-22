@@ -113,11 +113,14 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .iter()
             .map(|record| record.entity_id.as_str().to_owned())
             .collect::<Vec<_>>();
-        let snapshot = self
+        let pointers = self
             .lifecycle
-            .current_snapshot()
+            .current_pointers()
             .map_err(|_| ProductionError::Storage)?;
-        let cursor = detail_cursor(&snapshot, &parent);
+        let detail = self.latest_current_detail(&parent)?;
+        let cursor = detail
+            .as_ref()
+            .and_then(crate::production_ship_cursor::durable_cursor);
         let limits = self
             .heavy_limits
             .as_ref()
@@ -132,7 +135,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )?;
         let observed = self.ship_timing.observed(&next);
         let margin = limits.rate_interval_millis as u64;
-        let revision_floor = Some(super::revision_floor::from_snapshot(&snapshot));
+        let revision_floor = Some(super::revision_floor::from_pointers(&pointers));
         if crate::production_ship_cursor::refresh_required(
             now,
             parent.receipt().accepted_at,
@@ -153,23 +156,39 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             revision_floor,
         })
     }
-}
 
-fn detail_cursor<'a>(
-    snapshot: &'a [CurrentRevision],
-    parent: &CurrentRevision,
-) -> Option<(&'a str, &'static str)> {
-    snapshot
-        .iter()
-        .filter(|value| {
-            crate::receiver_ship_detail::is_key(value.revision().section_key.as_str())
-                && value.revision().source_scope == parent.revision().source_scope
-                && value
-                    .revision()
-                    .dependencies
-                    .get(&parent.revision().section_key)
-                    == Some(&parent.receipt().revision)
-        })
-        .max_by_key(|value| value.receipt().revision.get())
-        .and_then(crate::production_ship_cursor::durable_cursor)
+    fn latest_current_detail(
+        &self,
+        parent: &CurrentRevision,
+    ) -> Result<Option<CurrentRevision>, ProductionError> {
+        let candidates = self
+            .lifecycle
+            .current_dependents(parent)
+            .map_err(|_| ProductionError::Storage)?;
+        let Some((key, revision)) = candidates
+            .into_iter()
+            .filter(|(key, _)| crate::receiver_ship_detail::is_key(key.as_str()))
+            .max_by(|(key, revision), (other_key, other_revision)| {
+                revision.cmp(other_revision).then(key.cmp(other_key))
+            })
+        else {
+            return Ok(None);
+        };
+        let detail = self
+            .lifecycle
+            .current_revision(&key)
+            .map_err(|_| ProductionError::Storage)?
+            .ok_or(ProductionError::Storage)?;
+        if detail.receipt().revision != revision
+            || detail.revision().source_scope != parent.revision().source_scope
+            || detail
+                .revision()
+                .dependencies
+                .get(&parent.receipt().section_key)
+                != Some(&parent.receipt().revision)
+        {
+            return Err(ProductionError::Storage);
+        }
+        Ok(Some(detail))
+    }
 }
