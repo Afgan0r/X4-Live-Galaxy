@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 paired normal X4 diagnostic confirmed cutoff; Gate B repeat-cycle coverage remains open
+stopped_at: Plan 11 located the repeat-cycle delay before first receive logging; causal split remains open
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: Verified paired normal FPS and the live admission cutoff. Reopened 137 receipts. Eleven of 21 nonempty factions completed two cycles.
+last_activity_desc: Attributed the second-cycle intervals in the retained run. The largest measured delay preceded the first receive entry.
 state_head: a2b8c4e5c2236c4ef37926b2b2c97ef1b26feaad
 progress:
   total_phases: 14
@@ -234,8 +234,10 @@ None yet.
 - [Phase 05.5]: The paired normal diagnostic on `a2b8c4e` confirmed the
   cutoff disposition with no terminal rejection. The 144 FPS floor held
   under the tested load. Full two-cycle coverage requires 37 more nonempty
-  family revisions within the existing limits in this run. Complete callback
-  timing, sustained SETA, recovery, and goal verification remain open.
+  family revisions in this run. The prior-commit to first-receive-entry
+  interval accounts for 14.364 of 17.066 seconds in the 31 retained
+  transitions. Split that interval before selecting a throughput change.
+  Complete callback timing, sustained SETA and recovery remain open.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -269,5 +271,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 paired normal diagnostic retained; repeat-cycle throughput remains open
+Stopped at: Plan 11 repeat-cycle delay localized; boundary timestamp split pending
 Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
