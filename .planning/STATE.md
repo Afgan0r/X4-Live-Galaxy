@@ -3,7 +3,7 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 located the repeat-cycle delay before first receive logging; causal split remains open
+stopped_at: Plan 11 measured duplicate bridge snapshot reads; optimization pending
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
 last_activity_desc: Attributed the second-cycle intervals in the retained run. The largest measured delay preceded the first receive entry.
@@ -271,5 +271,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 repeat-cycle delay localized; boundary timestamp split pending
+Stopped at: Plan 11 measured two full snapshot reads per successor selection
 Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
