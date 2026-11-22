@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 normal Gate B failed at repeated equal callback clock; 11 of 21 two-cycle coverage
+stopped_at: Plan 11 local full-roster replay shows equal-clock recovery is insufficient for Gate B
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: The paired normal Gate B run verified 134 receipts and identified an equal callback clock in all three Xenon revision 135 failures.
+last_activity_desc: The temporary equal-clock prototype resumed without repeating work. The optimistic full-roster replay estimated 72.774 seconds from the latest prefix.
 state_head: d72ee055b5501c92b64e502503e396ffcf7c9c17
 progress:
   total_phases: 14
@@ -234,9 +234,11 @@ None yet.
 - [Phase 05.5]: The paired normal Gate B run on `d72ee05` had 11 two-cycle
   factions and needed 40 more nonempty family revisions. All three
   clock diagnostics were equal readings at callback entry while collecting
-  Xenon revision 135, which did not commit. Verify a bounded no-work clock
-  deferral before the next acceptance attempt. Complete callback timing,
-  sustained SETA and recovery remain open.
+  Xenon revision 135, which did not commit. A temporary candidate preserved
+  collection during equal samples. The observed timing replay still needs
+  72.774 seconds with the best observed tail. The next local experiment
+  must measure throughput across the entire sequence. Complete callback
+  timing, sustained SETA and recovery remain open.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -270,5 +272,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 paired normal Gate B failed; equal callback clock diagnosed
+Stopped at: Plan 11 local clock and full-roster replay completed; throughput experiment pending
 Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
