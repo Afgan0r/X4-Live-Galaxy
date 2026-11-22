@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 matched repair package verified locally; awaiting owner X4 main-menu checkpoint
+stopped_at: Plan 11 replacement normal Gate A failed at admission cutoff after verified Xenon cargo
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: Reviewed cargo and clock repair passed local regression and eight mutations. All 31 files of the matched 6f2dd0f package were verified. Owner X4 validation is pending.
+last_activity_desc: Verified 131 durable readbacks and real multi-tag Xenon cargo on 6f2dd0f. Normal Gate A failed at the 60-second admission cutoff. Gate B remains open.
 state_head: 6f2dd0f1a09920d567689f396dd86e1b52c60a7c
 progress:
   total_phases: 14
@@ -27,18 +27,17 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 ## Current Position
 
-Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; NORMAL GATE B COVERAGE FAILED
+Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; REPLACEMENT NORMAL GATE A OPEN
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in execution. The locally verified matched repair package
-`dist/live-galaxy-gate-b-repair-6f2dd0f` handles multi-tag storage and reports
-distinct clock failure context. Await the owner at the X4 main menu after
-installation. Verify the installed identity and affected Gate A activation
-before the replacement normal window.
-Last activity: 2026-11-22 — Normal run `055-gate-b-normal-20261122-083252`
-recorded 214.35 FPS and 87 durable readbacks. The repair passed independent
-review, focused mutation, full local regression, and manifest verification.
-See the [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
-[prior Gate B evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
+Status: Plan 11 in execution. The installed repair package `6f2dd0f` passed
+the main-menu activation check. Its replacement normal Gate A window failed
+on the bridge admission cutoff after 131 durable commits. Xenon committed
+all four section families and no clock refusal was recorded in the window.
+Last activity: 2026-11-22 — Run `055-gate-a-normal-20261122-102638` measured
+185.585 FPS and independently reopened all 131 durable revisions. All 21
+nonempty factions had all four families. Ten had at least two revisions of
+each family. See the [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md)
+and [runtime evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
 Progress: [████░░░░░░] 43% (6 of 14 phases complete; Phase 05.5 has 3 of 4 active plans complete)
 
@@ -232,11 +231,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 05.5]: Gate A passed at `f4465ef`. The global callback package
-  failed the November normal Gate B window. Eleven of 24 included factions
-  had all four ship section families. The matched repair package awaits
-  affected Gate A revalidation and normal Gate B. Complete callback duration,
-  same-session control, SETA, recovery, and goal verification remain pending.
+- [Phase 05.5]: Gate A passed at `f4465ef`. The replacement normal
+  window on `6f2dd0f` recorded real Xenon multi-tag cargo and no clock
+  refusal, but the 60-second schedule rejected Scale Plate cargo.
+  Diagnose the deadline disposition and repeat-cycle throughput before
+  another acceptance window. Complete callback timing, control, SETA,
+  recovery, and goal verification remain pending.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -270,5 +270,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 matched repair package verified locally; awaiting owner at the X4 main menu
-Resume file: tests/x4-disposable/05.5-heavy-ship-procedure.md
+Stopped at: Plan 11 replacement normal Gate A evidence retained; admission cutoff and repeat-cycle coverage unresolved
+Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
