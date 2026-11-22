@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 shared-snapshot package verified; paired normal X4 run pending
+stopped_at: Plan 11 normal Gate B failed at repeated equal callback clock; 11 of 21 two-cycle coverage
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: Verified shared-snapshot selection and package. Local retention and selection median fell from 140.437 ms to 68.940 ms.
+last_activity_desc: The paired normal Gate B run verified 134 receipts and identified an equal callback clock in all three Xenon revision 135 failures.
 state_head: d72ee055b5501c92b64e502503e396ffcf7c9c17
 progress:
   total_phases: 14
@@ -29,14 +29,13 @@ See: .planning/PROJECT.md (updated 2026-09-05)
 
 Phase: 05.5 (Heavy Faction Ship Conformance) — PLAN 10 COMPLETE; REPEAT-CYCLE COVERAGE OPEN
 Plan: 3 of 4 active plans complete; next is 11
-Status: Plan 11 in execution. The shared-snapshot package `d72ee05`
-passed review and local regression. Its installed extension files match.
-The owner-operated paired normal run is next.
-Last activity: 2026-11-22 — Local successor selection with retention
-measured a 68.940 ms median, from 140.437 ms previously. The previous X4
-run reopened 137 revisions and had two cycles for 11 of 21 nonempty
-factions. Gate B still needs two cycles for all 21, sustained SETA and
-recovery evidence. See the
+Status: Plan 11 in execution. The paired normal Gate B run on `d72ee05`
+failed at three equal-clock diagnostics while collecting Xenon revision
+135. The owner-operated control is retained.
+Last activity: 2026-11-22 — Reopened 134 receipts and verified two linked
+cycles for 11 of 21 nonempty factions. Average FPS was 187.780 with the
+bridge and 301.550 without it. Gate B needs complete cycles, sustained
+SETA and recovery evidence. See the
 [procedure](../tests/x4-disposable/05.5-heavy-ship-procedure.md) and
 [runtime evidence](../tests/x4-disposable/05.5-heavy-ship-evidence.md).
 
@@ -232,14 +231,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 05.5]: The paired normal diagnostic on `a2b8c4e` confirmed the
-  cutoff disposition with no terminal rejection. The 144 FPS floor held
-  under the tested load. Full two-cycle coverage requires 37 more nonempty
-  family revisions in this run. The prior-commit to first-receive-entry
-  interval accounts for 14.364 of 17.066 seconds in the 31 retained
-  transitions. The new build removes one full snapshot read per successor
-  selection. Measure its effect on the exact paired normal procedure.
-  Complete callback timing, sustained SETA and recovery remain open.
+- [Phase 05.5]: The paired normal Gate B run on `d72ee05` had 11 two-cycle
+  factions and needed 40 more nonempty family revisions. All three
+  clock diagnostics were equal readings at callback entry while collecting
+  Xenon revision 135, which did not commit. Verify a bounded no-work clock
+  deferral before the next acceptance attempt. Complete callback timing,
+  sustained SETA and recovery remain open.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -273,5 +270,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 shared-snapshot package verified; paired normal X4 run pending
-Resume file: tests/x4-disposable/05.5-heavy-ship-procedure.md
+Stopped at: Plan 11 paired normal Gate B failed; equal callback clock diagnosed
+Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
