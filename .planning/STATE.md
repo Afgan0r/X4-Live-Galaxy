@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: "05.5"
 current_phase_name: Heavy Faction Ship Conformance
 status: executing
-stopped_at: Plan 11 local full-roster replay shows equal-clock recovery is insufficient for Gate B
+stopped_at: Plan 11 tested targeted SQLite reads and queued handoff; combined local validation pending
 last_updated: "2026-11-22"
 last_activity: 2026-11-22
-last_activity_desc: The temporary equal-clock prototype resumed without repeating work. The optimistic full-roster replay estimated 72.774 seconds from the latest prefix.
+last_activity_desc: A targeted SQLite read preserved floor and cursor in 402 comparisons and saved 8.021 seconds over 133 reconstructed transitions.
 state_head: d72ee055b5501c92b64e502503e396ffcf7c9c17
 progress:
   total_phases: 14
@@ -236,9 +236,9 @@ None yet.
   clock diagnostics were equal readings at callback entry while collecting
   Xenon revision 135, which did not commit. A temporary candidate preserved
   collection during equal samples. The observed timing replay still needs
-  72.774 seconds with the best observed tail. The next local experiment
-  must measure throughput across the entire sequence. Complete callback
-  timing, sustained SETA and recovery remain open.
+  72.774 seconds with the best observed tail. Use targeted SQLite reads and
+  evaluate the queued control handoff together over the full workload.
+  Complete callback timing, sustained SETA and recovery remain open.
 
 - [Phase 1]: Exact X4 9.00 observation, transport, embedded Lua, Mission Director, identity, scheduling, protocol negotiation, degraded-mode, and restart-condition semantics require phase research and disposable evidence.
 - [Phase 4]: The X4-owned compact persistence contract remains an evidence-dependent boundary decision; player save files are prohibited.
@@ -272,5 +272,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-22
-Stopped at: Plan 11 local clock and full-roster replay completed; throughput experiment pending
+Stopped at: Plan 11 measured targeted selection and the queued handoff; combined implementation pending
 Resume file: tests/x4-disposable/05.5-heavy-ship-evidence.md
