@@ -125,7 +125,9 @@ pub fn recover_idle_selection(
     let next_key = session.skip_stale_ship_scope().ok()?;
     *key = next_key;
     let attempt = schedule.as_mut()?.next_attempt();
-    let issued = selection::issue(peer, identity, limits, session, schedule, key, attempt).ok()?;
+    let demand = selection::SelectionDemand::new(key);
+    let issued =
+        selection::issue(peer, identity, limits, session, schedule, demand, attempt).ok()?;
     *progress = ReceiveProgress::issued(issued_at.max(issued.at), limits, true);
     Some(issued)
 }

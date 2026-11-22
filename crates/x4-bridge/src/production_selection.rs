@@ -1,9 +1,19 @@
 use super::{ProductionError, ProductionObservationSession};
 use observation_domain::SectionKey;
-use observation_persistence::ObservationRepository;
+use observation_persistence::{CurrentRevision, ObservationRepository};
+#[cfg(test)]
+#[path = "production_selection_tests.rs"]
+mod selection_tests;
 #[cfg(test)]
 #[path = "production_ship_timing_tests.rs"]
 mod timing_tests;
+
+pub struct NextShipSelection {
+    pub key: String,
+    // An exhausted revision is reported only after the schedule admits the key.
+    pub revision_floor: Option<Result<u64, ProductionError>>,
+}
+
 impl<R: ObservationRepository> ProductionObservationSession<R> {
     pub(crate) fn ship_receipt_completed(
         &mut self,
@@ -75,39 +85,21 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
                 now.saturating_sub(parent.receipt().accepted_at) >= limits.freshness_millis as u64
             })
     }
-    pub fn heavy_revision_floor(&self) -> Result<u64, ProductionError> {
-        if self.heavy_limits.is_none() {
-            return self.next_revision(
-                &SectionKey::new(self.collection_key()).ok_or(ProductionError::InvalidLimits)?,
-            );
-        }
-        // Scan actual durable section identities, not the resource envelope.
-        // This also preserves old groups after a smaller replacement census.
-        let census_floor = self.next_revision(
-            &SectionKey::new("faction_census").ok_or(ProductionError::InvalidLimits)?,
-        )?;
-        self.lifecycle
-            .current_snapshot()
-            .map_err(|_| ProductionError::Storage)?
-            .iter()
-            .filter(|v| {
-                observation_domain::ShipSectionIdentity::parse(v.revision().section_key.as_str())
-                    .is_some()
-            })
-            .try_fold(census_floor, |floor, v| {
-                let next = v
-                    .receipt()
-                    .revision
-                    .get()
-                    .checked_add(1)
-                    .filter(|n| *n <= observation_ingest::MAX_DURABLE_SECTION_REVISION)
-                    .ok_or(ProductionError::RevisionExhausted)?;
-                Ok(floor.max(next))
-            })
-    }
     pub fn next_ship_key(&mut self, previous: &str, now: u64) -> Result<String, ProductionError> {
+        self.next_ship_selection(previous, now)
+            .map(|selection| selection.key)
+    }
+
+    pub(crate) fn next_ship_selection(
+        &mut self,
+        previous: &str,
+        now: u64,
+    ) -> Result<NextShipSelection, ProductionError> {
         if self.heavy_limits.is_none() || previous == "faction_census" {
-            return Ok(self.collection_key());
+            return Ok(NextShipSelection {
+                key: self.collection_key(),
+                revision_floor: None,
+            });
         }
         let key = SectionKey::new(self.collection_key()).ok_or(ProductionError::InvalidLimits)?;
         let parent = self
@@ -125,18 +117,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             .lifecycle
             .current_snapshot()
             .map_err(|_| ProductionError::Storage)?;
-        let details = snapshot
-            .iter()
-            .filter(|value| {
-                crate::receiver_ship_detail::is_key(value.revision().section_key.as_str())
-                    && value.revision().source_scope == parent.revision().source_scope
-                    && value.revision().dependencies.get(&key) == Some(&parent.receipt().revision)
-            })
-            .collect::<Vec<_>>();
-        let last = details
-            .iter()
-            .max_by_key(|value| value.receipt().revision.get());
-        let cursor = last.and_then(|value| crate::production_ship_cursor::durable_cursor(value));
+        let cursor = detail_cursor(&snapshot, &parent);
         let limits = self
             .heavy_limits
             .as_ref()
@@ -151,6 +132,7 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
         )?;
         let observed = self.ship_timing.observed(&next);
         let margin = limits.rate_interval_millis as u64;
+        let revision_floor = Some(super::revision_floor::from_snapshot(&snapshot));
         if crate::production_ship_cursor::refresh_required(
             now,
             parent.receipt().accepted_at,
@@ -158,28 +140,36 @@ impl<R: ObservationRepository> ProductionObservationSession<R> {
             observed,
             margin,
         ) {
-            return Ok(self.collection_key());
+            return Ok(NextShipSelection {
+                key: self.collection_key(),
+                revision_floor,
+            });
         }
         if next == "ship_core" && (previous_legacy != "ship_core" || members.is_empty()) {
             self.rotate_ship_scope();
         }
-        self.scoped_key(&next)
-    }
-    pub fn next_revision(&self, key: &SectionKey) -> Result<u64, ProductionError> {
-        let current = self
-            .lifecycle
-            .current_revision(key)
-            .map_err(|_| ProductionError::Storage)?;
-        current.map_or(Ok(1), |value| {
-            let next = value
-                .revision()
-                .revision
-                .get()
-                .checked_add(1)
-                .ok_or(ProductionError::RevisionExhausted)?;
-            (next <= observation_ingest::MAX_DURABLE_SECTION_REVISION)
-                .then_some(next)
-                .ok_or(ProductionError::RevisionExhausted)
+        Ok(NextShipSelection {
+            key: self.scoped_key(&next)?,
+            revision_floor,
         })
     }
+}
+
+fn detail_cursor<'a>(
+    snapshot: &'a [CurrentRevision],
+    parent: &CurrentRevision,
+) -> Option<(&'a str, &'static str)> {
+    snapshot
+        .iter()
+        .filter(|value| {
+            crate::receiver_ship_detail::is_key(value.revision().section_key.as_str())
+                && value.revision().source_scope == parent.revision().source_scope
+                && value
+                    .revision()
+                    .dependencies
+                    .get(&parent.revision().section_key)
+                    == Some(&parent.receipt().revision)
+        })
+        .max_by_key(|value| value.receipt().revision.get())
+        .and_then(crate::production_ship_cursor::durable_cursor)
 }

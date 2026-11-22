@@ -6,6 +6,8 @@ mod receiver_faction;
 mod reconciliation;
 #[path = "production_retention.rs"]
 mod retention;
+#[path = "production_revision_floor.rs"]
+mod revision_floor;
 #[path = "production_selection.rs"]
 mod selection;
 #[path = "production_ship_scope.rs"]
